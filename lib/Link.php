@@ -1,4 +1,5 @@
 <?php
+
 // lib/Link.php
 namespace LibreNMS\Plugins\WeathermapNG;
 

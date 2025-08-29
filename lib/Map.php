@@ -1,4 +1,5 @@
 <?php
+
 // lib/Map.php
 namespace LibreNMS\Plugins\WeathermapNG;
 
@@ -148,10 +149,10 @@ class Map
             'title' => $this->title,
             'width' => $this->width,
             'height' => $this->height,
-            'nodes' => array_map(function($node) {
+            'nodes' => array_map(function ($node) {
                 return $node->toArray();
             }, $this->nodes),
-            'links' => array_map(function($link) {
+            'links' => array_map(function ($link) {
                 return $link->toArray();
             }, $this->links),
             'metadata' => [

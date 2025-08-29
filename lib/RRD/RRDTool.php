@@ -1,4 +1,5 @@
 <?php
+
 // lib/RRD/RRDTool.php
 namespace LibreNMS\Plugins\WeathermapNG\RRD;
 
@@ -106,12 +107,14 @@ class RRDTool
                 $value = isset($valueArray[$metricIndex]) ? trim($valueArray[$metricIndex]) : null;
 
                 // Handle various "no data" representations
-                if ($value !== null &&
+                if (
+                    $value !== null &&
                     $value !== 'nan' &&
                     $value !== 'NAN' &&
                     $value !== 'U' &&
                     $value !== '-nan' &&
-                    is_numeric($value)) {
+                    is_numeric($value)
+                ) {
                     $data[] = [
                         'timestamp' => (int)$timestamp,
                         'value' => (float)$value

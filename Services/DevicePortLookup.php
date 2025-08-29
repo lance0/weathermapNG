@@ -1,4 +1,5 @@
 <?php
+
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use Illuminate\Support\Facades\Cache;
@@ -33,7 +34,6 @@ class DevicePortLookup
                 ", [$deviceId]);
 
                 return $ports ?: [];
-
             } catch (\Exception $e) {
                 return [];
             }
@@ -79,7 +79,6 @@ class DevicePortLookup
                 ", ["%{$query}%", "%{$query}%", $limit]);
 
                 return $devices ?: [];
-
             } catch (\Exception $e) {
                 return [];
             }
@@ -104,7 +103,6 @@ class DevicePortLookup
                 // Fallback
                 $device = dbFetchRow("SELECT * FROM devices WHERE device_id = ?", [$deviceId]);
                 return $device ?: null;
-
             } catch (\Exception $e) {
                 return null;
             }
@@ -129,7 +127,6 @@ class DevicePortLookup
                 // Fallback
                 $port = dbFetchRow("SELECT * FROM ports WHERE port_id = ?", [$portId]);
                 return $port ?: null;
-
             } catch (\Exception $e) {
                 return null;
             }
@@ -164,7 +161,6 @@ class DevicePortLookup
                 ");
 
                 return $devices ?: [];
-
             } catch (\Exception $e) {
                 return [];
             }
@@ -186,7 +182,6 @@ class DevicePortLookup
             // Fallback
             $count = dbFetchCell("SELECT COUNT(*) FROM devices WHERE disabled = 0 AND ignore = 0");
             return (int) $count;
-
         } catch (\Exception $e) {
             return 0;
         }
@@ -207,7 +202,6 @@ class DevicePortLookup
             // Fallback
             $count = dbFetchCell("SELECT COUNT(*) FROM ports WHERE device_id = ? AND deleted = 0", [$deviceId]);
             return (int) $count;
-
         } catch (\Exception $e) {
             return 0;
         }

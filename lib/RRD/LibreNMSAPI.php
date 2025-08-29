@@ -1,4 +1,5 @@
 <?php
+
 // lib/RRD/LibreNMSAPI.php
 namespace LibreNMS\Plugins\WeathermapNG\RRD;
 
@@ -97,7 +98,6 @@ class LibreNMSAPI
 
             // If API fails, return mock data
             return $this->generateMockData($period);
-
         } catch (\Exception $e) {
             // Log the error but return mock data
             error_log("LibreNMSAPI Error: " . $e->getMessage());
@@ -130,7 +130,6 @@ class LibreNMSAPI
 
             // If API fails, return mock data
             return $this->generateMockData($period);
-
         } catch (\Exception $e) {
             // Log the error but return mock data
             error_log("LibreNMSAPI Error: " . $e->getMessage());
@@ -218,7 +217,6 @@ class LibreNMSAPI
             }
 
             return $this->generateMockData($period);
-
         } catch (\Exception $e) {
             // Log the error but return mock data
             error_log("LibreNMSAPI Error: " . $e->getMessage());

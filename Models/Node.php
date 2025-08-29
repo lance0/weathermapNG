@@ -1,4 +1,5 @@
 <?php
+
 namespace LibreNMS\Plugins\WeathermapNG\Models;
 
 use Illuminate\Database\Eloquent\Model;

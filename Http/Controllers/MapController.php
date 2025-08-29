@@ -1,4 +1,5 @@
 <?php
+
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
@@ -155,8 +156,13 @@ class MapController
             }
 
             // Fallback for older versions
-            $devices = dbFetchRows("SELECT device_id, hostname, sysName FROM devices WHERE disabled = 0 AND ignore = 0 ORDER BY hostname");
-            return collect($devices)->map(function($device) {
+            $devices = dbFetchRows(
+                "SELECT device_id, hostname, sysName\n" .
+                "FROM devices\n" .
+                "WHERE disabled = 0 AND ignore = 0\n" .
+                "ORDER BY hostname"
+            );
+            return collect($devices)->map(function ($device) {
                 return (object) $device;
             });
         } catch (\Exception $e) {

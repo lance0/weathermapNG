@@ -1,4 +1,5 @@
 <?php
+
 // lib/API/MapAPI.php
 namespace LibreNMS\Plugins\WeathermapNG\API;
 
@@ -23,7 +24,6 @@ class MapAPI
             $data = $map->toArray();
 
             return response()->json($data);
-
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to render map',
@@ -47,7 +47,6 @@ class MapAPI
             $mapData = $map->toArray();
 
             return view('plugins.WeathermapNG.embed', compact('mapData', 'mapId'));
-
         } catch (\Exception $e) {
             abort(500, 'Failed to load embedded map');
         }
@@ -128,7 +127,6 @@ class MapAPI
                 'id' => $mapId,
                 'message' => 'Map created successfully'
             ], 201);
-
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to create map',
@@ -159,7 +157,6 @@ class MapAPI
                 'status' => 'success',
                 'message' => 'Map updated successfully'
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Failed to update map',
@@ -199,7 +196,7 @@ class MapAPI
     {
         $devices = DataSource::getDevices();
 
-        $formatted = $devices->map(function($device) {
+        $formatted = $devices->map(function ($device) {
             return [
                 'id' => $device->device_id ?? $device['device_id'],
                 'hostname' => $device->hostname ?? $device['hostname'],
@@ -215,7 +212,7 @@ class MapAPI
     {
         $interfaces = DataSource::getInterfaces($deviceId);
 
-        $formatted = $interfaces->map(function($interface) {
+        $formatted = $interfaces->map(function ($interface) {
             return [
                 'id' => $interface->port_id ?? $interface['port_id'],
                 'name' => $interface->ifName ?? $interface['ifName'],
