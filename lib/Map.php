@@ -27,14 +27,14 @@ class Map
             ];
         }
 
-        $this->width = $this->config['global']['width'] ?? 800;
-        $this->height = $this->config['global']['height'] ?? 600;
+        $this->width = $this->config['global']['width'] ?? config('weathermapng.default_width', 800);
+        $this->height = $this->config['global']['height'] ?? config('weathermapng.default_height', 600);
         $this->title = $this->config['global']['title'] ?? 'Network Map';
     }
 
     public function loadFromFile($configFile)
     {
-        $this->config = parse_ini_file($configFile, true);
+        $this->config = $this->parseConfigFile($configFile);
         $this->id = basename($configFile, '.conf');
 
         // Parse nodes
@@ -50,7 +50,7 @@ class Map
             if (strpos($section, 'link:') === 0) {
                 $linkId = substr($section, 5);
                 if (isset($data['nodes'])) {
-                    $nodeIds = explode(' ', $data['nodes']);
+                    $nodeIds = preg_split('/\s+/', trim($data['nodes']));
                     if (count($nodeIds) >= 2) {
                         $sourceId = $nodeIds[0];
                         $targetId = $nodeIds[1];
@@ -67,6 +67,71 @@ class Map
                 }
             }
         }
+    }
+
+    private function parseConfigFile(string $file): array
+    {
+        $config = [];
+        $current = null;
+
+        $lines = @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            return [
+                'global' => [
+                    'width' => config('weathermapng.default_width', 800),
+                    'height' => config('weathermapng.default_height', 600),
+                    'title' => 'Network Map',
+                ],
+            ];
+        }
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === ';' || $line[0] === '#') {
+                continue;
+            }
+
+            // Section header
+            if (preg_match('/^\[(.+)\]$/', $line, $m)) {
+                $current = strtolower($m[1]);
+                if (!isset($config[$current])) {
+                    $config[$current] = [];
+                }
+                continue;
+            }
+
+            if ($current === null) {
+                continue;
+            }
+
+            // Key value in "key value" format (quoted or unquoted)
+            if (preg_match('/^([A-Za-z0-9_:-]+)\s+(.+)$/', $line, $m)) {
+                $key = strtolower($m[1]);
+                $value = trim($m[2]);
+
+                // Strip inline comments starting with # or ; if not quoted
+                if ($value !== '' && $value[0] !== '"' && $value[0] !== "'") {
+                    $value = preg_replace('/\s*[#;].*$/', '', $value);
+                }
+
+                // Remove surrounding quotes
+                if (
+                    (str_starts_with($value, '"') && str_ends_with($value, '"'))
+                    || (str_starts_with($value, "'") && str_ends_with($value, "'"))
+                ) {
+                    $value = substr($value, 1, -1);
+                }
+
+                // Cast numeric
+                if (is_numeric($value)) {
+                    $value = strpos($value, '.') !== false ? (float) $value : (int) $value;
+                }
+
+                $config[$current][$key] = $value;
+            }
+        }
+
+        return $config;
     }
 
     public function addNode(Node $node)

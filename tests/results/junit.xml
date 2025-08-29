@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="/home/lance/weathermapNG/phpunit.xml" tests="5" assertions="0" errors="5" failures="0" skipped="0" time="0.005026">
+    <testsuite name="All Tests" tests="5" assertions="0" errors="5" failures="0" skipped="0" time="0.005026">
+      <testsuite name="LibMapTest" file="/home/lance/weathermapNG/tests/LibMapTest.php" tests="2" assertions="0" errors="2" failures="0" skipped="0" time="0.004680">
+        <testcase name="test_parses_example_config" file="/home/lance/weathermapNG/tests/LibMapTest.php" line="15" class="LibMapTest" classname="LibMapTest" assertions="0" time="0.004523">
+          <error type="Error">LibMapTest::test_parses_example_config
+Error: Class "LibreNMS\Plugins\WeathermapNG\Map" not found
+
+/home/lance/weathermapNG/tests/LibMapTest.php:17</error>
+        </testcase>
+        <testcase name="test_to_array_structure_is_reasonable" file="/home/lance/weathermapNG/tests/LibMapTest.php" line="45" class="LibMapTest" classname="LibMapTest" assertions="0" time="0.000157">
+          <error type="Error">LibMapTest::test_to_array_structure_is_reasonable
+Error: Class "LibreNMS\Plugins\WeathermapNG\Map" not found
+
+/home/lance/weathermapNG/tests/LibMapTest.php:47</error>
+        </testcase>
+      </testsuite>
+      <testsuite name="LinkUtilizationTest" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" tests="2" assertions="0" errors="2" failures="0" skipped="0" time="0.000250">
+        <testcase name="test_link_utilization_uses_max_direction" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" line="27" class="LinkUtilizationTest" classname="LinkUtilizationTest" assertions="0" time="0.000150">
+          <error type="Error">LinkUtilizationTest::test_link_utilization_uses_max_direction
+Error: Class "LibreNMS\Plugins\WeathermapNG\Node" not found
+
+/home/lance/weathermapNG/tests/LinkUtilizationTest.php:11
+/home/lance/weathermapNG/tests/LinkUtilizationTest.php:29</error>
+        </testcase>
+        <testcase name="test_link_status_thresholds" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" line="43" class="LinkUtilizationTest" classname="LinkUtilizationTest" assertions="0" time="0.000100">
+          <error type="Error">LinkUtilizationTest::test_link_status_thresholds
+Error: Class "LibreNMS\Plugins\WeathermapNG\Node" not found
+
+/home/lance/weathermapNG/tests/LinkUtilizationTest.php:11
+/home/lance/weathermapNG/tests/LinkUtilizationTest.php:45</error>
+        </testcase>
+      </testsuite>
+      <testsuite name="NodeDataTest" file="/home/lance/weathermapNG/tests/NodeDataTest.php" tests="1" assertions="0" errors="1" failures="0" skipped="0" time="0.000096">
+        <testcase name="test_current_avg_max_values" file="/home/lance/weathermapNG/tests/NodeDataTest.php" line="8" class="NodeDataTest" classname="NodeDataTest" assertions="0" time="0.000096">
+          <error type="Error">NodeDataTest::test_current_avg_max_values
+Error: Class "LibreNMS\Plugins\WeathermapNG\Node" not found
+
+/home/lance/weathermapNG/tests/NodeDataTest.php:10</error>
+        </testcase>
+      </testsuite>
+    </testsuite>
+  </testsuite>
+</testsuites>
