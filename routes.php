@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
 
 Route::middleware(['auth'])->prefix('plugins/weathermapng')->group(function () {
 
@@ -45,4 +46,16 @@ Route::middleware(['auth'])->prefix('plugins/weathermapng')->group(function () {
         $service = new \LibreNMS\Plugins\WeathermapNG\Services\DevicePortLookup();
         return response()->json(['ports' => $service->portsForDevice((int) $deviceId)]);
     })->name('weathermapng.api.device.ports');
+
+    // Health check routes (no auth required for monitoring)
+    Route::get('/health', [HealthController::class, 'check'])->name('weathermapng.health');
+    Route::get('/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
+});
+
+// Public routes (no auth required)
+Route::prefix('plugins/weathermapng')->group(function () {
+    // Public embed routes (if configured)
+    Route::get('/public/embed/{map}', [RenderController::class, 'embed'])
+        ->middleware('weathermapng.public')
+        ->name('weathermapng.public.embed');
 });
