@@ -1,0 +1,60 @@
+# WeathermapNG .gitignore
+
+# User-generated map configurations
+config/maps/*.conf
+!config/maps/example.conf
+
+# Generated map images
+output/maps/*.png
+output/thumbnails/*.png
+
+# Logs
+logs/*.log
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+cache/
+*.cache
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Composer
+vendor/
+composer.lock
+
+# Node.js (if used for frontend build)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# LibreNMS specific
+/includes/config.php
+/includes/definitions/
+*.rrd
+
+# Backup files
+*.bak
+*.backup
+*~

@@ -1,0 +1,31 @@
+# WeathermapNG Output Security
+# Allow access to generated images but deny other content
+
+# Prevent directory listing
+Options -Indexes
+
+# Allow access to image files
+<FilesMatch "\.(png|jpg|jpeg|gif|svg)$">
+    <RequireAll>
+        Require all granted
+    </RequireAll>
+</FilesMatch>
+
+# Deny access to everything else
+<FilesMatch "^.*$">
+    <RequireAll>
+        Require all denied
+    </RequireAll>
+</FilesMatch>
+
+# Set proper headers for images
+<FilesMatch "\.(png|jpg|jpeg|gif)$">
+    Header set Cache-Control "public, max-age=300"
+    Header set Expires "access plus 5 minutes"
+</FilesMatch>
+
+# Prevent hotlinking (optional)
+# RewriteEngine on
+# RewriteCond %{HTTP_REFERER} !^$
+# RewriteCond %{HTTP_REFERER} !^https?://(www\.)?yourdomain\.com [NC]
+# RewriteRule \.(png|jpg|jpeg|gif)$ - [F]
