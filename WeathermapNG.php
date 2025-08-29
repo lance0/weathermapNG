@@ -2,123 +2,54 @@
 // WeathermapNG.php
 namespace LibreNMS\Plugins;
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
+use LibreNMS\Interfaces\Plugin;
+use LibreNMS\Plugins\Hooks\Menu;
 
-class WeathermapNG
+class WeathermapNG implements Plugin
 {
-    public static function menu()
+    public $name = 'WeathermapNG';
+    public $description = 'Modern interactive network weathermap for LibreNMS';
+
+    public function __construct()
     {
-        echo '<li><a href="' . url('plugins/weathermapng') . '">WeathermapNG</a></li>';
-        echo '<li><a href="' . url('plugins/weathermapng/editor') . '">Map Editor</a></li>';
+        require __DIR__ . '/routes.php';
+        Menu::add('WeathermapNG', url('/plugins/weathermapng'));
     }
 
-    public static function init()
+    public function activate()
     {
-        $configPath = __DIR__ . '/config/settings.php';
-        if (file_exists($configPath)) {
-            $config = include $configPath;
-            config(['weathermapng' => $config]);
-        }
+        // Plugin activation logic
+        // Could run migrations, set up permissions, etc.
+        return true;
     }
 
-    public static function routes()
+    public function deactivate()
     {
-        Route::middleware(['auth'])->group(function () {
-            Route::get('/plugins/weathermapng', [self::class, 'index'])->name('weathermapng.index');
-            Route::get('/plugins/weathermapng/editor', [self::class, 'editor'])->name('weathermapng.editor');
-            Route::get('/plugins/weathermapng/api/maps', [self::class, 'apiMaps'])->name('weathermapng.api.maps');
-            Route::get('/plugins/weathermapng/api/map/{id}', [self::class, 'apiMap'])->name('weathermapng.api.map');
-            Route::post('/plugins/weathermapng/api/map', [self::class, 'storeMap'])->name('weathermapng.api.store');
-            Route::get('/plugins/weathermapng/embed/{id}', [self::class, 'embed'])->name('weathermapng.embed');
-        });
+        // Plugin deactivation logic
+        return true;
     }
 
-    public function index()
+    public function uninstall()
     {
-        $maps = $this->getAvailableMaps();
-        return view('plugins.WeathermapNG.index', compact('maps'));
+        // Plugin uninstall logic
+        // Could drop tables, clean up files, etc.
+        return true;
     }
 
-    public function editor()
+    public function getVersion()
     {
-        $devices = \LibreNMS\Plugins\WeathermapNG\DataSource::getDevices();
-        return view('plugins.WeathermapNG.editor', compact('devices'));
+        return '1.0.0';
     }
 
-    public function apiMaps()
+    public function getInfo()
     {
-        return response()->json($this->getAvailableMaps());
-    }
-
-    public function apiMap($id)
-    {
-        $mapData = $this->loadMapData($id);
-        return response()->json($mapData);
-    }
-
-    public function embed($id)
-    {
-        $mapData = $this->loadMapData($id);
-        return view('plugins.WeathermapNG.embed', compact('mapData', 'id'));
-    }
-
-    public function storeMap(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'config' => 'required|string'
-        ]);
-
-        $filename = preg_replace('/[^a-zA-Z0-9_-]/', '', $validated['name']);
-        $configPath = config('weathermapng.map_dir') . $filename . '.conf';
-
-        file_put_contents($configPath, $validated['config']);
-
-        return response()->json([
-            'status' => 'success',
-            'id' => $filename
-        ]);
-    }
-
-    private function getAvailableMaps()
-    {
-        $mapsDir = config('weathermapng.map_dir', __DIR__ . '/config/maps/');
-        $maps = [];
-
-        if (!is_dir($mapsDir)) {
-            return $maps;
-        }
-
-        foreach (glob($mapsDir . '*.conf') as $file) {
-            $maps[] = [
-                'id' => basename($file, '.conf'),
-                'name' => basename($file, '.conf'),
-                'file' => basename($file, '.conf') . '.png',
-                'config_path' => $file
-            ];
-        }
-        return $maps;
-    }
-
-    private function loadMapData($id)
-    {
-        $configFile = config('weathermapng.map_dir', __DIR__ . '/config/maps/') . $id . '.conf';
-
-        if (!file_exists($configFile)) {
-            return ['error' => 'Map not found'];
-        }
-
-        $config = parse_ini_file($configFile, true);
-
         return [
-            'metadata' => [
-                'title' => $id,
-                'width' => $config['global']['width'] ?? 800,
-                'height' => $config['global']['height'] ?? 600,
-                'last_updated' => date('c', filemtime($configFile))
-            ],
-            'config' => $config
+            'name' => $this->name,
+            'description' => $this->description,
+            'version' => $this->getVersion(),
+            'author' => 'LibreNMS Community',
+            'email' => 'info@librenms.org',
+            'homepage' => 'https://github.com/lance0/weathermapNG',
         ];
     }
 }
