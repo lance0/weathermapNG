@@ -161,107 +161,106 @@ class PortUtilService
             return ['in' => 0, 'out' => 0];
         }
     }
-}
 
     /**
      * Extract the latest value from API data
      */
-private function extractLatestValue(array $data): float
-{
-    if (empty($data)) {
-        return 0.0;
-    }
+    private function extractLatestValue(array $data): float
+    {
+        if (empty($data)) {
+            return 0.0;
+        }
 
-    // Get the most recent entry
-    $latest = end($data);
-    return (float) ($latest['value'] ?? 0);
-}
+        // Get the most recent entry
+        $latest = end($data);
+        return (float) ($latest['value'] ?? 0);
+    }
 
     /**
      * Get port information
      */
-private function getPortInfo(int $portId)
-{
-    try {
-        if (class_exists('\App\Models\Port')) {
-            return \App\Models\Port::find($portId);
-        }
+    private function getPortInfo(int $portId)
+    {
+        try {
+            if (class_exists('\App\Models\Port')) {
+                return \App\Models\Port::find($portId);
+            }
 
-        // Fallback
-        return dbFetchRow("SELECT * FROM ports WHERE port_id = ?", [$portId]);
-    } catch (\Exception $e) {
-        return null;
+            // Fallback
+            return dbFetchRow("SELECT * FROM ports WHERE port_id = ?", [$portId]);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
-}
 
     /**
      * Get device information
      */
-private function getDeviceInfo(int $deviceId)
-{
-    try {
-        if (class_exists('\App\Models\Device')) {
-            return \App\Models\Device::find($deviceId);
-        }
+    private function getDeviceInfo(int $deviceId)
+    {
+        try {
+            if (class_exists('\App\Models\Device')) {
+                return \App\Models\Device::find($deviceId);
+            }
 
-        // Fallback
-        return dbFetchRow("SELECT * FROM devices WHERE device_id = ?", [$deviceId]);
-    } catch (\Exception $e) {
-        return null;
+            // Fallback
+            return dbFetchRow("SELECT * FROM devices WHERE device_id = ?", [$deviceId]);
+        } catch (\Exception $e) {
+            return null;
+        }
     }
-}
 
     /**
      * Get historical data for a port
      */
-public function getPortHistory(int $portId, string $metric, string $period = '1h'): array
-{
-    $cacheKey = "weathermapng.port_history.{$portId}.{$metric}.{$period}";
-    $cacheTtl = config('weathermapng.cache_ttl', 300);
+    public function getPortHistory(int $portId, string $metric, string $period = '1h'): array
+    {
+        $cacheKey = "weathermapng.port_history.{$portId}.{$metric}.{$period}";
+        $cacheTtl = config('weathermapng.cache_ttl', 300);
 
-    return Cache::remember($cacheKey, $cacheTtl, function () use ($portId, $metric, $period) {
-        $port = $this->getPortInfo($portId);
-        if (!$port) {
-            return [];
-        }
-
-        // Try RRD first
-        if (config('weathermapng.enable_local_rrd', true)) {
-            $rrdData = $this->fetchHistoryFromRRD($port, $metric, $period);
-            if (!empty($rrdData)) {
-                return $rrdData;
+        return Cache::remember($cacheKey, $cacheTtl, function () use ($portId, $metric, $period) {
+            $port = $this->getPortInfo($portId);
+            if (!$port) {
+                return [];
             }
-        }
 
-        // Fallback to API
-        if (config('weathermapng.enable_api_fallback', true)) {
-            return $this->api->getPortData($portId, $metric, $period);
-        }
+            // Try RRD first
+            if (config('weathermapng.enable_local_rrd', true)) {
+                $rrdData = $this->fetchHistoryFromRRD($port, $metric, $period);
+                if (!empty($rrdData)) {
+                    return $rrdData;
+                }
+            }
 
-        return [];
-    });
-}
+            // Fallback to API
+            if (config('weathermapng.enable_api_fallback', true)) {
+                return $this->api->getPortData($portId, $metric, $period);
+            }
+
+            return [];
+        });
+    }
 
     /**
      * Fetch historical data from RRD
      */
-private function fetchHistoryFromRRD($port, string $metric, string $period): array
-{
-    try {
-        $device = $this->getDeviceInfo($port->device_id ?? $port['device_id']);
-        if (!$device || !isset($device->rrd_path)) {
+    private function fetchHistoryFromRRD($port, string $metric, string $period): array
+    {
+        try {
+            $device = $this->getDeviceInfo($port->device_id ?? $port['device_id']);
+            if (!$device || !isset($device->rrd_path)) {
+                return [];
+            }
+
+            $rrdPath = $device->rrd_path . '/port-' . ($port->ifIndex ?? $port['ifIndex']) . '.rrd';
+
+            if (!file_exists($rrdPath)) {
+                return [];
+            }
+
+            return $this->rrdTool->fetch($rrdPath, $metric, $period);
+        } catch (\Exception $e) {
             return [];
         }
-
-        $rrdPath = $device->rrd_path . '/port-' . ($port->ifIndex ?? $port['ifIndex']) . '.rrd';
-
-        if (!file_exists($rrdPath)) {
-            return [];
-        }
-
-        return $this->rrdTool->fetch($rrdPath, $metric, $period);
-    } catch (\Exception $e) {
-        return [];
     }
-}
 }
