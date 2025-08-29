@@ -1,6 +1,13 @@
 <?php
 // Minimal bootstrap for PHPUnit in plugin context
 
+// Ensure Composer autoload is available
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require __DIR__ . '/../vendor/autoload.php';
+} elseif (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+    require __DIR__ . '/../../vendor/autoload.php';
+}
+
 // Shim Laravel's config() helper used by lib classes
 if (!function_exists('config')) {
     function config($key = null, $default = null) {
@@ -21,4 +28,3 @@ if (!function_exists('config')) {
         return $cfg[$key] ?? $default;
     }
 }
-
