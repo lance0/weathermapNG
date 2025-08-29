@@ -296,7 +296,7 @@ composer lint
 
 ## License
 
-This project is licensed under the GPL-3.0-or-later License - see the LICENSE file for details.
+This project is licensed under the Unlicense - see the LICENSE file for details.
 
 ## Support
 
