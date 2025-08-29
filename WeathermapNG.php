@@ -12,8 +12,24 @@ class WeathermapNG implements Plugin
 
     public function __construct()
     {
-        require __DIR__ . '/routes.php';
+        // Register service provider if available
+        if (class_exists('\Illuminate\Foundation\Application')) {
+            $this->registerServiceProvider();
+        }
+
+        // Fallback: load routes directly
+        if (file_exists(__DIR__ . '/routes.php')) {
+            require __DIR__ . '/routes.php';
+        }
+
         Menu::add('WeathermapNG', url('/plugins/weathermapng'));
+    }
+
+    private function registerServiceProvider()
+    {
+        $provider = new WeathermapNGServiceProvider(app());
+        $provider->register();
+        $provider->boot();
     }
 
     public function activate()

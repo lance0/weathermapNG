@@ -16,8 +16,8 @@ class MapController
 
     public function show(Map $map)
     {
-        $map->load(['nodes', 'links']);
-        return view('plugins.WeathermapNG.show', compact('map'));
+        // Redirect to embed view to avoid missing template issues
+        return redirect()->route('weathermapng.embed', $map);
     }
 
     public function editor(Map $map)

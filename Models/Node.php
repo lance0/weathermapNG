@@ -54,12 +54,30 @@ class Node extends Model
         try {
             if (class_exists('\App\Models\Device')) {
                 $device = \App\Models\Device::find($this->device_id);
-                return $device ? ($device->status === 'up' ? 'up' : 'down') : 'unknown';
+                if (!$device) {
+                    return 'unknown';
+                }
+
+                // Handle both string and numeric status values
+                $status = $device->status;
+                if (is_numeric($status)) {
+                    return (int)$status === 1 ? 'up' : 'down';
+                }
+                return strtolower($status) === 'up' ? 'up' : 'down';
             }
 
-            // Fallback
+            // Fallback for older LibreNMS versions
             $device = dbFetchRow("SELECT status FROM devices WHERE device_id = ?", [$this->device_id]);
-            return $device ? ($device['status'] === 'up' ? 'up' : 'down') : 'unknown';
+            if (!$device) {
+                return 'unknown';
+            }
+
+            // Handle both string and numeric status values
+            $status = $device['status'];
+            if (is_numeric($status)) {
+                return (int)$status === 1 ? 'up' : 'down';
+            }
+            return strtolower($status) === 'up' ? 'up' : 'down';
         } catch (\Exception $e) {
             return 'unknown';
         }

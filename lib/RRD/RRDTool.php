@@ -8,16 +8,43 @@ class RRDTool
 
     public function __construct()
     {
-        $this->rrdtoolPath = '/usr/bin/rrdtool'; // Default path, can be configured
+        $this->rrdtoolPath = config('weathermapng.rrdtool_path', '/usr/bin/rrdtool');
+
+        // Try common rrdtool locations if not found
+        if (!file_exists($this->rrdtoolPath)) {
+            $commonPaths = [
+                '/usr/bin/rrdtool',
+                '/usr/local/bin/rrdtool',
+                '/opt/rrdtool/bin/rrdtool',
+                'rrdtool' // hope it's in PATH
+            ];
+
+            foreach ($commonPaths as $path) {
+                if (file_exists($path) || $this->commandExists($path)) {
+                    $this->rrdtoolPath = $path;
+                    break;
+                }
+            }
+        }
+    }
+
+    private function commandExists($command)
+    {
+        $returnVal = shell_exec("which $command 2>/dev/null");
+        return !empty($returnVal);
     }
 
     public function fetch($rrdPath, $metric, $period = '1h')
     {
+        if (!file_exists($rrdPath)) {
+            return [];
+        }
+
         $start = strtotime("-{$period}");
         $end = time();
 
         $command = sprintf(
-            '%s fetch %s AVERAGE -s %d -e %d',
+            '%s fetch %s AVERAGE -s %d -e %d 2>/dev/null',
             escapeshellcmd($this->rrdtoolPath),
             escapeshellarg($rrdPath),
             $start,
@@ -26,7 +53,7 @@ class RRDTool
 
         $output = shell_exec($command);
 
-        if ($output === null) {
+        if ($output === null || $output === false) {
             return [];
         }
 
@@ -47,9 +74,14 @@ class RRDTool
                 continue;
             }
 
+            // Skip error messages
+            if (stripos($line, 'error') !== false || stripos($line, 'rrdtool') === 0) {
+                continue;
+            }
+
             // Parse header to find metric index
             if (!$headerParsed && strpos($line, ':') === false) {
-                $headers = explode(' ', $line);
+                $headers = preg_split('/\s+/', $line);
                 $metricIndex = $this->getMetricIndex($metric, $headers);
                 $headerParsed = true;
                 continue;
@@ -57,12 +89,29 @@ class RRDTool
 
             // Parse data lines
             if (strpos($line, ':') !== false) {
-                list($timestamp, $values) = explode(':', $line, 2);
-                $valueArray = explode(' ', trim($values));
+                $parts = explode(':', $line, 2);
+                if (count($parts) !== 2) {
+                    continue;
+                }
 
+                list($timestamp, $values) = $parts;
+                $timestamp = trim($timestamp);
+                $values = trim($values);
+
+                if (!is_numeric($timestamp)) {
+                    continue;
+                }
+
+                $valueArray = preg_split('/\s+/', $values);
                 $value = isset($valueArray[$metricIndex]) ? trim($valueArray[$metricIndex]) : null;
 
-                if ($value !== null && $value !== 'nan' && is_numeric($value)) {
+                // Handle various "no data" representations
+                if ($value !== null &&
+                    $value !== 'nan' &&
+                    $value !== 'NAN' &&
+                    $value !== 'U' &&
+                    $value !== '-nan' &&
+                    is_numeric($value)) {
                     $data[] = [
                         'timestamp' => (int)$timestamp,
                         'value' => (float)$value

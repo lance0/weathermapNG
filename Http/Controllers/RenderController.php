@@ -1,9 +1,10 @@
 <?php
-namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
+namespace LibreNMS\\Plugins\\WeathermapNG\\Http\\Controllers;
 
-use LibreNMS\Plugins\WeathermapNG\Models\Map;
-use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
-use Illuminate\Http\Request;
+use LibreNMS\\Plugins\\WeathermapNG\\Models\\Map;
+use LibreNMS\\Plugins\\WeathermapNG\\Models\\Node;
+use LibreNMS\\Plugins\\WeathermapNG\\Services\\PortUtilService;
+use Illuminate\\Http\\Request;
 
 class RenderController
 {
@@ -32,7 +33,9 @@ class RenderController
 
     public function embed(Map $map)
     {
-        return view('plugins.WeathermapNG.embed', compact('map'));
+        $mapData = $map->toJsonModel();
+        $mapId = $map->id;
+        return view('plugins.WeathermapNG.embed', compact('mapData', 'mapId'));
     }
 
     public function export(Map $map, Request $request)

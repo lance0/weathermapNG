@@ -56,6 +56,5 @@ Route::middleware(['auth'])->prefix('plugins/weathermapng')->group(function () {
 Route::prefix('plugins/weathermapng')->group(function () {
     // Public embed routes (if configured)
     Route::get('/public/embed/{map}', [RenderController::class, 'embed'])
-        ->middleware('weathermapng.public')
         ->name('weathermapng.public.embed');
 });

@@ -125,8 +125,8 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Calculate scale to fit map in canvas
-            const mapWidth = mapData.metadata?.width || 800;
-            const mapHeight = mapData.metadata?.height || 600;
+            const mapWidth = mapData.width || mapData.metadata?.width || 800;
+            const mapHeight = mapData.height || mapData.metadata?.height || 600;
             const scaleX = canvas.width / mapWidth;
             const scaleY = canvas.height / mapHeight;
             const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
@@ -140,14 +140,18 @@
             ctx.scale(scale, scale);
 
             // Draw links first (behind nodes)
-            mapData.links.forEach(link => {
-                drawLink(link);
-            });
+            if (Array.isArray(mapData.links)) {
+                mapData.links.forEach(link => {
+                    drawLink(link);
+                });
+            }
 
             // Draw nodes
-            mapData.nodes.forEach(node => {
-                drawNode(node);
-            });
+            if (Array.isArray(mapData.nodes)) {
+                mapData.nodes.forEach(node => {
+                    drawNode(node);
+                });
+            }
 
             ctx.restore();
 
@@ -156,8 +160,8 @@
         }
 
         function drawNode(node) {
-            const x = node.position?.x || 0;
-            const y = node.position?.y || 0;
+            const x = (node.position?.x ?? node.x) || 0;
+            const y = (node.position?.y ?? node.y) || 0;
             const radius = 8;
 
             // Node body
@@ -185,8 +189,10 @@
         }
 
         function drawLink(link) {
-            const sourceNode = mapData.nodes.find(n => n.id === link.source);
-            const targetNode = mapData.nodes.find(n => n.id === link.target);
+            const srcId = link.source ?? link.src ?? link.source_id;
+            const dstId = link.target ?? link.dst ?? link.destination_id;
+            const sourceNode = mapData.nodes.find(n => (n.id ?? n.src_node_id) === srcId);
+            const targetNode = mapData.nodes.find(n => (n.id ?? n.dst_node_id) === dstId);
 
             if (!sourceNode || !targetNode) return;
 
@@ -245,14 +251,14 @@
         }
 
         function startAutoUpdate() {
-            // Update every 5 minutes
+            // Update every 60 seconds by default
             setInterval(() => {
                 fetchMapData();
-            }, 5 * 60 * 1000);
+            }, 60 * 1000);
         }
 
         function fetchMapData() {
-            fetch(`${baseUrl}/plugins/weathermapng/api/map/${mapId}`)
+            fetch(`${baseUrl}/plugins/weathermapng/api/maps/${mapId}`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.error) {

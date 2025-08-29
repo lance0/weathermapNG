@@ -135,10 +135,10 @@ class PortUtilService
     private function fetchFromAPI(int $portId): array
     {
         try {
-            $data = $this->api->getPortData($portId, 'traffic_in', '5m');
+            $data = $this->api->getPortMetricByPortId($portId, 'traffic_in', '5m');
             $inBps = $this->extractLatestValue($data);
 
-            $data = $this->api->getPortData($portId, 'traffic_out', '5m');
+            $data = $this->api->getPortMetricByPortId($portId, 'traffic_out', '5m');
             $outBps = $this->extractLatestValue($data);
 
             return [

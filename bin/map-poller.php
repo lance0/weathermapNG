@@ -7,7 +7,26 @@
  * Run this via cron every 5 minutes.
  */
 
-require __DIR__ . '/../../includes/init.php'; // LibreNMS bootstrap
+// Locate LibreNMS bootstrap
+$bootstrapCandidates = [
+    '/opt/librenms/includes/init.php',
+    __DIR__ . '/../../../../includes/init.php', // typical when plugin is under html/plugins/WeathermapNG/bin
+    __DIR__ . '/../../includes/init.php',
+];
+
+$bootstrapLoaded = false;
+foreach ($bootstrapCandidates as $file) {
+    if (file_exists($file)) {
+        require $file;
+        $bootstrapLoaded = true;
+        break;
+    }
+}
+
+if (!$bootstrapLoaded) {
+    fwrite(STDERR, "Unable to locate LibreNMS bootstrap (includes/init.php).\n");
+    exit(1);
+}
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;

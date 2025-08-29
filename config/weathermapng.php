@@ -1,5 +1,7 @@
 <?php
 return [
+    'default_width' => 800,
+    'default_height' => 600,
     'poll_interval' => 300,         // seconds for CLI poller default
     'thresholds'    => [50,80,95],  // % utilization thresholds
     'scale'         => 'bits',      // 'bits' or 'bytes'
