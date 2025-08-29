@@ -48,5 +48,8 @@
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="CACHE_DRIVER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="WEATHERMAPNG_CACHE_TTL" value="0"/>
+        <env name="WEATHERMAPNG_ENABLE_LOCAL_RRD" value="false"/>
+        <env name="WEATHERMAPNG_ENABLE_API_FALLBACK" value="false"/>
     </php>
 </phpunit>

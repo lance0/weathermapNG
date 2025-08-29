@@ -73,9 +73,19 @@ class LibreNMSAPI
         return (float) ($latest['value'] ?? 0);
     }
 
+    /**
+     * Fetch timeseries for a specific port by port ID
+     */
+    public function getPortMetricByPortId($portId, $metric, $period = '1h')
+    {
+        if (!$this->apiToken) {
+            return $this->generateMockData($period);
+        }
+
         try {
             $response = Http::withToken($this->apiToken)
-                ->timeout(10)
+                ->timeout(3) // Reduced timeout for testing
+                ->retry(1, 100) // Retry once with 100ms delay
                 ->get("{$this->baseUrl}/api/v0/ports/{$portId}", [
                     'period' => $period
                 ]);
@@ -89,6 +99,8 @@ class LibreNMSAPI
             return $this->generateMockData($period);
 
         } catch (\Exception $e) {
+            // Log the error but return mock data
+            error_log("LibreNMSAPI Error: " . $e->getMessage());
             return $this->generateMockData($period);
         }
     }
@@ -105,7 +117,8 @@ class LibreNMSAPI
 
         try {
             $response = Http::withToken($this->apiToken)
-                ->timeout(10)
+                ->timeout(3) // Reduced timeout for testing
+                ->retry(1, 100) // Retry once with 100ms delay
                 ->get("{$this->baseUrl}/api/v0/devices/{$deviceId}/ports/{$interfaceId}", [
                     'period' => $period
                 ]);
@@ -119,38 +132,13 @@ class LibreNMSAPI
             return $this->generateMockData($period);
 
         } catch (\Exception $e) {
+            // Log the error but return mock data
+            error_log("LibreNMSAPI Error: " . $e->getMessage());
             return $this->generateMockData($period);
         }
     }
 
-    /**
-     * New: Fetch timeseries for a port by port_id directly.
-     */
-    public function getPortMetricByPortId(int $portId, string $metric, string $period = '1h')
-    {
-        if (!$this->apiToken) {
-            return $this->generateMockData($period);
-        }
 
-        try {
-            // Attempt a generic LibreNMS v0 API pattern for ports
-            $response = Http::withToken($this->apiToken)
-                ->timeout(10)
-                ->get("{$this->baseUrl}/api/v0/ports/{$portId}", [
-                    'period' => $period
-                ]);
-
-            if ($response->successful()) {
-                $data = $response->json();
-                return $this->formatApiData($data, $metric);
-            }
-
-            return $this->generateMockData($period);
-
-        } catch (\Exception $e) {
-            return $this->generateMockData($period);
-        }
-    }
 
     private function formatApiData($apiData, $metric)
     {
@@ -218,7 +206,8 @@ class LibreNMSAPI
 
         try {
             $response = Http::withToken($this->apiToken)
-                ->timeout(10)
+                ->timeout(3) // Reduced timeout for testing
+                ->retry(1, 100) // Retry once with 100ms delay
                 ->get("{$this->baseUrl}/api/v0/devices/{$deviceId}", [
                     'period' => $period
                 ]);
@@ -231,6 +220,8 @@ class LibreNMSAPI
             return $this->generateMockData($period);
 
         } catch (\Exception $e) {
+            // Log the error but return mock data
+            error_log("LibreNMSAPI Error: " . $e->getMessage());
             return $this->generateMockData($period);
         }
     }

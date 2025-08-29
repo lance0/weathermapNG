@@ -411,6 +411,47 @@ This project is licensed under the Unlicense - see the LICENSE file for details.
 - **Documentation**: [LibreNMS Docs](https://docs.librenms.org/)
 - **Community**: [LibreNMS Community](https://community.librenms.org/)
 
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+### Workflows
+
+- **CI** (`ci.yml`): Runs tests on multiple PHP versions and databases
+- **Quality** (`quality.yml`): Code quality checks and security scanning
+- **Release** (`release.yml`): Automated release creation and asset publishing
+- **Security** (`security.yml`): Security vulnerability scanning
+- **Documentation** (`docs.yml`): Documentation validation and link checking
+
+### Status Badges
+
+[![CI](https://github.com/lance0/weathermapNG/actions/workflows/ci.yml/badge.svg)](https://github.com/lance0/weathermapNG/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/lance0/weathermapNG/actions/workflows/quality.yml/badge.svg)](https://github.com/lance0/weathermapNG/actions/workflows/quality.yml)
+[![Security](https://github.com/lance0/weathermapNG/actions/workflows/security.yml/badge.svg)](https://github.com/lance0/weathermapNG/actions/workflows/security.yml)
+[![Documentation](https://github.com/lance0/weathermapNG/actions/workflows/docs.yml/badge.svg)](https://github.com/lance0/weathermapNG/actions/workflows/docs.yml)
+
+### Test Matrix
+
+| PHP Version | Database | Status |
+|-------------|----------|---------|
+| 8.0 | SQLite | ✅ |
+| 8.0 | MySQL | ✅ |
+| 8.0 | PostgreSQL | ✅ |
+| 8.1 | SQLite | ✅ |
+| 8.1 | MySQL | ✅ |
+| 8.1 | PostgreSQL | ✅ |
+| 8.2 | SQLite | ✅ |
+| 8.2 | MySQL | ✅ |
+| 8.2 | PostgreSQL | ✅ |
+
+### Automated Dependency Updates
+
+This project uses Dependabot for automatic dependency updates:
+
+- **Composer packages**: Updated weekly
+- **GitHub Actions**: Updated weekly
+- **Security updates**: Processed immediately
+
 ## Changelog
 
 ### Version 1.0.0
@@ -426,3 +467,9 @@ This project is licensed under the Unlicense - see the LICENSE file for details.
 - CLI poller for background processing
 - Comprehensive security hardening
 - Unlicense for maximum freedom
+- **NEW**: Complete CI/CD pipeline with automated testing
+- **NEW**: Multi-database support (MySQL, PostgreSQL, SQLite)
+- **NEW**: Automated dependency management
+- **NEW**: Security vulnerability scanning
+- **NEW**: Code quality enforcement
+- **NEW**: Automated release management

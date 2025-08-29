@@ -1,10 +1,10 @@
 <?php
-namespace LibreNMS\\Plugins\\WeathermapNG\\Http\\Controllers;
+namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
-use LibreNMS\\Plugins\\WeathermapNG\\Models\\Map;
-use LibreNMS\\Plugins\\WeathermapNG\\Models\\Node;
-use LibreNMS\\Plugins\\WeathermapNG\\Services\\PortUtilService;
-use Illuminate\\Http\\Request;
+use LibreNMS\Plugins\WeathermapNG\Models\Map;
+use LibreNMS\Plugins\WeathermapNG\Models\Node;
+use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
+use Illuminate\Http\Request;
 
 class RenderController
 {

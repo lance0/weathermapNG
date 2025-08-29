@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php" colors="true" beStrictAboutOutputDuringTests="true">
+  <testsuites>
+    <testsuite name="WeathermapNG Test Suite">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+  <php>
+    <ini name="date.timezone" value="UTC"/>
+  </php>
+</phpunit>
+
