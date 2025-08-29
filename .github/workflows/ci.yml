@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: [8.0, 8.1, 8.2]
+        db: [sqlite, mysql, pgsql]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: weathermapng_test
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_DB: weathermapng_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+        extensions: pdo, pdo_mysql, pdo_pgsql, pdo_sqlite, gd, json, mbstring
+        coverage: xdebug
+
+    - name: Cache Composer dependencies
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
+        restore-keys: |
+          ${{ runner.os }}-php${{ matrix.php }}-composer-
+
+    - name: Install Composer dependencies
+      run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+    - name: Setup test database
+      run: |
+        if [ "${{ matrix.db }}" = "mysql" ]; then
+          mysql -h 127.0.0.1 -u test -ptest -e "CREATE DATABASE IF NOT EXISTS weathermapng_test;"
+        elif [ "${{ matrix.db }}" = "pgsql" ]; then
+          PGPASSWORD=test psql -h 127.0.0.1 -U test -d weathermapng_test -c "SELECT 1;" || echo "PostgreSQL ready"
+        fi
+
+    - name: Copy test configuration
+      run: |
+        cp config/weathermapng.php config/weathermapng.php.backup
+        sed -i 's/enable_local_rrd.*/enable_local_rrd\" => false,/' config/weathermapng.php
+        sed -i 's/enable_api_fallback.*/enable_api_fallback\" => false,/' config/weathermapng.php
+
+    - name: Run tests
+      run: |
+        if [ "${{ matrix.db }}" = "sqlite" ]; then
+          DB_CONNECTION=sqlite DB_DATABASE=:memory: composer test
+        elif [ "${{ matrix.db }}" = "mysql" ]; then
+          DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3306 DB_DATABASE=weathermapng_test DB_USERNAME=test DB_PASSWORD=test composer test
+        elif [ "${{ matrix.db }}" = "pgsql" ]; then
+          DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=5432 DB_DATABASE=weathermapng_test DB_USERNAME=test DB_PASSWORD=test composer test
+        fi
+      env:
+        DB_CONNECTION: ${{ matrix.db }}
+
+    - name: Generate coverage report
+      if: matrix.php == '8.1' && matrix.db == 'sqlite'
+      run: composer test:coverage
+
+    - name: Upload coverage to Codecov
+      if: matrix.php == '8.1' && matrix.db == 'sqlite'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./tests/coverage/clover.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Restore configuration
+      run: mv config/weathermapng.php.backup config/weathermapng.php

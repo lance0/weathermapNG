@@ -1,0 +1,98 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.1
+        extensions: pdo, pdo_mysql, pdo_sqlite, gd, json, mbstring
+
+    - name: Cache Composer dependencies
+      uses: actions/cache@v3
+      with:
+        path: vendor
+        key: ${{ runner.os }}-php81-quality-composer-${{ hashFiles('**/composer.json') }}
+        restore-keys: |
+          ${{ runner.os }}-php81-quality-composer-
+
+    - name: Install Composer dependencies
+      run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+    - name: Run PHP CodeSniffer
+      run: composer lint
+
+    - name: Run PHP Mess Detector
+      run: composer analyze
+
+    - name: Check PHP syntax
+      run: find . -name "*.php" -not -path "./vendor/*" -not -path "./tests/coverage/*" -exec php -l {} \;
+
+    - name: Validate composer.json
+      run: composer validate
+
+    - name: Check for security vulnerabilities
+      run: |
+        if command -v composer &> /dev/null; then
+          composer audit --no-interaction
+        else
+          echo "Composer audit skipped - composer not available"
+        fi
+
+    - name: Check file permissions
+      run: |
+        # Check for executable files that shouldn't be
+        find . -name "*.php" -not -path "./vendor/*" -not -path "./bin/*" -not -path "./tests/*" -executable | wc -l | xargs -I {} sh -c 'if [ {} -gt 0 ]; then echo "Found {} executable PHP files outside bin/"; exit 1; fi'
+
+        # Check bin files are executable
+        if [ -f "bin/map-poller.php" ]; then
+          if [ ! -x "bin/map-poller.php" ]; then
+            echo "bin/map-poller.php is not executable"
+            exit 1
+          fi
+        fi
+
+    - name: Validate JSON files
+      run: |
+        find . -name "*.json" -not -path "./vendor/*" -not -path "./node_modules/*" -exec sh -c 'echo "Validating $1"; python3 -m json.tool "$1" > /dev/null' _ {} \;
+
+    - name: Check for large files
+      run: |
+        # Warn about files larger than 1MB
+        find . -type f -size +1M -not -path "./vendor/*" -not -path "./node_modules/*" -not -path "./.git/*" | while read file; do
+          echo "Large file found: $file ($(du -h "$file" | cut -f1))"
+        done
+
+    - name: Validate plugin structure
+      run: |
+        # Check required files exist
+        required_files=("WeathermapNG.php" "composer.json" "routes.php" "README.md")
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "Required file missing: $file"
+            exit 1
+          fi
+        done
+
+        # Check required directories exist
+        required_dirs=("Http/Controllers" "Models" "config" "Resources/views")
+        for dir in "${required_dirs[@]}"; do
+          if [ ! -d "$dir" ]; then
+            echo "Required directory missing: $dir"
+            exit 1
+          fi
+        done
+
+        echo "Plugin structure validation passed"

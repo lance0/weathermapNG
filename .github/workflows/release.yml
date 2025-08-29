@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: 8.1
+        extensions: pdo, pdo_mysql, pdo_sqlite, gd, json, mbstring
+
+    - name: Install Composer dependencies
+      run: composer install --no-progress --prefer-dist --optimize-autoloader --no-dev
+
+    - name: Run tests
+      run: composer test
+      env:
+        DB_CONNECTION: sqlite
+        DB_DATABASE: :memory:
+
+    - name: Generate release archive
+      run: |
+        # Create release directory
+        mkdir -p release
+
+        # Copy plugin files (excluding development files)
+        rsync -av \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='tests' \
+          --exclude='vendor' \
+          --exclude='node_modules' \
+          --exclude='.env*' \
+          --exclude='*.log' \
+          --exclude='coverage' \
+          --exclude='*.sqlite' \
+          --exclude='.phpunit.result.cache' \
+          ./ release/
+
+        # Install production dependencies
+        cd release
+        composer install --no-dev --optimize-autoloader
+
+        # Create archive
+        cd ..
+        tar -czf weathermapng-${{ github.ref_name }}.tar.gz -C release .
+
+    - name: Create GitHub Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          ## WeathermapNG ${{ github.ref_name }}
+
+          ### Changes
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+
+          ### Installation
+          ```bash
+          cd /opt/librenms/html/plugins
+          wget https://github.com/lance0/weathermapNG/releases/download/${{ github.ref_name }}/weathermapng-${{ github.ref_name }}.tar.gz
+          tar -xzf weathermapng-${{ github.ref_name }}.tar.gz
+          cd WeathermapNG
+          composer install --no-dev
+          ```
+
+          ### Requirements
+          - LibreNMS (latest stable)
+          - PHP 8.0+
+          - MySQL 5.7+ or PostgreSQL 9.5+
+
+        draft: false
+        prerelease: false
+
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./weathermapng-${{ github.ref_name }}.tar.gz
+        asset_name: weathermapng-${{ github.ref_name }}.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Generate changelog
+      run: |
+        # Generate changelog since last tag
+        LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+        if [ -n "$LAST_TAG" ]; then
+          echo "## Changes since $LAST_TAG" >> release_notes.md
+          git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD >> release_notes.md
+        else
+          echo "## Initial Release" >> release_notes.md
+          git log --pretty=format:"- %s (%h)" --reverse >> release_notes.md
+        fi
+
+    - name: Update release with changelog
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref }}
+        body_path: release_notes.md
+        append_body: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
