@@ -204,6 +204,16 @@ Content-Type: multipart/form-data
 File: map.json
 ```
 
+#### Health Check
+```
+GET /plugins/weathermapng/health
+```
+
+#### System Statistics
+```
+GET /plugins/weathermapng/health/stats
+```
+
 ### JavaScript API
 
 ```javascript
@@ -273,6 +283,8 @@ Set these in your `.env` file:
 ```bash
 LIBRENMS_API_TOKEN=your_api_token_here
 WEATHERMAPNG_RRD_PATH=/opt/librenms/rrd
+WEATHERMAPNG_CACHE_TTL=300
+WEATHERMAPNG_API_FALLBACK=true
 ```
 
 ## Security Considerations

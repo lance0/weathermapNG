@@ -38,7 +38,7 @@ This project follows a code of conduct to ensure a welcoming environment for all
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
-   git clone https://github.com/yourusername/weathermapNG.git
+   git clone https://github.com/lance0/weathermapNG.git
    cd weathermapNG
    ```
 
@@ -85,6 +85,55 @@ php artisan db:seed --class=LibreNMS\\Plugins\\WeathermapNG\\Database\\Seeders\\
 
 ## Project Structure
 
+```
+WeathermapNG/
+├── WeathermapNG.php                 # Plugin bootstrap
+├── WeathermapNGServiceProvider.php  # Laravel service provider
+├── composer.json                    # Dependencies & autoloading
+├── routes.php                       # Route definitions
+├── database/
+│   ├── migrations/                  # Database schema
+│   └── seeders/                     # Demo data
+├── config/
+│   └── weathermapng.php             # Configuration
+├── Http/Controllers/                # Web controllers
+│   ├── MapController.php            # Map CRUD operations
+│   ├── RenderController.php         # JSON API & rendering
+│   └── HealthController.php         # Health checks & stats
+├── Models/                          # Eloquent models
+│   ├── Map.php                      # Map model
+│   ├── Node.php                     # Network node model
+│   └── Link.php                     # Network link model
+├── Policies/                        # Authorization policies
+│   └── MapPolicy.php                # Map access policies
+├── Services/                        # Business logic services
+│   ├── PortUtilService.php          # RRD/API data fetching
+│   └── DevicePortLookup.php         # Device/port lookups
+├── Resources/                       # Frontend resources
+│   ├── views/                       # Blade templates
+│   │   ├── index.blade.php          # Maps list
+│   │   ├── editor.blade.php         # Map editor
+│   │   ├── show.blade.php           # Map viewer
+│   │   └── embed.blade.php          # Embeddable viewer
+│   ├── js/                          # JavaScript assets
+│   │   ├── editor.js                # Editor functionality
+│   │   └── viewer.js                # Viewer functionality
+│   └── css/                         # Stylesheets
+│       └── weathermapng.css
+├── lib/RRD/                         # Legacy RRD handling
+│   ├── RRDTool.php                  # RRD file operations
+│   └── LibreNMSAPI.php              # API fallback
+├── bin/                             # Executable scripts
+│   └── map-poller.php               # Background poller
+├── tests/                           # Test files
+│   └── MapTest.php                  # Basic model tests
+├── output/                          # Generated content (git-ignored)
+│   ├── maps/                        # Map images
+│   └── thumbnails/                  # Thumbnails
+├── LICENSE                          # Unlicense
+├── README.md                        # Main documentation
+├── CONTRIBUTING.md                  # This file
+└── CHANGELOG.md                     # Version history
 ```
 WeathermapNG/
 ├── WeathermapNG.php          # Main plugin bootstrap
