@@ -106,20 +106,6 @@ handle_user_context() {
     fi
 }
 
-# Main installation logic
-if detect_docker; then
-    DOCKER_MODE=true
-    log "🐳 Docker environment detected - using container-optimized installation"
-    handle_user_context
-    detect_librenms_paths
-    install_docker
-else
-    log "🖥️  Standard installation detected"
-    handle_user_context
-    detect_librenms_paths
-    install_standard
-fi
-
 # Docker-optimized installation
 install_docker() {
     log "🐳 Starting Docker-optimized installation..."
@@ -490,3 +476,22 @@ verify_docker_installation() {
     log ""
     log "📖 For Docker help, see: https://github.com/lance0/weathermapNG#docker-installation"
 }
+
+# Main execution logic
+main() {
+    if detect_docker; then
+        DOCKER_MODE=true
+        log "🐳 Docker environment detected - using container-optimized installation"
+        handle_user_context
+        detect_librenms_paths
+        install_docker
+    else
+        log "🖥️  Standard installation detected"
+        handle_user_context
+        detect_librenms_paths
+        install_standard
+    fi
+}
+
+# Run main function
+main "$@"

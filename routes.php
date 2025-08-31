@@ -55,6 +55,10 @@ Route::middleware(['auth'])->prefix('plugins/weathermapng')->group(function () {
     // Health check routes (no auth required for monitoring)
     Route::get('/health', [HealthController::class, 'check'])->name('weathermapng.health');
     Route::get('/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
+    Route::get('/health/detailed', [HealthController::class, 'detailed'])->name('weathermapng.health.detailed');
+    Route::get('/ready', [HealthController::class, 'ready'])->name('weathermapng.ready');
+    Route::get('/live', [HealthController::class, 'live'])->name('weathermapng.live');
+    Route::get('/metrics', [HealthController::class, 'metrics'])->name('weathermapng.metrics');
 });
 
 // Public routes (no auth required)
