@@ -46,7 +46,14 @@ log_info() {
 cleanup() {
     if [ "$CLEANUP_ON_EXIT" = true ]; then
         log_info "Cleaning up test containers..."
-        docker-compose -p "$TEST_PREFIX" down -v 2>/dev/null || true
+        # Try to use the detected compose command if available
+        if [ ! -z "${COMPOSE_CMD:-}" ]; then
+            $COMPOSE_CMD -p "$TEST_PREFIX" down -v 2>/dev/null || true
+        else
+            # Fallback to trying both
+            docker compose -p "$TEST_PREFIX" down -v 2>/dev/null || \
+            docker-compose -p "$TEST_PREFIX" down -v 2>/dev/null || true
+        fi
         docker network rm "${TEST_PREFIX}_default" 2>/dev/null || true
     fi
 }
@@ -71,8 +78,11 @@ test_docker_prerequisites() {
         return 1
     fi
     
-    if command -v docker-compose &>/dev/null; then
+    # Check for Docker Compose (v2 is built into docker)
+    if docker compose version &>/dev/null; then
         log_pass "Docker Compose installed"
+    elif command -v docker-compose &>/dev/null; then
+        log_pass "Docker Compose (standalone) installed"
     else
         log_fail "Docker Compose" "Not installed"
         return 1
@@ -88,15 +98,20 @@ test_compose_config() {
         return 1
     fi
     
-    if docker-compose -f docker-compose.simple.yml config &>/dev/null; then
+    # Try docker compose v2 first, then fall back to docker-compose
+    if docker compose -f docker-compose.simple.yml config &>/dev/null; then
         log_pass "Compose file syntax valid"
+        COMPOSE_CMD="docker compose"
+    elif docker-compose -f docker-compose.simple.yml config &>/dev/null; then
+        log_pass "Compose file syntax valid"
+        COMPOSE_CMD="docker-compose"
     else
         log_fail "Compose file syntax" "Invalid YAML or configuration"
         return 1
     fi
     
     # Check required services
-    local services=$(docker-compose -f docker-compose.simple.yml config --services 2>/dev/null)
+    local services=$($COMPOSE_CMD -f docker-compose.simple.yml config --services 2>/dev/null)
     if echo "$services" | grep -q "librenms"; then
         log_pass "LibreNMS service defined"
     else
@@ -152,7 +167,7 @@ test_container_startup() {
     
     log_info "Starting containers (this may take a few minutes)..."
     
-    if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml up -d &>/dev/null; then
+    if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml up -d &>/dev/null; then
         log_pass "Containers started"
     else
         log_fail "Container startup" "Failed to start containers"
@@ -164,7 +179,7 @@ test_container_startup() {
     sleep 30
     
     # Check container status
-    local containers=$(docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml ps -q)
+    local containers=$($COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml ps -q)
     local all_running=true
     
     for container in $containers; do
@@ -187,7 +202,7 @@ test_service_health() {
     log_test "Service health checks"
     
     # Test database connection
-    if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T db mysqladmin ping &>/dev/null; then
+    if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T db mysqladmin ping &>/dev/null; then
         log_pass "Database is responsive"
     else
         log_fail "Database" "Not responding to ping"
@@ -201,7 +216,7 @@ test_service_health() {
     fi
     
     # Test plugin directory
-    if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
+    if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
         test -d /opt/librenms/html/plugins/WeathermapNG; then
         log_pass "Plugin directory mounted"
     else
@@ -214,12 +229,12 @@ test_plugin_installation() {
     log_test "Plugin installation in container"
     
     # Check composer dependencies
-    if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
+    if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
         test -f /opt/librenms/html/plugins/WeathermapNG/vendor/autoload.php; then
         log_pass "Composer dependencies installed"
     else
         log_info "Installing composer dependencies..."
-        if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
+        if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
             bash -c "cd /opt/librenms/html/plugins/WeathermapNG && composer install --no-dev" &>/dev/null; then
             log_pass "Composer dependencies installed successfully"
         else
@@ -235,7 +250,7 @@ test_plugin_installation() {
     )
     
     for file in "${plugin_files[@]}"; do
-        if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
+        if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml exec -T librenms \
             test -f "/opt/librenms/html/plugins/WeathermapNG/$file"; then
             log_pass "Plugin file $file exists"
         else
@@ -249,7 +264,7 @@ test_container_logs() {
     log_test "Container logs analysis"
     
     # Check for errors in logs
-    local error_count=$(docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml logs 2>&1 | \
+    local error_count=$($COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml logs 2>&1 | \
         grep -ci "error\|fatal\|critical" || true)
     
     if [ "$error_count" -eq 0 ]; then
@@ -264,7 +279,7 @@ test_container_logs() {
 test_cleanup() {
     log_test "Container cleanup"
     
-    if docker-compose -p "$TEST_PREFIX" -f docker-compose.simple.yml down &>/dev/null; then
+    if $COMPOSE_CMD -p "$TEST_PREFIX" -f docker-compose.simple.yml down &>/dev/null; then
         log_pass "Containers stopped successfully"
     else
         log_fail "Container cleanup" "Failed to stop containers"
@@ -285,6 +300,9 @@ main() {
     echo "WeathermapNG Docker Test Suite"
     echo "========================================"
     echo
+    
+    # Initialize COMPOSE_CMD globally
+    COMPOSE_CMD=""
     
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -311,8 +329,8 @@ main() {
     test_compose_config || true
     test_env_file || true
     
-    # Only run container tests if Docker is available
-    if command -v docker &>/dev/null && docker info &>/dev/null; then
+    # Only run container tests if Docker is available and COMPOSE_CMD is set
+    if command -v docker &>/dev/null && docker info &>/dev/null && [ ! -z "$COMPOSE_CMD" ]; then
         test_container_startup || true
         
         # Only test services if containers started
@@ -324,7 +342,7 @@ main() {
         
         test_cleanup || true
     else
-        log_info "Skipping container tests - Docker not available"
+        log_info "Skipping container tests - Docker or Docker Compose not available"
     fi
     
     # Summary
