@@ -156,15 +156,28 @@ cd /opt/librenms
 ./lnms plugin:enable WeathermapNG
 ```
 
-#### Database Issues?
-```bash
-# Check if tables exist
-mysql -u librenms -p librenms -e "SHOW TABLES LIKE 'wmng_%';"
+#### Database Setup Failed?
+If automatic database setup fails, WeathermapNG provides multiple ways to create the required tables:
 
-# Run migrations manually
-cd /opt/librenms
-php artisan plugin:migrate WeathermapNG
+**Option 1: Run the setup script**
+```bash
+cd /opt/librenms/html/plugins/WeathermapNG
+php database/setup.php
 ```
+
+**Option 2: Import SQL directly**
+```bash
+cd /opt/librenms/html/plugins/WeathermapNG
+mysql -u librenms -p librenms < database/schema.sql
+```
+
+**Option 3: Check existing tables**
+```bash
+# Verify if tables already exist
+mysql -u librenms -p librenms -e "SHOW TABLES LIKE 'wmng_%';"
+```
+
+**Note**: The `plugin:migrate` command does not exist in LibreNMS. Local plugins cannot use Laravel migrations, so we create tables directly using the setup script or SQL file.
 
 ## Plugin Structure (LibreNMS 24.x)
 
