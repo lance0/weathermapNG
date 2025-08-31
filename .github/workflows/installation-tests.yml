@@ -58,6 +58,22 @@ jobs:
     runs-on: ubuntu-latest
     name: Test Installation Process
     
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: librenms
+          MYSQL_USER: librenms
+          MYSQL_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -69,14 +85,17 @@ jobs:
           extensions: gd, json, pdo, mbstring, mysqli
           tools: composer:v2
       
-      - name: Setup MySQL
+      - name: Wait for MySQL
         run: |
-          sudo systemctl start mysql
-          # GitHub Actions MySQL uses root with sudo, no password needed when using sudo
-          sudo mysql -e "CREATE DATABASE IF NOT EXISTS librenms;"
-          sudo mysql -e "CREATE USER IF NOT EXISTS 'librenms'@'localhost' IDENTIFIED BY 'password';"
-          sudo mysql -e "GRANT ALL PRIVILEGES ON librenms.* TO 'librenms'@'localhost';"
-          sudo mysql -e "FLUSH PRIVILEGES;"
+          until mysqladmin ping -h 127.0.0.1 -P 3306 --silent; do
+            echo 'Waiting for MySQL...'
+            sleep 2
+          done
+          echo "MySQL is ready!"
+      
+      - name: Verify MySQL connection
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -u librenms -ppassword librenms -e "SELECT 1"
       
       - name: Run installation tests
         run: |
