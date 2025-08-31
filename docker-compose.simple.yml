@@ -1,7 +1,5 @@
-version: '3.8'
-
 # Simplified WeathermapNG Docker Compose
-# Quick start: docker-compose -f docker-compose.simple.yml up -d
+# Quick start: docker compose up -d
 
 services:
   librenms:

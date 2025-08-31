@@ -72,9 +72,11 @@ jobs:
       - name: Setup MySQL
         run: |
           sudo systemctl start mysql
-          sudo mysql -e "CREATE DATABASE IF NOT EXISTS librenms;"
-          sudo mysql -e "CREATE USER IF NOT EXISTS 'librenms'@'localhost' IDENTIFIED BY 'password';"
-          sudo mysql -e "GRANT ALL PRIVILEGES ON librenms.* TO 'librenms'@'localhost';"
+          # Use root without password for GitHub Actions MySQL
+          sudo mysql -u root -e "CREATE DATABASE IF NOT EXISTS librenms;"
+          sudo mysql -u root -e "CREATE USER IF NOT EXISTS 'librenms'@'localhost' IDENTIFIED BY 'password';"
+          sudo mysql -u root -e "GRANT ALL PRIVILEGES ON librenms.* TO 'librenms'@'localhost';"
+          sudo mysql -u root -e "FLUSH PRIVILEGES;"
       
       - name: Run installation tests
         run: |
@@ -97,6 +99,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Prepare environment
+        run: |
+          # Create .env file from template for testing
+          cp .env.docker .env
+          # Set test values to avoid warnings
+          sed -i 's/your_db_name/testdb/g' .env
+          sed -i 's/your_db_user/testuser/g' .env
+          sed -i 's/your_db_password/testpass/g' .env
+          sed -i 's/your_root_password/rootpass/g' .env
       
       - name: Validate Docker Compose files
         run: |
