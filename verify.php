@@ -155,14 +155,41 @@ check_and_fix("PHP Extension: pdo_mysql", function() {
     return "PDO MySQL not loaded - install php{$phpVersion}-mysql";
 }, null);
 
-// 3. Required Files Check
+// 3. Architecture Detection and File Check
 $plugin_path = __DIR__;
-$required_files = [
+
+// Detect plugin architecture
+$architecture = 'unknown';
+$hook_based_files = [
+    'app/Plugins/WeathermapNG/Menu.php',
+    'app/Plugins/WeathermapNG/Page.php',
+    'app/Plugins/WeathermapNG/Settings.php'
+];
+
+$traditional_files = [
     'WeathermapNG.php',
     'composer.json',
     'routes.php',
-    'Http/Controllers/MapController.php',
+    'Http/Controllers/MapController.php'
 ];
+
+// Check for hook-based architecture
+$hook_files_found = 0;
+foreach ($hook_based_files as $file) {
+    if (file_exists($plugin_path . '/' . $file)) {
+        $hook_files_found++;
+    }
+}
+
+if ($hook_files_found >= 2) {
+    $architecture = 'hook-based';
+    $required_files = array_merge(['composer.json', 'routes.php'], $hook_based_files);
+} else {
+    $architecture = 'traditional';
+    $required_files = $traditional_files;
+}
+
+output("Detected plugin architecture: $architecture", 'info');
 
 foreach ($required_files as $file) {
     check_and_fix("Required file: $file", function() use ($plugin_path, $file) {
@@ -330,28 +357,37 @@ check_and_fix('Log directory', function() {
     return "Cannot create log file";
 });
 
-// 10. Hook Files Check (LibreNMS integration)
-check_and_fix('LibreNMS Hooks', function() use ($plugin_path) {
-    $hooks_dir = $plugin_path . '/Hooks';
-    if (!is_dir($hooks_dir)) {
-        return "Hooks directory missing";
-    }
-    
-    $required_hooks = ['Menu.php', 'DeviceOverview.php', 'PortTab.php'];
-    $missing = [];
-    
-    foreach ($required_hooks as $hook) {
-        if (!file_exists($hooks_dir . '/' . $hook)) {
-            $missing[] = $hook;
+// 10. LibreNMS Integration Check
+check_and_fix('LibreNMS Integration', function() use ($plugin_path, $architecture) {
+    if ($architecture === 'hook-based') {
+        // Check hook-based integration
+        $hooks_dir = $plugin_path . '/app/Plugins/WeathermapNG';
+        if (!is_dir($hooks_dir)) {
+            return "Hook directory missing: $hooks_dir";
         }
+
+        $required_hooks = ['Menu.php', 'Page.php', 'Settings.php'];
+        $missing = [];
+
+        foreach ($required_hooks as $hook) {
+            if (!file_exists($hooks_dir . '/' . $hook)) {
+                $missing[] = $hook;
+            }
+        }
+
+        if (empty($missing)) {
+            return true;
+        }
+
+        return "Missing hooks: " . implode(', ', $missing);
+    } else {
+        // Check traditional plugin file
+        if (file_exists($plugin_path . '/WeathermapNG.php')) {
+            return true;
+        }
+        return "Traditional plugin file missing";
     }
-    
-    if (empty($missing)) {
-        return true;
-    }
-    
-    return "Missing hooks: " . implode(', ', $missing);
-}, null); // Can't recreate complex hook files
+}, null); // Can't recreate complex integration files
 
 // Summary
 echo "\n";
