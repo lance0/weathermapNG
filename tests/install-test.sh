@@ -142,16 +142,7 @@ test_mock_installation() {
 test_verify_script() {
     test_start "Verify script functionality"
     
-    # Save current directory and go to project root
-    local original_dir=$(pwd)
-    # Get the directory containing this script
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    # Project root is one level up from tests directory
-    local project_root="$(cd "$script_dir/.." && pwd)"
-    
-    cd "$project_root"
-    
-    # Test help option
+    # When run from project root, files should be here
     if [ -f "verify.php" ]; then
         if php verify.php --help &>"$TEST_LOG"; then
             test_pass "verify.php --help"
@@ -170,25 +161,15 @@ test_verify_script() {
             test_fail "verify.php --quiet" "Script failed"
         fi
     else
-        test_fail "verify.php" "Script not found at $project_root"
+        test_fail "verify.php" "Script not found in $(pwd)"
     fi
-    
-    cd "$original_dir"
 }
 
 # Test 5: Docker configuration
 test_docker_config() {
     test_start "Docker configuration"
     
-    # Save current directory and go to project root
-    local original_dir=$(pwd)
-    # Get the directory containing this script
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    # Project root is one level up from tests directory
-    local project_root="$(cd "$script_dir/.." && pwd)"
-    
-    cd "$project_root"
-    
+    # When run from project root, files should be here
     if [ -f "docker-compose.simple.yml" ]; then
         if docker compose -f docker-compose.simple.yml config &>"$TEST_LOG" 2>&1; then
             test_pass "Docker Compose syntax"
@@ -204,23 +185,13 @@ test_docker_config() {
     else
         test_fail ".env.docker" "Template file missing"
     fi
-    
-    cd "$original_dir"
 }
 
 # Test 6: Installation modes
 test_installation_modes() {
     test_start "Installation mode detection"
     
-    # Save current directory and go to project root
-    local original_dir=$(pwd)
-    # Get the directory containing this script
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    # Project root is one level up from tests directory
-    local project_root="$(cd "$script_dir/.." && pwd)"
-    
-    cd "$project_root"
-    
+    # When run from project root, files should be here
     if [ -f "install.sh" ]; then
         # Test help output
         if ./install.sh --help | grep -q "express"; then
@@ -243,23 +214,13 @@ test_installation_modes() {
     else
         test_fail "install.sh" "Script not found"
     fi
-    
-    cd "$original_dir"
 }
 
 # Test 7: File integrity
 test_file_integrity() {
     test_start "File integrity checks"
     
-    # Save current directory and go to project root
-    local original_dir=$(pwd)
-    # Get the directory containing this script
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    # Project root is one level up from tests directory
-    local project_root="$(cd "$script_dir/.." && pwd)"
-    
-    cd "$project_root"
-    
+    # When run from project root, files should be here
     local required_files=(
         "WeathermapNG.php"
         "composer.json"
@@ -278,23 +239,13 @@ test_file_integrity() {
             test_fail "$file" "Required file missing"
         fi
     done
-    
-    cd "$original_dir"
 }
 
 # Test 8: Composer validation
 test_composer_validation() {
     test_start "Composer configuration"
     
-    # Save current directory and go to project root
-    local original_dir=$(pwd)
-    # Get the directory containing this script
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    # Project root is one level up from tests directory
-    local project_root="$(cd "$script_dir/.." && pwd)"
-    
-    cd "$project_root"
-    
+    # When run from project root, files should be here
     if [ -f "composer.json" ]; then
         if composer validate --no-check-all &>"$TEST_LOG"; then
             test_pass "composer.json valid"
@@ -310,8 +261,6 @@ test_composer_validation() {
     else
         test_fail "composer.json" "File not found"
     fi
-    
-    cd "$original_dir"
 }
 
 # Main test execution
