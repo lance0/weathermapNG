@@ -2,19 +2,20 @@
 
 namespace App\Plugins\WeathermapNG;
 
-use LibreNMS\Interfaces\Plugins\MenuEntryHook;
-
-class Menu extends MenuEntryHook
+class Menu
 {
-    public string $view = 'weathermapng::menu';
-
     public function data(): array
     {
         return [
             'title' => 'WeathermapNG',
-            'url' => url('/plugin/weathermapng'),
-            'icon' => 'fa-map',
-            'order' => 1000,
+            'url' => url('/plugins/weathermapng'),
+            'icon' => 'fa-network-wired',
         ];
+    }
+
+    public function authorize($user): bool
+    {
+        // Allow all authenticated users to see the menu
+        return $user !== null;
     }
 }
