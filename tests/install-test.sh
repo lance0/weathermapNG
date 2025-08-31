@@ -129,33 +129,51 @@ test_mock_installation() {
 test_verify_script() {
     test_start "Verify script functionality"
     
-    cd "$(dirname "$0")/.."
+    # Save current directory and go to project root
+    local original_dir=$(pwd)
+    local script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local project_root="$(dirname "$script_dir")"
+    
+    cd "$project_root"
     
     # Test help option
-    if php verify.php --help &>"$TEST_LOG"; then
-        test_pass "verify.php --help"
-    else
-        test_fail "verify.php --help" "Script failed"
-    fi
-    
-    # Test quiet mode
-    if php verify.php --quiet &>"$TEST_LOG"; then
-        if [ -s "$TEST_LOG" ]; then
-            test_fail "Quiet mode" "Output produced in quiet mode"
+    if [ -f "verify.php" ]; then
+        if php verify.php --help &>"$TEST_LOG"; then
+            test_pass "verify.php --help"
         else
-            test_pass "Quiet mode"
+            test_fail "verify.php --help" "Script failed"
+        fi
+        
+        # Test quiet mode
+        if php verify.php --quiet &>"$TEST_LOG"; then
+            if [ -s "$TEST_LOG" ]; then
+                test_fail "Quiet mode" "Output produced in quiet mode"
+            else
+                test_pass "Quiet mode"
+            fi
+        else
+            test_fail "verify.php --quiet" "Script failed"
         fi
     else
-        test_fail "verify.php --quiet" "Script failed"
+        test_fail "verify.php" "Script not found at $project_root"
     fi
+    
+    cd "$original_dir"
 }
 
 # Test 5: Docker configuration
 test_docker_config() {
     test_start "Docker configuration"
     
+    # Save current directory and go to project root
+    local original_dir=$(pwd)
+    local script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local project_root="$(dirname "$script_dir")"
+    
+    cd "$project_root"
+    
     if [ -f "docker-compose.simple.yml" ]; then
-        if docker-compose -f docker-compose.simple.yml config &>"$TEST_LOG"; then
+        if docker compose -f docker-compose.simple.yml config &>"$TEST_LOG" 2>&1; then
             test_pass "Docker Compose syntax"
         else
             test_fail "Docker Compose syntax" "Invalid configuration"
@@ -169,35 +187,57 @@ test_docker_config() {
     else
         test_fail ".env.docker" "Template file missing"
     fi
+    
+    cd "$original_dir"
 }
 
 # Test 6: Installation modes
 test_installation_modes() {
     test_start "Installation mode detection"
     
-    # Test help output
-    if ./install.sh --help | grep -q "express"; then
-        test_pass "Express mode documented"
+    # Save current directory and go to project root
+    local original_dir=$(pwd)
+    local script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local project_root="$(dirname "$script_dir")"
+    
+    cd "$project_root"
+    
+    if [ -f "install.sh" ]; then
+        # Test help output
+        if ./install.sh --help | grep -q "express"; then
+            test_pass "Express mode documented"
+        else
+            test_fail "Express mode" "Not documented in help"
+        fi
+        
+        if ./install.sh --help | grep -q "custom"; then
+            test_pass "Custom mode documented"
+        else
+            test_fail "Custom mode" "Not documented in help"
+        fi
+        
+        if ./install.sh --help | grep -q "docker"; then
+            test_pass "Docker mode documented"
+        else
+            test_fail "Docker mode" "Not documented in help"
+        fi
     else
-        test_fail "Express mode" "Not documented in help"
+        test_fail "install.sh" "Script not found"
     fi
     
-    if ./install.sh --help | grep -q "custom"; then
-        test_pass "Custom mode documented"
-    else
-        test_fail "Custom mode" "Not documented in help"
-    fi
-    
-    if ./install.sh --help | grep -q "docker"; then
-        test_pass "Docker mode documented"
-    else
-        test_fail "Docker mode" "Not documented in help"
-    fi
+    cd "$original_dir"
 }
 
 # Test 7: File integrity
 test_file_integrity() {
     test_start "File integrity checks"
+    
+    # Save current directory and go to project root
+    local original_dir=$(pwd)
+    local script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local project_root="$(dirname "$script_dir")"
+    
+    cd "$project_root"
     
     local required_files=(
         "WeathermapNG.php"
@@ -217,23 +257,38 @@ test_file_integrity() {
             test_fail "$file" "Required file missing"
         fi
     done
+    
+    cd "$original_dir"
 }
 
 # Test 8: Composer validation
 test_composer_validation() {
     test_start "Composer configuration"
     
-    if composer validate --no-check-all &>"$TEST_LOG"; then
-        test_pass "composer.json valid"
+    # Save current directory and go to project root
+    local original_dir=$(pwd)
+    local script_dir="$(cd "$(dirname "$0")" && pwd)"
+    local project_root="$(dirname "$script_dir")"
+    
+    cd "$project_root"
+    
+    if [ -f "composer.json" ]; then
+        if composer validate --no-check-all &>"$TEST_LOG"; then
+            test_pass "composer.json valid"
+        else
+            test_fail "composer.json" "Invalid configuration"
+        fi
+        
+        if composer validate --no-check-publish &>"$TEST_LOG"; then
+            test_pass "Composer package structure"
+        else
+            test_fail "Composer package" "Structure issues found"
+        fi
     else
-        test_fail "composer.json" "Invalid configuration"
+        test_fail "composer.json" "File not found"
     fi
     
-    if composer validate --no-check-publish &>"$TEST_LOG"; then
-        test_pass "Composer package structure"
-    else
-        test_fail "Composer package" "Structure issues found"
-    fi
+    cd "$original_dir"
 }
 
 # Main test execution
