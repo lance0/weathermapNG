@@ -1,0 +1,92 @@
+version: '3.8'
+
+# Simplified WeathermapNG Docker Compose
+# Quick start: docker-compose -f docker-compose.simple.yml up -d
+
+services:
+  librenms:
+    image: librenms/librenms:latest
+    container_name: librenms-weathermap
+    env_file: .env
+    environment:
+      - INSTALL_WEATHERMAP=true
+    volumes:
+      - ./:/opt/librenms/html/plugins/WeathermapNG:cached
+      - librenms_data:/data
+    ports:
+      - "${WEB_PORT:-8000}:80"
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      bash -c "
+        # Wait for database
+        while ! mysqladmin ping -h db --silent; do
+          echo 'Waiting for database...'
+          sleep 5
+        done
+        
+        # Install WeathermapNG on first run
+        if [ ! -f /data/.weathermap_installed ]; then
+          echo 'Installing WeathermapNG...'
+          cd /opt/librenms/html/plugins/WeathermapNG
+          composer install --no-dev --no-interaction 2>/dev/null || true
+          touch /data/.weathermap_installed
+        fi
+        
+        # Start LibreNMS
+        /opt/librenms/librenms.sh
+      "
+
+  db:
+    image: mariadb:10.5
+    container_name: librenms-db
+    env_file: .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Combined poller for LibreNMS and WeathermapNG
+  poller:
+    image: librenms/librenms:latest
+    container_name: librenms-poller
+    env_file: .env
+    volumes:
+      - ./:/opt/librenms/html/plugins/WeathermapNG:cached
+      - librenms_data:/data
+    depends_on:
+      - librenms
+    command: >
+      bash -c "
+        echo 'Starting combined poller service...'
+        while true; do
+          # Run LibreNMS discovery and poller
+          /opt/librenms/discovery.php -h all 2>/dev/null || true
+          /opt/librenms/poller.php -h all 2>/dev/null || true
+          
+          # Run WeathermapNG poller
+          if [ -f /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php ]; then
+            php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php 2>/dev/null || true
+          fi
+          
+          # Wait 5 minutes
+          sleep 300
+        done
+      "
+
+volumes:
+  db_data:
+  librenms_data:
