@@ -1,0 +1,110 @@
+version: '3.8'
+
+# WeathermapNG Docker Compose Example
+# Copy this to docker-compose.yml and customize for your environment
+
+services:
+  # LibreNMS with WeathermapNG
+  librenms:
+    image: librenms/librenms:latest
+    container_name: librenms
+    hostname: librenms
+    environment:
+      - TZ=Etc/UTC
+      - LIBRENMS_DOCKER=true
+      - SKIP_CRON=true  # Let separate service handle polling
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=librenms
+      - DB_USERNAME=librenms
+      - DB_PASSWORD=librenms_password
+      - LOG_TO_STDOUT=true
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+      - librenms_logs:/opt/librenms/logs
+      - librenms_rrd:/opt/librenms/rrd
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - memcached
+    command: >
+      bash -c "
+        echo 'Starting LibreNMS with WeathermapNG...' &&
+        cd /opt/librenms/html/plugins/WeathermapNG &&
+        ./install.sh &&
+        echo 'WeathermapNG installed successfully!' &&
+        /opt/librenms/librenms.sh
+      "
+
+  # Separate poller service for WeathermapNG
+  weathermap-poller:
+    image: librenms/librenms:latest
+    container_name: weathermap-poller
+    hostname: weathermap-poller
+    environment:
+      - TZ=Etc/UTC
+      - LIBRENMS_DOCKER=true
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=librenms
+      - DB_USERNAME=librenms
+      - DB_PASSWORD=librenms_password
+      - LOG_TO_STDOUT=true
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+      - librenms_logs:/opt/librenms/logs
+      - librenms_rrd:/opt/librenms/rrd
+    depends_on:
+      - librenms
+    command: >
+      bash -c "
+        echo 'Starting WeathermapNG poller...' &&
+        while true; do
+          echo \"\$(date): Running WeathermapNG poller...\";
+          cd /opt/librenms/html/plugins/WeathermapNG &&
+          php bin/map-poller.php 2>&1;
+          echo \"\$(date): Poller completed, sleeping for 5 minutes...\";
+          sleep 300;
+        done
+      "
+    restart: unless-stopped
+
+  # Database
+  db:
+    image: mariadb:10.5
+    container_name: librenms-db
+    command: --sql_mode=""
+    environment:
+      - TZ=Etc/UTC
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=librenms
+      - MYSQL_USER=librenms
+      - MYSQL_PASSWORD=librenms_password
+    volumes:
+      - librenms_db:/var/lib/mysql
+    restart: always
+
+  # Memcached
+  memcached:
+    image: memcached:alpine
+    container_name: librenms-memcached
+    restart: always
+
+  # Redis (optional, for improved performance)
+  redis:
+    image: redis:7-alpine
+    container_name: librenms-redis
+    restart: always
+
+volumes:
+  librenms_db:
+    driver: local
+  librenms_logs:
+    driver: local
+  librenms_rrd:
+    driver: local
+
+networks:
+  default:
+    name: librenms_network

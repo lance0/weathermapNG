@@ -4,8 +4,13 @@ use Illuminate\Support\Facades\Route;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\InstallController;
 
 Route::middleware(['auth'])->prefix('plugins/weathermapng')->group(function () {
+
+    // Installation routes (temporary, remove after installation)
+    Route::get('/install', [InstallController::class, 'index'])->name('weathermapng.install');
+    Route::post('/install', [InstallController::class, 'install'])->name('weathermapng.install.post');
 
     // Main map management routes
     Route::get('/', [MapController::class, 'index'])->name('weathermapng.index');

@@ -1,97 +1,692 @@
-# WeathermapNG - Next-Generation LibreNMS Weathermap Plugin
+# 🚀 WeathermapNG - Next-Generation LibreNMS Weathermap Plugin
 
-A modern, secure, and extensible weathermap plugin for LibreNMS that provides interactive network topology visualization with real-time data integration using a database-driven architecture.
+[![Installation Time](https://img.shields.io/badge/Installation-2%20minutes-brightgreen)](https://github.com/lance0/weathermapNG)
+[![PHP Version](https://img.shields.io/badge/PHP-8.0+-blue)](https://php.net)
+[![License](https://img.shields.io/badge/License-Unlicense-green)](LICENSE)
 
-## Features
+**The easiest way to create interactive network topology maps in LibreNMS!**
 
-- **Modern Architecture**: Built for PHP 8+ with Laravel-ish MVC structure and clean routing
-- **Database-Driven**: Uses MySQL/PostgreSQL with proper migrations and Eloquent models
-- **Real-time Data**: Local RRD integration with API fallback for maximum compatibility
-- **Interactive Editor**: Web-based drag-and-drop map editor with device integration
-- **Embeddable Views**: Dashboard widgets and iframe support for external systems
-- **Security First**: Auth-guarded routes, server-side data fetching, and secure file handling
-- **JSON API**: RESTful API for programmatic access and third-party integrations
-- **Responsive Design**: Mobile-friendly interface with modern UI components
-- **Service Layer**: Dedicated services for RRD fetching, device lookup, and business logic
+WeathermapNG provides modern, secure, and extensible network topology visualization with real-time data integration using a database-driven architecture.
 
-## Requirements
+## ✨ Quick Start (2 Minutes!)
 
-- LibreNMS (latest stable version recommended)
-- PHP 8.0 or higher
-- MySQL or PostgreSQL (LibreNMS database)
-- GD extension for image generation
-- Composer for dependency management
-- Web server with URL rewriting support
-
-## Installation
-
-### 1. Download and Install
-
+### 🚀 One-Click Installation
 ```bash
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git
 cd WeathermapNG
+./install.sh
+```
+
+**That's it!** 🎉 Your plugin is now installed and ready to use.
+
+### 🌐 Alternative: Web Installer (1 Minute)
+1. Download and place plugin in `/opt/librenms/html/plugins/WeathermapNG`
+2. Visit `https://your-librenms/plugins/weathermapng/install`
+3. Click "Start Installation"
+
+### ✅ Verify Installation
+```bash
+cd /opt/librenms/html/plugins/WeathermapNG
+php verify.php
+```
+
+## 📋 Quick Reference
+
+| Task | Command | Description |
+|------|---------|-------------|
+| **Install** | `./install.sh` | One-click installation |
+| **Verify** | `php verify.php` | Check installation |
+| **Update** | `composer update` | Update dependencies |
+| **Test** | `composer test` | Run test suite |
+| **Logs** | `tail -f /var/log/librenms/weathermapng.log` | View logs |
+
+## 🎯 What You Get
+
+- **📊 Interactive Maps**: Drag-and-drop network topology editor
+- **⚡ Real-time Data**: Live bandwidth utilization from LibreNMS
+- **🎨 Modern UI**: Responsive design with dark mode support
+- **🔗 API Integration**: RESTful API for external systems
+- **📱 Embeddable**: Dashboard widgets and iframe support
+- **🔒 Secure**: Auth-guarded routes and secure file handling
+
+## 📋 System Requirements
+
+| Component | Requirement | Status |
+|-----------|-------------|---------|
+| LibreNMS | Latest stable | ✅ |
+| PHP | 8.0 or higher | ✅ |
+| Database | MySQL/PostgreSQL | ✅ |
+| GD Extension | Enabled | ✅ |
+| Composer | Latest | ✅ |
+
+## 📦 Installation Methods
+
+### 🎯 Recommended: Automated Installation
+
+#### Method 1: One-Click Script (Fastest)
+```bash
+# Run as librenms user (not root)
+cd /opt/librenms/html/plugins
+git clone https://github.com/lance0/weathermapNG.git
+cd WeathermapNG
+./install.sh
+```
+
+**What happens automatically:**
+- ✅ Downloads dependencies
+- ✅ Creates database tables
+- ✅ Sets proper permissions
+- ✅ Configures cron job
+- ✅ Enables plugin in LibreNMS
+
+#### Method 2: Web-Based Installer (Easiest)
+1. Download and extract to `/opt/librenms/html/plugins/WeathermapNG`
+2. Visit: `https://your-librenms/plugins/weathermapng/install`
+3. Click **"Start Installation"**
+4. Done! 🎉
+
+### 🔧 Manual Installation (Advanced)
+
+If automated methods fail:
+
+```bash
+# 1. Install dependencies
+cd /opt/librenms/html/plugins/WeathermapNG
 composer install
-```
 
-### 2. Run Database Migrations
-
-```bash
+# 2. Run migrations
 cd /opt/librenms
-php artisan migrate
-```
+php -r "
+require 'vendor/autoload.php';
+require 'bootstrap/app.php';
+\$plugin = new \LibreNMS\Plugins\WeathermapNG\WeathermapNG();
+\$plugin->activate();
+"
 
-This will create the necessary tables:
-- `wmng_maps` - Store map metadata and configuration
-- `wmng_nodes` - Network devices with positioning
-- `wmng_links` - Connections between nodes with bandwidth
-
-### 3. Set Permissions
-
-```bash
-# Set proper ownership
+# 3. Set permissions
 chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
-
-# Set directory permissions
 chmod -R 755 /opt/librenms/html/plugins/WeathermapNG
 chmod -R 775 /opt/librenms/html/plugins/WeathermapNG/output
-
-# Make poller executable
 chmod +x /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php
 
-# Set SELinux context if applicable
-chcon -R -t httpd_sys_content_t /opt/librenms/html/plugins/WeathermapNG
+# 4. Add cron job
+echo '*/5 * * * * librenms /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php >> /var/log/librenms/weathermapng.log 2>&1' >> /etc/cron.d/librenms
 ```
 
-### 4. Enable Plugin
+### ✅ Final Steps
 
-1. Log into LibreNMS web interface
-2. Navigate to **Overview → Plugins → Plugin Admin**
-3. Find **WeathermapNG** in the list
-4. Click **Enable**
+1. **Enable Plugin:**
+   - Login to LibreNMS web interface
+   - Go to **Overview → Plugins → Plugin Admin**
+   - Find **WeathermapNG** and click **Enable**
 
-### 5. Configure Cron Job
+2. **Verify Installation:**
+   ```bash
+   cd /opt/librenms/html/plugins/WeathermapNG
+   php verify.php
+   ```
 
-Add the following line to `/etc/cron.d/librenms`:
+3. **Access Plugin:**
+   - Visit: `https://your-librenms/plugins/weathermapng`
+
+## 🐳 Docker Installation
+
+WeathermapNG has **full Docker support** with automatic environment detection and container-optimized installation!
+
+### Docker Installation Methods
+
+#### Method 1: Docker Compose (Recommended)
+```yaml
+version: '3.8'
+services:
+  librenms:
+    image: librenms/librenms:latest
+    environment:
+      - LIBRENMS_DOCKER=true
+      - SKIP_CRON=true  # Let orchestration handle scheduling
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+    command: >
+      bash -c "
+        cd /opt/librenms/html/plugins/WeathermapNG &&
+        ./install.sh &&
+        /opt/librenms/librenms.sh
+      "
+    depends_on:
+      - db
+
+  weathermap-poller:
+    image: librenms/librenms:latest
+    environment:
+      - LIBRENMS_DOCKER=true
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+    command: >
+      bash -c "
+        while true; do
+          cd /opt/librenms/html/plugins/WeathermapNG &&
+          php bin/map-poller.php
+          sleep 300
+        done
+      "
+    depends_on:
+      - librenms
+```
+
+#### Method 2: Docker Compose (Recommended)
+```bash
+# Use the provided example
+cp docker-compose.example.yml docker-compose.yml
+# Edit docker-compose.yml with your settings
+docker-compose up -d
+
+# Or use the quick setup
+curl -s https://raw.githubusercontent.com/lance0/weathermapNG/main/docker-compose.example.yml > docker-compose.yml
+docker-compose up -d
+```
+
+#### Method 3: Manual Docker Installation
+```bash
+# Install in running container
+docker exec -it librenms bash -c "
+  cd /opt/librenms/html/plugins/WeathermapNG &&
+  ./install.sh
+"
+
+# Or use environment variables
+docker run -e LIBRENMS_DOCKER=true \
+  -v $(pwd)/WeathermapNG:/opt/librenms/html/plugins/WeathermapNG \
+  librenms/librenms:latest \
+  bash -c "cd /opt/librenms/html/plugins/WeathermapNG && ./install.sh"
+```
+
+#### Method 4: Build-Time Installation
+```dockerfile
+FROM librenms/librenms:latest
+
+# Install WeathermapNG during build
+COPY WeathermapNG /opt/librenms/html/plugins/WeathermapNG
+RUN cd /opt/librenms/html/plugins/WeathermapNG && \
+    LIBRENMS_DOCKER=true ./install.sh
+
+# Set environment
+ENV LIBRENMS_DOCKER=true
+```
+
+#### Method 3: Build-Time Installation
+```dockerfile
+FROM librenms/librenms:latest
+
+# Install WeathermapNG during build
+COPY WeathermapNG /opt/librenms/html/plugins/WeathermapNG
+RUN cd /opt/librenms/html/plugins/WeathermapNG && \
+    LIBRENMS_DOCKER=true ./install.sh
+
+# Set environment
+ENV LIBRENMS_DOCKER=true
+```
+
+### Docker Configuration
+
+#### Configuration File
+For advanced Docker setups, use the provided Docker configuration:
 
 ```bash
-*/5 * * * * librenms /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php >> /var/log/librenms/weathermapng.log 2>&1
+# Copy the Docker-optimized config
+cp config/weathermapng.docker.php config/weathermapng.php
 ```
 
-### 6. Verify Installation
+This configuration includes:
+- Docker-aware logging (stdout instead of files)
+- Container networking database settings
+- Optimized polling intervals for containers
+- Environment variable support
 
-Visit `https://your-librenms/plugins/weathermapng` to access the plugin.
+#### Environment Variables
 
-## Usage
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LIBRENMS_DOCKER` | Enable Docker mode | `false` |
+| `SKIP_CRON` | Skip cron setup (use orchestration) | `false` |
+| `LIBRENMS_PATH` | Custom LibreNMS path | Auto-detected |
+| `WEATHERMAP_OUTPUT` | Custom output directory | Auto-detected |
+| `LOG_TO_STDOUT` | Log to stdout instead of file | `true` in Docker |
+| `WEATHERMAP_LOG` | Custom log file path | `/dev/stdout` |
+| `LIBRENMS_RRD_BASE` | RRD files location | `/opt/librenms/rrd` |
+
+### Docker Troubleshooting
+
+#### Permission Issues in Container?
+```bash
+# Check container user
+docker exec librenms whoami
+
+# Fix permissions in running container
+docker exec librenms chown -R www-data:www-data /opt/librenms/html/plugins/WeathermapNG
+```
+
+#### Database Connection Failed?
+```bash
+# Check database connectivity from container
+docker exec librenms mysql -h db -u librenms -p librenms
+
+# Verify environment variables
+docker exec librenms env | grep DB_
+```
+
+#### Cron Not Working in Container?
+```bash
+# Use Docker Compose for scheduling
+version: '3.8'
+services:
+  weathermap-cron:
+    image: librenms/librenms:latest
+    command: >
+      bash -c "
+        while true; do
+          php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php
+          sleep 300
+        done
+      "
+```
+
+#### Plugin Not Loading?
+```bash
+# Check plugin directory in container
+docker exec librenms ls -la /opt/librenms/html/plugins/
+
+# Verify plugin files
+docker exec librenms find /opt/librenms/html/plugins/WeathermapNG -name "*.php" | head -5
+```
+
+### Docker Compose Examples
+
+#### Basic Setup
+```yaml
+version: '3.8'
+services:
+  librenms:
+    image: librenms/librenms:latest
+    environment:
+      - LIBRENMS_DOCKER=true
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+```
+
+#### Advanced Setup with Separate Poller
+```yaml
+version: '3.8'
+services:
+  librenms:
+    image: librenms/librenms:latest
+    environment:
+      - LIBRENMS_DOCKER=true
+      - SKIP_CRON=true
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+    depends_on:
+      - db
+
+  weathermap-poller:
+    image: librenms/librenms:latest
+    environment:
+      - LIBRENMS_DOCKER=true
+    volumes:
+      - ./WeathermapNG:/opt/librenms/html/plugins/WeathermapNG
+    command: >
+      bash -c "
+        while true; do
+          php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php
+          sleep 300
+        done
+      "
+    depends_on:
+      - librenms
+```
+
+## 📊 Installation Comparison
+
+| Method | Time | Steps | User Level | Automation | Docker Support |
+|--------|------|-------|------------|------------|----------------|
+| **Docker Compose** | 3 min | 2 commands | Beginner | 100% | ✅ Native |
+| **One-Click Script** | 2 min | 3 commands | Beginner | 100% | ✅ Full |
+| **Web Installer** | 1 min | 1 click | Beginner | 100% | ✅ Full |
+| **Manual Docker** | 5 min | 4 commands | Intermediate | 90% | ✅ Full |
+| **Manual Setup** | 30-45 min | 15+ steps | Advanced | 0% | ❌ Limited |
+
+## 🔍 Troubleshooting
+
+### Installation Fails?
+```bash
+# Check system requirements
+cd /opt/librenms/html/plugins/WeathermapNG
+php verify.php
+
+# View installation logs
+tail -f /var/log/librenms/weathermapng_install.log
+```
+
+### Plugin Not Showing?
+- Ensure you're running as `librenms` user (not root)
+- Check file permissions: `ls -la /opt/librenms/html/plugins/WeathermapNG`
+- Verify LibreNMS can read the plugin files
+
+### Database Issues?
+- Check LibreNMS database credentials
+- Ensure user has table creation permissions
+- Verify MySQL/PostgreSQL is running
+
+### Permission Errors?
+```bash
+# Fix ownership
+chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+
+# Fix permissions
+chmod -R 755 /opt/librenms/html/plugins/WeathermapNG
+chmod -R 775 /opt/librenms/html/plugins/WeathermapNG/output
+```
+
+## 🎨 Features
+
+### Core Features
+- **📊 Interactive Editor**: Drag-and-drop network topology creation
+- **⚡ Real-time Monitoring**: Live bandwidth utilization from RRD files
+- **🎨 Modern UI**: Responsive design with Bootstrap styling
+- **🌙 Dark Mode**: Automatic dark mode support
+- **📱 Mobile Friendly**: Works on all device sizes
+- **🔗 API Integration**: RESTful API for external systems
+- **📊 Multiple Data Sources**: RRD files + LibreNMS API fallback
+- **🔒 Security First**: Auth-guarded routes and secure file handling
+
+### Advanced Features
+- **Custom Styling**: Color-coded nodes and links based on status
+- **Auto Layout**: Intelligent node positioning algorithms
+- **Export/Import**: JSON-based map backup and sharing
+- **Embeddable**: Dashboard widgets and iframe support
+- **Multi-user**: Role-based access control
+- **Performance**: Optimized for large networks (1000+ devices)
+
+## 🚀 Getting Started
 
 ### Creating Your First Map
 
-1. **Access the Editor**: Navigate to the WeathermapNG section and click "Create New Map"
-2. **Configure Map**: Enter a name, title, and dimensions for your map
-3. **Add Devices**: Use the device search to find and add network devices from LibreNMS
-4. **Position Nodes**: Drag and drop devices on the canvas to position them
-5. **Create Links**: Draw connections between devices and configure bandwidth
-6. **Save Map**: Your map is automatically saved to the database
+1. **Access WeathermapNG**: Visit `https://your-librenms/plugins/weathermapng`
+2. **Create New Map**: Click the **"Create New Map"** button
+3. **Configure Settings**:
+   - **Name**: Unique identifier (e.g., `core-network`)
+   - **Title**: Display name (e.g., `Core Network Topology`)
+   - **Dimensions**: Canvas size (default: 800x600)
+4. **Add Devices**:
+   - Use the device search dropdown
+   - Select network devices from LibreNMS
+   - Choose interfaces for monitoring
+5. **Position Elements**: Drag nodes to arrange your topology
+6. **Save & View**: Your map is automatically saved and starts monitoring
+
+### Example Map Creation
+```bash
+# After installation, visit:
+https://your-librenms/plugins/weathermapng
+
+# Create a simple 3-node topology:
+# Router1 (Core) ↔ Switch1 (Distribution) ↔ Server1 (Access)
+```
+
+## 🏗️ Project Structure
+
+```
+WeathermapNG/
+├── 📁 Http/Controllers/          # Web controllers
+│   ├── MapController.php        # Main map management
+│   ├── RenderController.php     # API and rendering
+│   └── InstallController.php    # Installation wizard
+├── 📁 Models/                   # Eloquent models
+│   ├── Map.php                  # Map model
+│   ├── Node.php                 # Network node model
+│   └── Link.php                 # Connection model
+├── 📁 Resources/views/          # Blade templates
+│   ├── index.blade.php          # Map listing
+│   ├── editor.blade.php         # Map editor
+│   ├── embed.blade.php          # Embedded view
+│   └── install/index.blade.php  # Installation wizard
+├── 📁 Services/                 # Business logic
+│   ├── DevicePortLookup.php     # Device/port integration
+│   └── PortUtilService.php      # RRD data processing
+├── 📁 database/migrations/      # Database schema
+├── 📁 config/                   # Configuration files
+├── 📁 lib/                      # Core libraries
+│   ├── API/                     # API integrations
+│   └── RRD/                     # RRD file handling
+├── 📁 tests/                    # Unit tests
+├── 📁 bin/                      # Executables
+│   └── map-poller.php           # Background poller
+├── install.sh                   # One-click installer
+├── verify.php                   # Installation verifier
+└── composer.json               # Dependencies
+```
+
+## 📚 Usage Examples
+
+### Basic Map Creation
+```javascript
+// Create a simple network map
+POST /plugins/weathermapng/maps
+{
+  "name": "office-network",
+  "title": "Office Network Topology",
+  "width": 800,
+  "height": 600
+}
+```
+
+### Embedding Maps
+```html
+<!-- Dashboard Widget -->
+<iframe src="/plugins/weathermapng/embed/office-network"
+        width="100%" height="400" frameborder="0">
+</iframe>
+
+<!-- External System -->
+<div style="width: 100%; height: 400px; border: 1px solid #ccc;">
+    <iframe src="https://librenms.company.com/plugins/weathermapng/embed/office-network"
+            width="100%" height="100%" frameborder="0">
+    </iframe>
+</div>
+```
+
+### API Integration
+```javascript
+// Get map data
+fetch('/plugins/weathermapng/api/maps/office-network')
+    .then(response => response.json())
+    .then(data => {
+        console.log('Map nodes:', data.nodes);
+        console.log('Map links:', data.links);
+    });
+
+// Get live data
+fetch('/plugins/weathermapng/api/maps/office-network/live')
+    .then(response => response.json())
+    .then(data => {
+        // Real-time bandwidth data
+        data.nodes.forEach(node => {
+            console.log(`${node.label}: ${node.current_value} Mbps`);
+        });
+    });
+```
+
+## ⚙️ Configuration
+
+### Default Settings
+WeathermapNG comes pre-configured with optimal settings:
+
+```php
+// config/weathermapng.php
+return [
+    'default_width' => 800,
+    'default_height' => 600,
+    'poll_interval' => 300, // 5 minutes
+    'thresholds' => [50, 80, 95], // % utilization
+    'colors' => [
+        'node_up' => '#28a745',
+        'node_down' => '#dc3545',
+        'link_normal' => '#28a745',
+        'link_warning' => '#ffc107',
+        'link_critical' => '#dc3545'
+    ]
+];
+```
+
+### Customization
+Edit `/opt/librenms/html/plugins/WeathermapNG/config/weathermapng.php` to customize:
+
+- Polling intervals
+- Color schemes
+- Threshold values
+- RRD file locations
+- API endpoints
+
+## 🆘 Getting Help
+
+### Quick Diagnosis
+```bash
+# Check installation
+cd /opt/librenms/html/plugins/WeathermapNG
+php verify.php
+
+# View logs
+tail -f /var/log/librenms/weathermapng_install.log
+tail -f /var/log/librenms/weathermapng.log
+```
+
+### Common Issues
+
+#### Maps Not Updating?
+```bash
+# Check cron job
+crontab -l | grep weathermapng
+
+# Manual poll
+cd /opt/librenms/html/plugins/WeathermapNG
+php bin/map-poller.php
+```
+
+#### Permission Errors?
+```bash
+# Fix ownership
+chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+
+# Fix permissions
+chmod -R 755 /opt/librenms/html/plugins/WeathermapNG
+chmod -R 775 /opt/librenms/html/plugins/WeathermapNG/output
+```
+
+#### Database Issues?
+```bash
+# Check tables exist
+mysql -u librenms -p librenms -e "SHOW TABLES LIKE 'wmng_%';"
+
+# Check LibreNMS database connection
+cd /opt/librenms
+php artisan tinker --execute="DB::connection()->getPdo(); echo 'Connected\n';"
+```
+
+### Support Resources
+
+- 📖 **Documentation**: [GitHub Wiki](https://github.com/lance0/weathermapNG/wiki)
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/lance0/weathermapNG/issues)
+- 💬 **Community**: [LibreNMS Community](https://community.librenms.org)
+- 📧 **Email**: info@librenms.org
+
+### Debug Mode
+Enable detailed logging by adding to `config/weathermapng.php`:
+```php
+'debug' => true,
+'log_level' => 'debug',
+'log_file' => '/var/log/librenms/weathermapng_debug.log'
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to get involved:
+
+### Development Setup
+```bash
+# Clone repository
+git clone https://github.com/lance0/weathermapNG.git
+cd weathermapNG
+
+# Install dependencies
+composer install
+
+# Run tests
+composer test
+
+# Run linting
+composer lint
+```
+
+### Code Style
+- Follow PSR-12 coding standards
+- Use meaningful commit messages
+- Add tests for new features
+- Update documentation
+
+### Pull Request Process
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📋 Changelog
+
+### Version 1.0.0 (Latest)
+- 🚀 **Automated Installation**: One-click setup with `./install.sh`
+- 🌐 **Web Installer**: GUI-based installation wizard
+- 🔧 **Smart Requirements Check**: Automatic system validation
+- 📊 **Real-time Verification**: Post-installation verification script
+- ⚡ **Performance Improvements**: Optimized database queries and caching
+- 🎨 **Enhanced UI**: Modern responsive design with dark mode
+- 🔒 **Security Hardening**: Improved authentication and file handling
+- 📱 **Mobile Support**: Fully responsive mobile interface
+- 🔗 **API Enhancements**: RESTful API for external integrations
+- 📈 **Monitoring**: Comprehensive logging and error tracking
+
+### Previous Versions
+- **0.9.0**: Database-driven architecture, basic editor
+- **0.8.0**: Initial LibreNMS integration
+- **0.7.0**: Core functionality and RRD integration
+
+## 📄 License
+
+This project is licensed under the **Unlicense** - see the [LICENSE](LICENSE) file for details.
+
+```
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+```
+
+## 🙏 Acknowledgments
+
+- **LibreNMS Community**: For the amazing monitoring platform
+- **PHP Community**: For the robust language ecosystem
+- **Open Source Community**: For making this possible
+
+---
+
+<div align="center">
+
+**Made with ❤️ by the LibreNMS Community**
+
+[⭐ Star us on GitHub](https://github.com/lance0/weathermapNG) • [🐛 Report Issues](https://github.com/lance0/weathermapNG/issues) • [📖 Documentation](https://github.com/lance0/weathermapNG/wiki)
+
+</div>
 
 ### Database Schema
 

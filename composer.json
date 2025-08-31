@@ -30,10 +30,18 @@
       "LibreNMS\\Plugins\\WeathermapNG\\Services\\": "Services/",
       "LibreNMS\\Plugins\\WeathermapNG\\Policies\\": "Policies/",
       "LibreNMS\\Plugins\\WeathermapNG\\API\\": "lib/API/",
-      "LibreNMS\\Plugins\\WeathermapNG\\RRD\\": "lib/RRD/"
+      "LibreNMS\\Plugins\\WeathermapNG\\RRD\\": "lib/RRD/",
+      "LibreNMS\\Plugins\\WeathermapNG\\Database\\Factories\\": "database/factories/"
     }
   },
-  "autoload-dev": { "psr-4": { "LibreNMS\\Plugins\\WeathermapNG\\Tests\\": "tests/" } },
+  "autoload-dev": {
+    "psr-4": {
+      "LibreNMS\\Plugins\\WeathermapNG\\Tests\\": "tests/"
+    },
+    "files": [
+      "verify.php"
+    ]
+  },
     "scripts": {
         "test": "phpunit",
         "test:unit": "phpunit --testsuite Unit",
