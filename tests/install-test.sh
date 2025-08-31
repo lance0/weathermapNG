@@ -269,9 +269,11 @@ main() {
     echo "WeathermapNG Installation Test Suite"
     echo "======================================"
     
-    # Debug: Show where we're running from
+    # Simple path handling - use GITHUB_WORKSPACE if available, otherwise current directory
+    PROJECT_ROOT="${GITHUB_WORKSPACE:-$(pwd)}"
+    cd "$PROJECT_ROOT"
+    
     echo "Running from: $(pwd)"
-    echo "Script location: ${BASH_SOURCE[0]}"
     echo
     
     # Run all tests

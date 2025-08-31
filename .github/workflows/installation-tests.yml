@@ -99,8 +99,9 @@ jobs:
       
       - name: Run installation tests
         run: |
+          cd ${{ github.workspace }}
           chmod +x tests/install-test.sh
-          ./tests/install-test.sh
+          bash tests/install-test.sh
       
       - name: Test verify script
         run: |
