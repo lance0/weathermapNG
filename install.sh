@@ -290,45 +290,39 @@ install_dependencies() {
 run_migrations() {
     step "Setting up database..."
     
-    cd "$LIBRENMS_PATH"
+    cd "$PLUGIN_DIR"
     
-    # Try multiple migration methods
-    local migration_success=false
-    
-    # Method 1: LibreNMS artisan command
-    if command -v php &> /dev/null && [[ -f "artisan" ]]; then
-        if php artisan plugin:migrate WeathermapNG 2>/dev/null; then
-            log "Database migrations completed via artisan"
-            migration_success=true
+    # Run our manual database setup script
+    if [[ -f "database/setup.php" ]]; then
+        log "Running database setup script..."
+        if php database/setup.php; then
+            log "Database tables created successfully"
+            INSTALL_STEPS+=("database")
+            return
+        else
+            warn "Could not create database tables automatically"
         fi
     fi
     
-    # Method 2: Direct migration
-    if [[ "$migration_success" == "false" ]]; then
-        cd "$PLUGIN_DIR"
-        if [[ -f "database/migrations/2025_08_29_000001_create_weathermapng_tables.php" ]]; then
-            php -r "
-            try {
-                require_once '$LIBRENMS_PATH/vendor/autoload.php';
-                require_once '$LIBRENMS_PATH/bootstrap/app.php';
-                require_once '$PLUGIN_DIR/WeathermapNG.php';
-                \$plugin = new \LibreNMS\Plugins\WeathermapNG();
-                if (\$plugin->activate()) {
-                    echo 'Database setup completed successfully';
-                    exit(0);
-                }
-                exit(1);
-            } catch (Exception \$e) {
-                echo 'Database setup failed: ' . \$e->getMessage();
-                exit(1);
-            }
-            " && migration_success=true
-        fi
-    fi
+    # Fallback: provide manual instructions
+    warn "Automatic database setup failed"
+    info "To create tables manually, choose one of these options:"
+    echo
+    info "Option 1 - Run setup script:"
+    info "  cd $PLUGIN_DIR"
+    info "  php database/setup.php"
+    echo
+    info "Option 2 - Import SQL directly:"
+    info "  mysql -u librenms -p librenms < $PLUGIN_DIR/database/schema.sql"
+    echo
     
-    if [[ "$migration_success" == "false" ]]; then
-        warn "Could not run database migrations automatically"
-        info "You may need to run them manually later"
+    if [[ "$INSTALL_MODE" != "express" ]]; then
+        read -p "Continue installation anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            error "Installation cancelled"
+            exit 1
+        fi
     fi
     
     INSTALL_STEPS+=("database")
@@ -400,17 +394,29 @@ enable_plugin() {
     
     cd "$LIBRENMS_PATH"
     
-    # Try to enable via CLI
-    if [[ -f "artisan" ]]; then
-        if php artisan plugin:enable WeathermapNG 2>/dev/null; then
+    # Try to enable via lnms CLI (correct command)
+    if [[ -f "lnms" ]]; then
+        if ./lnms plugin:enable WeathermapNG 2>/dev/null; then
             log "Plugin enabled successfully"
         else
             warn "Could not enable plugin automatically"
-            info "Enable manually in LibreNMS web interface:"
+            info "Enable manually via:"
+            echo
+            info "Option 1 - Command line:"
+            info "  cd $LIBRENMS_PATH"
+            info "  ./lnms plugin:enable WeathermapNG"
+            echo
+            info "Option 2 - Web interface:"
             info "  Overview → Plugins → Plugin Admin → WeathermapNG → Enable"
         fi
     else
-        info "Enable plugin in LibreNMS web interface:"
+        info "Enable plugin in LibreNMS:"
+        echo
+        info "Option 1 - Find lnms command:"
+        info "  find $LIBRENMS_PATH -name 'lnms' -type f"
+        info "  ./lnms plugin:enable WeathermapNG"
+        echo
+        info "Option 2 - Web interface:"
         info "  Overview → Plugins → Plugin Admin → WeathermapNG → Enable"
     fi
     
