@@ -49,6 +49,7 @@ php verify.php
 - **🔗 API Integration**: RESTful API for external systems
 - **📱 Embeddable**: Dashboard widgets and iframe support
 - **🔒 Secure**: Auth-guarded routes and secure file handling
+- **🔌 LibreNMS Integration**: Full plugin system compliance with hooks for Device Overview, Port Tabs, Menu, and Settings
 
 ## 📋 System Requirements
 
@@ -433,14 +434,38 @@ https://your-librenms/plugins/weathermapng
 # Router1 (Core) ↔ Switch1 (Distribution) ↔ Server1 (Access)
 ```
 
+## 🔌 LibreNMS Plugin Architecture
+
+WeathermapNG is a **distributed plugin package** that fully complies with LibreNMS plugin standards:
+
+### Plugin Hooks
+- **Menu Hook**: Adds WeathermapNG to the LibreNMS navigation menu
+- **Device Overview Hook**: Shows maps containing the device on device pages
+- **Port Tab Hook**: Displays weathermap links on port detail pages
+- **Settings Hook**: Integrates with LibreNMS settings for centralized configuration
+- **Page Hook**: Provides the main weathermap interface
+
+### Integration Points
+- Database migrations managed through LibreNMS
+- Authentication inherited from LibreNMS
+- Permissions use LibreNMS user roles
+- API endpoints secured with LibreNMS tokens
+
 ## 🏗️ Project Structure
 
 ```
 WeathermapNG/
+├── 📁 Hooks/                    # LibreNMS plugin hooks
+│   ├── Menu.php                 # Navigation menu integration
+│   ├── DeviceOverview.php       # Device page integration
+│   ├── PortTab.php              # Port page integration
+│   ├── Settings.php             # Settings page integration
+│   └── Page.php                 # Main plugin page
 ├── 📁 Http/Controllers/          # Web controllers
 │   ├── MapController.php        # Main map management
 │   ├── RenderController.php     # API and rendering
-│   └── InstallController.php    # Installation wizard
+│   ├── InstallController.php    # Installation wizard
+│   └── HealthController.php     # Health check endpoints
 ├── 📁 Models/                   # Eloquent models
 │   ├── Map.php                  # Map model
 │   ├── Node.php                 # Network node model

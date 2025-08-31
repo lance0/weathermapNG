@@ -3,12 +3,15 @@
 namespace LibreNMS\Plugins;
 
 use LibreNMS\Interfaces\Plugin;
-use LibreNMS\Plugins\Hooks\Menu;
 
 class WeathermapNG implements Plugin
 {
     public $name = 'WeathermapNG';
     public $description = 'Modern interactive network weathermap for LibreNMS';
+    public $author = 'LibreNMS Community';
+    public $version = '1.0.0';
+    
+    protected $docker_mode = false;
 
     public function __construct()
     {
@@ -19,56 +22,114 @@ class WeathermapNG implements Plugin
         if (class_exists('\Illuminate\Foundation\Application')) {
             $this->registerServiceProvider();
         }
-
-        // Fallback: load routes directly
-        if (file_exists(__DIR__ . '/routes.php')) {
-            require __DIR__ . '/routes.php';
-        }
-
-        Menu::add('WeathermapNG', url('/plugins/weathermapng'));
     }
 
-    private function registerServiceProvider()
+    /**
+     * Register the service provider
+     */
+    protected function registerServiceProvider(): void
     {
         $provider = new WeathermapNGServiceProvider(app());
         $provider->register();
         $provider->boot();
     }
-
-    public function activate()
+    
+    /**
+     * Get plugin metadata
+     */
+    public function getMetadata(): array
     {
-        // Check requirements first
-        $issues = $this->checkRequirements();
-        if (!empty($issues)) {
-            throw new Exception("Installation requirements not met: " . implode(', ', $issues));
-        }
-
-        // Run migrations automatically
-        $this->runMigrations();
-
-        // Set up permissions
-        $this->setPermissions();
-
-        // Create default config
-        $this->createDefaultConfig();
-
-        return true;
+        return [
+            'name' => $this->name,
+            'description' => $this->description,
+            'author' => $this->author,
+            'version' => $this->version,
+            'homepage' => 'https://github.com/lance0/weathermapNG',
+            'minimum_librenms' => '21.0.0',
+            'hooks' => [
+                'Menu',
+                'DeviceOverview',
+                'PortTab',
+                'Settings',
+                'Page'
+            ]
+        ];
     }
 
-    public function deactivate()
+    /**
+     * Plugin activation
+     */
+    public function activate(): bool
+    {
+        try {
+            // Check requirements first
+            $issues = $this->checkRequirements();
+            if (!empty($issues)) {
+                throw new \Exception("Installation requirements not met: " . implode(', ', $issues));
+            }
+
+            // Run migrations automatically
+            $this->runMigrations();
+
+            // Set up permissions
+            $this->setPermissions();
+
+            // Create default config
+            $this->createDefaultConfig();
+            
+            // Register hooks
+            $this->registerHooks();
+
+            return true;
+        } catch (\Exception $e) {
+            $this->log('Activation failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Register plugin hooks
+     */
+    protected function registerHooks(): void
+    {
+        // Hooks are registered via the service provider
+        // This is just a placeholder for any additional hook setup
+    }
+
+    /**
+     * Plugin deactivation
+     */
+    public function deactivate(): bool
     {
         // Plugin deactivation logic
+        // Could disable cron jobs, clear cache, etc.
         return true;
     }
 
-    public function uninstall()
+    /**
+     * Plugin uninstall
+     */
+    public function uninstall(): bool
     {
         // Plugin uninstall logic
-        // Could drop tables, clean up files, etc.
+        // Note: Be careful about dropping tables as data may be needed
+        // Consider backing up or warning the user
         return true;
     }
+    
+    /**
+     * Check if plugin can be installed
+     */
+    public function canBeInstalled(): bool
+    {
+        $issues = $this->checkRequirements();
+        return empty($issues);
+    }
 
-    private function runMigrations()
+    /**
+     * Run database migrations
+     */
+    protected function runMigrations(): void
     {
         $migrationPath = __DIR__ . '/database/migrations/';
         $files = glob($migrationPath . '*.php');
@@ -78,14 +139,17 @@ class WeathermapNG implements Plugin
             try {
                 $migration->up();
                 $this->log("Migration executed: " . basename($file));
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $this->log("Migration failed: " . $e->getMessage());
                 throw $e;
             }
         }
     }
 
-    private function checkRequirements()
+    /**
+     * Check installation requirements
+     */
+    protected function checkRequirements(): array
     {
         $issues = [];
 
@@ -234,7 +298,7 @@ class WeathermapNG implements Plugin
 
     public function getVersion()
     {
-        return '1.0.0';
+        return $this->version;
     }
 
     public function getInfo()
@@ -243,7 +307,7 @@ class WeathermapNG implements Plugin
             'name' => $this->name,
             'description' => $this->description,
             'version' => $this->getVersion(),
-            'author' => 'LibreNMS Community',
+            'author' => $this->author,
             'email' => 'info@librenms.org',
             'homepage' => 'https://github.com/lance0/weathermapNG',
         ];

@@ -3,6 +3,7 @@ namespace LibreNMS\Plugins\WeathermapNG;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
+use App\Plugins\PluginManager;
 
 class WeathermapNGServiceProvider extends ServiceProvider
 {
@@ -21,6 +22,26 @@ class WeathermapNGServiceProvider extends ServiceProvider
         $this->app->bind(
             \LibreNMS\Plugins\WeathermapNG\Policies\MapPolicy::class
         );
+        
+        // Register hooks
+        $this->registerHooks();
+    }
+    
+    /**
+     * Register plugin hooks
+     */
+    protected function registerHooks(): void
+    {
+        if (class_exists('\App\Plugins\PluginManager')) {
+            $pluginManager = app(PluginManager::class);
+            
+            // Register each hook
+            $pluginManager->registerHook('WeathermapNG', 'Menu', \LibreNMS\Plugins\WeathermapNG\Hooks\Menu::class);
+            $pluginManager->registerHook('WeathermapNG', 'DeviceOverview', \LibreNMS\Plugins\WeathermapNG\Hooks\DeviceOverview::class);
+            $pluginManager->registerHook('WeathermapNG', 'PortTab', \LibreNMS\Plugins\WeathermapNG\Hooks\PortTab::class);
+            $pluginManager->registerHook('WeathermapNG', 'Settings', \LibreNMS\Plugins\WeathermapNG\Hooks\Settings::class);
+            $pluginManager->registerHook('WeathermapNG', 'Page', \LibreNMS\Plugins\WeathermapNG\Hooks\Page::class);
+        }
     }
 
     /**
