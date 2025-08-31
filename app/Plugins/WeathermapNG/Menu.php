@@ -6,9 +6,19 @@ class Menu
 {
     public function data(): array
     {
+        // Handle case where Laravel helpers might not be available (e.g., in testing)
+        $url = '/plugins/weathermapng';
+        if (function_exists('url')) {
+            try {
+                $url = url('/plugins/weathermapng');
+            } catch (Exception $e) {
+                // Keep default URL if url() helper fails
+            }
+        }
+
         return [
             'title' => 'WeathermapNG',
-            'url' => url('/plugins/weathermapng'),
+            'url' => $url,
             'icon' => 'fa-network-wired',
         ];
     }
