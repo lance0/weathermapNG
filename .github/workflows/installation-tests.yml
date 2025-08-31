@@ -1,0 +1,242 @@
+name: Installation Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'install.sh'
+      - 'verify.php'
+      - 'docker-compose*.yml'
+      - '.env.*'
+      - 'tests/**'
+      - '.github/workflows/installation-tests.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'install.sh'
+      - 'verify.php'
+      - 'docker-compose*.yml'
+      - '.env.*'
+      - 'tests/**'
+
+jobs:
+  script-validation:
+    runs-on: ubuntu-latest
+    name: Validate Installation Scripts
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: gd, json, pdo, mbstring, mysqli
+          tools: composer:v2
+      
+      - name: Validate bash scripts
+        run: |
+          echo "Checking bash script syntax..."
+          bash -n install.sh
+          bash -n tests/install-test.sh
+          bash -n tests/docker-test.sh
+      
+      - name: Validate PHP scripts
+        run: |
+          echo "Checking PHP script syntax..."
+          php -l verify.php
+          php -l WeathermapNG.php
+      
+      - name: Check file permissions
+        run: |
+          echo "Checking script permissions..."
+          test -x install.sh || (echo "install.sh not executable" && exit 1)
+          test -r verify.php || (echo "verify.php not readable" && exit 1)
+
+  installation-test:
+    runs-on: ubuntu-latest
+    name: Test Installation Process
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: gd, json, pdo, mbstring, mysqli
+          tools: composer:v2
+      
+      - name: Setup MySQL
+        run: |
+          sudo systemctl start mysql
+          sudo mysql -e "CREATE DATABASE IF NOT EXISTS librenms;"
+          sudo mysql -e "CREATE USER IF NOT EXISTS 'librenms'@'localhost' IDENTIFIED BY 'password';"
+          sudo mysql -e "GRANT ALL PRIVILEGES ON librenms.* TO 'librenms'@'localhost';"
+      
+      - name: Run installation tests
+        run: |
+          chmod +x tests/install-test.sh
+          ./tests/install-test.sh
+      
+      - name: Test verify script
+        run: |
+          php verify.php --quiet
+          php verify.php --help
+      
+      - name: Test installer help
+        run: |
+          ./install.sh --help
+
+  docker-test:
+    runs-on: ubuntu-latest
+    name: Test Docker Installation
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Validate Docker Compose files
+        run: |
+          docker-compose -f docker-compose.simple.yml config
+      
+      - name: Check Docker environment files
+        run: |
+          test -f .env.docker || (echo ".env.docker missing" && exit 1)
+          test -f docker-compose.simple.yml || (echo "docker-compose.simple.yml missing" && exit 1)
+      
+      - name: Run Docker tests
+        run: |
+          chmod +x tests/docker-test.sh
+          ./tests/docker-test.sh --port 18080
+      
+      - name: Docker Compose syntax check
+        run: |
+          docker-compose -f docker-compose.simple.yml config > /dev/null
+
+  unit-tests:
+    runs-on: ubuntu-latest
+    name: PHP Unit Tests
+    strategy:
+      matrix:
+        php-version: ['8.0', '8.1', '8.2']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: gd, json, pdo, mbstring, mysqli
+          tools: composer:v2, phpunit
+      
+      - name: Install dependencies
+        run: |
+          composer install --prefer-dist --no-progress
+      
+      - name: Run PHPUnit tests
+        run: |
+          if [ -f phpunit.xml ]; then
+            vendor/bin/phpunit --testdox
+          else
+            echo "PHPUnit configuration not found, skipping"
+          fi
+      
+      - name: Test Composer validation
+        run: |
+          composer validate --no-check-publish
+
+  documentation-check:
+    runs-on: ubuntu-latest
+    name: Documentation Validation
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check documentation files
+        run: |
+          echo "Checking required documentation..."
+          test -f README.md || (echo "README.md missing" && exit 1)
+          test -f INSTALL.md || (echo "INSTALL.md missing" && exit 1)
+      
+      - name: Check for broken links in docs
+        run: |
+          if command -v markdown-link-check &> /dev/null; then
+            markdown-link-check README.md
+            markdown-link-check INSTALL.md
+          else
+            echo "markdown-link-check not available, skipping"
+          fi
+
+  integration-test:
+    runs-on: ubuntu-latest
+    name: Full Integration Test
+    needs: [script-validation, installation-test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git composer
+      
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          extensions: gd, json, pdo, mbstring, mysqli
+          tools: composer:v2
+      
+      - name: Create mock LibreNMS structure
+        run: |
+          mkdir -p /tmp/librenms/html/plugins
+          mkdir -p /tmp/librenms/bootstrap
+          touch /tmp/librenms/bootstrap/app.php
+      
+      - name: Test express installation (dry run)
+        run: |
+          export LIBRENMS_PATH=/tmp/librenms
+          # Note: This is a dry run - actual installation would require full LibreNMS
+          ./install.sh --help
+          
+      - name: Verify installation components
+        run: |
+          # Check all required files exist
+          for file in WeathermapNG.php routes.php plugin.json composer.json; do
+            test -f "$file" || (echo "$file missing" && exit 1)
+          done
+          
+          # Check hook files
+          for hook in Menu DeviceOverview PortTab Settings Page; do
+            test -f "Hooks/$hook.php" || (echo "Hook $hook.php missing" && exit 1)
+          done
+
+  security-check:
+    runs-on: ubuntu-latest
+    name: Security Checks
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Check for hardcoded credentials
+        run: |
+          echo "Checking for hardcoded credentials..."
+          ! grep -r "password\s*=\s*['\"][^'\"]*['\"]" --include="*.php" --include="*.sh" . || \
+            (echo "Found hardcoded passwords" && exit 1)
+          
+          ! grep -r "api[_-]?key\s*=\s*['\"][^'\"]*['\"]" --include="*.php" --include="*.sh" . || \
+            (echo "Found hardcoded API keys" && exit 1)
+      
+      - name: Check file permissions in repo
+        run: |
+          # Ensure no files have overly permissive permissions
+          find . -type f -perm /111 -name "*.php" -exec echo "PHP file {} is executable" \; | \
+            grep -q "is executable" && exit 1 || exit 0

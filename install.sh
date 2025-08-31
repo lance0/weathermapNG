@@ -1,497 +1,516 @@
 #!/bin/bash
-# WeathermapNG One-Click Installer
-# Usage: ./install.sh
+# WeathermapNG Enhanced Installer v2
+# One-click installation with better error handling and automation
 
-set -e  # Exit on any error
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
+
+# ============================================================================
+# Configuration & Setup
+# ============================================================================
+
+SCRIPT_VERSION="2.0.0"
+PLUGIN_NAME="WeathermapNG"
+GITHUB_REPO="https://github.com/lance0/weathermapNG.git"
+LOG_FILE="/tmp/weathermapng_install_$(date +%Y%m%d_%H%M%S).log"
+INSTALL_MODE="${1:-express}"  # express, custom, docker, dev
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Installation state for rollback
+INSTALL_STEPS=()
+PLUGIN_DIR=""
+LIBRENMS_PATH=""
+DOCKER_MODE=false
+
+# ============================================================================
+# Logging Functions
+# ============================================================================
+
 log() {
-    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] $1${NC}"
+    local message="$1"
+    echo -e "${GREEN}[✓]${NC} $message"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $message" >> "$LOG_FILE"
 }
 
 error() {
-    echo -e "${RED}[ERROR] $1${NC}" >&2
+    local message="$1"
+    echo -e "${RED}[✗]${NC} $message" >&2
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $message" >> "$LOG_FILE"
 }
 
 warn() {
-    echo -e "${YELLOW}[WARNING] $1${NC}"
+    local message="$1"
+    echo -e "${YELLOW}[!]${NC} $message"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] WARN: $message" >> "$LOG_FILE"
 }
 
 info() {
-    echo -e "${BLUE}[INFO] $1${NC}"
+    local message="$1"
+    echo -e "${BLUE}[i]${NC} $message"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] INFO: $message" >> "$LOG_FILE"
 }
 
-# Global variables
-DOCKER_MODE=false
-LIBRENMS_PATH=""
-DOCKER_ROOT=false
+step() {
+    local message="$1"
+    echo -e "${CYAN}==>${NC} $message"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] STEP: $message" >> "$LOG_FILE"
+}
 
-# Detect Docker environment
-detect_docker() {
-    # Check for Docker environment variables
-    if [[ -n "$DOCKER_CONTAINER" ]] || [[ -f "/.dockerenv" ]] || [[ -n "$LIBRENMS_DOCKER" ]]; then
-        return 0  # True, we're in Docker
-    fi
+# ============================================================================
+# Prerequisite Checks
+# ============================================================================
 
-    # Check for common Docker indicators
-    if [[ -d "/var/lib/docker" ]] || [[ -S "/var/run/docker.sock" ]]; then
-        if [[ -n "$FORCE_DOCKER" ]]; then
-            warn "🐳 Docker environment detected (forced)"
-            return 0
+check_prerequisites() {
+    step "Checking prerequisites..."
+    
+    local missing_deps=()
+    
+    # Check PHP version
+    if command -v php &> /dev/null; then
+        PHP_VERSION=$(php -r "echo PHP_VERSION;")
+        if [[ $(php -r "echo version_compare('$PHP_VERSION', '8.0.0', '>=') ? 'true' : 'false';") == "false" ]]; then
+            error "PHP 8.0+ required (found: $PHP_VERSION)"
+            exit 1
         fi
+        log "PHP $PHP_VERSION found"
+    else
+        missing_deps+=("php")
     fi
-
-    return 1  # False, not in Docker
-}
-
-# Detect LibreNMS installation path
-detect_librenms_paths() {
-    # Try common LibreNMS paths
-    possible_paths=(
-        "/opt/librenms"           # Standard installation
-        "/app"                    # Some containers
-        "/var/www/html"          # Web containers
-        "/usr/share/librenms"    # Some distros
-        "/data/librenms"         # Custom containers
-    )
-
-    for path in "${possible_paths[@]}"; do
-        if [[ -f "$path/bootstrap/app.php" ]] || [[ -f "$path/librenms.php" ]] || [[ -f "$path/app.php" ]]; then
-            LIBRENMS_PATH="$path"
-            log "✅ Found LibreNMS at: $LIBRENMS_PATH"
-            return 0
+    
+    # Check required commands
+    local required_commands=("git" "composer" "mysql")
+    for cmd in "${required_commands[@]}"; do
+        if ! command -v "$cmd" &> /dev/null; then
+            missing_deps+=("$cmd")
+        else
+            log "$cmd found"
         fi
     done
-
-    # Check environment variable
-    if [[ -n "$LIBRENMS_PATH" ]]; then
-        if [[ -f "$LIBRENMS_PATH/bootstrap/app.php" ]] || [[ -f "$LIBRENMS_PATH/librenms.php" ]]; then
-            log "✅ Using LIBRENMS_PATH: $LIBRENMS_PATH"
-            return 0
+    
+    # Check PHP extensions
+    local required_extensions=("gd" "json" "pdo" "mbstring" "mysqli")
+    for ext in "${required_extensions[@]}"; do
+        if ! php -m 2>/dev/null | grep -q "^$ext$"; then
+            missing_deps+=("php-$ext")
+        else
+            log "PHP extension $ext found"
+        fi
+    done
+    
+    # Report missing dependencies
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        error "Missing dependencies: ${missing_deps[*]}"
+        info "Install them with:"
+        
+        # Detect package manager
+        if command -v apt-get &> /dev/null; then
+            info "  sudo apt-get install ${missing_deps[*]}"
+        elif command -v yum &> /dev/null; then
+            info "  sudo yum install ${missing_deps[*]}"
+        elif command -v dnf &> /dev/null; then
+            info "  sudo dnf install ${missing_deps[*]}"
+        fi
+        
+        if [[ "$INSTALL_MODE" != "express" ]]; then
+            read -p "Continue anyway? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
+        else
+            exit 1
         fi
     fi
+    
+    INSTALL_STEPS+=("prerequisites")
+}
 
-    # Fallback: ask user or use current directory
-    if [[ -f "./bootstrap/app.php" ]] || [[ -f "./librenms.php" ]]; then
-        LIBRENMS_PATH="$(pwd)"
-        log "✅ Using current directory: $LIBRENMS_PATH"
-        return 0
+# ============================================================================
+# Environment Detection
+# ============================================================================
+
+detect_environment() {
+    step "Detecting environment..."
+    
+    # Check for Docker
+    if [[ -f "/.dockerenv" ]] || [[ -n "${DOCKER_CONTAINER:-}" ]] || [[ -n "${LIBRENMS_DOCKER:-}" ]]; then
+        DOCKER_MODE=true
+        log "Docker environment detected"
+    else
+        log "Standard host environment detected"
     fi
+    
+    # Check user context
+    if [[ $EUID -eq 0 ]] && [[ "$DOCKER_MODE" == "false" ]]; then
+        error "Do not run as root. Please run as librenms user or use sudo."
+        info "Try: sudo -u librenms $0"
+        exit 1
+    fi
+    
+    INSTALL_STEPS+=("environment")
+}
 
-    error "Could not find LibreNMS installation"
-    error "Please set LIBRENMS_PATH environment variable or run from LibreNMS directory"
+# ============================================================================
+# LibreNMS Detection
+# ============================================================================
+
+detect_librenms() {
+    step "Locating LibreNMS installation..."
+    
+    # Check common paths
+    local paths=(
+        "/opt/librenms"
+        "/usr/local/librenms"
+        "/var/www/librenms"
+        "/app"
+        "${LIBRENMS_PATH:-}"
+    )
+    
+    for path in "${paths[@]}"; do
+        if [[ -n "$path" ]] && [[ -f "$path/bootstrap/app.php" ]] || [[ -f "$path/librenms.php" ]]; then
+            LIBRENMS_PATH="$path"
+            log "Found LibreNMS at: $LIBRENMS_PATH"
+            break
+        fi
+    done
+    
+    # If not found, ask user
+    if [[ -z "$LIBRENMS_PATH" ]]; then
+        if [[ "$INSTALL_MODE" == "express" ]]; then
+            error "Could not find LibreNMS installation"
+            info "Set LIBRENMS_PATH environment variable and try again"
+            exit 1
+        else
+            read -p "Enter LibreNMS path: " -r LIBRENMS_PATH
+            if [[ ! -f "$LIBRENMS_PATH/bootstrap/app.php" ]]; then
+                error "Invalid LibreNMS path"
+                exit 1
+            fi
+        fi
+    fi
+    
+    # Set plugin directory
+    PLUGIN_DIR="$LIBRENMS_PATH/html/plugins/$PLUGIN_NAME"
+    
+    INSTALL_STEPS+=("librenms")
+}
+
+# ============================================================================
+# Installation Functions
+# ============================================================================
+
+download_plugin() {
+    step "Downloading WeathermapNG..."
+    
+    if [[ -d "$PLUGIN_DIR" ]]; then
+        warn "Plugin directory already exists"
+        if [[ "$INSTALL_MODE" == "express" ]]; then
+            log "Updating existing installation..."
+            cd "$PLUGIN_DIR"
+            git pull origin main 2>/dev/null || true
+        else
+            read -p "Update existing installation? (Y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Nn]$ ]]; then
+                log "Keeping existing installation"
+                return
+            fi
+            cd "$PLUGIN_DIR"
+            git pull origin main
+        fi
+    else
+        cd "$LIBRENMS_PATH/html/plugins"
+        log "Cloning repository..."
+        git clone "$GITHUB_REPO" "$PLUGIN_NAME"
+    fi
+    
+    INSTALL_STEPS+=("download")
+}
+
+install_dependencies() {
+    step "Installing dependencies..."
+    
+    cd "$PLUGIN_DIR"
+    
+    # Install composer dependencies
+    if [[ "$INSTALL_MODE" == "dev" ]]; then
+        log "Installing development dependencies..."
+        composer install --optimize-autoloader
+    else
+        log "Installing production dependencies..."
+        composer install --no-dev --optimize-autoloader --no-interaction
+    fi
+    
+    INSTALL_STEPS+=("dependencies")
+}
+
+run_migrations() {
+    step "Setting up database..."
+    
+    cd "$LIBRENMS_PATH"
+    
+    # Try multiple migration methods
+    local migration_success=false
+    
+    # Method 1: LibreNMS artisan command
+    if command -v php &> /dev/null && [[ -f "artisan" ]]; then
+        if php artisan plugin:migrate WeathermapNG 2>/dev/null; then
+            log "Database migrations completed via artisan"
+            migration_success=true
+        fi
+    fi
+    
+    # Method 2: Direct migration
+    if [[ "$migration_success" == "false" ]]; then
+        cd "$PLUGIN_DIR"
+        if [[ -f "database/migrations/2025_08_29_000001_create_weathermapng_tables.php" ]]; then
+            php -r "
+            try {
+                require_once '$LIBRENMS_PATH/vendor/autoload.php';
+                require_once '$LIBRENMS_PATH/bootstrap/app.php';
+                require_once '$PLUGIN_DIR/WeathermapNG.php';
+                \$plugin = new \LibreNMS\Plugins\WeathermapNG();
+                if (\$plugin->activate()) {
+                    echo 'Database setup completed successfully';
+                    exit(0);
+                }
+                exit(1);
+            } catch (Exception \$e) {
+                echo 'Database setup failed: ' . \$e->getMessage();
+                exit(1);
+            }
+            " && migration_success=true
+        fi
+    fi
+    
+    if [[ "$migration_success" == "false" ]]; then
+        warn "Could not run database migrations automatically"
+        info "You may need to run them manually later"
+    fi
+    
+    INSTALL_STEPS+=("database")
+}
+
+set_permissions() {
+    step "Setting permissions..."
+    
+    # Detect web user
+    local web_user="librenms"
+    if [[ "$DOCKER_MODE" == "true" ]]; then
+        web_user="www-data"
+    elif id "www-data" &>/dev/null; then
+        web_user="www-data"
+    fi
+    
+    # Set ownership (may require sudo)
+    if [[ $EUID -eq 0 ]] || sudo -n true 2>/dev/null; then
+        sudo chown -R "$web_user:$web_user" "$PLUGIN_DIR"
+        log "Ownership set to $web_user"
+    else
+        warn "Cannot set ownership (need sudo). Run manually:"
+        info "  sudo chown -R $web_user:$web_user $PLUGIN_DIR"
+    fi
+    
+    # Set permissions
+    chmod -R 755 "$PLUGIN_DIR"
+    chmod -R 775 "$PLUGIN_DIR/output" 2>/dev/null || mkdir -p "$PLUGIN_DIR/output" && chmod 775 "$PLUGIN_DIR/output"
+    [[ -f "$PLUGIN_DIR/bin/map-poller.php" ]] && chmod +x "$PLUGIN_DIR/bin/map-poller.php"
+    
+    INSTALL_STEPS+=("permissions")
+}
+
+setup_cron() {
+    step "Setting up scheduled tasks..."
+    
+    if [[ "$DOCKER_MODE" == "true" ]]; then
+        info "Docker detected - skipping cron setup"
+        info "Add polling to your container orchestration"
+        return
+    fi
+    
+    local cron_line="*/5 * * * * librenms php $PLUGIN_DIR/bin/map-poller.php >> /var/log/librenms/weathermapng.log 2>&1"
+    
+    # Try to add to system cron
+    if [[ -f "/etc/cron.d/librenms" ]]; then
+        if ! grep -q "weathermapng" /etc/cron.d/librenms 2>/dev/null; then
+            if [[ $EUID -eq 0 ]] || sudo -n true 2>/dev/null; then
+                echo "$cron_line" | sudo tee -a /etc/cron.d/librenms > /dev/null
+                log "Cron job added"
+            else
+                warn "Cannot add cron job (need sudo). Add manually:"
+                info "  $cron_line"
+            fi
+        else
+            log "Cron job already exists"
+        fi
+    else
+        # Try user crontab
+        (crontab -l 2>/dev/null | grep -q weathermapng) || (crontab -l 2>/dev/null; echo "$cron_line") | crontab -
+        log "Added to user crontab"
+    fi
+    
+    INSTALL_STEPS+=("cron")
+}
+
+enable_plugin() {
+    step "Enabling plugin..."
+    
+    cd "$LIBRENMS_PATH"
+    
+    # Try to enable via CLI
+    if [[ -f "artisan" ]]; then
+        if php artisan plugin:enable WeathermapNG 2>/dev/null; then
+            log "Plugin enabled successfully"
+        else
+            warn "Could not enable plugin automatically"
+            info "Enable manually in LibreNMS web interface:"
+            info "  Overview → Plugins → Plugin Admin → WeathermapNG → Enable"
+        fi
+    else
+        info "Enable plugin in LibreNMS web interface:"
+        info "  Overview → Plugins → Plugin Admin → WeathermapNG → Enable"
+    fi
+    
+    INSTALL_STEPS+=("enable")
+}
+
+# ============================================================================
+# Verification
+# ============================================================================
+
+verify_installation() {
+    step "Verifying installation..."
+    
+    cd "$PLUGIN_DIR"
+    
+    if [[ -f "verify.php" ]]; then
+        php verify.php
+    fi
+    
+    # Quick health check
+    local health_url="http://localhost/plugins/weathermapng/health"
+    if command -v curl &> /dev/null; then
+        if curl -s "$health_url" | grep -q "healthy"; then
+            log "Health check passed"
+        else
+            warn "Health check failed or not accessible"
+        fi
+    fi
+    
+    INSTALL_STEPS+=("verify")
+}
+
+# ============================================================================
+# Rollback Function
+# ============================================================================
+
+rollback() {
+    error "Installation failed. Rolling back..."
+    
+    for step in "${INSTALL_STEPS[@]}"; do
+        case $step in
+            "download")
+                [[ -d "$PLUGIN_DIR" ]] && rm -rf "$PLUGIN_DIR"
+                warn "Removed plugin directory"
+                ;;
+            "database")
+                warn "Database changes may need manual cleanup"
+                ;;
+            "cron")
+                if [[ -f "/etc/cron.d/librenms" ]]; then
+                    sudo sed -i '/weathermapng/d' /etc/cron.d/librenms 2>/dev/null || true
+                fi
+                crontab -l | grep -v weathermapng | crontab - 2>/dev/null || true
+                ;;
+        esac
+    done
+    
+    error "Installation rolled back. Check log: $LOG_FILE"
     exit 1
 }
 
-# Handle user context
-handle_user_context() {
-    if [[ $EUID -eq 0 ]]; then
-        if [[ "$DOCKER_MODE" == "true" ]]; then
-            log "🔧 Running as root in Docker container"
-            DOCKER_ROOT=true
-        else
-            error "Do not run as root in standard installation. Run as librenms user."
-            exit 1
-        fi
-    else
-        CURRENT_USER=$(whoami)
-        log "🔧 Running as user: $CURRENT_USER"
-        DOCKER_ROOT=false
-    fi
+# ============================================================================
+# Success Message
+# ============================================================================
+
+show_success() {
+    echo
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║        WeathermapNG Installation Successful! 🎉        ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════╝${NC}"
+    echo
+    log "Installation completed successfully!"
+    info "Log file: $LOG_FILE"
+    echo
+    echo -e "${CYAN}Next steps:${NC}"
+    echo "  1. Enable plugin in LibreNMS (if not done automatically)"
+    echo "  2. Visit: http://your-librenms/plugins/weathermapng"
+    echo "  3. Create your first network map!"
+    echo
+    info "For help: https://github.com/lance0/weathermapNG"
 }
 
-# Docker-optimized installation
-install_docker() {
-    log "🐳 Starting Docker-optimized installation..."
+# ============================================================================
+# Main Installation Flow
+# ============================================================================
 
-    # 1. Install dependencies (skip if already in image)
-    install_dependencies_docker
-
-    # 2. Run migrations with container database
-    run_migrations_docker
-
-    # 3. Set container-appropriate permissions
-    set_docker_permissions
-
-    # 4. Handle cron (or skip for containers)
-    handle_docker_cron
-
-    # 5. Create container-specific config
-    create_docker_config
-
-    # 6. Verify installation
-    verify_docker_installation
-}
-
-# Standard installation
-install_standard() {
-    log "🖥️  Starting standard installation..."
-
-    # Check LibreNMS installation
-    if [[ ! -d "$LIBRENMS_PATH" ]]; then
-        error "LibreNMS not found at $LIBRENMS_PATH"
-        exit 1
-    fi
-
-    # Check PHP version
-    PHP_VERSION=$(php -r "echo PHP_VERSION;")
-    if [[ $(php -r "echo version_compare('$PHP_VERSION', '8.0.0', '<');") == "1" ]]; then
-        error "PHP 8.0+ required. Current version: $PHP_VERSION"
-        exit 1
-    fi
-
-    # Check if GD extension is loaded
-    if ! php -m | grep -q gd; then
-        error "GD extension not loaded. Please install php-gd"
-        exit 1
-    fi
-
-    # Install via Composer
-    cd "$LIBRENMS_PATH/html/plugins"
-    if [[ ! -d "WeathermapNG" ]]; then
-        log "📥 Cloning WeathermapNG..."
-        git clone https://github.com/lance0/weathermapNG.git
-    fi
-
-    cd WeathermapNG
-    log "📦 Installing dependencies..."
-    composer install --no-dev --optimize-autoloader
-
-    # Run migrations automatically
-    log "📊 Running database migrations..."
-    cd "$LIBRENMS_PATH"
-
-    # Try artisan plugin command first (if LibreNMS supports it)
-    if php artisan plugin:migrate WeathermapNG 2>/dev/null; then
-        log "✅ Migrations completed via artisan"
-    else
-        log "⚠️  Artisan migration failed, trying manual migration..."
-        php -r "
-        require 'vendor/autoload.php';
-        require 'bootstrap/app.php';
-        \$plugin = new \LibreNMS\Plugins\WeathermapNG\WeathermapNG();
-        try {
-            \$plugin->activate();
-            echo 'Manual migration completed\n';
-        } catch (Exception \$e) {
-            echo 'Migration failed: ' . \$e->getMessage() . '\n';
-            exit(1);
-        }
-        "
-    fi
-
-    # Set permissions
-    log "🔐 Setting permissions..."
-    chown -R librenms:librenms "$LIBRENMS_PATH/html/plugins/WeathermapNG"
-    chmod -R 755 "$LIBRENMS_PATH/html/plugins/WeathermapNG"
-    chmod -R 775 "$LIBRENMS_PATH/html/plugins/WeathermapNG/output"
-
-    if [[ -f "$LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php" ]]; then
-        chmod +x "$LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php"
-    fi
-
-    # Enable plugin (if LibreNMS has plugin management)
-    log "⚡ Checking plugin status..."
-    if php artisan plugin:list 2>/dev/null | grep -q "WeathermapNG"; then
-        if php artisan plugin:enable WeathermapNG 2>/dev/null; then
-            log "✅ Plugin enabled via artisan"
-        else
-            warn "⚠️  Could not enable plugin via artisan, please enable manually in web interface"
-        fi
-    else
-        info "ℹ️  Plugin not registered with artisan, please enable in LibreNMS web interface"
-    fi
-
-    # Set up cron job
-    log "⏰ Setting up cron job..."
-    CRON_LINE="*/5 * * * * librenms $LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php >> /var/log/librenms/weathermapng.log 2>&1"
-    CRON_FILE="/etc/cron.d/librenms"
-
-    if [[ -f "$CRON_FILE" ]]; then
-        if ! grep -q "weathermapng" "$CRON_FILE" 2>/dev/null; then
-            echo "$CRON_LINE" >> "$CRON_FILE"
-            log "✅ Cron job added"
-        else
-            log "ℹ️  Cron job already exists"
-        fi
-    else
-        warn "⚠️  Cron file not found at $CRON_FILE, please add cron job manually"
-    fi
-
-    # Verify installation
-    log "🔍 Verifying installation..."
-
-    # Check if tables were created
-    TABLES_CREATED=false
-    if mysql -u librenms -p librenms -e "SHOW TABLES LIKE 'wmng_%';" 2>/dev/null | grep -q "wmng_"; then
-        TABLES_CREATED=true
-        log "✅ Database tables created"
-    else
-        warn "⚠️  Database tables may not have been created"
-    fi
-
-    # Check if output directory is writable
-    if [[ -w "$LIBRENMS_PATH/html/plugins/WeathermapNG/output" ]]; then
-        log "✅ Output directory writable"
-    else
-        warn "⚠️  Output directory not writable"
-    fi
-
-    log ""
-    log "🎉 WeathermapNG installation completed!"
-    log "🌐 Access at: https://your-librenms/plugins/weathermapng"
-    log ""
-
-    if [[ "$TABLES_CREATED" == "true" ]]; then
-        log "📝 Next steps:"
-        log "   1. Log into LibreNMS web interface"
-        log "   2. Go to Overview → Plugins → Plugin Admin"
-        log "   3. Verify WeathermapNG is enabled"
-        log "   4. Create your first network map!"
-    else
-        warn "⚠️  Installation may have issues. Please check:"
-        warn "   - Database credentials"
-        warn "   - File permissions"
-        warn "   - PHP extensions"
-        warn "   - Check /var/log/librenms/weathermapng_install.log for details"
-    fi
-}
-
-# Docker-specific functions
-install_dependencies_docker() {
-    log "📦 Installing dependencies in container..."
-    if [[ -f "composer.json" ]]; then
-        # Check if composer is available
-        if command -v composer &> /dev/null; then
-            composer install --no-dev --optimize-autoloader
-        else
-            warn "⚠️  Composer not found in container, assuming dependencies are pre-installed"
-        fi
-    fi
-}
-
-run_migrations_docker() {
-    log "📊 Running database migrations in container..."
-
-    # Try to find and run LibreNMS bootstrap
-    if [[ -f "$LIBRENMS_PATH/bootstrap/app.php" ]]; then
-        cd "$LIBRENMS_PATH"
-        php -r "
-        require 'vendor/autoload.php';
-        require 'bootstrap/app.php';
-        \$plugin = new \LibreNMS\Plugins\WeathermapNG\WeathermapNG();
-        try {
-            \$plugin->activate();
-            echo 'Migration completed successfully\n';
-        } catch (Exception \$e) {
-            echo 'Migration failed: ' . \$e->getMessage() . '\n';
-            exit(1);
-        }
-        "
-    else
-        warn "⚠️  Could not find LibreNMS bootstrap, trying alternative migration..."
-        # Fallback: try to run migration directly
-        if [[ -f "database/migrations/2025_08_29_000001_create_weathermapng_tables.php" ]]; then
-            php -r "
-            \$migration = require 'database/migrations/2025_08_29_000001_create_weathermapng_tables.php';
-            try {
-                \$migration->up();
-                echo 'Direct migration completed\n';
-            } catch (Exception \$e) {
-                echo 'Direct migration failed: ' . \$e->getMessage() . '\n';
-            }
-            "
-        fi
-    fi
-}
-
-set_docker_permissions() {
-    log "🔐 Setting container-appropriate permissions..."
-
-    # In containers, we might be running as root or different user
-    if [[ "$DOCKER_ROOT" == "true" ]]; then
-        # Running as root in container
-        chmod -R 755 "$LIBRENMS_PATH/html/plugins/WeathermapNG"
-        chmod -R 775 "$LIBRENMS_PATH/html/plugins/WeathermapNG/output"
-        if [[ -f "$LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php" ]]; then
-            chmod +x "$LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php"
-        fi
-    else
-        # Try to set appropriate ownership
-        if command -v chown &> /dev/null; then
-            # Try common container users
-            for user in www-data nginx apache librenms; do
-                if id "$user" &>/dev/null; then
-                    chown -R "$user:$user" "$LIBRENMS_PATH/html/plugins/WeathermapNG" 2>/dev/null
-                    break
-                fi
-            done
-        fi
-        chmod -R 755 "$LIBRENMS_PATH/html/plugins/WeathermapNG"
-        chmod -R 775 "$LIBRENMS_PATH/html/plugins/WeathermapNG/output"
-    fi
-}
-
-handle_docker_cron() {
-    # Option 1: Skip cron (let container orchestration handle it)
-    if [[ -n "$SKIP_CRON" ]] || [[ "$DOCKER_ROOT" == "true" ]]; then
-        warn "⚠️  Skipping cron setup in container environment"
-        warn "   Use container orchestration (Docker Compose, Kubernetes) for scheduling"
-        create_cron_instructions
-        return 0
-    fi
-
-    # Option 2: Try container cron
-    if [[ -f "/etc/cron.d/librenms" ]] && [[ -w "/etc/cron.d/librenms" ]]; then
-        setup_container_cron
-    else
-        warn "⚠️  Cron not available in container - manual scheduling required"
-        create_cron_instructions
-    fi
-}
-
-setup_container_cron() {
-    CRON_LINE="*/5 * * * * librenms $LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php >> /var/log/librenms/weathermapng.log 2>&1"
-    CRON_FILE="/etc/cron.d/librenms"
-
-    if ! grep -q "weathermapng" "$CRON_FILE" 2>/dev/null; then
-        echo "$CRON_LINE" >> "$CRON_FILE"
-        log "✅ Cron job added to container"
-    else
-        log "ℹ️  Cron job already exists in container"
-    fi
-}
-
-create_cron_instructions() {
-    log "📋 Container Cron Instructions:"
-    log "   Add this to your Docker Compose or orchestration:"
-    log "   "
-    log "   command: >"
-    log "     bash -c \""
-    log "       while true; do"
-    log "         php $LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php"
-    log "         sleep 300"
-    log "       done"
-    log "     \""
-}
-
-create_docker_config() {
-    log "⚙️  Creating Docker-optimized configuration..."
-
-    CONFIG_FILE="$LIBRENMS_PATH/html/plugins/WeathermapNG/config/weathermapng.php"
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        cat > "$CONFIG_FILE" << 'EOF'
-<?php
-return [
-    'docker_mode' => true,
-    'default_width' => 800,
-    'default_height' => 600,
-    'poll_interval' => 300,
-    'thresholds' => [50, 80, 95],
-    'scale' => 'bits',
-    'rrd_base' => env('LIBRENMS_RRD_BASE', '/opt/librenms/rrd'),
-    'enable_local_rrd' => true,
-    'enable_api_fallback' => true,
-    'cache_ttl' => 300,
-    'colors' => [
-        'node_up' => '#28a745',
-        'node_down' => '#dc3545',
-        'node_warning' => '#ffc107',
-        'node_unknown' => '#6c757d',
-        'link_normal' => '#28a745',
-        'link_warning' => '#ffc107',
-        'link_critical' => '#dc3545',
-        'background' => '#ffffff',
-    ],
-    'rendering' => [
-        'image_format' => 'png',
-        'quality' => 90,
-        'font_size' => 10,
-        'node_radius' => 10,
-        'link_width' => 2,
-    ],
-    'security' => [
-        'allow_embed' => true,
-        'max_image_size' => 2048,
-    ],
-    'editor' => [
-        'grid_size' => 20,
-        'snap_to_grid' => true,
-        'auto_save' => true,
-        'auto_save_interval' => 30,
-    ],
-    // Docker-specific settings
-    'log_to_stdout' => env('LOG_TO_STDOUT', true),
-    'log_file' => env('WEATHERMAP_LOG', '/dev/stdout'),
-];
-EOF
-        log "✅ Docker configuration created"
-    else
-        log "ℹ️  Configuration file already exists"
-    fi
-}
-
-verify_docker_installation() {
-    log "🔍 Verifying Docker installation..."
-
-    # Check if output directory exists and is writable
-    if [[ -w "$LIBRENMS_PATH/html/plugins/WeathermapNG/output" ]]; then
-        log "✅ Output directory writable"
-    else
-        warn "⚠️  Output directory not writable"
-    fi
-
-    # Check if poller script exists and is executable
-    if [[ -f "$LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php" ]]; then
-        if [[ -x "$LIBRENMS_PATH/html/plugins/WeathermapNG/bin/map-poller.php" ]]; then
-            log "✅ Poller script executable"
-        else
-            warn "⚠️  Poller script not executable"
-        fi
-    else
-        warn "⚠️  Poller script not found"
-    fi
-
-    # Check if vendor directory exists (Composer dependencies)
-    if [[ -d "$LIBRENMS_PATH/html/plugins/WeathermapNG/vendor" ]]; then
-        log "✅ Dependencies available"
-    else
-        warn "⚠️  Dependencies not found - ensure they're installed in container image"
-    fi
-
-    log ""
-    log "🎉 Docker installation completed!"
-    log "🌐 Access at: https://your-librenms/plugins/weathermapng"
-    log ""
-    log "📋 Container-specific notes:"
-    log "   - Cron scheduling should be handled by your container orchestration"
-    log "   - Use Docker Compose or Kubernetes for automated polling"
-    log "   - Check container logs for WeathermapNG output"
-    log ""
-    log "📖 For Docker help, see: https://github.com/lance0/weathermapNG#docker-installation"
-}
-
-# Main execution logic
 main() {
-    if detect_docker; then
-        DOCKER_MODE=true
-        log "🐳 Docker environment detected - using container-optimized installation"
-        handle_user_context
-        detect_librenms_paths
-        install_docker
-    else
-        log "🖥️  Standard installation detected"
-        handle_user_context
-        detect_librenms_paths
-        install_standard
-    fi
+    echo -e "${CYAN}╔════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║          WeathermapNG Enhanced Installer v2.0          ║${NC}"
+    echo -e "${CYAN}║                  Mode: $INSTALL_MODE                   ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════════════════════╝${NC}"
+    echo
+    
+    # Set error trap
+    trap rollback ERR
+    
+    # Run installation steps
+    check_prerequisites
+    detect_environment
+    detect_librenms
+    download_plugin
+    install_dependencies
+    run_migrations
+    set_permissions
+    setup_cron
+    enable_plugin
+    verify_installation
+    
+    # Clear error trap
+    trap - ERR
+    
+    show_success
 }
 
-# Run main function
+# ============================================================================
+# Script Entry Point
+# ============================================================================
+
+# Show help if requested
+if [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+    echo "WeathermapNG Enhanced Installer"
+    echo ""
+    echo "Usage: $0 [mode]"
+    echo ""
+    echo "Modes:"
+    echo "  express  - Fully automatic installation (default)"
+    echo "  custom   - Interactive installation with prompts"
+    echo "  docker   - Optimized for Docker containers"
+    echo "  dev      - Development mode with all dependencies"
+    echo ""
+    echo "Examples:"
+    echo "  $0                    # Express installation"
+    echo "  $0 custom            # Interactive mode"
+    echo "  $0 docker            # Docker installation"
+    echo ""
+    exit 0
+fi
+
+# Start installation
 main "$@"
