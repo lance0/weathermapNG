@@ -94,14 +94,51 @@ check_prerequisites() {
     done
     
     # Check PHP extensions
-    local required_extensions=("gd" "json" "pdo" "mbstring" "mysqli")
+    local required_extensions=("gd" "json" "mbstring" "mysqli")
     for ext in "${required_extensions[@]}"; do
-        if ! php -m 2>/dev/null | grep -q "^$ext$"; then
+        if ! php -m 2>/dev/null | grep -qi "^$ext$"; then
             missing_deps+=("php-$ext")
         else
             log "PHP extension $ext found"
         fi
     done
+    
+    # Check PDO (uppercase in php -m output, included in php-common)
+    if ! php -m 2>/dev/null | grep -q "^PDO$"; then
+        # PDO should be in php-common
+        if command -v apt-get &> /dev/null; then
+            PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null || echo "")
+            if [[ -n "$PHP_VERSION" ]]; then
+                missing_deps+=("php${PHP_VERSION}-common")
+            else
+                missing_deps+=("php-common")
+            fi
+        else
+            missing_deps+=("php-common")
+        fi
+    else
+        log "PHP extension PDO found"
+    fi
+    
+    # Check for PDO MySQL driver (lowercase in php -m output)
+    if ! php -m 2>/dev/null | grep -q "^pdo_mysql$"; then
+        # Need php-mysql for PDO MySQL support
+        if command -v apt-get &> /dev/null; then
+            # Ubuntu/Debian - use version-specific package
+            PHP_VERSION=$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;" 2>/dev/null || echo "")
+            if [[ -n "$PHP_VERSION" ]]; then
+                missing_deps+=("php${PHP_VERSION}-mysql")
+            else
+                missing_deps+=("php-mysql")
+            fi
+        elif command -v yum &> /dev/null || command -v dnf &> /dev/null; then
+            missing_deps+=("php-mysqlnd")
+        else
+            missing_deps+=("php-mysql")
+        fi
+    else
+        log "PHP extension pdo_mysql found"
+    fi
     
     # Report missing dependencies
     if [[ ${#missing_deps[@]} -gt 0 ]]; then

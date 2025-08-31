@@ -124,7 +124,7 @@ check_and_fix('PHP Version', function() {
 }, null); // Can't auto-fix PHP version
 
 // 2. PHP Extensions Check
-$required_extensions = ['gd', 'json', 'pdo', 'mbstring'];
+$required_extensions = ['gd', 'json', 'mbstring'];
 foreach ($required_extensions as $ext) {
     check_and_fix("PHP Extension: $ext", function() use ($ext) {
         if (extension_loaded($ext)) {
@@ -133,6 +133,27 @@ foreach ($required_extensions as $ext) {
         return "Extension not loaded";
     }, null); // Can't auto-install PHP extensions
 }
+
+// Check PDO core (should be present with php-common)
+check_and_fix("PHP Extension: PDO", function() {
+    // extension_loaded is case-insensitive
+    if (extension_loaded('pdo')) {
+        return true;
+    }
+    // Get PHP version for accurate package suggestion
+    $phpVersion = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+    return "PDO not loaded - install php{$phpVersion}-common";
+}, null);
+
+// Check PDO MySQL driver
+check_and_fix("PHP Extension: pdo_mysql", function() {
+    if (extension_loaded('pdo_mysql')) {
+        return true;
+    }
+    // Get PHP version for accurate package suggestion
+    $phpVersion = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+    return "PDO MySQL not loaded - install php{$phpVersion}-mysql";
+}, null);
 
 // 3. Required Files Check
 $plugin_path = __DIR__;
