@@ -72,11 +72,11 @@ jobs:
       - name: Setup MySQL
         run: |
           sudo systemctl start mysql
-          # Use root without password for GitHub Actions MySQL
-          sudo mysql -u root -e "CREATE DATABASE IF NOT EXISTS librenms;"
-          sudo mysql -u root -e "CREATE USER IF NOT EXISTS 'librenms'@'localhost' IDENTIFIED BY 'password';"
-          sudo mysql -u root -e "GRANT ALL PRIVILEGES ON librenms.* TO 'librenms'@'localhost';"
-          sudo mysql -u root -e "FLUSH PRIVILEGES;"
+          # GitHub Actions MySQL uses root with sudo, no password needed when using sudo
+          sudo mysql -e "CREATE DATABASE IF NOT EXISTS librenms;"
+          sudo mysql -e "CREATE USER IF NOT EXISTS 'librenms'@'localhost' IDENTIFIED BY 'password';"
+          sudo mysql -e "GRANT ALL PRIVILEGES ON librenms.* TO 'librenms'@'localhost';"
+          sudo mysql -e "FLUSH PRIVILEGES;"
       
       - name: Run installation tests
         run: |
