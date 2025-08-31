@@ -2,9 +2,7 @@
 
 namespace App\Plugins\WeathermapNG;
 
-use LibreNMS\Interfaces\Plugins\SettingsHook;
-
-class Settings extends SettingsHook
+class Settings
 {
     public function settings(): array
     {
@@ -44,5 +42,11 @@ class Settings extends SettingsHook
                 'description' => 'Comma-separated percentage values for traffic coloring',
             ],
         ];
+    }
+
+    public function authorize($user): bool
+    {
+        // Only allow admin users to modify settings
+        return $user && $user->hasRole('admin');
     }
 }
