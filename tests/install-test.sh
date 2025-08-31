@@ -67,29 +67,42 @@ test_prerequisites() {
     fi
     
     # Test PHP extensions
-    for ext in gd json pdo mbstring; do
+    for ext in gd json mbstring; do
         if php -m 2>/dev/null | grep -q "^$ext$"; then
             test_pass "PHP extension $ext"
         else
             test_fail "PHP extension $ext" "Not loaded"
         fi
     done
+    
+    # PDO check (may show as PDO or pdo_mysql)
+    if php -m 2>/dev/null | grep -qi "pdo"; then
+        test_pass "PHP extension PDO"
+    else
+        test_fail "PHP extension PDO" "Not loaded"
+    fi
 }
 
 # Test 2: Installation script syntax
 test_script_syntax() {
     test_start "Installation script syntax"
     
-    if bash -n install.sh 2>"$TEST_LOG"; then
-        test_pass "install.sh syntax valid"
+    # Check if we're in the project root or need to find files
+    if [ -f "install.sh" ]; then
+        # We're in project root
+        if bash -n install.sh 2>"$TEST_LOG"; then
+            test_pass "install.sh syntax valid"
+        else
+            test_fail "install.sh syntax" "$(cat $TEST_LOG)"
+        fi
+        
+        if php -l verify.php &>"$TEST_LOG"; then
+            test_pass "verify.php syntax valid"
+        else
+            test_fail "verify.php syntax" "$(cat $TEST_LOG)"
+        fi
     else
-        test_fail "install.sh syntax" "$(cat $TEST_LOG)"
-    fi
-    
-    if php -l verify.php &>"$TEST_LOG"; then
-        test_pass "verify.php syntax valid"
-    else
-        test_fail "verify.php syntax" "$(cat $TEST_LOG)"
+        test_fail "install.sh" "Script not found in current directory: $(pwd)"
     fi
 }
 
@@ -131,8 +144,10 @@ test_verify_script() {
     
     # Save current directory and go to project root
     local original_dir=$(pwd)
-    local script_dir="$(cd "$(dirname "$0")" && pwd)"
-    local project_root="$(dirname "$script_dir")"
+    # Get the directory containing this script
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Project root is one level up from tests directory
+    local project_root="$(cd "$script_dir/.." && pwd)"
     
     cd "$project_root"
     
@@ -167,8 +182,10 @@ test_docker_config() {
     
     # Save current directory and go to project root
     local original_dir=$(pwd)
-    local script_dir="$(cd "$(dirname "$0")" && pwd)"
-    local project_root="$(dirname "$script_dir")"
+    # Get the directory containing this script
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Project root is one level up from tests directory
+    local project_root="$(cd "$script_dir/.." && pwd)"
     
     cd "$project_root"
     
@@ -197,8 +214,10 @@ test_installation_modes() {
     
     # Save current directory and go to project root
     local original_dir=$(pwd)
-    local script_dir="$(cd "$(dirname "$0")" && pwd)"
-    local project_root="$(dirname "$script_dir")"
+    # Get the directory containing this script
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Project root is one level up from tests directory
+    local project_root="$(cd "$script_dir/.." && pwd)"
     
     cd "$project_root"
     
@@ -234,8 +253,10 @@ test_file_integrity() {
     
     # Save current directory and go to project root
     local original_dir=$(pwd)
-    local script_dir="$(cd "$(dirname "$0")" && pwd)"
-    local project_root="$(dirname "$script_dir")"
+    # Get the directory containing this script
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Project root is one level up from tests directory
+    local project_root="$(cd "$script_dir/.." && pwd)"
     
     cd "$project_root"
     
@@ -267,8 +288,10 @@ test_composer_validation() {
     
     # Save current directory and go to project root
     local original_dir=$(pwd)
-    local script_dir="$(cd "$(dirname "$0")" && pwd)"
-    local project_root="$(dirname "$script_dir")"
+    # Get the directory containing this script
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    # Project root is one level up from tests directory
+    local project_root="$(cd "$script_dir/.." && pwd)"
     
     cd "$project_root"
     
@@ -296,6 +319,10 @@ main() {
     echo "======================================"
     echo "WeathermapNG Installation Test Suite"
     echo "======================================"
+    
+    # Debug: Show where we're running from
+    echo "Running from: $(pwd)"
+    echo "Script location: ${BASH_SOURCE[0]}"
     echo
     
     # Run all tests
