@@ -2,7 +2,7 @@
 # WeathermapNG Installation Test Suite
 # Tests installation process in various scenarios
 
-set -euo pipefail
+set -uo pipefail  # Remove -e to continue on errors (we handle them ourselves)
 
 # Test configuration
 TEST_DIR="/tmp/weathermapng-test-$$"
@@ -51,13 +51,20 @@ test_prerequisites() {
     fi
     
     # Test required commands
-    for cmd in git composer mysql; do
+    for cmd in git composer; do
         if command -v "$cmd" &>/dev/null; then
             test_pass "Command $cmd found"
         else
             test_fail "Command $cmd" "Not found in PATH"
         fi
     done
+    
+    # MySQL client is optional (might use service container)
+    if command -v mysql &>/dev/null; then
+        test_pass "Command mysql found (optional)"
+    else
+        echo -e "${YELLOW}ℹ${NC} mysql client not found (optional - may use service container)"
+    fi
     
     # Test PHP extensions
     for ext in gd json pdo mbstring; do
