@@ -49,7 +49,7 @@ php verify.php
 - **🔗 API Integration**: RESTful API for external systems
 - **📱 Embeddable**: Dashboard widgets and iframe support
 - **🔒 Secure**: Auth-guarded routes and secure file handling
-- **🔌 LibreNMS Integration**: Full plugin system compliance with hooks for Device Overview, Port Tabs, Menu, and Settings
+- **🔌 LibreNMS Integration**: Full plugin system compliance with hook-based architecture (Menu, Page, Settings)
 
 ## 📋 System Requirements
 
@@ -60,6 +60,15 @@ php verify.php
 | Database | MySQL/PostgreSQL | ✅ |
 | GD Extension | Enabled | ✅ |
 | Composer | Latest | ✅ |
+
+## ⚠️ Important: Plugin Architecture (LibreNMS 24.x)
+
+WeathermapNG uses LibreNMS's hook-based plugin system. The plugin extends specific hook classes:
+- **MenuEntryHook**: Adds menu items to LibreNMS navigation
+- **PageHook**: Creates custom plugin pages
+- **SettingsHook**: Manages plugin configuration
+
+**Note**: If you encounter "Interface not found" errors, ensure you're using LibreNMS 24.1.0 or later.
 
 ## 📦 Installation Methods
 
@@ -81,10 +90,10 @@ cd WeathermapNG
 - ✅ Configures cron job
 - ✅ Enables plugin in LibreNMS
 
-#### Method 2: Web-Based Installer (Easiest)
+#### Method 2: LibreNMS Plugin Manager
 1. Download and extract to `/opt/librenms/html/plugins/WeathermapNG`
-2. Visit: `https://your-librenms/plugins/weathermapng/install`
-3. Click **"Start Installation"**
+2. Enable via CLI: `./lnms plugin:enable WeathermapNG`
+3. Or via Web UI: Overview → Plugins → Plugin Admin → WeathermapNG → Enable
 4. Done! 🎉
 
 ### 🔧 Manual Installation (Advanced)
@@ -215,18 +224,6 @@ RUN cd /opt/librenms/html/plugins/WeathermapNG && \
 ENV LIBRENMS_DOCKER=true
 ```
 
-#### Method 3: Build-Time Installation
-```dockerfile
-FROM librenms/librenms:latest
-
-# Install WeathermapNG during build
-COPY WeathermapNG /opt/librenms/html/plugins/WeathermapNG
-RUN cd /opt/librenms/html/plugins/WeathermapNG && \
-    LIBRENMS_DOCKER=true ./install.sh
-
-# Set environment
-ENV LIBRENMS_DOCKER=true
-```
 
 ### Docker Configuration
 

@@ -20,24 +20,16 @@
     ],
     "hooks": {
         "Menu": {
-            "class": "LibreNMS\\Plugins\\WeathermapNG\\Hooks\\Menu",
-            "view": "WeathermapNG::hooks.menu"
-        },
-        "DeviceOverview": {
-            "class": "LibreNMS\\Plugins\\WeathermapNG\\Hooks\\DeviceOverview",
-            "view": "WeathermapNG::hooks.device-overview"
-        },
-        "PortTab": {
-            "class": "LibreNMS\\Plugins\\WeathermapNG\\Hooks\\PortTab",
-            "view": "WeathermapNG::hooks.port-tab"
-        },
-        "Settings": {
-            "class": "LibreNMS\\Plugins\\WeathermapNG\\Hooks\\Settings",
-            "view": "WeathermapNG::hooks.settings"
+            "class": "App\\Plugins\\WeathermapNG\\Menu",
+            "view": "weathermapng::menu"
         },
         "Page": {
-            "class": "LibreNMS\\Plugins\\WeathermapNG\\Hooks\\Page",
-            "view": "WeathermapNG::hooks.page"
+            "class": "App\\Plugins\\WeathermapNG\\Page",
+            "view": "weathermapng::page"
+        },
+        "Settings": {
+            "class": "App\\Plugins\\WeathermapNG\\Settings",
+            "view": "weathermapng::settings"
         }
     },
     "routes": {
@@ -49,8 +41,8 @@
         "seeders": "database/seeders"
     },
     "views": {
-        "namespace": "WeathermapNG",
-        "path": "Resources/views"
+        "namespace": "weathermapng",
+        "path": "resources/views/weathermapng"
     },
     "config": {
         "file": "config/weathermapng.php",

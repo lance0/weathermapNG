@@ -1,5 +1,12 @@
 # WeathermapNG Installation Guide
 
+## ⚠️ Important: LibreNMS 24.x Compatibility
+
+WeathermapNG has been updated to use LibreNMS's hook-based plugin architecture. If you're upgrading from an older version:
+1. Remove any old `WeathermapNG.php` file that implements non-existent interfaces
+2. Ensure you're running LibreNMS 24.1.0 or later
+3. The plugin now uses hooks in `app/Plugins/WeathermapNG/` directory
+
 ## 🚀 Quick Start (1 minute!)
 
 ### One-Line Installation
@@ -38,7 +45,7 @@ cd WeathermapNG
 - ✅ Sets up database
 - ✅ Configures permissions
 - ✅ Adds cron job
-- ✅ Attempts to enable plugin
+- ✅ Enables plugin via LibreNMS CLI
 
 ### Method 2: Custom Installation
 ```bash
@@ -86,9 +93,15 @@ echo '*/5 * * * * librenms php /opt/librenms/html/plugins/WeathermapNG/bin/map-p
 ```
 
 4. **Enable Plugin**
-- Go to LibreNMS web interface
-- Navigate to: Overview → Plugins → Plugin Admin
-- Enable WeathermapNG
+```bash
+# Via CLI (recommended)
+cd /opt/librenms
+./lnms plugin:enable WeathermapNG
+
+# Or via Web UI
+# Navigate to: Overview → Plugins → Plugin Admin
+# Click Enable for WeathermapNG
+```
 
 ## Verification & Troubleshooting
 
@@ -103,8 +116,11 @@ php verify.php --fix   # Auto-fix issues
 
 #### Prerequisites Missing?
 ```bash
-# Debian/Ubuntu
-sudo apt-get install php8.0-gd php8.0-mbstring php8.0-mysql composer git
+# Debian/Ubuntu (PHP 8.3)
+sudo apt-get install php8.3-gd php8.3-mbstring php8.3-mysql composer git
+
+# Debian/Ubuntu (Default PHP)
+sudo apt-get install php-gd php-mbstring php-mysql composer git
 
 # RHEL/CentOS
 sudo yum install php-gd php-mbstring php-mysqlnd composer git
@@ -125,6 +141,21 @@ sudo chmod -R 775 /opt/librenms/html/plugins/WeathermapNG/output
 2. Clear LibreNMS cache: `cd /opt/librenms && php artisan cache:clear`
 3. Check logs: `tail -f /var/log/librenms/weathermapng.log`
 
+#### "Interface not found" Error?
+This means you're using the old plugin structure. Fix:
+```bash
+# Remove old incompatible plugin file
+rm /opt/librenms/html/plugins/WeathermapNG/WeathermapNG.php
+
+# Pull latest version
+cd /opt/librenms/html/plugins/WeathermapNG
+git pull
+
+# Re-enable plugin
+cd /opt/librenms
+./lnms plugin:enable WeathermapNG
+```
+
 #### Database Issues?
 ```bash
 # Check if tables exist
@@ -133,6 +164,29 @@ mysql -u librenms -p librenms -e "SHOW TABLES LIKE 'wmng_%';"
 # Run migrations manually
 cd /opt/librenms
 php artisan plugin:migrate WeathermapNG
+```
+
+## Plugin Structure (LibreNMS 24.x)
+
+The plugin follows LibreNMS's hook-based architecture:
+
+```
+WeathermapNG/
+├── app/
+│   └── Plugins/
+│       └── WeathermapNG/
+│           ├── Menu.php         # Menu hook
+│           ├── Page.php         # Page hook
+│           └── Settings.php     # Settings hook
+├── resources/
+│   └── views/
+│       └── weathermapng/
+│           ├── menu.blade.php
+│           ├── page.blade.php
+│           └── settings.blade.php
+├── routes.php                   # Plugin routes
+├── plugin.json                  # Plugin metadata
+└── install.sh                   # Installation script
 ```
 
 ## System Requirements
