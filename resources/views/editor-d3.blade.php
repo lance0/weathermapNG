@@ -277,18 +277,21 @@
                                             <option value="Gbps">Gbps</option>
                                         </select>
                                     </div>
+                                    <div class="form-text" id="link-bw-help"></div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small">Port A</label>
                                     <select class="form-select form-select-sm" id="link-port-a">
                                         <option value="">Auto</option>
                                     </select>
+                                    <div class="form-text" id="link-port-a-help"></div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small">Port B</label>
                                     <select class="form-select form-select-sm" id="link-port-b">
                                         <option value="">Auto</option>
                                     </select>
+                                    <div class="form-text" id="link-port-b-help"></div>
                                 </div>
                                 <div class="d-grid gap-2 mb-2">
                                     <button class="btn btn-sm btn-primary" id="apply-link-btn">
@@ -969,41 +972,60 @@ class WeathermapEditor {
         document.getElementById('node-properties').style.display = 'none';
         document.getElementById('link-properties').style.display = 'none';
         
-        if (selected.length === 1) {
+        // Bulk link edit support
+        const allLinks = selected.length > 1 && selected.every(e => e.type === 'link');
+
+        if (selected.length === 1 || allLinks) {
             const element = selected[0];
             
-            if (element.type === 'node' || !element.type) {
+            if (!allLinks && (element.type === 'node' || !element.type)) {
                 // Show node properties
                 document.getElementById('node-properties').style.display = 'block';
                 document.getElementById('node-label').value = element.label || '';
                 document.getElementById('node-device').value = element.device_id || '';
                 document.getElementById('node-x').value = Math.round(element.x);
                 document.getElementById('node-y').value = Math.round(element.y);
-            } else if (element.type === 'link') {
+            } else if (element.type === 'link' || allLinks) {
                 // Show link properties
                 document.getElementById('link-properties').style.display = 'block';
-                document.getElementById('link-label').value = element.label || '';
+                const linkLabel = document.getElementById('link-label');
+                const bwHelp = document.getElementById('link-bw-help');
+                linkLabel.value = allLinks ? '' : (element.label || '');
                 // Infer units from bandwidth_bps
                 const unitSel = document.getElementById('link-bandwidth-unit');
                 const bwField = document.getElementById('link-bandwidth');
-                if (element.bandwidth_bps && element.bandwidth_bps >= 1e9) {
+                if (!allLinks && element.bandwidth_bps && element.bandwidth_bps >= 1e9) {
                     unitSel.value = 'Gbps';
                     bwField.value = Math.round(element.bandwidth_bps / 1e9);
-                } else if (element.bandwidth_bps) {
+                } else if (!allLinks && element.bandwidth_bps) {
                     unitSel.value = 'Mbps';
                     bwField.value = Math.round(element.bandwidth_bps / 1e6);
                 } else {
                     unitSel.value = 'Mbps';
                     bwField.value = '';
                 }
-                // Populate ports for endpoints
-                this.populateLinkPorts(element);
+                bwHelp.textContent = allLinks ? 'Bulk edit: applies bandwidth/label to all selected links. Ports disabled.' : '';
+                // Populate ports for endpoints when single link
+                this.populateLinkPorts(allLinks ? null : element);
+                // Disable port selects for bulk edits
+                document.getElementById('link-port-a').disabled = allLinks;
+                document.getElementById('link-port-b').disabled = allLinks;
             }
         }
     }
 
     // Populate port dropdowns for selected link based on endpoint devices
     async populateLinkPorts(link) {
+        const helpA = document.getElementById('link-port-a-help');
+        const helpB = document.getElementById('link-port-b-help');
+        helpA.textContent = '';
+        helpB.textContent = '';
+        if (!link) {
+            // bulk mode: clear selects
+            document.getElementById('link-port-a').innerHTML = '<option value="">Auto</option>';
+            document.getElementById('link-port-b').innerHTML = '<option value="">Auto</option>';
+            return;
+        }
         const srcNode = editorState.nodes.find(n => n.id === link.source);
         const dstNode = editorState.nodes.find(n => n.id === link.target);
         const selA = document.getElementById('link-port-a');
@@ -1031,21 +1053,31 @@ class WeathermapEditor {
         try {
             if (srcNode && srcNode.device_id) {
                 const portsA = await loadPorts(srcNode.device_id);
+                if (!portsA.length) {
+                    helpA.textContent = 'No ports found on source device.';
+                }
                 portsA.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.port_id;
                     opt.text = p.ifName || `Port ${p.port_id}`;
                     selA.add(opt);
                 });
+            } else {
+                helpA.textContent = 'No device selected on source node.';
             }
             if (dstNode && dstNode.device_id) {
                 const portsB = await loadPorts(dstNode.device_id);
+                if (!portsB.length) {
+                    helpB.textContent = 'No ports found on destination device.';
+                }
                 portsB.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.port_id;
                     opt.text = p.ifName || `Port ${p.port_id}`;
                     selB.add(opt);
                 });
+            } else {
+                helpB.textContent = 'No device selected on destination node.';
             }
         } catch (e) {
             this.showStatus('Failed to load ports', 'error');
@@ -1053,6 +1085,10 @@ class WeathermapEditor {
         // Set selected values if present
         selA.value = link.port_id_a ? String(link.port_id_a) : '';
         selB.value = link.port_id_b ? String(link.port_id_b) : '';
+
+        // Change listeners to update local state
+        selA.onchange = () => { link.port_id_a = selA.value ? parseInt(selA.value, 10) : null; };
+        selB.onchange = () => { link.port_id_b = selB.value ? parseInt(selB.value, 10) : null; };
     }
     
     saveNodePosition(node) {
@@ -1569,7 +1605,8 @@ class WeathermapEditor {
     // Apply changes from the link properties panel
     applyLinkChanges() {
         if (!editorState.selectedElements[0]) return;
-        const l = editorState.selectedElements[0];
+        const selected = editorState.selectedElements.filter(e => e.type === 'link');
+        const l = selected[0];
         const bwField = document.getElementById('link-bandwidth');
         const unitField = document.getElementById('link-bandwidth-unit');
         const labelField = document.getElementById('link-label');
@@ -1579,34 +1616,43 @@ class WeathermapEditor {
         if (!isNaN(bwVal) && bwVal > 0) {
             bps = Math.round(bwVal * (unit === 'Gbps' ? 1e9 : 1e6));
         }
-        const payload = {
-            bandwidth_bps: bps,
-            port_id_a: (document.getElementById('link-port-a')?.value || '') || null,
-            port_id_b: (document.getElementById('link-port-b')?.value || '') || null,
-            style: { ...(l.style || {}), label: (labelField?.value || '') }
-        };
-        l.bandwidth_bps = bps;
-        l.port_id_a = payload.port_id_a ? parseInt(payload.port_id_a, 10) : null;
-        l.port_id_b = payload.port_id_b ? parseInt(payload.port_id_b, 10) : null;
-        l.style = payload.style;
-        l.label = labelField?.value || '';
-        fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/link/${l.id}`, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify(payload)
-        }).then(r => r.json())
-          .then(data => {
-              if (data && data.success) {
-                  this.showStatus('Link updated');
-                  this.addToHistory();
-              } else {
-                  this.showStatus('Failed to update link', 'error');
-              }
-          })
-          .catch(() => this.showStatus('Failed to update link', 'error'));
+        const newLabel = labelField?.value || '';
+        const isBulk = selected.length > 1;
+        const updates = [];
+        selected.forEach(link => {
+            const payload = {
+                bandwidth_bps: bps,
+                style: { ...(link.style || {}), label: newLabel }
+            };
+            if (!isBulk) {
+                payload.port_id_a = (document.getElementById('link-port-a')?.value || '') || null;
+                payload.port_id_b = (document.getElementById('link-port-b')?.value || '') || null;
+            }
+            // Update local state
+            link.bandwidth_bps = bps;
+            link.label = newLabel;
+            link.style = payload.style;
+            if (!isBulk) {
+                link.port_id_a = payload.port_id_a ? parseInt(payload.port_id_a, 10) : null;
+                link.port_id_b = payload.port_id_b ? parseInt(payload.port_id_b, 10) : null;
+            }
+            updates.push(fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/link/${link.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify(payload)
+            }).then(r => r.json()));
+        });
+
+        Promise.all(updates)
+            .then(responses => {
+                const ok = responses.every(d => d && d.success);
+                this.showStatus(ok ? (isBulk ? `Updated ${selected.length} links` : 'Link updated') : 'Some updates failed', ok ? 'info' : 'error');
+                if (ok) this.addToHistory();
+            })
+            .catch(() => this.showStatus('Failed to update links', 'error'));
     }
     
     showStatus(message, type = 'info') {
