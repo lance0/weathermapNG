@@ -127,6 +127,7 @@
     <script>
         const mapId = '{{ $mapId }}';
         const baseUrl = '{{ url("/") }}';
+        const deviceBaseUrl = '{{ url("device") }}';
         const WMNG_CONFIG = {
             thresholds: {!! json_encode(config('weathermapng.thresholds') ?? [50, 80, 95]) !!},
             colors: {
@@ -158,6 +159,7 @@
             mapData = { error: 'Invalid map data' };
         }
         let canvas, ctx, heatCanvas, heatCtx, minimap;
+        let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
         let animationId;
         let lastUpdate = Date.now();
         let animTick = 0;
@@ -238,6 +240,9 @@
             const offsetX = (canvas.width - mapWidth * scale) / 2;
             const offsetY = (canvas.height - mapHeight * scale) / 2;
 
+            // Expose transform for hit testing
+            viewScale = scale; viewOffsetX = offsetX; viewOffsetY = offsetY;
+
             ctx.save();
             ctx.translate(offsetX, offsetY);
             ctx.scale(scale, scale);
@@ -266,6 +271,7 @@
             }
         }
 
+        const nodeGeoms = [];
         function drawNode(node) {
             const x = (node.position?.x ?? node.x) || 0;
             const y = (node.position?.y ?? node.y) || 0;
@@ -309,6 +315,9 @@
                 ctx.strokeStyle = '#fff';
                 ctx.stroke();
             }
+
+            // store geometry for hover
+            nodeGeoms.push({ x, y, r: radius, node });
         }
 
         function drawLink(link) {
@@ -877,14 +886,38 @@
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            // find nearest segment
+            const mx = (x - viewOffsetX) / Math.max(0.0001, viewScale);
+            const my = (y - viewOffsetY) / Math.max(0.0001, viewScale);
+            // Node hover first
+            let nbest = null; let nd = 1e9;
+            for (const g of nodeGeoms) {
+                const d = Math.hypot(mx - g.x, my - g.y) - g.r;
+                if (d < nd && d < 8) { nd = d; nbest = g; }
+            }
             let best = null, bestDist = 12; // threshold px
-            for (const g of linkGeoms) {
-                const d = distToSegment(x, y, g.x1, g.y1, g.x2, g.y2);
-                if (d < bestDist) { bestDist = d; best = g; }
+            if (!nbest) {
+                for (const g of linkGeoms) {
+                    const lx1 = g.x1 * viewScale + viewOffsetX;
+                    const ly1 = g.y1 * viewScale + viewOffsetY;
+                    const lx2 = g.x2 * viewScale + viewOffsetX;
+                    const ly2 = g.y2 * viewScale + viewOffsetY;
+                    const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
+                    if (d < bestDist) { bestDist = d; best = g; }
+                }
             }
             const tooltip = document.getElementById('tooltip');
-            if (best) {
+            if (nbest) {
+                const n = nbest.node;
+                const t = n.traffic || {};
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.pageX + 10) + 'px';
+                tooltip.style.top = (e.pageY + 10) + 'px';
+                const sum = t.sum_bps ?? n.current_value ?? 0;
+                tooltip.innerHTML = `${n.label || n.id}<br>` +
+                  `In: ${humanBits(t.in_bps ?? 0)}<br>` +
+                  `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
+                  `Sum: ${humanBits(sum ?? 0)}`;
+            } else if (best) {
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.pageX + 10) + 'px';
                 tooltip.style.top = (e.pageY + 10) + 'px';
@@ -893,14 +926,33 @@
                 tooltip.style.display = 'none';
             }
         });
-        // Click link to open historical graphs
+        // Click: node → device page; else link → port graphs
         document.getElementById('map-canvas').addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+            const mx = (x - viewOffsetX) / Math.max(0.0001, viewScale);
+            const my = (y - viewOffsetY) / Math.max(0.0001, viewScale);
+            // Node first
+            for (const g of nodeGeoms) {
+                if (Math.hypot(mx - g.x, my - g.y) <= g.r + 4) {
+                    const n = g.node;
+                    const did = n.device_id || n.deviceId || n.deviceid;
+                    if (did) {
+                        const url = deviceBaseUrl + '/' + did;
+                        window.open(url, '_blank');
+                        return;
+                    }
+                }
+            }
+            // Else link
             let best = null, bestDist = 10;
             for (const g of linkGeoms) {
-                const d = distToSegment(x, y, g.x1, g.y1, g.x2, g.y2);
+                const lx1 = g.x1 * viewScale + viewOffsetX;
+                const ly1 = g.y1 * viewScale + viewOffsetY;
+                const lx2 = g.x2 * viewScale + viewOffsetX;
+                const ly2 = g.y2 * viewScale + viewOffsetY;
+                const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
                 if (d < bestDist) { bestDist = d; best = g; }
             }
             if (best && best.link) {
