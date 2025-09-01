@@ -886,12 +886,13 @@ class WeathermapEditor {
                 ? editorState.links.filter(l => (l.label || '').length > 0)
                 : [], d => d.id);
 
+        const linkLabelSize = parseInt(document.getElementById('label-size')?.value || '12', 10);
         const linkLabelEnter = linkLabelGroups.enter()
             .append('g')
             .attr('class', 'link-label');
         linkLabelEnter.append('text')
             .attr('text-anchor', 'middle')
-            .attr('font-size', '12px')
+            .attr('font-size', `${linkLabelSize}px`)
             .attr('font-weight', '600')
             .attr('fill', '#ffffff')
             .attr('stroke', '#000000')
@@ -901,6 +902,7 @@ class WeathermapEditor {
         const linkLabelMerged = linkLabelGroups.merge(linkLabelEnter);
         linkLabelMerged.select('rect').remove(); // remove any old backgrounds if present
         linkLabelMerged.select('text')
+            .attr('font-size', `${linkLabelSize}px`)
             .attr('x', d => {
                 const s = editorState.nodes.find(n => n.id === d.source);
                 const t = editorState.nodes.find(n => n.id === d.target);
@@ -921,12 +923,13 @@ class WeathermapEditor {
                 .selectAll('.node-label')
                 .data(editorState.nodes, d => d.id);
 
+            const nodeLabelSize = parseInt(document.getElementById('label-size')?.value || '12', 10);
             const nodeLabelEnter = nodeLabels.enter()
                 .append('g')
                 .attr('class', 'node-label');
             nodeLabelEnter.append('text')
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '13px')
+                .attr('font-size', `${nodeLabelSize}px`)
                 .attr('font-weight', '600')
                 .attr('fill', '#ffffff')
                 .attr('stroke', '#000000')
@@ -936,6 +939,7 @@ class WeathermapEditor {
             const nodeLabelMerged = nodeLabels.merge(nodeLabelEnter);
             nodeLabelMerged.select('rect').remove(); // remove any old backgrounds
             nodeLabelMerged.select('text')
+                .attr('font-size', `${nodeLabelSize}px`)
                 .attr('x', d => d.x)
                 .attr('y', d => d.y + 35)
                 .text(d => d.label || '');
@@ -1122,8 +1126,52 @@ class WeathermapEditor {
                     try { localStorage.setItem(advKey, '1'); } catch (e) {}
                 }
                 setBadge(allLinks ? `Bulk Links (${selected.length})` : 'Link', allLinks ? 'bg-warning text-dark' : 'bg-success');
+                // Validate after populating
+                this.validateLinkForm();
             }
         }
+    }
+
+    // Validate link form and enable/disable Apply accordingly
+    validateLinkForm() {
+        const sel = editorState.selectedElements || [];
+        const allLinks = sel.length > 1 && sel.every(e => e.type === 'link');
+        const applyBtn = document.getElementById('apply-link-btn');
+        const bwField = document.getElementById('link-bandwidth');
+        const unitField = document.getElementById('link-bandwidth-unit');
+        const portA = document.getElementById('link-port-a');
+        const portB = document.getElementById('link-port-b');
+        const helpBw = document.getElementById('link-bw-help');
+        const helpA = document.getElementById('link-port-a-help');
+        const helpB = document.getElementById('link-port-b-help');
+        let valid = true;
+        // Bandwidth: allow blank, otherwise number >= 0
+        const bwVal = (bwField?.value || '').trim();
+        if (bwVal !== '') {
+            const n = Number(bwVal);
+            if (!isFinite(n) || n < 0) {
+                valid = false;
+                if (helpBw) { helpBw.textContent = 'Enter a non-negative number or leave blank.'; helpBw.classList.add('text-danger'); }
+            } else if (helpBw) { helpBw.textContent = ''; helpBw.classList.remove('text-danger'); }
+        } else if (helpBw) { helpBw.textContent = ''; helpBw.classList.remove('text-danger'); }
+        // Ports validation only for single link mode
+        if (!allLinks && sel.length === 1 && sel[0]?.type === 'link') {
+            const link = sel[0];
+            const srcNode = editorState.nodes.find(n => n.id === link.source);
+            const dstNode = editorState.nodes.find(n => n.id === link.target);
+            const portAVal = portA?.value || '';
+            const portBVal = portB?.value || '';
+            // If a port is chosen, require corresponding device
+            if (portAVal && !srcNode?.device_id) { valid = false; if (helpA) { helpA.textContent = 'Select a source device to use ports.'; helpA.classList.add('text-danger'); } }
+            else if (helpA) { /* keep previous info if any */ if (!helpA.classList.contains('text-muted')) helpA.classList.remove('text-danger'); }
+            if (portBVal && !dstNode?.device_id) { valid = false; if (helpB) { helpB.textContent = 'Select a destination device to use ports.'; helpB.classList.add('text-danger'); } }
+            else if (helpB) { if (!helpB.classList.contains('text-muted')) helpB.classList.remove('text-danger'); }
+        } else {
+            if (helpA) { helpA.classList.remove('text-danger'); }
+            if (helpB) { helpB.classList.remove('text-danger'); }
+        }
+        if (applyBtn) applyBtn.disabled = !valid;
+        return valid;
     }
 
     // Populate port dropdowns for selected link based on endpoint devices
@@ -1264,6 +1312,14 @@ class WeathermapEditor {
                     type: 'link'
                 }));
                 this.render();
+                // Restore label size option when available
+                try {
+                    const lbl = data.options && data.options.label_size ? parseInt(data.options.label_size, 10) : null;
+                    if (lbl && document.getElementById('label-size')) {
+                        document.getElementById('label-size').value = lbl;
+                        editorState.needsRender = true;
+                    }
+                } catch (e) {}
             });
     }
     
@@ -1436,6 +1492,21 @@ class WeathermapEditor {
                 this.applyBackgroundPreset(preset);
             });
         }
+
+        // Label size live update
+        const labelSize = document.getElementById('label-size');
+        if (labelSize) labelSize.addEventListener('input', () => { editorState.needsRender = true; });
+
+        // Link validation events
+        const bwField = document.getElementById('link-bandwidth');
+        const unitField = document.getElementById('link-bandwidth-unit');
+        const portA = document.getElementById('link-port-a');
+        const portB = document.getElementById('link-port-b');
+        const revalidate = () => this.validateLinkForm();
+        if (bwField) bwField.addEventListener('input', revalidate);
+        if (unitField) unitField.addEventListener('change', revalidate);
+        if (portA) portA.addEventListener('change', revalidate);
+        if (portB) portB.addEventListener('change', revalidate);
 
         // Link advanced toggle (separate prefs for single vs bulk)
         const advBtn = document.getElementById('toggle-link-advanced');
@@ -1870,6 +1941,7 @@ class WeathermapEditor {
     // Apply changes from the link properties panel
     applyLinkChanges() {
         if (!editorState.selectedElements[0]) return;
+        if (!this.validateLinkForm()) return;
         const selected = editorState.selectedElements.filter(e => e.type === 'link');
         const l = selected[0];
         const bwField = document.getElementById('link-bandwidth');
