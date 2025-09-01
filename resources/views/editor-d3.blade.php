@@ -156,6 +156,8 @@
                                 <g id="selection-layer"></g>
                             </g>
                         </svg>
+                        <!-- Hover tooltip for nodes/links (live preview) -->
+                        <div id="editor-tooltip" style="position:absolute; display:none; background: rgba(0,0,0,0.85); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; pointer-events:none; z-index:10;"></div>
                     </div>
                     
                     <!-- Minimap -->
@@ -866,9 +868,30 @@ class WeathermapEditor {
                 if (editorState.tool === 'add-link') {
                     d3.select(event.currentTarget).classed('hover-target', true);
                 }
+                // Show node tooltip with live traffic if available
+                const tip = document.getElementById('editor-tooltip');
+                const live = editorState.liveData && editorState.liveData.nodes ? editorState.liveData.nodes[d.id] : null;
+                const tr = live && live.traffic ? live.traffic : null;
+                if (tip && tr) {
+                    const human = (v) => {
+                        if (v >= 1e9) return (v/1e9).toFixed(2) + ' Gb/s';
+                        if (v >= 1e6) return (v/1e6).toFixed(2) + ' Mb/s';
+                        if (v >= 1e3) return (v/1e3).toFixed(2) + ' Kb/s';
+                        return (v||0) + ' b/s';
+                    };
+                    tip.innerHTML = `${d.label || ('Node ' + d.id)}<br>` +
+                        `In: ${human(tr.in_bps||0)}<br>` +
+                        `Out: ${human(tr.out_bps||0)}<br>` +
+                        `Sum: ${human(tr.sum_bps||0)}`;
+                    tip.style.display = 'block';
+                    tip.style.left = (event.pageX + 10) + 'px';
+                    tip.style.top = (event.pageY + 10) + 'px';
+                }
             })
             .on('mouseout', (event, d) => {
                 d3.select(event.currentTarget).classed('hover-target', false);
+                const tip = document.getElementById('editor-tooltip');
+                if (tip) tip.style.display = 'none';
             })
             .on('dblclick', (event, d) => this.editNode(d));
         
@@ -1034,6 +1057,14 @@ class WeathermapEditor {
 
     // Handle node click for both selection and linking
     onNodeClick(event, node) {
+        // Ctrl/Cmd click opens device page in a new tab
+        if ((event.ctrlKey || event.metaKey) && (node.device_id || node.deviceId)) {
+            const base = '{{ url('device') }}';
+            const did = node.device_id || node.deviceId;
+            window.open(base + '/' + did, '_blank');
+            event.stopPropagation();
+            return;
+        }
         if (editorState.tool === 'add-link') {
             event.stopPropagation();
             if (!editorState.linkStart) {
