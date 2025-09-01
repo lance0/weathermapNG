@@ -12,7 +12,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 PLUGIN_NAME="WeathermapNG"
-PLUGIN_DIR=$(dirname "$0")
+PLUGIN_DIR=$(cd "$(dirname "$0")" && pwd)  # Get absolute path
 LIBRENMS_PATH="${LIBRENMS_PATH:-/opt/librenms}"
 
 echo -e "${GREEN}========================================${NC}"
@@ -50,17 +50,29 @@ if [ -f "$PLUGIN_DIR/composer.json" ]; then
 fi
 
 # Step 3: Ensure plugin is in LibreNMS plugins directory
-if [ "$PLUGIN_DIR" != "$LIBRENMS_PATH/html/plugins/$PLUGIN_NAME" ]; then
-    warn "Plugin not in standard LibreNMS location"
-    warn "Expected: $LIBRENMS_PATH/html/plugins/$PLUGIN_NAME"
-    warn "Current: $PLUGIN_DIR"
-    echo ""
-    read -p "Create symlink to LibreNMS plugins directory? (y/n) " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log "Creating symlink..."
-        sudo ln -sfn "$PLUGIN_DIR" "$LIBRENMS_PATH/html/plugins/$PLUGIN_NAME"
+EXPECTED_DIR="$LIBRENMS_PATH/html/plugins/$PLUGIN_NAME"
+if [ "$PLUGIN_DIR" != "$EXPECTED_DIR" ]; then
+    # Check if we're already in a subdirectory of the expected location
+    if [[ "$PLUGIN_DIR" == "$EXPECTED_DIR"/* ]] || [[ "$EXPECTED_DIR" == "$PLUGIN_DIR"/* ]]; then
+        log "Plugin is in LibreNMS directory structure"
+    else
+        warn "Plugin not in standard LibreNMS location"
+        warn "Expected: $EXPECTED_DIR"
+        warn "Current: $PLUGIN_DIR"
+        echo ""
+        read -p "Create symlink to LibreNMS plugins directory? (y/n) " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            if [ -e "$EXPECTED_DIR" ]; then
+                warn "Target already exists, skipping symlink"
+            else
+                log "Creating symlink..."
+                sudo ln -sfn "$PLUGIN_DIR" "$EXPECTED_DIR"
+            fi
+        fi
     fi
+else
+    log "Plugin is in correct location"
 fi
 
 # Step 4: Run database migrations
@@ -81,14 +93,24 @@ fi
 log "Setting permissions..."
 if [ -d "$LIBRENMS_PATH" ]; then
     # Get LibreNMS user (usually librenms or www-data)
-    LIBRENMS_USER=$(stat -c '%U' "$LIBRENMS_PATH/logs" 2>/dev/null || echo "librenms")
+    if [ -f "$LIBRENMS_PATH/.env" ]; then
+        LIBRENMS_USER=$(grep -E "^LIBRENMS_USER=" "$LIBRENMS_PATH/.env" | cut -d'=' -f2 | tr -d '"' || echo "librenms")
+    else
+        LIBRENMS_USER=$(whoami)  # Use current user if can't determine
+    fi
     
-    # Set ownership
-    sudo chown -R "$LIBRENMS_USER:$LIBRENMS_USER" "$PLUGIN_DIR" 2>/dev/null || warn "Could not set ownership"
+    log "Using LibreNMS user: $LIBRENMS_USER"
+    
+    # Set ownership (only if we have permission)
+    if [ -w "$PLUGIN_DIR" ]; then
+        chown -R "$LIBRENMS_USER:$LIBRENMS_USER" "$PLUGIN_DIR" 2>/dev/null || warn "Could not set ownership (may need sudo)"
+    fi
     
     # Ensure output directories are writable
     [ -d "$PLUGIN_DIR/output" ] || mkdir -p "$PLUGIN_DIR/output"
-    chmod 755 "$PLUGIN_DIR/output"
+    [ -d "$PLUGIN_DIR/output/maps" ] || mkdir -p "$PLUGIN_DIR/output/maps"
+    [ -d "$PLUGIN_DIR/output/cache" ] || mkdir -p "$PLUGIN_DIR/output/cache"
+    chmod -R 755 "$PLUGIN_DIR/output"
 fi
 
 # Step 6: Clear Laravel caches
@@ -109,12 +131,35 @@ fi
 
 # Step 8: Setup cron job for poller
 log "Setting up cron job..."
-CRON_ENTRY="*/5 * * * * $LIBRENMS_USER php $PLUGIN_DIR/bin/map-poller.php >> /tmp/weathermapng.log 2>&1"
-if ! crontab -u "$LIBRENMS_USER" -l 2>/dev/null | grep -q "map-poller.php"; then
-    (crontab -u "$LIBRENMS_USER" -l 2>/dev/null; echo "$CRON_ENTRY") | crontab -u "$LIBRENMS_USER" -
-    log "Cron job added"
+if [ -f "$PLUGIN_DIR/bin/map-poller.php" ]; then
+    # Make poller executable
+    chmod +x "$PLUGIN_DIR/bin/map-poller.php"
+    
+    # Add to LibreNMS cron if not present
+    CRON_FILE="/etc/cron.d/librenms"
+    if [ -f "$CRON_FILE" ] && [ -w "$CRON_FILE" ]; then
+        if ! grep -q "map-poller.php" "$CRON_FILE"; then
+            echo "*/5 * * * * $LIBRENMS_USER php $PLUGIN_DIR/bin/map-poller.php >> /tmp/weathermapng.log 2>&1" | sudo tee -a "$CRON_FILE" > /dev/null
+            log "Cron job added to $CRON_FILE"
+        else
+            warn "Cron job already exists in $CRON_FILE"
+        fi
+    else
+        # Try user crontab as fallback
+        if command -v crontab >/dev/null 2>&1; then
+            if ! crontab -l 2>/dev/null | grep -q "map-poller.php"; then
+                (crontab -l 2>/dev/null; echo "*/5 * * * * php $PLUGIN_DIR/bin/map-poller.php >> /tmp/weathermapng.log 2>&1") | crontab -
+                log "Cron job added to user crontab"
+            else
+                warn "Cron job already exists in user crontab"
+            fi
+        else
+            warn "Could not add cron job - please add manually"
+            info "Add to cron: */5 * * * * php $PLUGIN_DIR/bin/map-poller.php"
+        fi
+    fi
 else
-    warn "Cron job already exists"
+    warn "Poller script not found at bin/map-poller.php"
 fi
 
 # Step 9: Verify installation
