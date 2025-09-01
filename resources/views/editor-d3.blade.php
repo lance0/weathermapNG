@@ -361,6 +361,14 @@
                                         <input type="number" class="form-control form-control-sm" id="geo-offset-y" value="0">
                                     </div>
                                 </div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button class="btn btn-sm btn-outline-secondary" id="geo-reset-btn" type="button">
+                                        <i class="fas fa-undo"></i> Reset Geo Transform
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" id="geo-fit-btn" type="button">
+                                        <i class="fas fa-expand"></i> Fit Geo To Bounds
+                                    </button>
+                                </div>
                                 <div class="form-text">Uses TopoJSON from world-atlas/us-atlas (CDN).</div>
                             </div>
                             <div class="mb-3">
@@ -847,7 +855,9 @@ class WeathermapEditor {
             nodeLabelEnter.append('rect').attr('class', 'label-bg');
             nodeLabelEnter.append('text')
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '12px');
+                .attr('font-size', '12px')
+                .attr('fill', '#111')
+                .attr('font-weight', '600');
 
             const nodeLabelMerged = nodeLabels.merge(nodeLabelEnter);
             nodeLabelMerged.each(function(d) {
@@ -1310,6 +1320,27 @@ class WeathermapEditor {
             const height = this.svg.node().clientHeight;
             const limY = height * 2;
             geoOffY.value = Math.max(-limY, Math.min(limY, parseFloat(geoOffY.value || '0')));
+            this.renderGeoBackground();
+        });
+        const geoReset = document.getElementById('geo-reset-btn');
+        const geoFit = document.getElementById('geo-fit-btn');
+        if (geoReset) geoReset.addEventListener('click', () => {
+            const s = document.getElementById('geo-scale');
+            const ox = document.getElementById('geo-offset-x');
+            const oy = document.getElementById('geo-offset-y');
+            if (s) s.value = 1;
+            if (ox) ox.value = 0;
+            if (oy) oy.value = 0;
+            this.renderGeoBackground();
+        });
+        if (geoFit) geoFit.addEventListener('click', () => {
+            // Same as reset, ensures projection refits via render
+            const s = document.getElementById('geo-scale');
+            const ox = document.getElementById('geo-offset-x');
+            const oy = document.getElementById('geo-offset-y');
+            if (s) s.value = 1;
+            if (ox) ox.value = 0;
+            if (oy) oy.value = 0;
             this.renderGeoBackground();
         });
         
