@@ -1,8 +1,8 @@
-<div class="panel panel-default">
-    <div class="panel-heading">
-        <h3 class="panel-title">{{ $title }}</h3>
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">{{ $title }}</h3>
     </div>
-    <div class="panel-body">
+    <div class="card-body">
         @if($saved)
             <div class="alert alert-success">
                 <i class="fa fa-check"></i> Settings saved successfully!
@@ -87,7 +87,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fa fa-save"></i> Save Settings
                     </button>
-                    <a href="{{ route('plugin.page', ['plugin' => 'WeathermapNG']) }}" class="btn btn-default">
+                    <a href="{{ route('plugin.page', ['plugin' => 'WeathermapNG']) }}" class="btn btn-secondary">
                         Cancel
                     </a>
                 </div>
