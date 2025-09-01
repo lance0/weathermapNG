@@ -253,8 +253,13 @@
         function getNodeColor(node) {
             const status = node.status || 'unknown';
             const colors = WMNG_CONFIG.colors || {};
-            if (status === 'up') return colors.node_up || '#28a745';
             if (status === 'down') return colors.node_down || '#dc3545';
+            // If up but CPU or MEM high, warn
+            const cpu = node.metrics?.cpu;
+            const mem = node.metrics?.mem;
+            const warn = (v) => typeof v === 'number' && v >= (WMNG_CONFIG.thresholds?.[1] ?? 80);
+            if (status === 'up' && (warn(cpu) || warn(mem))) return colors.node_warning || '#ffc107';
+            if (status === 'up') return colors.node_up || '#28a745';
             return colors.node_unknown || '#6c757d';
         }
 

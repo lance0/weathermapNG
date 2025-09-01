@@ -34,5 +34,7 @@ class RoutesSmokeTest extends TestCase
         $this->assertStringContainsString("/api/maps/{map}/save", $routes);
         $this->assertStringContainsString("/map/{map}/node/{node}", $routes);
         $this->assertStringContainsString("/map/{map}/link/{link}", $routes);
+        $this->assertStringContainsString("/map/{map}/node", $routes);
+        $this->assertStringContainsString("/map/{map}/link", $routes);
     }
 }
