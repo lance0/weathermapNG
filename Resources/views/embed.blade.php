@@ -82,6 +82,9 @@
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
         <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
+        <div id="controls" style="position:absolute; top:10px; left:10px; z-index:1000; display:flex; gap:8px;">
+            <button id="toggle-transport" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Live: loading…</button>
+        </div>
     </div>
 
     <script>
@@ -96,8 +99,20 @@
                 'node_up' => '#28a745',
                 'node_down' => '#dc3545',
                 'node_unknown' => '#6c757d'
-            ]))
+            ])),
+            enable_sse: @json(config('weathermapng.enable_sse', true)),
+            client_refresh: @json(config('weathermapng.client_refresh', 60)),
+            scale: @json(config('weathermapng.scale', 'bits')),
         };
+        const urlParams = new URLSearchParams(window.location.search);
+        const param = (k, d) => urlParams.has(k) ? urlParams.get(k) : d;
+        let scale = (param('scale', WMNG_CONFIG.scale) || '').toLowerCase();
+        if (scale !== 'bytes') scale = 'bits';
+        let intervalSec = parseInt(param('interval', WMNG_CONFIG.client_refresh), 10) || WMNG_CONFIG.client_refresh;
+        let sseEnabled = param('sse', WMNG_CONFIG.enable_sse ? '1' : '0') !== '0' && !!window.EventSource;
+        let sseMax = parseInt(param('max', 60), 10) || 60;
+        let currentTransport = 'init';
+        let eventSourceRef = null;
         let mapData = @json($mapData);
         let canvas, ctx;
         let animationId;
@@ -261,25 +276,69 @@
 
         // Live updates via SSE (fallback to polling)
         function startLiveUpdates() {
-            if (!!window.EventSource) {
-                try {
-                    const es = new EventSource(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/sse`);
-                    es.onmessage = (e) => {
-                        try {
-                            const live = JSON.parse(e.data);
-                            applyLiveUpdate(live);
-                        } catch {}
-                    };
-                    es.onerror = () => {
-                        es.close();
-                        startAutoUpdate();
-                    };
-                    return;
-                } catch (e) {
-                    // fall through to polling
-                }
+            updateTransportButton();
+            if (sseEnabled) {
+                startSSE();
+            } else {
+                startAutoUpdate();
             }
-            startAutoUpdate();
+            const btn = document.getElementById('toggle-transport');
+            btn.addEventListener('click', () => {
+                if (currentTransport === 'sse') {
+                    stopSSE();
+                    sseEnabled = false;
+                    startAutoUpdate();
+                } else {
+                    stopPolling();
+                    sseEnabled = true;
+                    startSSE();
+                }
+            });
+        }
+
+        let pollTimer = null;
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        function startSSE() {
+            try {
+                stopPolling();
+                if (eventSourceRef) { try { eventSourceRef.close(); } catch {} }
+                const url = `${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/sse?interval=${intervalSec}&max=${sseMax}`;
+                const es = new EventSource(url);
+                eventSourceRef = es;
+                currentTransport = 'sse';
+                updateTransportButton();
+                es.onmessage = (e) => {
+                    try {
+                        const live = JSON.parse(e.data);
+                        applyLiveUpdate(live);
+                    } catch {}
+                };
+                es.onerror = () => {
+                    es.close();
+                    eventSourceRef = null;
+                    // fall back to polling
+                    currentTransport = 'poll';
+                    sseEnabled = false;
+                    startAutoUpdate();
+                };
+            } catch (e) {
+                currentTransport = 'poll';
+                sseEnabled = false;
+                startAutoUpdate();
+            }
+        }
+
+        function stopSSE() {
+            if (eventSourceRef) {
+                try { eventSourceRef.close(); } catch {}
+                eventSourceRef = null;
+            }
         }
 
         function applyLiveUpdate(live) {
@@ -324,10 +383,13 @@
         }
 
         function startAutoUpdate() {
-            // Update every 60 seconds by default
-            setInterval(() => {
+            stopPolling();
+            currentTransport = 'poll';
+            updateTransportButton();
+            fetchMapData();
+            pollTimer = setInterval(() => {
                 fetchMapData();
-            }, 60 * 1000);
+            }, intervalSec * 1000);
         }
 
         function fetchMapData() {
@@ -384,10 +446,28 @@
         }
 
         function humanBits(v) {
+            if (scale === 'bytes') {
+                if (v >= 8e9) return (v/8e9).toFixed(2) + ' GB/s';
+                if (v >= 8e6) return (v/8e6).toFixed(2) + ' MB/s';
+                if (v >= 8e3) return (v/8e3).toFixed(2) + ' KB/s';
+                return (v/8).toFixed(0) + ' B/s';
+            }
             if (v >= 1e9) return (v/1e9).toFixed(2) + ' Gb/s';
             if (v >= 1e6) return (v/1e6).toFixed(2) + ' Mb/s';
             if (v >= 1e3) return (v/1e3).toFixed(2) + ' Kb/s';
             return v + ' b/s';
+        }
+
+        function updateTransportButton() {
+            const btn = document.getElementById('toggle-transport');
+            if (!btn) return;
+            if (currentTransport === 'sse') {
+                btn.textContent = `Live: SSE (${intervalSec}s)`;
+            } else if (currentTransport === 'poll') {
+                btn.textContent = `Live: Poll (${intervalSec}s)`;
+            } else {
+                btn.textContent = 'Live: …';
+            }
         }
 
         document.getElementById('map-canvas').addEventListener('mousemove', (e) => {
