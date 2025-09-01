@@ -121,6 +121,11 @@ if [ -f "artisan" ]; then
     php artisan cache:clear
     php artisan view:clear
     php artisan route:clear
+    php artisan optimize:clear
+    # Also clear compiled class loader
+    [ -f bootstrap/cache/compiled.php ] && rm bootstrap/cache/compiled.php
+    [ -f bootstrap/cache/services.php ] && rm bootstrap/cache/services.php
+    [ -f bootstrap/cache/packages.php ] && rm bootstrap/cache/packages.php
 fi
 
 # Step 7: Register plugin hooks (v2 style)
