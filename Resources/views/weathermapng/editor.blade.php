@@ -277,46 +277,65 @@ function clearCanvas() {
 function saveMap() {
     const mapName = document.getElementById('map-name').value.trim();
     const mapTitle = document.getElementById('map-title').value.trim();
-    const mapWidth = document.getElementById('map-width').value;
-    const mapHeight = document.getElementById('map-height').value;
+    const mapWidth = parseInt(document.getElementById('map-width').value, 10);
+    const mapHeight = parseInt(document.getElementById('map-height').value, 10);
 
     if (!mapName) {
         alert('Please enter a map name.');
         return;
     }
 
-    const formData = new FormData();
-    formData.append('name', mapName);
-    formData.append('title', mapTitle);
-    formData.append('width', mapWidth);
-    formData.append('height', mapHeight);
-    formData.append('nodes', JSON.stringify(nodes));
+    if (!mapId) {
+        // Create then redirect (legacy flow)
+        const formData = new FormData();
+        formData.append('name', mapName);
+        formData.append('title', mapTitle);
+        formData.append('width', mapWidth);
+        formData.append('height', mapHeight);
+        fetch('{{ url("plugin/WeathermapNG/map") }}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            }
+        }).then(() => window.location.href = '{{ url("plugin/WeathermapNG") }}');
+        return;
+    }
 
-    const url = mapId
-        ? `{{ url('plugin/WeathermapNG/map') }}/${mapId}`
-        : '{{ url("plugin/WeathermapNG/map") }}';
+    // Update options + nodes/links via combined save endpoint
+    const payload = {
+        title: mapTitle,
+        options: {
+            width: mapWidth,
+            height: mapHeight,
+        },
+        nodes: nodes.map(n => ({
+            label: n.label,
+            x: n.x,
+            y: n.y,
+            device_id: n.deviceId || null,
+            meta: { interface_id: n.interfaceId || null }
+        })),
+        links: [] // TODO: populate when link UI is added
+    };
 
-    const method = mapId ? 'PUT' : 'POST';
-
-    fetch(url, {
-        method: method,
-        body: formData,
+    fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${mapId}/save`, {
+        method: 'POST',
         headers: {
+            'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        }
+        },
+        body: JSON.stringify(payload)
     })
-    .then(response => response.json())
+    .then(r => r.json())
     .then(data => {
         if (data.success) {
             alert('Map saved successfully!');
-            window.location.href = '{{ url("plugin/WeathermapNG") }}';
         } else {
             alert('Error saving map: ' + (data.message || 'Unknown error'));
         }
     })
-    .catch(error => {
-        alert('Error saving map: ' + error.message);
-    });
+    .catch(err => alert('Error saving map: ' + err.message));
 }
 
 function exportConfig() {

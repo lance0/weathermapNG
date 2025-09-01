@@ -144,6 +144,125 @@ class MapController
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Combined save endpoint to persist map options, nodes, and links
+     * POST /plugin/WeathermapNG/api/maps/{map}/save
+     */
+    public function save(Request $request, Map $map)
+    {
+        $data = $this->validate($request, [
+            'title' => 'nullable|string|max:255',
+            'options' => 'array',
+            'options.width' => 'nullable|integer|min:100|max:4096',
+            'options.height' => 'nullable|integer|min:100|max:4096',
+            'options.background' => 'nullable|string',
+            'nodes' => 'array',
+            'nodes.*.label' => 'required|string|max:255',
+            'nodes.*.x' => 'required|numeric',
+            'nodes.*.y' => 'required|numeric',
+            'nodes.*.device_id' => 'nullable|integer',
+            'nodes.*.meta' => 'array',
+            'links' => 'array',
+            'links.*.src_node_id' => 'required|integer',
+            'links.*.dst_node_id' => 'required|integer',
+            'links.*.port_id_a' => 'nullable|integer',
+            'links.*.port_id_b' => 'nullable|integer',
+            'links.*.bandwidth_bps' => 'nullable|integer',
+            'links.*.style' => 'array',
+        ]);
+
+        // Update map options/title
+        if (!empty($data['options']) || !empty($data['title'])) {
+            $opts = $map->options ?? [];
+            $opts['width'] = $data['options']['width'] ?? ($opts['width'] ?? 800);
+            $opts['height'] = $data['options']['height'] ?? ($opts['height'] ?? 600);
+            if (isset($data['options']['background'])) {
+                $opts['background'] = $data['options']['background'];
+            }
+            $map->title = $data['title'] ?? $map->title;
+            $map->options = $opts;
+            $map->save();
+        }
+
+        if (isset($data['nodes'])) {
+            $map->nodes()->delete();
+            foreach ($data['nodes'] as $n) {
+                Node::create([
+                    'map_id' => $map->id,
+                    'label' => $n['label'],
+                    'x' => $n['x'],
+                    'y' => $n['y'],
+                    'device_id' => $n['device_id'] ?? null,
+                    'meta' => $n['meta'] ?? [],
+                ]);
+            }
+        }
+
+        if (isset($data['links'])) {
+            $map->links()->delete();
+            foreach ($data['links'] as $l) {
+                Link::create([
+                    'map_id' => $map->id,
+                    'src_node_id' => $l['src_node_id'],
+                    'dst_node_id' => $l['dst_node_id'],
+                    'port_id_a' => $l['port_id_a'] ?? null,
+                    'port_id_b' => $l['port_id_b'] ?? null,
+                    'bandwidth_bps' => $l['bandwidth_bps'] ?? null,
+                    'style' => $l['style'] ?? [],
+                ]);
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Patch a single node
+     */
+    public function updateNode(Request $request, Map $map, Node $node)
+    {
+        if ($node->map_id !== $map->id) {
+            return response()->json(['success' => false, 'message' => 'Node does not belong to map'], 400);
+        }
+
+        $data = $this->validate($request, [
+            'label' => 'sometimes|string|max:255',
+            'x' => 'sometimes|numeric',
+            'y' => 'sometimes|numeric',
+            'device_id' => 'sometimes|nullable|integer',
+            'meta' => 'sometimes|array',
+        ]);
+
+        $node->fill($data);
+        $node->save();
+
+        return response()->json(['success' => true, 'node' => $node]);
+    }
+
+    /**
+     * Patch a single link
+     */
+    public function updateLink(Request $request, Map $map, Link $link)
+    {
+        if ($link->map_id !== $map->id) {
+            return response()->json(['success' => false, 'message' => 'Link does not belong to map'], 400);
+        }
+
+        $data = $this->validate($request, [
+            'src_node_id' => 'sometimes|integer',
+            'dst_node_id' => 'sometimes|integer',
+            'port_id_a' => 'sometimes|nullable|integer',
+            'port_id_b' => 'sometimes|nullable|integer',
+            'bandwidth_bps' => 'sometimes|nullable|integer',
+            'style' => 'sometimes|array',
+        ]);
+
+        $link->fill($data);
+        $link->save();
+
+        return response()->json(['success' => true, 'link' => $link]);
+    }
+
     private function getDevicesForEditor()
     {
         try {
