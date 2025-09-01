@@ -1,8 +1,17 @@
 <?php
 /**
  * WeathermapNG Map Editor - v1 Plugin
+ * Redirects to modern editor
  */
 
+// Include the modern editor directly
+$editorPath = __DIR__ . '/editor-modern.php';
+if (file_exists($editorPath)) {
+    include $editorPath;
+    exit;
+}
+
+// Fallback to legacy editor if modern not found
 // Get map details
 $map = dbFetchRow("SELECT * FROM wmng_maps WHERE id = ?", [$mapId]);
 if (!$map) {
