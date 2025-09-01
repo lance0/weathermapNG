@@ -174,7 +174,7 @@ class MapController
      */
     public function createNode(Request $request, Map $map)
     {
-        $data = $this->validate($request, [
+        $data = $request->validate([
             'label' => 'required|string|max:255',
             'x' => 'required|numeric',
             'y' => 'required|numeric',
@@ -213,7 +213,7 @@ class MapController
      */
     public function createLink(Request $request, Map $map)
     {
-        $data = $this->validate($request, [
+        $data = $request->validate([
             'src_node_id' => 'required|integer|exists:wmng_nodes,id',
             'dst_node_id' => 'required|integer|exists:wmng_nodes,id',
             'port_id_a' => 'nullable|integer',
@@ -278,7 +278,7 @@ class MapController
      */
     public function save(Request $request, Map $map)
     {
-        $data = $this->validate($request, [
+        $data = $request->validate([
             'title' => 'nullable|string|max:255',
             'options' => 'array',
             'options.width' => 'nullable|integer|min:100|max:4096',
@@ -353,7 +353,7 @@ class MapController
             return response()->json(['success' => false, 'message' => 'Node does not belong to map'], 400);
         }
 
-        $data = $this->validate($request, [
+        $data = $request->validate([
             'label' => 'sometimes|string|max:255',
             'x' => 'sometimes|numeric',
             'y' => 'sometimes|numeric',
@@ -376,7 +376,7 @@ class MapController
             return response()->json(['success' => false, 'message' => 'Link does not belong to map'], 400);
         }
 
-        $data = $this->validate($request, [
+        $data = $request->validate([
             'src_node_id' => 'sometimes|integer',
             'dst_node_id' => 'sometimes|integer',
             'port_id_a' => 'sometimes|nullable|integer',
