@@ -5,11 +5,16 @@ use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\LookupController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\PageController;
 
-// Additional plugin routes under the standard v2 plugin path
-// Main page is provided by the v2 SinglePageHook at: /plugin/WeathermapNG
+// Plugin routes under the standard v2 plugin path
 
 Route::group(['prefix' => 'plugin/WeathermapNG', 'middleware' => ['web', 'auth']], function () {
+    // Main pages
+    Route::get('/', [PageController::class, 'index'])->name('weathermapng.index');
+    Route::get('/editor/{map?}', [PageController::class, 'editor'])->name('weathermapng.editor');
+    Route::get('/view/{map}', [PageController::class, 'view'])->name('weathermapng.view');
+    Route::get('/settings', [PageController::class, 'settings'])->name('weathermapng.settings');
     // Embed view and JSON endpoints
     Route::get('/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed');
     Route::get('/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json');
