@@ -103,6 +103,27 @@
                                 <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
                                     <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e0e0e0" stroke-width="1"/>
                                 </pattern>
+                                <!-- Dark Grid pattern -->
+                                <pattern id="grid-dark" width="20" height="20" patternUnits="userSpaceOnUse">
+                                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#c0c0c0" stroke-width="1"/>
+                                </pattern>
+                                <!-- Dots pattern -->
+                                <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+                                    <circle cx="2" cy="2" r="1" fill="#d8d8d8"/>
+                                </pattern>
+                                <!-- Hex pattern -->
+                                <pattern id="hex" width="24" height="21" patternUnits="userSpaceOnUse" patternTransform="translate(0,0)">
+                                    <path d="M6,0 L18,0 L24,10.5 L18,21 L6,21 L0,10.5 Z" fill="none" stroke="#e0e0e0" stroke-width="1" />
+                                </pattern>
+                                <!-- Gradients -->
+                                <linearGradient id="bg-gradient-blue" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#eef5ff"/>
+                                    <stop offset="100%" stop-color="#cfe0ff"/>
+                                </linearGradient>
+                                <linearGradient id="bg-gradient-gray" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#f9f9f9"/>
+                                    <stop offset="100%" stop-color="#e9ecef"/>
+                                </linearGradient>
                                 
                                 <!-- Drop shadow filter -->
                                 <filter id="dropshadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -283,6 +304,18 @@
                         <!-- Style Tab -->
                         <div class="tab-pane fade" id="style-tab">
                             <h6 class="mb-3">Map Style</h6>
+                            <div class="mb-3">
+                                <label class="form-label small">Preset Background</label>
+                                <select class="form-select form-select-sm" id="preset-background">
+                                    <option value="none">None</option>
+                                    <option value="grid-light" selected>Grid (Light)</option>
+                                    <option value="grid-dark">Grid (Dark)</option>
+                                    <option value="dots">Dots</option>
+                                    <option value="hex">Hex</option>
+                                    <option value="gradient-blue">Gradient (Blue)</option>
+                                    <option value="gradient-gray">Gradient (Gray)</option>
+                                </select>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label small">Background</label>
                                 <input type="color" class="form-control form-control-sm" id="map-bg-color" value="#ffffff">
@@ -1016,6 +1049,11 @@ class WeathermapEditor {
         fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${editorState.mapId}/json`)
             .then(response => response.json())
             .then(data => {
+                // Apply background preset if present
+                const preset = (data.options && data.options.background_preset) ? data.options.background_preset : 'grid-light';
+                editorState.backgroundPreset = preset;
+                document.getElementById('preset-background').value = preset;
+                this.applyBackgroundPreset(preset);
                 editorState.nodes = (data.nodes || []).map(n => ({
                     id: n.id,
                     x: n.x,
@@ -1119,6 +1157,16 @@ class WeathermapEditor {
         // Link apply
         const applyLinkBtn = document.getElementById('apply-link-btn');
         if (applyLinkBtn) applyLinkBtn.addEventListener('click', () => this.applyLinkChanges());
+
+        // Preset background select
+        const presetSel = document.getElementById('preset-background');
+        if (presetSel) {
+            presetSel.addEventListener('change', () => {
+                const preset = presetSel.value;
+                editorState.backgroundPreset = preset;
+                this.applyBackgroundPreset(preset);
+            });
+        }
         
         // Mouse position tracking + link preview
         this.svg.on('mousemove', (event) => {
@@ -1398,7 +1446,7 @@ class WeathermapEditor {
             },
             body: JSON.stringify({
                 title: data.title,
-                options: data.options,
+                options: { ...data.options, background_preset: (document.getElementById('preset-background')?.value || 'grid-light') },
                 nodes: editorState.nodes.map(n => ({
                     label: n.label,
                     x: n.x,
@@ -1576,6 +1624,33 @@ class WeathermapEditor {
             .attr('fill', 'none')
             .attr('stroke', '#ff0000')
             .attr('stroke-width', 1);
+    }
+
+    // Apply a preset background fill
+    applyBackgroundPreset(preset) {
+        const bgRect = this.svg.select('.grid-background');
+        switch (preset) {
+            case 'grid-light':
+                bgRect.attr('fill', 'url(#grid)');
+                break;
+            case 'grid-dark':
+                bgRect.attr('fill', 'url(#grid-dark)');
+                break;
+            case 'dots':
+                bgRect.attr('fill', 'url(#dots)');
+                break;
+            case 'hex':
+                bgRect.attr('fill', 'url(#hex)');
+                break;
+            case 'gradient-blue':
+                bgRect.attr('fill', 'url(#bg-gradient-blue)');
+                break;
+            case 'gradient-gray':
+                bgRect.attr('fill', 'url(#bg-gradient-gray)');
+                break;
+            default:
+                bgRect.attr('fill', document.getElementById('map-bg-color').value || '#ffffff');
+        }
     }
 }
 
