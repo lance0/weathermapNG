@@ -51,7 +51,10 @@ chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 6. Save - your map now shows live traffic!
 
 ### D3 Editor Guide
-- See docs/EDITOR_D3.md for routes, features, data mapping, and tips for the advanced D3 editor.
+- See `docs/EDITOR_D3.md` for routes, features, data mapping, and tips for the advanced D3 editor.
+
+### Embed Viewer
+- See `docs/EMBED.md` for metric options, legend, live updates, and export.
 
 ## 🔧 Architecture
 

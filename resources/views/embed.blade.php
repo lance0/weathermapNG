@@ -260,6 +260,20 @@
                 const value = formatValue(node.current_value);
                 ctx.fillText(value, x, y + radius + 15);
             }
+
+            // Alert badge (if any)
+            if (node.alerts && node.alerts.count > 0) {
+                const bx = x + radius - 3;
+                const by = y - radius + 3;
+                ctx.beginPath();
+                ctx.arc(bx, by, 5, 0, Math.PI * 2);
+                const sev = (node.alerts.severity || 'warning');
+                ctx.fillStyle = (sev === 'severe' || sev === 'critical') ? '#dc3545' : '#ffc107';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#fff';
+                ctx.stroke();
+            }
         }
 
         function drawLink(link) {
@@ -303,6 +317,24 @@
                 ctx.lineWidth = 3;
                 ctx.strokeText(label, midX, midY - 5);
                 ctx.fillText(label, midX, midY - 5);
+            }
+            // Link alert badge (diamond)
+            if (link.alerts && link.alerts.count > 0) {
+                const midX = (x1 + x2) / 2;
+                const midY = (y1 + y2) / 2;
+                const size = 5;
+                ctx.save();
+                ctx.translate(midX + 10, midY - 10);
+                ctx.rotate(Math.PI / 4);
+                const sev = (link.alerts.severity || 'warning');
+                ctx.fillStyle = (sev === 'severe' || sev === 'critical') ? '#dc3545' : '#ffc107';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.rect(-size, -size, size * 2, size * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
             }
             // store geometry for hover
             storeLinkGeom(link, x1, y1, x2, y2, pct);
@@ -446,6 +478,21 @@
                         n.status = live.nodes[id].status || n.status;
                     }
                 });
+            }
+            // Alert overlays
+            if (live && live.alerts) {
+                if (live.alerts.nodes && Array.isArray(mapData.nodes)) {
+                    mapData.nodes.forEach(n => {
+                        const id = n.id ?? n.node_id ?? null;
+                        n.alerts = (id && live.alerts.nodes[id]) ? live.alerts.nodes[id] : { count: 0, severity: 'ok' };
+                    });
+                }
+                if (live.alerts.links && Array.isArray(mapData.links)) {
+                    mapData.links.forEach(l => {
+                        const id = l.id ?? l.link_id ?? null;
+                        l.alerts = (id && live.alerts.links[id]) ? live.alerts.links[id] : { count: 0, severity: 'ok' };
+                    });
+                }
             }
             renderMap();
         }
