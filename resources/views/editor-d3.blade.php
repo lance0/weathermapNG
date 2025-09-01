@@ -47,23 +47,23 @@
         <div class="col-md-1">
             <div class="card h-100">
                 <div class="card-body p-2">
-                    <div class="btn-group-vertical w-100" role="group">
-                        <button class="btn btn-sm btn-outline-secondary tool-btn active" data-tool="select" title="Select (V)">
+                            <div class="btn-group-vertical w-100" role="group" aria-label="Modes">
+                        <button class="btn btn-sm btn-outline-secondary tool-btn active" data-tool="select" title="Select (V)" data-toggle="tooltip">
                             <i class="fas fa-mouse-pointer"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="pan" title="Pan (H)">
+                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="pan" title="Pan (H)" data-toggle="tooltip">
                             <i class="fas fa-hand-paper"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="add-node" title="Add Node (N)">
+                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="add-node" title="Add Node (N)" data-toggle="tooltip">
                             <i class="fas fa-plus-circle"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="add-link" title="Add Link (L)">
+                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="add-link" title="Add Link (L)" data-toggle="tooltip">
                             <i class="fas fa-link"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="add-text" title="Add Text (T)">
+                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="add-text" title="Add Text (T)" data-toggle="tooltip">
                             <i class="fas fa-font"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="delete" title="Delete (Del)">
+                        <button class="btn btn-sm btn-outline-secondary tool-btn" data-tool="delete" title="Delete (Del)" data-toggle="tooltip">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -626,6 +626,28 @@ class WeathermapEditor {
             .on('drag', (event, d) => this.dragMove(event, d))
             .on('end', (event, d) => this.dragEnd(event, d));
         
+        // Load persisted UI prefs
+        try {
+            const lastTool = localStorage.getItem('wmng.lastTool');
+            if (lastTool) {
+                const btn = document.querySelector(`.tool-btn[data-tool="${lastTool}"]`);
+                if (btn) btn.click();
+            }
+            const gridPref = localStorage.getItem('wmng.grid');
+            if (gridPref !== null) {
+                const val = gridPref === '1';
+                document.getElementById('gridToggle').checked = val;
+                editorState.grid = val;
+                this.svg.select('.grid-background').style('display', val ? 'block' : 'none');
+            }
+            const snapPref = localStorage.getItem('wmng.snap');
+            if (snapPref !== null) {
+                const val = snapPref === '1';
+                document.getElementById('snapToggle').checked = val;
+                editorState.snap = val;
+            }
+        } catch (e) {}
+
         // Load initial data if editing
         if (editorState.mapId) {
             this.loadMap();
@@ -638,7 +660,8 @@ class WeathermapEditor {
         // Initialize minimap
         this.initMinimap();
         
-        // Start render loop
+        // Start render loop (event-driven dirty flag)
+        editorState.needsRender = true;
         this.render();
     }
     
@@ -648,6 +671,7 @@ class WeathermapEditor {
         this.mapGroup.attr('transform', event.transform);
         document.getElementById('zoom-level').textContent = Math.round(editorState.zoom * 100) + '%';
         this.updateMinimap();
+        editorState.needsRender = true;
     }
     
     dragStart(event, d) {
@@ -676,6 +700,7 @@ class WeathermapEditor {
         
         this.updateNodePosition(d);
         this.updateLinks();
+        editorState.needsRender = true;
     }
     
     dragEnd(event, d) {
@@ -729,6 +754,12 @@ class WeathermapEditor {
     }
     
     render() {
+        // Only re-render when needed
+        if (!editorState.needsRender) {
+            requestAnimationFrame(() => this.render());
+            return;
+        }
+        editorState.needsRender = false;
         // Render nodes
         const nodes = this.mapGroup.select('#nodes-layer')
             .selectAll('.node')
@@ -1188,6 +1219,8 @@ class WeathermapEditor {
                 }
                 // Toggle linking class for subtle dimming
                 this.mapGroup.classed('linking', editorState.tool === 'add-link');
+                // persist last tool
+                try { localStorage.setItem('wmng.lastTool', editorState.tool); } catch (e) {}
             });
         });
         
@@ -1231,11 +1264,14 @@ class WeathermapEditor {
             editorState.grid = e.target.checked;
             this.svg.select('.grid-background')
                 .style('display', editorState.grid ? 'block' : 'none');
+            try { localStorage.setItem('wmng.grid', editorState.grid ? '1' : '0'); } catch (e) {}
+            editorState.needsRender = true;
         });
         
         // Snap toggle
         document.getElementById('snapToggle').addEventListener('change', (e) => {
             editorState.snap = e.target.checked;
+            try { localStorage.setItem('wmng.snap', editorState.snap ? '1' : '0'); } catch (e) {}
         });
         
         // Node property field bindings (live updates) and apply buttons
@@ -1296,21 +1332,21 @@ class WeathermapEditor {
         const geoScale = document.getElementById('geo-scale');
         const geoOffX = document.getElementById('geo-offset-x');
         const geoOffY = document.getElementById('geo-offset-y');
-        if (geoToggle) geoToggle.addEventListener('change', () => this.renderGeoBackground());
-        if (geoPreset) geoPreset.addEventListener('change', () => this.renderGeoBackground());
-        if (geoProj) geoProj.addEventListener('change', () => this.renderGeoBackground());
-        if (geoScale) geoScale.addEventListener('input', () => this.renderGeoBackground());
+        if (geoToggle) geoToggle.addEventListener('change', () => { this.renderGeoBackground(); try { localStorage.setItem('wmng.geo.enabled', geoToggle.checked ? '1' : '0'); } catch (e) {} });
+        if (geoPreset) geoPreset.addEventListener('change', () => { this.renderGeoBackground(); try { localStorage.setItem('wmng.geo.preset', geoPreset.value); } catch (e) {} });
+        if (geoProj) geoProj.addEventListener('change', () => { this.renderGeoBackground(); try { localStorage.setItem('wmng.geo.proj', geoProj.value); } catch (e) {} });
+        if (geoScale) geoScale.addEventListener('input', () => { this.renderGeoBackground(); try { localStorage.setItem('wmng.geo.scale', geoScale.value); } catch (e) {} });
         if (geoOffX) geoOffX.addEventListener('input', () => {
             const width = this.svg.node().clientWidth;
             const limX = width * 2;
             geoOffX.value = Math.max(-limX, Math.min(limX, parseFloat(geoOffX.value || '0')));
-            this.renderGeoBackground();
+            this.renderGeoBackground(); try { localStorage.setItem('wmng.geo.offx', geoOffX.value); } catch (e) {}
         });
         if (geoOffY) geoOffY.addEventListener('input', () => {
             const height = this.svg.node().clientHeight;
             const limY = height * 2;
             geoOffY.value = Math.max(-limY, Math.min(limY, parseFloat(geoOffY.value || '0')));
-            this.renderGeoBackground();
+            this.renderGeoBackground(); try { localStorage.setItem('wmng.geo.offy', geoOffY.value); } catch (e) {}
         });
         const geoReset = document.getElementById('geo-reset-btn');
         const geoFit = document.getElementById('geo-fit-btn');
@@ -1745,14 +1781,17 @@ class WeathermapEditor {
     }
     
     showStatus(message, type = 'info') {
-        const statusElement = document.getElementById('status-message');
-        statusElement.textContent = message;
-        statusElement.className = type === 'error' ? 'text-danger' : 'text-muted';
-        
+        const bar = document.getElementById('snackbar');
+        if (!bar) return;
+        bar.textContent = message;
+        bar.className = `snackbar show ${type}`;
         setTimeout(() => {
-            statusElement.textContent = 'Ready';
-            statusElement.className = 'text-muted';
-        }, 3000);
+            bar.className = 'snackbar';
+            const inline = document.getElementById('status-inline');
+            if (inline) inline.textContent = 'Ready';
+        }, 2200);
+        const inline = document.getElementById('status-inline');
+        if (inline) inline.textContent = message;
     }
     
     initMinimap() {
@@ -2182,6 +2221,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 select.appendChild(option);
             });
         });
+    
+    // Initialize bootstrap/jQuery tooltips if available
+    try { $('[data-toggle="tooltip"]').tooltip(); } catch (e) {}
 });
 </script>
 @endsection
@@ -2225,6 +2267,24 @@ document.addEventListener('DOMContentLoaded', () => {
     pointer-events: none;
     user-select: none;
 }
+
+.snackbar {
+    visibility: hidden;
+    min-width: 200px;
+    background-color: rgba(33,37,41,0.9);
+    color: #fff;
+    text-align: left;
+    border-radius: 4px;
+    padding: 8px 12px;
+    position: absolute;
+    z-index: 1000;
+    left: 14px;
+    bottom: 14px;
+    font-size: 12px;
+}
+.snackbar.show { visibility: visible; transition: opacity 0.2s ease; }
+.snackbar.error { background-color: rgba(220,53,69,0.95); }
+.snackbar.info { background-color: rgba(33,37,41,0.9); }
 
 .label-bg {
     fill: #ffffff;
