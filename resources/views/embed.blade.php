@@ -84,8 +84,22 @@
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
         <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
-        <div id="controls" style="position:absolute; top:10px; left:10px; z-index:1000; display:flex; gap:8px;">
+        <div id="controls" style="position:absolute; top:10px; left:10px; z-index:1000; display:flex; gap:8px; align-items:center;">
             <button id="toggle-transport" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Live: loading…</button>
+            <label style="background:#fff; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:12px;">
+                Metric
+                <select id="metric-select" style="border:none; outline:none; font-size:12px;">
+                    <option value="percent">Percent</option>
+                    <option value="in">Inbound</option>
+                    <option value="out">Outbound</option>
+                    <option value="sum">In+Out</option>
+                </select>
+            </label>
+            <button id="export-png" title="Export PNG" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Export PNG</button>
+        </div>
+        <div id="legend" style="position:absolute; bottom:10px; right:10px; background:rgba(255,255,255,0.9); border:1px solid #ddd; border-radius:4px; font-size:12px; padding:6px 8px; z-index:1000;">
+            <div style="font-weight:600; margin-bottom:4px;">Legend</div>
+            <div id="legend-rows"></div>
         </div>
     </div>
 
@@ -127,12 +141,18 @@
         let lastUpdate = Date.now();
         let animTick = 0;
         let bgImg = null;
+        let currentMetric = (param('metric', 'percent') || 'percent').toLowerCase();
 
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
             if (mapData && !mapData.error) {
                 renderMap();
                 startLiveUpdates();
+                renderLegend();
+                const ms = document.getElementById('metric-select');
+                if (ms) { ms.value = currentMetric; ms.addEventListener('change', () => { currentMetric = ms.value; renderLegend(); renderMap(); }); }
+                const ex = document.getElementById('export-png');
+                if (ex) ex.addEventListener('click', exportPNG);
             } else {
                 showError(mapData.error || 'Failed to load map');
             }
@@ -259,25 +279,30 @@
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-            const pct = getLinkPct(link);
+            const metric = getLinkMetric(link);
+            const pct = getLinkPct(link, metric);
             ctx.strokeStyle = getLinkColor(pct);
             const width = Math.max(1, (link.width || 2));
             ctx.lineWidth = width;
             const dash = Math.max(6, width * 3);
             ctx.setLineDash([dash, dash]);
-            const speed = Math.max(0.5, Math.min(5, (pct || 10) / 20));
+            const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
             ctx.lineDashOffset = - (animTick * speed);
             ctx.stroke();
             ctx.setLineDash([]);
 
             // Link utilization label
-            if (pct !== null && pct !== undefined) {
+            if (metric !== null && metric !== undefined) {
                 const midX = (x1 + x2) / 2;
                 const midY = (y1 + y2) / 2;
-                ctx.fillStyle = '#666';
-                ctx.font = '10px Arial';
+                ctx.fillStyle = '#111';
+                ctx.font = '11px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(Math.round(pct) + '%', midX, midY - 5);
+                const label = (currentMetric === 'percent') ? (Math.round(pct) + '%') : humanBits(metric);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.strokeText(label, midX, midY - 5);
+                ctx.fillText(label, midX, midY - 5);
             }
             // store geometry for hover
             storeLinkGeom(link, x1, y1, x2, y2, pct);
@@ -296,12 +321,29 @@
             return colors.node_unknown || '#6c757d';
         }
 
-        function getLinkPct(link) {
-            // live data may be attached on link.live or link.utilization/pct
-            if (link.live && typeof link.live.pct === 'number') return link.live.pct;
-            if (typeof link.pct === 'number') return link.pct;
-            if (typeof link.utilization === 'number') return link.utilization * 100;
-            return null;
+        function getLinkMetric(link) {
+            const live = link.live || {};
+            if (currentMetric === 'in') return (typeof live.in_bps === 'number') ? live.in_bps : null;
+            if (currentMetric === 'out') return (typeof live.out_bps === 'number') ? live.out_bps : null;
+            if (currentMetric === 'sum') {
+                const a = (typeof live.in_bps === 'number') ? live.in_bps : 0;
+                const b = (typeof live.out_bps === 'number') ? live.out_bps : 0;
+                return (a + b) || null;
+            }
+            // percent
+            if (typeof live.pct === 'number') return live.pct;
+            const bps = (typeof live.in_bps === 'number') ? live.in_bps : ((live.in_bps || 0) + (live.out_bps || 0));
+            return getLinkPct(link, bps);
+        }
+
+        function getLinkPct(link, metricBps) {
+            if (typeof metricBps === 'number') {
+                const bw = link.bandwidth_bps || link.bandwidth || null;
+                if (bw) return Math.max(0, Math.min(100, (metricBps / bw) * 100));
+                return null;
+            }
+            if (metricBps === null || typeof metricBps === 'undefined') return null;
+            return metricBps; // already percent
         }
 
         function getLinkColor(pct) {
@@ -425,6 +467,45 @@
 
             lastUpdated.textContent = new Date().toLocaleTimeString();
             statusBar.style.display = 'block';
+        }
+
+        function renderLegend() {
+            const rows = document.getElementById('legend-rows');
+            if (!rows) return;
+            rows.innerHTML = '';
+            const [t1, t2, t3] = WMNG_CONFIG.thresholds || [50,80,95];
+            const items = [
+                { c: WMNG_CONFIG.colors.link_normal || '#28a745', l: `< ${t1}%` },
+                { c: WMNG_CONFIG.colors.link_warning || '#ffc107', l: `${t1}–${t2}%` },
+                { c: WMNG_CONFIG.colors.link_critical || '#dc3545', l: `≥ ${t2}%` }
+            ];
+            items.forEach(it => {
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.alignItems = 'center';
+                div.style.gap = '6px';
+                div.innerHTML = `<span style=\"display:inline-block; width:18px; height:10px; background:${it.c}; border:1px solid #999;\"></span><span>${it.l}</span>`;
+                rows.appendChild(div);
+            });
+            const metricLabel = document.createElement('div');
+            metricLabel.style.marginTop = '6px';
+            metricLabel.style.color = '#444';
+            metricLabel.textContent = `Metric: ${currentMetric}`;
+            rows.appendChild(metricLabel);
+        }
+
+        function exportPNG() {
+            try {
+                const out = document.createElement('canvas');
+                out.width = canvas.width; out.height = canvas.height;
+                const octx = out.getContext('2d');
+                octx.drawImage(canvas, 0, 0);
+                octx.drawImage(heatCanvas, 0, 0);
+                const a = document.createElement('a');
+                a.href = out.toDataURL('image/png');
+                a.download = `weathermap-${mapId}.png`;
+                a.click();
+            } catch (e) { console.error('Export failed', e); }
         }
 
         function startAutoUpdate() {
