@@ -24,7 +24,7 @@
     },
   "autoload": {
     "psr-4": {
-      "LibreNMS\\Plugins\\WeathermapNG\\": "src/",
+      "LibreNMS\\Plugins\\WeathermapNG\\": "./",
       "LibreNMS\\Plugins\\WeathermapNG\\Http\\Controllers\\": "Http/Controllers/",
       "LibreNMS\\Plugins\\WeathermapNG\\Models\\": "Models/",
       "LibreNMS\\Plugins\\WeathermapNG\\Services\\": "Services/",
