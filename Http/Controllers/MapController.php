@@ -31,6 +31,13 @@ class MapController
         return view('plugins.WeathermapNG.editor', compact('map', 'devices'));
     }
 
+    public function editorD3(Map $map)
+    {
+        $map->load(['nodes', 'links']);
+        $title = 'WeathermapNG - D3 Editor';
+        return view('plugins.WeathermapNG.editor-d3', compact('map', 'title'));
+    }
+
     public function create(Request $request)
     {
         $validated = $request->validate([

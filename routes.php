@@ -24,6 +24,7 @@ Route::group(['prefix' => 'plugin/WeathermapNG', 'middleware' => ['web', 'auth']
 
     // Optional CRUD endpoints (guard as needed)
     Route::post('/map', [MapController::class, 'create'])->name('weathermapng.map.create');
+    Route::get('/editor-d3/{map}', [MapController::class, 'editorD3'])->name('weathermapng.editor.d3');
     Route::put('/map/{map}', [MapController::class, 'update'])->name('weathermapng.map.update');
     Route::delete('/map/{map}', [MapController::class, 'destroy'])->name('weathermapng.map.destroy');
     Route::post('/map/{map}/nodes', [MapController::class, 'storeNodes'])->name('weathermapng.nodes.store');
