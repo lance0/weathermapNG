@@ -21,8 +21,8 @@ class HealthController
         return $this->logger;
     }
     /**
-     * Basic health check endpoint
-     * GET /plugins/weathermapng/health
+     * Basic health check endpoint (v2)
+     * GET /plugin/WeathermapNG/health
      */
     public function check(Request $request)
     {
@@ -174,7 +174,7 @@ class HealthController
     
     /**
      * Readiness probe for container orchestration
-     * GET /plugins/weathermapng/ready
+     * GET /plugin/WeathermapNG/ready
      */
     public function ready(Request $request)
     {
@@ -205,7 +205,7 @@ class HealthController
     
     /**
      * Liveness probe for container orchestration
-     * GET /plugins/weathermapng/live
+     * GET /plugin/WeathermapNG/live
      */
     public function live(Request $request)
     {
@@ -218,7 +218,7 @@ class HealthController
     
     /**
      * Prometheus metrics endpoint
-     * GET /plugins/weathermapng/metrics
+     * GET /plugin/WeathermapNG/metrics
      */
     public function metrics(Request $request)
     {
@@ -263,7 +263,7 @@ class HealthController
     
     /**
      * Detailed health check
-     * GET /plugins/weathermapng/health/detailed
+     * GET /plugin/WeathermapNG/health/detailed
      */
     public function detailed(Request $request)
     {

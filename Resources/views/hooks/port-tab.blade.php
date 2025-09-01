@@ -39,7 +39,7 @@
                 @foreach($links as $link)
                     <tr>
                         <td>
-                            <a href="{{ url('/plugins/weathermapng/maps/' . $link->map_id) }}">
+                            <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" target="_blank">
                                 {{ $link->map->title ?? $link->map->name }}
                             </a>
                         </td>
@@ -54,9 +54,9 @@
                             {{ number_format($link->bandwidth_bps / 1000000) }} Mbps
                         </td>
                         <td>
-                            <a href="{{ url('/plugins/weathermapng/maps/' . $link->map_id . '/editor') }}" 
-                               class="btn btn-xs btn-primary">
-                                <i class="fa fa-edit"></i> Edit
+                            <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" 
+                               class="btn btn-xs btn-default" target="_blank">
+                                <i class="fa fa-external-link"></i> View
                             </a>
                         </td>
                     </tr>

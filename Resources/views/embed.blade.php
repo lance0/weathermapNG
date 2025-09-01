@@ -81,11 +81,23 @@
         <div id="status-bar" class="status-bar" style="display: none;">
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
+        <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
     </div>
 
     <script>
         const mapId = '{{ $mapId }}';
         const baseUrl = '{{ url("/") }}';
+        const WMNG_CONFIG = {
+            thresholds: @json(config('weathermapng.thresholds', [50, 80, 95])),
+            colors: @json(config('weathermapng.colors', [
+                'link_normal' => '#28a745',
+                'link_warning' => '#ffc107',
+                'link_critical' => '#dc3545',
+                'node_up' => '#28a745',
+                'node_down' => '#dc3545',
+                'node_unknown' => '#6c757d'
+            ]))
+        };
         let mapData = @json($mapData);
         let canvas, ctx;
         let animationId;
@@ -95,7 +107,7 @@
             initCanvas();
             if (mapData && !mapData.error) {
                 renderMap();
-                startAutoUpdate();
+                startLiveUpdates();
             } else {
                 showError(mapData.error || 'Failed to load map');
             }
@@ -205,30 +217,91 @@
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
-            ctx.strokeStyle = link.color || '#28a745';
+            const pct = getLinkPct(link);
+            ctx.strokeStyle = getLinkColor(pct);
             ctx.lineWidth = Math.max(1, (link.width || 2));
             ctx.stroke();
 
             // Link utilization label
-            if (link.utilization !== undefined) {
+            if (pct !== null && pct !== undefined) {
                 const midX = (x1 + x2) / 2;
                 const midY = (y1 + y2) / 2;
                 ctx.fillStyle = '#666';
                 ctx.font = '10px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(Math.round(link.utilization * 100) + '%', midX, midY - 5);
+                ctx.fillText(Math.round(pct) + '%', midX, midY - 5);
             }
+            // store geometry for hover
+            storeLinkGeom(link, x1, y1, x2, y2, pct);
         }
 
         function getNodeColor(node) {
             const status = node.status || 'unknown';
-            const colors = {
-                'up': '#28a745',
-                'down': '#dc3545',
-                'warning': '#ffc107',
-                'unknown': '#6c757d'
-            };
-            return colors[status] || colors.unknown;
+            const colors = WMNG_CONFIG.colors || {};
+            if (status === 'up') return colors.node_up || '#28a745';
+            if (status === 'down') return colors.node_down || '#dc3545';
+            return colors.node_unknown || '#6c757d';
+        }
+
+        function getLinkPct(link) {
+            // live data may be attached on link.live or link.utilization/pct
+            if (link.live && typeof link.live.pct === 'number') return link.live.pct;
+            if (typeof link.pct === 'number') return link.pct;
+            if (typeof link.utilization === 'number') return link.utilization * 100;
+            return null;
+        }
+
+        function getLinkColor(pct) {
+            if (pct === null) return WMNG_CONFIG.colors.link_normal || '#28a745';
+            const [t1, t2, t3] = WMNG_CONFIG.thresholds || [50, 80, 95];
+            if (pct >= t2) return WMNG_CONFIG.colors.link_critical || '#dc3545';
+            if (pct >= t1) return WMNG_CONFIG.colors.link_warning || '#ffc107';
+            return WMNG_CONFIG.colors.link_normal || '#28a745';
+        }
+
+        // Live updates via SSE (fallback to polling)
+        function startLiveUpdates() {
+            if (!!window.EventSource) {
+                try {
+                    const es = new EventSource(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/sse`);
+                    es.onmessage = (e) => {
+                        try {
+                            const live = JSON.parse(e.data);
+                            applyLiveUpdate(live);
+                        } catch {}
+                    };
+                    es.onerror = () => {
+                        es.close();
+                        startAutoUpdate();
+                    };
+                    return;
+                } catch (e) {
+                    // fall through to polling
+                }
+            }
+            startAutoUpdate();
+        }
+
+        function applyLiveUpdate(live) {
+            // Attach link live data by id
+            if (live && live.links && Array.isArray(mapData.links)) {
+                mapData.links.forEach(l => {
+                    const id = l.id ?? l.link_id ?? null;
+                    if (id && live.links[id]) {
+                        l.live = live.links[id];
+                    }
+                });
+            }
+            // Update node status by id
+            if (live && live.nodes && Array.isArray(mapData.nodes)) {
+                mapData.nodes.forEach(n => {
+                    const id = n.id ?? n.node_id ?? null;
+                    if (id && live.nodes[id]) {
+                        n.status = live.nodes[id].status || n.status;
+                    }
+                });
+            }
+            renderMap();
         }
 
         function formatValue(value) {
@@ -258,7 +331,7 @@
         }
 
         function fetchMapData() {
-            fetch(`${baseUrl}/plugins/weathermapng/api/maps/${mapId}`)
+            fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/json`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.error) {
@@ -289,6 +362,52 @@
                 canvas.width = container.clientWidth;
                 canvas.height = container.clientHeight;
                 renderMap();
+            }
+        });
+
+        // Hover tooltip for link bandwidth
+        const linkGeoms = [];
+        function storeLinkGeom(link, x1, y1, x2, y2, pct) {
+            const inBps = link.live?.in_bps ?? 0;
+            const outBps = link.live?.out_bps ?? 0;
+            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps});
+        }
+
+        function distToSegment(px, py, x1, y1, x2, y2) {
+            const dx = x2 - x1, dy = y2 - y1;
+            const len2 = dx*dx + dy*dy;
+            if (len2 === 0) return Math.hypot(px - x1, py - y1);
+            let t = ((px - x1)*dx + (py - y1)*dy) / len2;
+            t = Math.max(0, Math.min(1, t));
+            const projX = x1 + t*dx, projY = y1 + t*dy;
+            return Math.hypot(px - projX, py - projY);
+        }
+
+        function humanBits(v) {
+            if (v >= 1e9) return (v/1e9).toFixed(2) + ' Gb/s';
+            if (v >= 1e6) return (v/1e6).toFixed(2) + ' Mb/s';
+            if (v >= 1e3) return (v/1e3).toFixed(2) + ' Kb/s';
+            return v + ' b/s';
+        }
+
+        document.getElementById('map-canvas').addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            // find nearest segment
+            let best = null, bestDist = 12; // threshold px
+            for (const g of linkGeoms) {
+                const d = distToSegment(x, y, g.x1, g.y1, g.x2, g.y2);
+                if (d < bestDist) { bestDist = d; best = g; }
+            }
+            const tooltip = document.getElementById('tooltip');
+            if (best) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.pageX + 10) + 'px';
+                tooltip.style.top = (e.pageY + 10) + 'px';
+                tooltip.innerHTML = `Util: ${best.pct ?? 0}%<br>In: ${humanBits(best.inBps)}<br>Out: ${humanBits(best.outBps)}`;
+            } else {
+                tooltip.style.display = 'none';
             }
         });
     </script>

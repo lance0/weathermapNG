@@ -138,6 +138,6 @@ class WeathermapNGSeeder extends Seeder
 
         $this->command->info('Demo network map created successfully!');
         $this->command->info('Map ID: ' . $map->id);
-        $this->command->info('You can now view it at: /plugins/weathermapng/maps/' . $map->id);
+        $this->command->info('You can now view it at: /plugin/WeathermapNG/embed/' . $map->id);
     }
 }

@@ -9,7 +9,7 @@
             </div>
         @endif
         
-        <form method="POST" action="{{ url('/plugins/weathermapng/settings') }}" class="form-horizontal">
+        <form method="POST" action="{{ route('plugin.update', ['plugin' => 'WeathermapNG']) }}" class="form-horizontal">
             @csrf
             
             <div class="form-group">
@@ -87,7 +87,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fa fa-save"></i> Save Settings
                     </button>
-                    <a href="{{ url('/plugins/weathermapng') }}" class="btn btn-default">
+                    <a href="{{ route('plugin.page', ['plugin' => 'WeathermapNG']) }}" class="btn btn-default">
                         Cancel
                     </a>
                 </div>

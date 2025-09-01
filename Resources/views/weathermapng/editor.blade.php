@@ -9,7 +9,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1><i class="fas fa-edit"></i> {{ $map ? 'Edit Map: ' . $map->name : 'Create New Map' }}</h1>
                 <div>
-                    <a href="{{ url('/plugin/weathermapng') }}" class="btn btn-secondary">
+                    <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-secondary">
                         <i class="fas fa-arrow-left"></i> Back to Maps
                     </a>
                     <button class="btn btn-success" onclick="saveMap()">
@@ -174,7 +174,7 @@ function initCanvas() {
 }
 
 function loadDevices() {
-    fetch('{{ url("/plugin/weathermapng/api/devices") }}')
+    fetch('{{ url("plugin/WeathermapNG/api/devices") }}')
         .then(response => response.json())
         .then(data => {
             const select = document.getElementById('device-select');
@@ -193,7 +193,7 @@ function loadDevices() {
 }
 
 function loadInterfaces(deviceId) {
-    fetch(`{{ url("/plugin/weathermapng/api/device") }}/${deviceId}/ports`)
+    fetch(`{{ url("plugin/WeathermapNG/api/device") }}/${deviceId}/ports`)
         .then(response => response.json())
         .then(data => {
             const select = document.getElementById('interface-select');
@@ -293,8 +293,8 @@ function saveMap() {
     formData.append('nodes', JSON.stringify(nodes));
 
     const url = mapId
-        ? `{{ url('/plugin/weathermapng/map') }}/${mapId}`
-        : '{{ url("/plugin/weathermapng/map") }}';
+        ? `{{ url('plugin/WeathermapNG/map') }}/${mapId}`
+        : '{{ url("plugin/WeathermapNG/map") }}';
 
     const method = mapId ? 'PUT' : 'POST';
 
@@ -309,7 +309,7 @@ function saveMap() {
     .then(data => {
         if (data.success) {
             alert('Map saved successfully!');
-            window.location.href = '{{ url("/plugin/weathermapng") }}';
+            window.location.href = '{{ url("plugin/WeathermapNG") }}';
         } else {
             alert('Error saving map: ' + (data.message || 'Unknown error'));
         }

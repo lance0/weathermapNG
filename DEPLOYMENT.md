@@ -67,7 +67,7 @@ php artisan db:seed --class=LibreNMS\\Plugins\\WeathermapNG\\Database\\Seeders\\
 
 ```bash
 # Check plugin is loaded
-curl -s https://your-librenms/plugins/weathermapng/health | jq .status
+curl -s https://your-librenms/plugin/WeathermapNG/health | jq .status
 
 # Check database tables
 mysql -u librenms -p librenms -e "SHOW TABLES LIKE 'wmng_%';"
@@ -327,7 +327,7 @@ master:/opt/librenms/rrd /opt/librenms/rrd nfs defaults 0 0
 ```bash
 # Add to monitoring system
 # Check plugin health
-curl -f https://librenms.example.com/plugins/weathermapng/health
+curl -f https://librenms.example.com/plugin/WeathermapNG/health
 
 # Check poller status
 ps aux | grep map-poller.php

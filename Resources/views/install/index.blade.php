@@ -225,7 +225,7 @@ function updateStepStatus(step, success) {
 }
 
 function goToPlugin() {
-    window.location.href = '{{ url("/plugins/weathermapng") }}';
+    window.location.href = '{{ url("plugin/WeathermapNG") }}';
 }
 
 function retryInstallation() {

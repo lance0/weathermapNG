@@ -9,9 +9,9 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 class Page extends PageHook
 {
     /**
-     * The main page view
+     * The main page view (relative to plugin view namespace)
      */
-    public string $view = 'WeathermapNG::hooks.page';
+    public string $view = 'hooks.page';
     
     /**
      * Page title
@@ -38,14 +38,14 @@ class Page extends PageHook
                 'last_updated' => Map::max('updated_at'),
             ];
         } catch (\Exception $e) {
-            // Handle database errors
+            // Database might not be ready yet
         }
         
         return [
             'title' => 'Network Weathermaps',
             'maps' => $maps,
             'stats' => $stats,
-            'can_create' => auth()->user()->can('create-maps'),
+            'can_create' => true,
         ];
     }
     

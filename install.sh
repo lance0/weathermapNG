@@ -287,6 +287,27 @@ install_dependencies() {
     INSTALL_STEPS+=("dependencies")
 }
 
+install_v2_hooks() {
+    step "Registering v2 plugin hooks (app/Plugins)..."
+
+    local target_dir="$LIBRENMS_PATH/app/Plugins/$PLUGIN_NAME"
+    mkdir -p "$target_dir/resources/views"
+
+    # Copy hook classes
+    if cp -f "$PLUGIN_DIR/app/Plugins/$PLUGIN_NAME/"{Menu.php,Page.php,Settings.php} "$target_dir/" 2>/dev/null; then
+        log "Hook classes installed to app/Plugins/$PLUGIN_NAME"
+    else
+        warn "Could not copy hook classes — check paths"
+    fi
+
+    # Copy views for hooks
+    if cp -f "$PLUGIN_DIR/app/Plugins/$PLUGIN_NAME/resources/views/"*.blade.php "$target_dir/resources/views/" 2>/dev/null; then
+        log "Hook views installed"
+    else
+        warn "Could not copy hook views — check paths"
+    fi
+}
+
 run_migrations() {
     step "Setting up database..."
     
@@ -437,7 +458,7 @@ verify_installation() {
     fi
     
     # Quick health check
-    local health_url="http://localhost/plugins/weathermapng/health"
+    local health_url="http://localhost/plugin/WeathermapNG/health"
     if command -v curl &> /dev/null; then
         if curl -s "$health_url" | grep -q "healthy"; then
             log "Health check passed"
@@ -493,7 +514,7 @@ show_success() {
     echo
     echo -e "${CYAN}Next steps:${NC}"
     echo "  1. Enable plugin in LibreNMS (if not done automatically)"
-    echo "  2. Visit: http://your-librenms/plugins/weathermapng"
+    echo "  2. Visit: http://your-librenms/plugin/WeathermapNG"
     echo "  3. Create your first network map!"
     echo
     info "For help: https://github.com/lance0/weathermapNG"
@@ -519,6 +540,7 @@ main() {
     detect_librenms
     download_plugin
     install_dependencies
+    install_v2_hooks
     run_migrations
     set_permissions
     setup_cron

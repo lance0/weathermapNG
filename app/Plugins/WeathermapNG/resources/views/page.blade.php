@@ -1,91 +1,90 @@
-@extends('layouts.librenmsv1')
-
-@section('title', $title)
-
-@section('content')
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-12">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <h3 class="panel-title">
-                        <i class="fas fa-map"></i> {{ $title }}
-                        <div class="pull-right">
-                            <button class="btn btn-primary btn-sm" onclick="createNewMap()">
-                                <i class="fas fa-plus"></i> Create New Map
-                            </button>
-                        </div>
-                    </h3>
+<div class="row">
+    <div class="col-md-12">
+        <h2>{{ $title }}</h2>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="panel panel-default">
+                    <div class="panel-body text-center">
+                        <h3>{{ $stats['total_maps'] ?? 0 }}</h3>
+                        <p>Total Maps</p>
+                    </div>
                 </div>
-                <div class="panel-body">
-                    @if(count($maps) > 0)
-                        <div class="table-responsive">
-                            <table class="table table-hover table-condensed">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Description</th>
-                                        <th>Size</th>
-                                        <th>Last Updated</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($maps as $map)
-                                    <tr>
-                                        <td>
-                                            <a href="{{ url('/plugin/weathermapng/map/' . $map->id) }}">
-                                                {{ $map->name }}
-                                            </a>
-                                        </td>
-                                        <td>{{ $map->description }}</td>
-                                        <td>{{ $map->width }}x{{ $map->height }}</td>
-                                        <td>{{ $map->updated_at }}</td>
-                                        <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <a href="{{ url('/plugin/weathermapng/map/' . $map->id) }}" 
-                                                   class="btn btn-primary" title="View">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <a href="{{ url('/plugin/weathermapng/map/' . $map->id . '/edit') }}" 
-                                                   class="btn btn-warning" title="Edit">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <button onclick="deleteMap({{ $map->id }})" 
-                                                        class="btn btn-danger" title="Delete">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> 
-                            No weather maps have been created yet. 
-                            <a href="#" onclick="createNewMap()" class="alert-link">Create your first map</a>
-                        </div>
+            </div>
+            <div class="col-md-3">
+                <div class="panel panel-default">
+                    <div class="panel-body text-center">
+                        <h3>{{ $stats['total_nodes'] ?? 0 }}</h3>
+                        <p>Total Nodes</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="panel panel-default">
+                    <div class="panel-body text-center">
+                        <h3>{{ $stats['total_links'] ?? 0 }}</h3>
+                        <p>Total Links</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="panel panel-default">
+                    <div class="panel-body text-center">
+                        <h3>{{ !empty($stats['last_updated']) ? \Carbon\Carbon::parse($stats['last_updated'])->diffForHumans() : 'Never' }}</h3>
+                        <p>Last Updated</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">
+                    Network Maps
+                    @if(!empty($can_create))
+                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm pull-right">
+                            <i class="fa fa-plus"></i> Create New Map
+                        </a>
                     @endif
-                </div>
+                </h3>
+            </div>
+            <div class="panel-body">
+                @if(!empty($maps) && count($maps) > 0)
+                    <div class="row">
+                        @foreach($maps as $map)
+                            <div class="col-md-4">
+                                <div class="panel panel-default">
+                                    <div class="panel-body">
+                                        <h4>
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank">
+                                                {{ $map->title ?? $map->name }}
+                                            </a>
+                                        </h4>
+                                        <p class="text-muted">
+                                            <i class="fa fa-server"></i> {{ $map->nodes->count() }} nodes |
+                                            <i class="fa fa-link"></i> {{ $map->links->count() }} links
+                                        </p>
+                                        <p class="small">
+                                            Dimensions: {{ $map->width ?? 800 }}x{{ $map->height ?? 600 }}px<br>
+                                            Updated: {{ $map->updated_at ? $map->updated_at->diffForHumans() : 'Never' }}
+                                        </p>
+                                        <div class="btn-group">
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
+                                               class="btn btn-sm btn-primary" target="_blank">
+                                                <i class="fa fa-eye"></i> View
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="alert alert-info">
+                        <i class="fa fa-info-circle"></i> No maps have been created yet.
+                    </div>
+                @endif
             </div>
         </div>
     </div>
 </div>
-
-<script>
-function createNewMap() {
-    // Placeholder for map creation logic
-    alert('Map creation interface will be implemented here');
-}
-
-function deleteMap(mapId) {
-    if (confirm('Are you sure you want to delete this map?')) {
-        // Placeholder for map deletion logic
-        alert('Map deletion will be implemented here');
-    }
-}
-</script>
-@endsection

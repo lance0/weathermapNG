@@ -55,7 +55,9 @@
             "@lint",
             "@analyze",
             "@test"
-        ]
+        ],
+        "validate:install": "bash tests/install-test.sh",
+        "verify:plugin": "php verify.php --quiet"
     },
   "config": { "optimize-autoloader": true, "preferred-install": "dist", "sort-packages": true },
   "minimum-stability": "stable",
