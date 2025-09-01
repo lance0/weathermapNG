@@ -46,7 +46,7 @@
                                         <td>{{ $map->title ?? '' }}</td>
                                         <td>{{ Str::limit($map->description ?? '', 50) }}</td>
                                         <td>{{ $map->width ?? 800 }}x{{ $map->height ?? 600 }}</td>
-                                        <td>{{ $map->updated_at->format('M j, Y H:i') }}</td>
+                                        <td>{{ $map->updated_at ? \Carbon\Carbon::parse($map->updated_at)->format('M j, Y H:i') : 'Never' }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
