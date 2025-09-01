@@ -14,8 +14,8 @@
                 <div class="card-header">
                     <h3 class="card-title">
                         <i class="fas fa-map"></i> {{ $title }}
-                        <div class="float-end">
-                            <button class="btn btn-primary btn-sm" onclick="createNewMap()">
+                        <div class="float-right">
+                            <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#createMapModal">
                                 <i class="fas fa-plus"></i> Create New Map
                             </button>
                         </div>
@@ -72,7 +72,7 @@
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle"></i>
                             No weather maps have been created yet.
-                            <button class="btn btn-primary btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#createMapModal">
+                            <button class="btn btn-primary btn-sm ml-2" data-toggle="modal" data-target="#createMapModal">
                                 <i class="fas fa-plus"></i> Create Your First Map
                             </button>
                         </div>
@@ -91,20 +91,20 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create New Map</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
+                    <div class="form-group">
                         <label for="mapName" class="form-label">Name *</label>
                         <input type="text" class="form-control" id="mapName" name="name" required maxlength="255">
                         <div class="form-text">Unique identifier for the map</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-group">
                         <label for="mapTitle" class="form-label">Title</label>
                         <input type="text" class="form-control" id="mapTitle" name="title" maxlength="255">
                         <div class="form-text">Display title (optional)</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-group">
                         <label for="mapDescription" class="form-label">Description</label>
                         <textarea class="form-control" id="mapDescription" name="description" rows="3"></textarea>
                     </div>
@@ -122,7 +122,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Map</button>
                 </div>
             </div>
@@ -132,8 +132,7 @@
 
 <script>
 function createNewMap() {
-    const modal = new bootstrap.Modal(document.getElementById('createMapModal'));
-    modal.show();
+    $('#createMapModal').modal('show');
 }
 
 function deleteMap(mapId, mapName) {
@@ -160,7 +159,7 @@ function deleteMap(mapId, mapName) {
 }
 
 // Handle create map form submission
-document.getElementById('createMapForm').addEventListener('submit', function(e) {
+$('#createMapForm').on('submit', function(e) {
     e.preventDefault();
 
     const formData = new FormData(this);
@@ -175,8 +174,7 @@ document.getElementById('createMapForm').addEventListener('submit', function(e) 
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('createMapModal'));
-            modal.hide();
+            $('#createMapModal').modal('hide');
             location.reload();
         } else {
             alert('Error creating map: ' + (data.message || 'Unknown error'));
