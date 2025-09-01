@@ -39,7 +39,7 @@
                                     @foreach($maps as $map)
                                     <tr>
                                         <td>
-                                            <a href="{{ url('/plugin/weathermapng/map/' . $map->id) }}">
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank">
                                                 {{ $map->name }}
                                             </a>
                                         </td>
@@ -49,13 +49,9 @@
                                         <td>{{ $map->updated_at->format('M j, Y H:i') }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <a href="{{ url('/plugin/weathermapng/map/' . $map->id) }}"
-                                                   class="btn btn-primary" title="View">
+                                                <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
+                                                   class="btn btn-primary" title="View" target="_blank">
                                                     <i class="fas fa-eye"></i>
-                                                </a>
-                                                <a href="{{ url('/plugin/weathermapng/map/' . $map->id . '/edit') }}"
-                                                   class="btn btn-warning" title="Edit">
-                                                    <i class="fas fa-edit"></i>
                                                 </a>
                                                 <button onclick="deleteMap({{ $map->id }}, '{{ $map->name }}')"
                                                         class="btn btn-danger" title="Delete">
@@ -138,7 +134,7 @@ function createNewMap() {
 
 function deleteMap(mapId, mapName) {
     if (confirm(`Are you sure you want to delete the map "${mapName}"? This action cannot be undone.`)) {
-        fetch(`{{ url('/plugin/weathermapng/map') }}/${mapId}`, {
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}`, {
             method: 'DELETE',
             headers: {
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
@@ -165,7 +161,7 @@ document.getElementById('createMapForm').addEventListener('submit', function(e) 
 
     const formData = new FormData(this);
 
-    fetch('{{ url("/plugin/weathermapng/map") }}', {
+    fetch('{{ url("plugin/WeathermapNG/map") }}', {
         method: 'POST',
         body: formData,
         headers: {

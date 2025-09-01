@@ -46,7 +46,7 @@
                                 </ul>
                                 <div class="mt-auto">
                                     <div class="btn-group w-100" role="group">
-                                        <a href="{{ url('plugins/weathermapng/embed/' . $map->id) }}"
+                                        <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
                                            class="btn btn-outline-primary btn-sm" target="_blank">
                                             <i class="fas fa-external-link-alt"></i> View
                                         </a>
@@ -54,7 +54,7 @@
                                            class="btn btn-outline-secondary btn-sm">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
-                                        <a href="{{ url('plugins/weathermapng/api/maps/' . $map->id . '/export?format=json') }}"
+                                        <a href="{{ url('plugin/WeathermapNG/api/maps/' . $map->id . '/export?format=json') }}"
                                            class="btn btn-outline-info btn-sm">
                                             <i class="fas fa-download"></i> Export
                                         </a>
@@ -90,7 +90,7 @@
 <!-- Create Map Modal -->
 <div class="modal fade" id="createMapModal" tabindex="-1">
     <div class="modal-dialog">
-        <form method="POST" action="{{ url('plugins/weathermapng/maps') }}" class="modal-content">
+        <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" class="modal-content">
             @csrf
             <div class="modal-header">
                 <h5 class="modal-title">Create New Map</h5>
@@ -155,9 +155,27 @@
 
 @section('scripts')
 <script>
+// Auto-refresh simple stats if present on page (optional)
+document.addEventListener('DOMContentLoaded', function() {
+    const refresh = () => {
+        fetch('{{ url('plugin/WeathermapNG/health/stats') }}')
+            .then(r => r.json())
+            .then(d => {
+                // no fixed DOM ids here; left as example: update title with map count
+                const h1 = document.querySelector('h1');
+                if (h1 && d && typeof d.maps !== 'undefined') {
+                    h1.dataset.original = h1.dataset.original || h1.textContent;
+                    h1.textContent = (h1.dataset.original) + ' (' + d.maps + ' maps)';
+                }
+            }).catch(() => {});
+    };
+    refresh();
+    setInterval(refresh, 30000);
+});
+
 function showEmbedCode(mapId) {
     const baseUrl = '{{ url("/") }}';
-    const embedUrl = `${baseUrl}/plugins/weathermapng/embed/${mapId}`;
+    const embedUrl = `${baseUrl}/plugin/WeathermapNG/embed/${mapId}`;
 
     const htmlCode = `<div style="width: 100%; height: 400px; border: 1px solid #ccc;">\n    <iframe src="${embedUrl}" width="100%" height="100%" frameborder="0"></iframe>\n</div>`;
 

@@ -1,40 +1,40 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Plugins\WeathermapNG\Http\Controllers\WeathermapNGController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\LookupController;
 
-// WeathermapNG Plugin Routes - LibreNMS v2 format
-Route::group(['prefix' => 'plugin/weathermapng', 'middleware' => ['web', 'auth']], function () {
-    // Main plugin page (handled by Page hook)
-    Route::get('/', [WeathermapNGController::class, 'index'])->name('weathermapng.index');
+// Additional plugin routes under the standard v2 plugin path
+// Main page is provided by the v2 SinglePageHook at: /plugin/WeathermapNG
 
-    // Map viewing and editing
-    Route::get('/map/{id}', [WeathermapNGController::class, 'show'])->name('weathermapng.show');
-    Route::get('/map/{id}/edit', [WeathermapNGController::class, 'edit'])->name('weathermapng.edit');
+Route::group(['prefix' => 'plugin/WeathermapNG', 'middleware' => ['web', 'auth']], function () {
+    // Embed view and JSON endpoints
+    Route::get('/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed');
+    Route::get('/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json');
+    Route::get('/api/maps/{map}/live', [RenderController::class, 'live'])->name('weathermapng.live');
+    Route::get('/api/maps/{map}/export', [RenderController::class, 'export'])->name('weathermapng.export');
+    Route::post('/api/import', [RenderController::class, 'import'])->name('weathermapng.import');
+    Route::get('/api/maps/{map}/sse', [RenderController::class, 'sse'])->name('weathermapng.sse');
 
-    // Map CRUD operations
-    Route::post('/map', [WeathermapNGController::class, 'store'])->name('weathermapng.store');
-    Route::put('/map/{id}', [WeathermapNGController::class, 'update'])->name('weathermapng.update');
-    Route::delete('/map/{id}', [WeathermapNGController::class, 'destroy'])->name('weathermapng.destroy');
+    // Device and port lookup endpoints for editor
+    Route::get('/api/devices', [LookupController::class, 'devices'])->name('weathermapng.devices');
+    Route::get('/api/device/{id}/ports', [LookupController::class, 'ports'])->name('weathermapng.device.ports');
 
-    // API endpoints for map data
-    Route::get('/api/map/{id}/data', [WeathermapNGController::class, 'data'])->name('weathermapng.data');
-    Route::get('/api/map/{id}/live', [WeathermapNGController::class, 'live'])->name('weathermapng.live');
-    Route::get('/api/map/{id}/export', [WeathermapNGController::class, 'export'])->name('weathermapng.export');
-    Route::post('/api/import', [WeathermapNGController::class, 'import'])->name('weathermapng.import');
-
-    // Device and port lookup for editor
-    Route::get('/api/devices', [WeathermapNGController::class, 'devices'])->name('weathermapng.devices');
-    Route::get('/api/devices/search', [WeathermapNGController::class, 'searchDevices'])->name('weathermapng.devices.search');
-    Route::get('/api/device/{id}/ports', [WeathermapNGController::class, 'ports'])->name('weathermapng.ports');
-
-    // Node and link management
-    Route::post('/map/{id}/nodes', [WeathermapNGController::class, 'storeNodes'])->name('weathermapng.nodes.store');
-    Route::post('/map/{id}/links', [WeathermapNGController::class, 'storeLinks'])->name('weathermapng.links.store');
+    // Optional CRUD endpoints (guard as needed)
+    Route::post('/map', [MapController::class, 'create'])->name('weathermapng.map.create');
+    Route::put('/map/{map}', [MapController::class, 'update'])->name('weathermapng.map.update');
+    Route::delete('/map/{map}', [MapController::class, 'destroy'])->name('weathermapng.map.destroy');
+    Route::post('/map/{map}/nodes', [MapController::class, 'storeNodes'])->name('weathermapng.nodes.store');
+    Route::post('/map/{map}/links', [MapController::class, 'storeLinks'])->name('weathermapng.links.store');
 });
 
-// Health check routes (no auth required for monitoring)
-Route::prefix('plugin/weathermapng')->group(function () {
-    Route::get('health', [WeathermapNGController::class, 'health'])->name('weathermapng.health');
-    Route::get('ready', [WeathermapNGController::class, 'ready'])->name('weathermapng.ready');
+// Health and probe endpoints (no auth for k8s/monitoring)
+Route::prefix('plugin/WeathermapNG')->group(function () {
+    Route::get('/health', [HealthController::class, 'check'])->name('weathermapng.health');
+    Route::get('/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
+    Route::get('/ready', [HealthController::class, 'ready'])->name('weathermapng.ready');
+    Route::get('/live', [HealthController::class, 'live'])->name('weathermapng.alive');
+    Route::get('/metrics', [HealthController::class, 'metrics'])->name('weathermapng.metrics');
 });

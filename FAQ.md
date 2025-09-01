@@ -29,7 +29,7 @@ Basic installation works out of the box. For production:
 
 ### How do I create a map?
 
-1. Go to `/plugins/weathermapng`
+1. Go to `/plugin/WeathermapNG`
 2. Click "Create New Map"
 3. Add devices and links
 4. Save
@@ -42,7 +42,7 @@ Default is every 5 minutes (configured in cron).
 
 Yes, use the embed URL:
 ```html
-<iframe src="/plugins/weathermapng/embed/MAP_ID"></iframe>
+<iframe src="/plugin/WeathermapNG/embed/MAP_ID"></iframe>
 ```
 
 ## Troubleshooting
@@ -93,12 +93,12 @@ docker-compose logs weathermap-poller
 Use LibreNMS authentication:
 ```bash
 curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugins/weathermapng/api/maps
+     https://librenms/plugin/WeathermapNG/api/maps/1/json
 ```
 
 ### Is there a health check?
 
-Yes: `/plugins/weathermapng/health`
+Yes: `/plugin/WeathermapNG/health`
 
 ## Support
 

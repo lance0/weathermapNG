@@ -97,4 +97,86 @@ class RenderController
             'message' => 'Map imported successfully'
         ]);
     }
+
+    /**
+     * Server-Sent Events stream for live map updates
+     * GET /plugin/WeathermapNG/api/maps/{map}/sse
+     */
+    public function sse(Map $map, PortUtilService $svc, Request $request)
+    {
+        $interval = max(1, (int) $request->get('interval', 5));
+        $maxSeconds = (int) $request->get('max', 60); // connection duration
+
+        return response()->stream(function () use ($map, $svc, $interval, $maxSeconds) {
+            $start = time();
+            // Disable PHP output buffering
+            if (function_exists('apache_setenv')) {
+                @apache_setenv('no-gzip', '1');
+            }
+            @ini_set('zlib.output_compression', 0);
+            @ini_set('implicit_flush', 1);
+            while (ob_get_level() > 0) {
+                @ob_end_flush();
+            }
+            @ob_implicit_flush(1);
+
+            while (true) {
+                $payload = [
+                    'ts' => time(),
+                    'links' => [],
+                    'nodes' => [],
+                ];
+
+                // Links utilization
+                foreach ($map->links as $link) {
+                    $payload['links'][$link->id] = $svc->linkUtilBits([
+                        'port_id_a' => $link->port_id_a,
+                        'port_id_b' => $link->port_id_b,
+                        'bandwidth_bps' => $link->bandwidth_bps,
+                    ]);
+                }
+
+                // Node statuses
+                foreach ($map->nodes as $node) {
+                    $status = 'unknown';
+                    if ($node->device_id) {
+                        try {
+                            if (class_exists('App\\Models\\Device')) {
+                                $dev = \App\Models\Device::find($node->device_id);
+                                if ($dev) {
+                                    $status = ($dev->status ?? 0) ? 'up' : 'down';
+                                }
+                            } else {
+                                $row = \DB::table('devices')->select('status')->where('device_id', $node->device_id)->first();
+                                if ($row) {
+                                    $status = ($row->status ?? 0) ? 'up' : 'down';
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $status = 'unknown';
+                        }
+                    }
+                    $payload['nodes'][$node->id] = [
+                        'status' => $status,
+                    ];
+                }
+
+                // Emit SSE message
+                echo 'data: ' . json_encode($payload) . "\n\n";
+                @ob_flush();
+                @flush();
+
+                if (connection_aborted() || (time() - $start) >= $maxSeconds) {
+                    break;
+                }
+
+                sleep($interval);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache, no-transform',
+            'X-Accel-Buffering' => 'no',
+            'Connection' => 'keep-alive',
+        ]);
+    }
 }

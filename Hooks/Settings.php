@@ -8,9 +8,9 @@ use App\Models\User;
 class Settings extends SettingsHook
 {
     /**
-     * The view to render in settings page
+     * The view to render in settings page (relative to plugin view namespace)
      */
-    public string $view = 'WeathermapNG::hooks.settings';
+    public string $view = 'hooks.settings';
     
     /**
      * Settings section name
@@ -39,34 +39,6 @@ class Settings extends SettingsHook
             'settings' => $currentSettings,
             'saved' => request()->get('saved', false),
         ];
-    }
-    
-    /**
-     * Handle settings save
-     */
-    public function save(array $data): bool
-    {
-        // Save settings to config file or database
-        $configPath = base_path('config/weathermapng.php');
-        
-        try {
-            $config = require $configPath;
-            
-            // Update config values
-            foreach ($data as $key => $value) {
-                if (array_key_exists($key, $config)) {
-                    $config[$key] = $value;
-                }
-            }
-            
-            // Write config back
-            $configContent = "<?php\n\nreturn " . var_export($config, true) . ";\n";
-            file_put_contents($configPath, $configContent);
-            
-            return true;
-        } catch (\Exception $e) {
-            return false;
-        }
     }
     
     /**

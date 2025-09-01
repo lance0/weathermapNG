@@ -8,9 +8,9 @@ use App\Models\User;
 class Menu extends MenuEntryHook
 {
     /**
-     * The menu entry name - appears in the menu
+     * Blade view (relative to plugin view namespace)
      */
-    public string $view = 'WeathermapNG::hooks.menu';
+    public string $view = 'hooks.menu';
     
     /**
      * Provide data to the menu view
@@ -27,7 +27,7 @@ class Menu extends MenuEntryHook
         
         return [
             'title' => 'WeathermapNG',
-            'url' => url('/plugins/weathermapng'),
+            'url' => url('plugin/WeathermapNG'),
             'icon' => 'fa-map',
             'map_count' => $mapCount,
         ];
@@ -39,7 +39,6 @@ class Menu extends MenuEntryHook
     public function authorize(User $user): bool
     {
         // Show to all authenticated users
-        // You could add role checks here: return $user->can('view-maps');
         return true;
     }
 }

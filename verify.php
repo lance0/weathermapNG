@@ -398,7 +398,7 @@ echo "==========================================\n";
 if ($issues_found === 0) {
     output("All checks passed! ✨", 'success');
     echo "\n🎉 WeathermapNG is ready to use!\n";
-    echo "Visit: https://your-librenms/plugins/weathermapng\n";
+    echo "Visit: https://your-librenms/plugin/WeathermapNG\n";
     exit(0);
 } else {
     output("Found $issues_found issue(s)", 'warning');

@@ -2,21 +2,18 @@
 
 namespace App\Plugins\WeathermapNG;
 
-class Menu
+use App\Plugins\Hooks\MenuEntryHook;
+
+class Menu extends MenuEntryHook
 {
-    public string $view = 'weathermapng::menu';
+    public string $view = 'resources.views.menu';
+
     public function data(): array
     {
         return [
-            'title' => 'Network Maps',
-            'url' => '/plugin/WeathermapNG',
+            'title' => 'WeathermapNG',
+            'url' => url('plugin/WeathermapNG'),
             'icon' => 'fa-network-wired',
         ];
-    }
-
-    public function authorize($user): bool
-    {
-        // Allow all authenticated users to see the menu
-        return $user !== null;
     }
 }

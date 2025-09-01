@@ -33,7 +33,7 @@ class InstallController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'WeathermapNG installed successfully!',
-                    'redirect' => url('/plugins/weathermapng')
+                    'redirect' => url('plugin/WeathermapNG')
                 ]);
             }
 

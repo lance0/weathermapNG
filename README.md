@@ -22,7 +22,7 @@ cd WeathermapNG
 
 ### 🌐 Alternative: Web Installer (1 Minute)
 1. Download and place plugin in `/opt/librenms/html/plugins/WeathermapNG`
-2. Visit `https://your-librenms/plugins/weathermapng/install`
+2. Visit `https://your-librenms/plugin/WeathermapNG`
 3. Click "Start Installation"
 
 ### ✅ Verify Installation
@@ -138,7 +138,7 @@ echo '*/5 * * * * librenms /opt/librenms/html/plugins/WeathermapNG/bin/map-polle
    ```
 
 3. **Access Plugin:**
-   - Visit: `https://your-librenms/plugins/weathermapng`
+   - Visit: `https://your-librenms/plugin/WeathermapNG`
 
 ## 🐳 Docker Installation
 
@@ -409,7 +409,7 @@ chmod -R 775 /opt/librenms/html/plugins/WeathermapNG/output
 
 ### Creating Your First Map
 
-1. **Access WeathermapNG**: Visit `https://your-librenms/plugins/weathermapng`
+1. **Access WeathermapNG**: Visit `https://your-librenms/plugin/WeathermapNG`
 2. **Create New Map**: Click the **"Create New Map"** button
 3. **Configure Settings**:
    - **Name**: Unique identifier (e.g., `core-network`)
@@ -425,7 +425,7 @@ chmod -R 775 /opt/librenms/html/plugins/WeathermapNG/output
 ### Example Map Creation
 ```bash
 # After installation, visit:
-https://your-librenms/plugins/weathermapng
+https://your-librenms/plugin/WeathermapNG
 
 # Create a simple 3-node topology:
 # Router1 (Core) ↔ Switch1 (Distribution) ↔ Server1 (Access)
@@ -493,7 +493,7 @@ WeathermapNG/
 ### Basic Map Creation
 ```javascript
 // Create a simple network map
-POST /plugins/weathermapng/maps
+POST /plugin/WeathermapNG/map
 {
   "name": "office-network",
   "title": "Office Network Topology",
@@ -505,13 +505,13 @@ POST /plugins/weathermapng/maps
 ### Embedding Maps
 ```html
 <!-- Dashboard Widget -->
-<iframe src="/plugins/weathermapng/embed/office-network"
+<iframe src="/plugin/WeathermapNG/embed/123"
         width="100%" height="400" frameborder="0">
 </iframe>
 
 <!-- External System -->
 <div style="width: 100%; height: 400px; border: 1px solid #ccc;">
-    <iframe src="https://librenms.company.com/plugins/weathermapng/embed/office-network"
+    <iframe src="https://librenms.company.com/plugin/WeathermapNG/embed/123"
             width="100%" height="100%" frameborder="0">
     </iframe>
 </div>
@@ -520,7 +520,7 @@ POST /plugins/weathermapng/maps
 ### API Integration
 ```javascript
 // Get map data
-fetch('/plugins/weathermapng/api/maps/office-network')
+fetch('/plugin/WeathermapNG/api/maps/123/json')
     .then(response => response.json())
     .then(data => {
         console.log('Map nodes:', data.nodes);
@@ -528,7 +528,7 @@ fetch('/plugins/weathermapng/api/maps/office-network')
     });
 
 // Get live data
-fetch('/plugins/weathermapng/api/maps/office-network/live')
+fetch('/plugin/WeathermapNG/api/maps/123/live')
     .then(response => response.json())
     .then(data => {
         // Real-time bandwidth data
@@ -741,7 +741,7 @@ Maps are stored in a relational database with the following structure:
 
 #### Dashboard Widget
 ```html
-<iframe src="/plugins/weathermapng/embed/your-map-name"
+<iframe src="/plugin/WeathermapNG/embed/123"
         width="100%" height="400" frameborder="0">
 </iframe>
 ```
@@ -749,7 +749,7 @@ Maps are stored in a relational database with the following structure:
 #### External System
 ```html
 <div style="width: 100%; height: 400px; border: 1px solid #ccc;">
-    <iframe src="https://your-librenms/plugins/weathermapng/embed/your-map-name"
+    <iframe src="https://your-librenms/plugin/WeathermapNG/embed/your-map-name"
             width="100%" height="100%" frameborder="0">
     </iframe>
 </div>
@@ -763,17 +763,17 @@ All API endpoints require authentication and return JSON responses.
 
 #### List Maps
 ```
-GET /plugins/weathermapng/api/maps
+GET /plugin/WeathermapNG/api/maps
 ```
 
 #### Get Map Data
 ```
-GET /plugins/weathermapng/api/maps/{mapId}
+GET /plugin/WeathermapNG/api/maps/{mapId}
 ```
 
 #### Create Map
 ```
-POST /plugins/weathermapng/maps
+POST /plugin/WeathermapNG/map
 Content-Type: application/json
 
 {
@@ -786,56 +786,56 @@ Content-Type: application/json
 
 #### Update Map
 ```
-PUT /plugins/weathermapng/maps/{map}
+PUT /plugin/WeathermapNG/map/{id}
 ```
 
 #### Delete Map
 ```
-DELETE /plugins/weathermapng/maps/{map}
+DELETE /plugin/WeathermapNG/map/{id}
 ```
 
 #### Get Devices
 ```
-GET /plugins/weathermapng/api/devices
+GET /plugin/WeathermapNG/api/devices
 ```
 
 #### Get Device Interfaces
 ```
-GET /plugins/weathermapng/api/devices/{deviceId}/ports
+GET /plugin/WeathermapNG/api/devices/{deviceId}/ports
 ```
 
 #### Live Data (Real-time)
 ```
-GET /plugins/weathermapng/api/maps/{mapId}/live
+GET /plugin/WeathermapNG/api/maps/{mapId}/live
 ```
 
 #### Export Map
 ```
-GET /plugins/weathermapng/api/maps/{mapId}/export?format=json
+GET /plugin/WeathermapNG/api/maps/{mapId}/export?format=json
 ```
 
 #### Import Map
 ```
-POST /plugins/weathermapng/api/maps/import
+POST /plugin/WeathermapNG/api/import
 Content-Type: multipart/form-data
 File: map.json
 ```
 
 #### Health Check
 ```
-GET /plugins/weathermapng/health
+GET /plugin/WeathermapNG/health
 ```
 
 #### System Statistics
 ```
-GET /plugins/weathermapng/health/stats
+GET /plugin/WeathermapNG/health/stats
 ```
 
 ### JavaScript API
 
 ```javascript
 // Load map data
-fetch('/plugins/weathermapng/api/map/my-map')
+fetch('/plugin/WeathermapNG/api/map/my-map')
     .then(response => response.json())
     .then(data => {
         console.log('Map nodes:', data.nodes);

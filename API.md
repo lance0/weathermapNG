@@ -10,23 +10,23 @@ All API endpoints require LibreNMS authentication (session cookies or API token)
 
 #### List All Maps
 ```http
-GET /plugins/weathermapng/
+GET /plugin/WeathermapNG
 ```
 
 #### Get Map Data (JSON)
 ```http
-GET /plugins/weathermapng/api/maps/{mapId}
+GET /plugin/WeathermapNG/api/maps/{id}/json
 ```
 
 #### Get Live Map Data
 ```http
-GET /plugins/weathermapng/api/maps/{mapId}/live
+GET /plugin/WeathermapNG/api/maps/{id}/live
 ```
 Returns real-time bandwidth and status data.
 
 #### Create Map
 ```http
-POST /plugins/weathermapng/maps
+POST /plugin/WeathermapNG/map
 Content-Type: application/json
 
 {
@@ -39,36 +39,36 @@ Content-Type: application/json
 
 #### Update Map
 ```http
-PUT /plugins/weathermapng/maps/{mapId}
+PUT /plugin/WeathermapNG/map/{id}
 ```
 
 #### Delete Map
 ```http
-DELETE /plugins/weathermapng/maps/{mapId}
+DELETE /plugin/WeathermapNG/map/{id}
 ```
 
 ### Devices
 
 #### Get All Devices
 ```http
-GET /plugins/weathermapng/api/devices
+GET /plugin/WeathermapNG/api/devices
 ```
 
 #### Search Devices
 ```http
-GET /plugins/weathermapng/api/devices/search?q=router
+GET /plugin/WeathermapNG/api/devices/search?q=router
 ```
 
 #### Get Device Ports
 ```http
-GET /plugins/weathermapng/api/devices/{deviceId}/ports
+GET /plugin/WeathermapNG/api/device/{id}/ports
 ```
 
 ### Health & Monitoring
 
 #### Basic Health Check
 ```http
-GET /plugins/weathermapng/health
+GET /plugin/WeathermapNG/health
 ```
 
 Response:
@@ -87,34 +87,34 @@ Response:
 
 #### Statistics
 ```http
-GET /plugins/weathermapng/health/stats
+GET /plugin/WeathermapNG/metrics
 ```
 
 #### Readiness Probe (for Kubernetes/Docker)
 ```http
-GET /plugins/weathermapng/ready
+GET /plugin/WeathermapNG/ready
 ```
 
 #### Liveness Probe (for Kubernetes/Docker)
 ```http
-GET /plugins/weathermapng/live
+GET /plugin/WeathermapNG/live
 ```
 
 #### Prometheus Metrics
 ```http
-GET /plugins/weathermapng/metrics
+GET /plugin/WeathermapNG/metrics
 ```
 
 ### Import/Export
 
 #### Export Map
 ```http
-GET /plugins/weathermapng/api/maps/{mapId}/export
+GET /plugin/WeathermapNG/api/maps/{id}/export
 ```
 
 #### Import Map
 ```http
-POST /plugins/weathermapng/api/maps/import
+POST /plugin/WeathermapNG/api/import
 Content-Type: multipart/form-data
 ```
 
@@ -122,12 +122,12 @@ Content-Type: multipart/form-data
 
 #### Embed Map (authenticated)
 ```http
-GET /plugins/weathermapng/embed/{mapId}
+GET /plugin/WeathermapNG/embed/{id}
 ```
 
 #### Public Embed (if configured)
 ```http
-GET /plugins/weathermapng/public/embed/{mapId}
+GET /plugin/WeathermapNG/public/embed/{id}
 ```
 
 ## Response Codes
@@ -144,11 +144,11 @@ GET /plugins/weathermapng/public/embed/{mapId}
 ```bash
 # Get map data
 curl -H "X-Auth-Token: your-token" \
-     https://librenms/plugins/weathermapng/api/maps/1
+     https://librenms/plugin/WeathermapNG/api/maps/1/json
 
 # Check health
-curl https://librenms/plugins/weathermapng/health
+curl https://librenms/plugin/WeathermapNG/health
 
 # Get metrics for Prometheus
-curl https://librenms/plugins/weathermapng/metrics
+curl https://librenms/plugin/WeathermapNG/metrics
 ```

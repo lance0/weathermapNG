@@ -240,10 +240,10 @@ Settings can be configured at:
 ### Health Check
 ```bash
 # Check if plugin is healthy
-curl https://your-librenms/plugin/weathermapng/health
+curl https://your-librenms/plugin/WeathermapNG/health
 
 # View metrics
-curl https://your-librenms/plugin/weathermapng/api/metrics
+curl https://your-librenms/plugin/WeathermapNG/metrics
 ```
 
 ## Support

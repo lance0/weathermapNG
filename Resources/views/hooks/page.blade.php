@@ -42,7 +42,7 @@
                 <h3 class="panel-title">
                     Network Maps
                     @if($can_create)
-                        <a href="{{ url('/plugins/weathermapng/maps/create') }}" class="btn btn-primary btn-sm pull-right">
+                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm pull-right">
                             <i class="fa fa-plus"></i> Create New Map
                         </a>
                     @endif
@@ -56,7 +56,7 @@
                                 <div class="panel panel-default">
                                     <div class="panel-body">
                                         <h4>
-                                            <a href="{{ url('/plugins/weathermapng/maps/' . $map->id) }}">
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}">
                                                 {{ $map->title ?? $map->name }}
                                             </a>
                                         </h4>
@@ -69,15 +69,15 @@
                                             Updated: {{ $map->updated_at->diffForHumans() }}
                                         </p>
                                         <div class="btn-group">
-                                            <a href="{{ url('/plugins/weathermapng/maps/' . $map->id) }}" 
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
                                                class="btn btn-sm btn-primary">
                                                 <i class="fa fa-eye"></i> View
                                             </a>
-                                            <a href="{{ url('/plugins/weathermapng/maps/' . $map->id . '/editor') }}" 
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
                                                class="btn btn-sm btn-default">
                                                 <i class="fa fa-edit"></i> Edit
                                             </a>
-                                            <a href="{{ url('/plugins/weathermapng/embed/' . $map->id) }}" 
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
                                                target="_blank" class="btn btn-sm btn-default">
                                                 <i class="fa fa-external-link"></i> Embed
                                             </a>
@@ -91,7 +91,7 @@
                     <div class="alert alert-info">
                         <i class="fa fa-info-circle"></i> No maps have been created yet.
                         @if($can_create)
-                            <a href="{{ url('/plugins/weathermapng/maps/create') }}" class="btn btn-primary btn-sm">
+                            <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm">
                                 Create your first map
                             </a>
                         @endif
@@ -101,3 +101,26 @@
         </div>
     </div>
 </div>
+<script>
+// Auto-refresh stats from JSON endpoint every 30s
+document.addEventListener('DOMContentLoaded', function() {
+    const refresh = () => {
+        fetch('{{ url('plugin/WeathermapNG/health/stats') }}')
+            .then(r => r.json())
+            .then(d => {
+                const els = {
+                    maps: document.querySelectorAll('h3')
+                };
+                const cards = document.querySelectorAll('.panel .panel-body h3');
+                if (cards && cards.length >= 4) {
+                    cards[0].textContent = d.maps ?? cards[0].textContent;
+                    cards[1].textContent = d.nodes ?? cards[1].textContent;
+                    cards[2].textContent = d.links ?? cards[2].textContent;
+                    cards[3].textContent = d.last_updated ? new Date(d.last_updated).toLocaleString() : cards[3].textContent;
+                }
+            }).catch(() => {});
+    };
+    refresh();
+    setInterval(refresh, 30000);
+});
+</script>
