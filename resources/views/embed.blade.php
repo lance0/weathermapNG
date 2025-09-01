@@ -93,7 +93,7 @@
         const mapId = '{{ $mapId }}';
         const baseUrl = '{{ url("/") }}';
         const WMNG_CONFIG = {
-            thresholds: @json(config('weathermapng.thresholds', [50, 80, 95])),
+            thresholds: {!! json_encode(config('weathermapng.thresholds') ?? [50, 80, 95]) !!},
             colors: {
                 link_normal: '{{ config('weathermapng.colors.link_normal', '#28a745') }}',
                 link_warning: '{{ config('weathermapng.colors.link_warning', '#ffc107') }}',
@@ -102,9 +102,9 @@
                 node_down: '{{ config('weathermapng.colors.node_down', '#dc3545') }}',
                 node_unknown: '{{ config('weathermapng.colors.node_unknown', '#6c757d') }}'
             },
-            enable_sse: @json(config('weathermapng.enable_sse', true)),
-            client_refresh: @json(config('weathermapng.client_refresh', 60)),
-            scale: @json(config('weathermapng.scale', 'bits')),
+            enable_sse: {!! json_encode(config('weathermapng.enable_sse') ?? true) !!},
+            client_refresh: {!! json_encode(config('weathermapng.client_refresh') ?? 60) !!},
+            scale: {!! json_encode(config('weathermapng.scale') ?? 'bits') !!}
         };
         const urlParams = new URLSearchParams(window.location.search);
         const param = (k, d) => urlParams.has(k) ? urlParams.get(k) : d;
@@ -117,7 +117,7 @@
         let eventSourceRef = null;
         let mapData = {};
         try {
-            mapData = @json($mapData ?? []);
+            mapData = {!! json_encode($mapData ?? []) !!};
         } catch (e) {
             console.error('Failed to parse map data:', e);
             mapData = { error: 'Invalid map data' };
