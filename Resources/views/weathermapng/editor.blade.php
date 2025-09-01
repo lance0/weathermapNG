@@ -173,6 +173,8 @@ let nodeCounter = 1;
 let mapId = {{ $map->id ?? 'null' }};
 let linkMode = false;
 let linkSource = null;
+let selectedNode = null;
+let devicesCache = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     initCanvas();
@@ -266,6 +268,8 @@ function initCanvas() {
             }
         }
         if (hit) {
+            selectedNode = hit;
+            populateNodeProperties(hit);
             dragging = hit;
             dragOffset.x = hit.x - pos.x;
             dragOffset.y = hit.y - pos.y;
@@ -349,6 +353,7 @@ function renderEditor() {
     // draw links first, then nodes
     links.forEach(drawLink);
     nodes.forEach(drawNode);
+    renderLinksList();
 }
 
 function patchNodePos(node) {
@@ -369,12 +374,40 @@ function loadDevices() {
             const select = document.getElementById('device-select');
             select.innerHTML = '<option value="">Choose a device...</option>';
 
-            data.devices.forEach(device => {
+            devicesCache = data.devices || [];
+            devicesCache.forEach(device => {
                 const option = document.createElement('option');
                 option.value = device.device_id;
                 option.textContent = device.hostname;
                 select.appendChild(option);
             });
+
+            // populate node properties device select as well
+            const nodeDevSel = document.getElementById('node-prop-device');
+            if (nodeDevSel) {
+                nodeDevSel.innerHTML = '<option value="">No device</option>';
+                devicesCache.forEach(device => {
+                    const opt = document.createElement('option');
+                    opt.value = device.device_id;
+                    opt.text = device.hostname;
+                    nodeDevSel.appendChild(opt);
+                });
+                nodeDevSel.addEventListener('change', function() {
+                    const devId = this.value || null;
+                    const intSel = document.getElementById('node-prop-interface');
+                    intSel.innerHTML = '<option value="">No interface</option>';
+                    if (devId) {
+                        fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${devId}/ports`)
+                            .then(r => r.json()).then(d => {
+                                (d.ports || []).forEach(p => {
+                                    const o = document.createElement('option');
+                                    o.value = p.port_id; o.text = p.ifName;
+                                    intSel.appendChild(o);
+                                });
+                            });
+                    }
+                });
+            }
         })
         .catch(error => {
             console.error('Error loading devices:', error);
@@ -477,6 +510,13 @@ function drawNode(node) {
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(node.label, node.x, node.y - 15);
+    if (selectedNode && selectedNode === node) {
+        ctx.strokeStyle = '#fd7e14';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, 14, 0, Math.PI * 2);
+        ctx.stroke();
+    }
 }
 
 function findNodeById(id) {
@@ -685,6 +725,88 @@ function exportConfig() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function exportJson() {
+    if (!mapId) { alert('Save the map first.'); return; }
+    const url = `{{ url('plugin/WeathermapNG/api/maps') }}/${mapId}/export?format=json`;
+    window.open(url, '_blank');
+}
+
+function populateNodeProperties(node) {
+    const label = document.getElementById('node-prop-label');
+    const devSel = document.getElementById('node-prop-device');
+    const intSel = document.getElementById('node-prop-interface');
+    const saveBtn = document.getElementById('node-prop-save');
+    const delBtn = document.getElementById('node-prop-delete');
+    [label, devSel, intSel, saveBtn, delBtn].forEach(el => el.disabled = false);
+    label.value = node.label || '';
+    devSel.value = node.deviceId || '';
+    // load interfaces if device set
+    intSel.innerHTML = '<option value="">No interface</option>';
+    if (node.deviceId) {
+        fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${node.deviceId}/ports`)
+            .then(r => r.json()).then(d => {
+                (d.ports || []).forEach(p => {
+                    const o = document.createElement('option');
+                    o.value = p.port_id; o.text = p.ifName;
+                    if (node.interfaceId && node.interfaceId == p.port_id) o.selected = true;
+                    intSel.appendChild(o);
+                });
+            });
+    }
+}
+
+function saveSelectedNode() {
+    if (!selectedNode || !mapId || !selectedNode.dbId) return;
+    const label = document.getElementById('node-prop-label').value.trim();
+    const deviceId = document.getElementById('node-prop-device').value || null;
+    const ifaceId = document.getElementById('node-prop-interface').value || null;
+    const payload = { label: label, device_id: deviceId ? parseInt(deviceId, 10) : null, meta: { interface_id: ifaceId ? parseInt(ifaceId, 10) : null } };
+    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node/${selectedNode.dbId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (d.success) {
+            selectedNode.label = label;
+            selectedNode.deviceId = payload.device_id;
+            selectedNode.interfaceId = payload.meta.interface_id;
+            renderEditor();
+        } else {
+            alert('Failed to save node: ' + (d.message || 'Unknown error'));
+        }
+    });
+}
+
+function deleteSelectedNode() {
+    if (!selectedNode || !mapId || !selectedNode.dbId) return;
+    if (!confirm('Delete this node and attached links?')) return;
+    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node/${selectedNode.dbId}`, {
+        method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+    }).then(() => {
+        nodes = nodes.filter(n => n !== selectedNode);
+        links = links.filter(l => l.srcId !== selectedNode.dbId && l.dstId !== selectedNode.dbId);
+        selectedNode = null;
+        ['node-prop-label','node-prop-device','node-prop-interface','node-prop-save','node-prop-delete'].forEach(id => document.getElementById(id).disabled = true);
+        renderEditor();
+    });
+}
+
+function renderLinksList() {
+    const c = document.getElementById('links-list');
+    if (!c) return;
+    if (!links.length) { c.innerHTML = '<small class="text-muted">No links yet</small>'; return; }
+    const item = (l, idx) => {
+        const a = findNodeById(l.srcId); const b = findNodeById(l.dstId);
+        const aL = a ? a.label : l.srcId; const bL = b ? b.label : l.dstId;
+        return `<div class=\"d-flex align-items-center justify-content-between mb-2\">
+            <div><i class=\"fas fa-link\"></i> ${aL} → ${bL}</div>
+            <div class=\"btn-group btn-group-sm\">
+                <button class=\"btn btn-outline-secondary\" onclick=\"openLinkModal(links[${idx}])\"><i class=\"fas fa-edit\"></i></button>
+                <button class=\"btn btn-outline-danger\" onclick=\"deleteLink(links[${idx}])\"><i class=\"fas fa-trash\"></i></button>
+            </div>
+        </div>`
+    };
+    c.innerHTML = links.map((l,i) => item(l,i)).join('');
 }
 </script>
 @endsection
