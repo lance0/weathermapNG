@@ -2,23 +2,16 @@
 
 namespace App\Plugins\WeathermapNG;
 
-class Menu
+use LibreNMS\Plugins\Hooks\MenuEntryHook;
+
+class Menu extends MenuEntryHook
 {
+    public string $view = 'weathermapng::menu';
     public function data(): array
     {
-        // Handle case where Laravel helpers might not be available (e.g., in testing)
-        $url = '/plugins/weathermapng';
-        if (function_exists('url')) {
-            try {
-                $url = url('/plugins/weathermapng');
-            } catch (Exception $e) {
-                // Keep default URL if url() helper fails
-            }
-        }
-
         return [
             'title' => 'WeathermapNG',
-            'url' => $url,
+            'url' => route('plugin.page', ['plugin' => 'WeathermapNG']),
             'icon' => 'fa-network-wired',
         ];
     }
