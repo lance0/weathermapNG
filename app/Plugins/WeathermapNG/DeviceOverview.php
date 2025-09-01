@@ -7,7 +7,7 @@ use App\Plugins\Hooks\DeviceOverviewHook;
 
 class DeviceOverview extends DeviceOverviewHook
 {
-    public string $view = 'resources.views.device-overview';
+    public string $view = 'weathermapng::device-overview';
 
     public function data(Device $device): array
     {
