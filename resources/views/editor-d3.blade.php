@@ -819,6 +819,29 @@ class WeathermapEditor {
                 return `M${source.x},${source.y}L${target.x},${target.y}`;
         }
     }
+
+    // Live link utilization helpers (editor preview)
+    getLinkPct(link) {
+        try {
+            const live = editorState.liveData && editorState.liveData.links ? editorState.liveData.links[link.id] : null;
+            if (!live) return null;
+            if (typeof live.pct === 'number') return live.pct;
+            const inBps = typeof live.in_bps === 'number' ? live.in_bps : 0;
+            const outBps = typeof live.out_bps === 'number' ? live.out_bps : 0;
+            const bps = inBps + outBps;
+            if (bps && link.bandwidth_bps) {
+                return Math.max(0, Math.min(100, (bps / link.bandwidth_bps) * 100));
+            }
+        } catch (e) {}
+        return null;
+    }
+    getLinkColorByPct(pct) {
+        const t1 = 50, t2 = 80;
+        if (pct === null) return '#666';
+        if (pct >= t2) return '#dc3545';
+        if (pct >= t1) return '#ffc107';
+        return '#28a745';
+    }
     
     render() {
         // Only re-render when needed
@@ -1618,41 +1641,65 @@ class WeathermapEditor {
                 ports.forEach(p => { const o=document.createElement('option'); o.value=p.port_id; o.text=p.ifName || `Port ${p.port_id}`; sel.add(o); });
             } catch (e) {}
         };
-        if (portASearch && selA2) portASearch.addEventListener('input', async () => {
+        if (portASearch && selA2) {
+          let idxA = -1; const sugA = document.getElementById('link-port-a-suggestions');
+          const hideA = ()=>{ if(sugA){sugA.style.display='none';sugA.innerHTML='';idxA=-1;} };
+          portASearch.addEventListener('keydown', (e)=>{
+            const items = Array.from(sugA?.children||[]);
+            if (!items.length) return;
+            if (e.key==='ArrowDown'){ e.preventDefault(); idxA=(idxA+1)%items.length; items.forEach((it,i)=>it.classList.toggle('active',i===idxA)); }
+            else if (e.key==='ArrowUp'){ e.preventDefault(); idxA=(idxA-1+items.length)%items.length; items.forEach((it,i)=>it.classList.toggle('active',i===idxA)); }
+            else if (e.key==='Enter'){ e.preventDefault(); if(idxA>=0){ items[idxA].click(); hideA(); } }
+            else if (e.key==='Escape'){ hideA(); }
+          });
+          portASearch.addEventListener('blur', ()=> setTimeout(hideA,150));
+          portASearch.addEventListener('input', async () => {
             const q = portASearch.value.toLowerCase();
             const link = editorState.selectedElements.find(e => e.type === 'link');
             const srcNode = link ? editorState.nodes.find(n => n.id === link.source) : null;
             if (q.length >= 2 && srcNode?.device_id) { await fetchAndFillPorts(srcNode.device_id, q, selA2); }
             else { filterSelect(selA2, q); }
             // suggestions dropdown
-            const sug = document.getElementById('link-port-a-suggestions');
-            if (!sug) return;
+            const sug = sugA; if (!sug) return;
             while (sug.firstChild) sug.removeChild(sug.firstChild);
             if (q.length < 2) { sug.style.display='none'; return; }
-            Array.from(selA2.options).slice(1, 11).forEach((opt, idx) => {
+            Array.from(selA2.options).slice(1, 11).forEach((opt) => {
                 if (opt.style.display==='none') return;
                 const div = document.createElement('div'); div.className='autocomplete-item'; div.textContent=opt.text; div.onclick=()=>{ selA2.value=opt.value; selA2.dispatchEvent(new Event('change')); sug.style.display='none'; portASearch.value=opt.text; };
                 sug.appendChild(div);
             });
             sug.style.display = sug.children.length ? 'block' : 'none';
-        });
-        if (portBSearch && selB2) portBSearch.addEventListener('input', async () => {
+          });
+        }
+        if (portBSearch && selB2) {
+          let idxB = -1; const sugB = document.getElementById('link-port-b-suggestions');
+          const hideB = ()=>{ if(sugB){sugB.style.display='none';sugB.innerHTML='';idxB=-1;} };
+          portBSearch.addEventListener('keydown', (e)=>{
+            const items = Array.from(sugB?.children||[]);
+            if (!items.length) return;
+            if (e.key==='ArrowDown'){ e.preventDefault(); idxB=(idxB+1)%items.length; items.forEach((it,i)=>it.classList.toggle('active',i===idxB)); }
+            else if (e.key==='ArrowUp'){ e.preventDefault(); idxB=(idxB-1+items.length)%items.length; items.forEach((it,i)=>it.classList.toggle('active',i===idxB)); }
+            else if (e.key==='Enter'){ e.preventDefault(); if(idxB>=0){ items[idxB].click(); hideB(); } }
+            else if (e.key==='Escape'){ hideB(); }
+          });
+          portBSearch.addEventListener('blur', ()=> setTimeout(hideB,150));
+          portBSearch.addEventListener('input', async () => {
             const q = portBSearch.value.toLowerCase();
             const link = editorState.selectedElements.find(e => e.type === 'link');
             const dstNode = link ? editorState.nodes.find(n => n.id === link.target) : null;
             if (q.length >= 2 && dstNode?.device_id) { await fetchAndFillPorts(dstNode.device_id, q, selB2); }
             else { filterSelect(selB2, q); }
-            const sug = document.getElementById('link-port-b-suggestions');
-            if (!sug) return;
+            const sug = sugB; if (!sug) return;
             while (sug.firstChild) sug.removeChild(sug.firstChild);
             if (q.length < 2) { sug.style.display='none'; return; }
-            Array.from(selB2.options).slice(1, 11).forEach((opt, idx) => {
+            Array.from(selB2.options).slice(1, 11).forEach((opt) => {
                 if (opt.style.display==='none') return;
                 const div = document.createElement('div'); div.className='autocomplete-item'; div.textContent=opt.text; div.onclick=()=>{ selB2.value=opt.value; selB2.dispatchEvent(new Event('change')); sug.style.display='none'; portBSearch.value=opt.text; };
                 sug.appendChild(div);
             });
             sug.style.display = sug.children.length ? 'block' : 'none';
-        });
+          });
+        }
 
         const bwField = document.getElementById('link-bandwidth');
         const unitField = document.getElementById('link-bandwidth-unit');
@@ -2221,6 +2268,25 @@ class WeathermapEditor {
             .attr('fill', 'none')
             .attr('stroke', '#ff0000')
             .attr('stroke-width', 1);
+    }
+
+    // Live preview polling
+    startLivePreview() {
+        if (!editorState.mapId) return;
+        this.stopLivePreview();
+        const fetchLive = () => {
+            fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${editorState.mapId}/live`)
+                .then(r => r.json())
+                .then(data => { editorState.liveData = data; editorState.needsRender = true; })
+                .catch(() => {});
+        };
+        fetchLive();
+        editorState.liveTimer = setInterval(fetchLive, 5000);
+    }
+    stopLivePreview() {
+        if (editorState.liveTimer) { clearInterval(editorState.liveTimer); editorState.liveTimer = null; }
+        editorState.liveData = null;
+        editorState.needsRender = true;
     }
 
     // Apply a preset background fill
