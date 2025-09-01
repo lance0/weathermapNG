@@ -224,7 +224,12 @@ WeathermapNG/
 ## Post-Installation
 
 ### Access the Plugin
-Visit: `https://your-librenms/plugin/WeathermapNG`
+The plugin can be accessed via two methods:
+- **v2 Plugin System**: `https://your-librenms/plugin/WeathermapNG`
+- **v1 Legacy System**: `https://your-librenms/plugin/v1/WeathermapNG`
+
+Settings can be configured at:
+- `https://your-librenms/plugin/settings/WeathermapNG`
 
 ### Create Your First Map
 1. Click "Create New Map"
