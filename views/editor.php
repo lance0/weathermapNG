@@ -245,8 +245,9 @@ function assignDevice() {
 }
 
 function saveMap() {
+    var baseUrl = window.location.protocol + '//' + window.location.host;
     $.ajax({
-        url: '/plugin/v1/WeathermapNG/ajax/save-map',
+        url: baseUrl + '/plugin/v1/WeathermapNG/ajax/save-map',
         method: 'POST',
         data: {
             id: mapId,
