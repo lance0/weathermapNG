@@ -86,6 +86,27 @@
         <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
         <div id="controls" style="position:absolute; top:10px; left:10px; z-index:1000; display:flex; gap:8px; align-items:center;">
             <button id="toggle-transport" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Live: loading…</button>
+            <button id="toggle-flow" style="background:#007bff; color:#fff; border:1px solid #007bff; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Toggle flow animation">🌊 Flow</button>
+            <button id="toggle-heatmap" style="background:#6c757d; color:#fff; border:1px solid #6c757d; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Toggle heatmap overlay">🔥 Heat</button>
+            <div style="position:relative;">
+                <button id="viz-settings" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Visualization settings">⚙️</button>
+                <div id="viz-menu" style="position:absolute; top:100%; left:0; background:#fff; border:1px solid #ccc; border-radius:4px; padding:10px; min-width:250px; display:none; margin-top:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="font-size:12px; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">Flow Animation</div>
+                    <div style="margin-bottom:8px;">
+                        <label style="font-size:11px; display:block;">Particle Density: <span id="density-value">1.0</span></label>
+                        <input type="range" id="particle-density" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label style="font-size:11px; display:block;">Particle Speed: <span id="speed-value">1.0</span></label>
+                        <input type="range" id="particle-speed" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
+                    </div>
+                    <div style="font-size:12px; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">Heatmap Overlay</div>
+                    <div>
+                        <label style="font-size:11px; display:block;">Intensity: <span id="heatmap-intensity-value">1.0</span></label>
+                        <input type="range" id="heatmap-intensity" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
+                    </div>
+                </div>
+            </div>
             <label style="background:#fff; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:12px;">
                 Metric
                 <select id="metric-select" style="border:none; outline:none; font-size:12px;">
@@ -142,6 +163,16 @@
         let animTick = 0;
         let bgImg = null;
         let currentMetric = (param('metric', 'percent') || 'percent').toLowerCase();
+        
+        // Flow animation particles
+        let particles = [];
+        let flowAnimationEnabled = true;
+        let particleDensity = 1.0; // 0.5 to 2.0
+        let particleSpeed = 1.0; // 0.5 to 2.0
+        
+        // Heatmap overlay
+        let heatmapEnabled = false;
+        let heatmapIntensity = 1.0; // 0.5 to 2.0
 
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
@@ -230,7 +261,9 @@
             // Update status and overlays
             updateStatus();
             drawMinimap();
-            drawHeatOverlay();
+            if (heatmapEnabled) {
+                drawHeatOverlay();
+            }
         }
 
         function drawNode(node) {
@@ -298,12 +331,21 @@
             ctx.strokeStyle = getLinkColor(pct);
             const width = Math.max(1, (link.width || 2));
             ctx.lineWidth = width;
-            const dash = Math.max(6, width * 3);
-            ctx.setLineDash([dash, dash]);
-            const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
-            ctx.lineDashOffset = - (animTick * speed);
+            
+            // Use solid line if flow animation is enabled
+            if (!flowAnimationEnabled) {
+                const dash = Math.max(6, width * 3);
+                ctx.setLineDash([dash, dash]);
+                const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
+                ctx.lineDashOffset = - (animTick * speed);
+            }
             ctx.stroke();
             ctx.setLineDash([]);
+            
+            // Draw flow particles if enabled
+            if (flowAnimationEnabled) {
+                drawFlowParticles(link, x1, y1, x2, y2, pct);
+            }
 
             // Link utilization label
             if (metric !== null && metric !== undefined) {
@@ -338,6 +380,115 @@
             }
             // store geometry for hover
             storeLinkGeom(link, x1, y1, x2, y2, pct);
+        }
+        
+        function drawFlowParticles(link, x1, y1, x2, y2, pct) {
+            const live = link.live || {};
+            const inBps = live.in_bps || 0;
+            const outBps = live.out_bps || 0;
+            
+            // Skip if no traffic
+            if (inBps === 0 && outBps === 0) return;
+            
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            if (length === 0) return;
+            
+            const nx = dx / length;
+            const ny = dy / length;
+            
+            // Calculate particle properties based on traffic
+            const maxFlow = Math.max(inBps, outBps);
+            const relativeFlow = pct ? pct / 100 : 0.5;
+            const particleCount = Math.max(1, Math.floor((length / 50) * relativeFlow * particleDensity));
+            const particleSpacing = length / (particleCount + 1);
+            const speedFactor = 0.5 + (relativeFlow * 1.5) * particleSpeed;
+            
+            // Create unique link ID
+            const linkId = `${link.id || (x1 + '-' + y1 + '-' + x2 + '-' + y2)}`;
+            
+            // Initialize particles for this link if needed
+            if (!particles[linkId]) {
+                particles[linkId] = {
+                    forward: [],
+                    backward: [],
+                    inRatio: inBps / (inBps + outBps + 0.001),
+                    outRatio: outBps / (inBps + outBps + 0.001)
+                };
+                
+                // Create forward particles (source to dest)
+                if (outBps > 0) {
+                    for (let i = 0; i < particleCount * particles[linkId].outRatio; i++) {
+                        particles[linkId].forward.push({
+                            progress: (i / particleCount),
+                            speed: speedFactor * (0.8 + Math.random() * 0.4),
+                            size: 2 + Math.random() * 2,
+                            opacity: 0.6 + Math.random() * 0.4
+                        });
+                    }
+                }
+                
+                // Create backward particles (dest to source)
+                if (inBps > 0) {
+                    for (let i = 0; i < particleCount * particles[linkId].inRatio; i++) {
+                        particles[linkId].backward.push({
+                            progress: (i / particleCount),
+                            speed: speedFactor * (0.8 + Math.random() * 0.4),
+                            size: 2 + Math.random() * 2,
+                            opacity: 0.6 + Math.random() * 0.4
+                        });
+                    }
+                }
+            }
+            
+            const linkParticles = particles[linkId];
+            
+            // Update and draw forward particles
+            ctx.save();
+            linkParticles.forward.forEach(particle => {
+                particle.progress += (particle.speed * 0.005);
+                if (particle.progress > 1) particle.progress -= 1;
+                
+                const px = x1 + (dx * particle.progress);
+                const py = y1 + (dy * particle.progress);
+                
+                // Draw particle with glow effect
+                ctx.globalAlpha = particle.opacity * 0.3;
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(px, py, particle.size * 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalAlpha = particle.opacity;
+                ctx.fillStyle = '#40ff40';
+                ctx.beginPath();
+                ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Update and draw backward particles
+            linkParticles.backward.forEach(particle => {
+                particle.progress += (particle.speed * 0.005);
+                if (particle.progress > 1) particle.progress -= 1;
+                
+                const px = x2 - (dx * particle.progress);
+                const py = y2 - (dy * particle.progress);
+                
+                // Draw particle with glow effect
+                ctx.globalAlpha = particle.opacity * 0.3;
+                ctx.fillStyle = '#0080ff';
+                ctx.beginPath();
+                ctx.arc(px, py, particle.size * 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.globalAlpha = particle.opacity;
+                ctx.fillStyle = '#40a0ff';
+                ctx.beginPath();
+                ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
         }
 
         function getNodeColor(node) {
@@ -406,6 +557,64 @@
                     startSSE();
                 }
             });
+            
+            // Flow animation controls
+            document.getElementById('toggle-flow').addEventListener('click', () => {
+                flowAnimationEnabled = !flowAnimationEnabled;
+                const btn = document.getElementById('toggle-flow');
+                if (flowAnimationEnabled) {
+                    btn.style.background = '#007bff';
+                    btn.style.color = '#fff';
+                    btn.style.borderColor = '#007bff';
+                } else {
+                    btn.style.background = '#6c757d';
+                    btn.style.color = '#fff';
+                    btn.style.borderColor = '#6c757d';
+                    particles = []; // Clear particles when disabled
+                }
+            });
+            
+            // Heatmap toggle
+            document.getElementById('toggle-heatmap').addEventListener('click', () => {
+                heatmapEnabled = !heatmapEnabled;
+                const btn = document.getElementById('toggle-heatmap');
+                if (heatmapEnabled) {
+                    btn.style.background = '#dc3545';
+                    btn.style.borderColor = '#dc3545';
+                } else {
+                    btn.style.background = '#6c757d';
+                    btn.style.borderColor = '#6c757d';
+                }
+            });
+            
+            // Visualization settings menu toggle
+            document.getElementById('viz-settings').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const menu = document.getElementById('viz-menu');
+                menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+            });
+            
+            // Close menu when clicking outside
+            document.addEventListener('click', () => {
+                document.getElementById('viz-menu').style.display = 'none';
+            });
+            
+            document.getElementById('particle-density').addEventListener('input', (e) => {
+                particleDensity = parseFloat(e.target.value);
+                document.getElementById('density-value').textContent = particleDensity.toFixed(1);
+                particles = []; // Reset particles to apply new density
+            });
+            
+            document.getElementById('particle-speed').addEventListener('input', (e) => {
+                particleSpeed = parseFloat(e.target.value);
+                document.getElementById('speed-value').textContent = particleSpeed.toFixed(1);
+            });
+            
+            document.getElementById('heatmap-intensity').addEventListener('input', (e) => {
+                heatmapIntensity = parseFloat(e.target.value);
+                document.getElementById('heatmap-intensity-value').textContent = heatmapIntensity.toFixed(1);
+            });
+            
             // start animation loop
             function tick() {
                 animTick += 1;
@@ -712,29 +921,93 @@
 
         function drawHeatOverlay() {
             if (!heatCtx) return;
-            heatCtx.clearRect(0,0,heatCanvas.width, heatCanvas.height);
-            // nodes: red glow if down
-            (mapData.nodes||[]).forEach(n => {
-                const status = n.status || 'unknown';
-                if (status === 'down') {
-                    heatCtx.fillStyle = 'rgba(220,53,69,0.2)';
-                    heatCtx.beginPath();
-                    const x = (n.position?.x ?? n.x)||0, y = (n.position?.y ?? n.y)||0;
-                    heatCtx.arc(x, y, 30, 0, Math.PI*2);
-                    heatCtx.fill();
+            heatCtx.clearRect(0, 0, heatCanvas.width, heatCanvas.height);
+            
+            // Create temporary canvas for gradient processing
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = heatCanvas.width;
+            tempCanvas.height = heatCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw heat points for links
+            linkGeoms.forEach(g => {
+                if (g.pct == null || g.pct === 0) return;
+                
+                // Calculate intensity based on utilization
+                const intensity = (g.pct / 100) * heatmapIntensity;
+                const radius = 40 + (intensity * 30);
+                
+                // Draw heat points along the link
+                const steps = Math.max(3, Math.floor(Math.sqrt((g.x2-g.x1)**2 + (g.y2-g.y1)**2) / 50));
+                for (let i = 0; i <= steps; i++) {
+                    const t = i / steps;
+                    const x = g.x1 + (g.x2 - g.x1) * t;
+                    const y = g.y1 + (g.y2 - g.y1) * t;
+                    
+                    const gradient = tempCtx.createRadialGradient(x, y, 0, x, y, radius);
+                    
+                    // Color based on utilization level
+                    if (g.pct < 30) {
+                        gradient.addColorStop(0, `rgba(0, 255, 0, ${intensity * 0.5})`);
+                        gradient.addColorStop(0.5, `rgba(0, 255, 0, ${intensity * 0.2})`);
+                        gradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
+                    } else if (g.pct < 60) {
+                        gradient.addColorStop(0, `rgba(255, 255, 0, ${intensity * 0.6})`);
+                        gradient.addColorStop(0.5, `rgba(255, 255, 0, ${intensity * 0.3})`);
+                        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
+                    } else if (g.pct < 80) {
+                        gradient.addColorStop(0, `rgba(255, 165, 0, ${intensity * 0.7})`);
+                        gradient.addColorStop(0.5, `rgba(255, 165, 0, ${intensity * 0.35})`);
+                        gradient.addColorStop(1, 'rgba(255, 165, 0, 0)');
+                    } else {
+                        gradient.addColorStop(0, `rgba(255, 0, 0, ${intensity * 0.8})`);
+                        gradient.addColorStop(0.5, `rgba(255, 0, 0, ${intensity * 0.4})`);
+                        gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
+                    }
+                    
+                    tempCtx.fillStyle = gradient;
+                    tempCtx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
                 }
             });
-            // links: overlay intensity by pct
-            linkGeoms.forEach(g => {
-                if (g.pct == null) return;
-                const alpha = Math.min(0.35, (g.pct/100)*0.35);
-                heatCtx.strokeStyle = `rgba(255,0,0,${alpha})`;
-                heatCtx.lineWidth = 6;
-                heatCtx.beginPath();
-                heatCtx.moveTo(g.x1, g.y1);
-                heatCtx.lineTo(g.x2, g.y2);
-                heatCtx.stroke();
+            
+            // Draw heat for problematic nodes
+            (mapData.nodes || []).forEach(n => {
+                const x = (n.position?.x ?? n.x) || 0;
+                const y = (n.position?.y ?? n.y) || 0;
+                const status = n.status || 'unknown';
+                const cpu = n.metrics?.cpu || 0;
+                const mem = n.metrics?.mem || 0;
+                
+                let drawHeat = false;
+                let color, intensity;
+                
+                if (status === 'down') {
+                    drawHeat = true;
+                    color = [220, 53, 69]; // red
+                    intensity = 0.8 * heatmapIntensity;
+                } else if (cpu > 80 || mem > 80) {
+                    drawHeat = true;
+                    color = [255, 193, 7]; // yellow
+                    intensity = (Math.max(cpu, mem) / 100) * 0.6 * heatmapIntensity;
+                }
+                
+                if (drawHeat) {
+                    const radius = 50 * (1 + intensity);
+                    const gradient = tempCtx.createRadialGradient(x, y, 0, x, y, radius);
+                    gradient.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${intensity})`);
+                    gradient.addColorStop(0.5, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${intensity * 0.5})`);
+                    gradient.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
+                    
+                    tempCtx.fillStyle = gradient;
+                    tempCtx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+                }
             });
+            
+            // Apply blur for smooth heatmap effect
+            heatCtx.filter = 'blur(15px)';
+            heatCtx.globalCompositeOperation = 'source-over';
+            heatCtx.drawImage(tempCanvas, 0, 0);
+            heatCtx.filter = 'none';
         }
     </script>
 </body>
