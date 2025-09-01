@@ -87,7 +87,7 @@
                         @endif
                         <div id="installSpinner" class="d-none mt-3">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Installing...</span>
+                                <span class="sr-only">Installing...</span>
                             </div>
                             <span class="ms-2">Installing WeathermapNG...</span>
                         </div>
@@ -113,7 +113,7 @@
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title"><i class="fas fa-check-circle"></i> Installation Complete!</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="mb-3">WeathermapNG has been successfully installed!</p>
@@ -141,7 +141,7 @@
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
                 <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Installation Failed</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <p id="errorMessage">An error occurred during installation.</p>
@@ -156,7 +156,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" onclick="retryInstallation()">
                     <i class="fas fa-redo"></i> Retry
                 </button>
@@ -194,13 +194,11 @@ function startInstallation() {
             updateStepStatus('plugin', true);
 
             // Show success modal
-            const successModal = new bootstrap.Modal(document.getElementById('successModal'));
-            successModal.show();
+            $('#successModal').modal('show');
         } else {
             // Show error modal
             document.getElementById('errorMessage').textContent = data.message;
-            const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-            errorModal.show();
+            $('#errorModal').modal('show');
 
             btn.classList.remove('d-none');
         }

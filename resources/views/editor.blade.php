@@ -134,7 +134,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Configure Link</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
@@ -154,7 +154,7 @@
                 <button type="button" class="btn btn-danger" id="delete-link-btn" style="display:none;">
                     <i class="fas fa-trash"></i> Delete
                 </button>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="save-link-btn">
                     <i class="fas fa-save"></i> Save
                 </button>
@@ -603,11 +603,10 @@ function openLinkModal(link) {
     loadPorts(src.deviceId, srcSel, link.portA || null);
     loadPorts(dst.deviceId, dstSel, link.portB || null);
     document.getElementById('link-bandwidth').value = link.bw || '';
-    const modal = new bootstrap.Modal(document.getElementById('linkModal'));
     document.getElementById('delete-link-btn').style.display = link.dbId ? 'inline-block' : 'none';
     document.getElementById('delete-link-btn').onclick = () => deleteLink(link);
     document.getElementById('save-link-btn').onclick = () => saveLink(link);
-    modal.show();
+    $('#linkModal').modal('show');
 }
 
 function saveLink(link) {

@@ -12,7 +12,7 @@ class MapController
     public function index()
     {
         $maps = Map::withCount(['nodes', 'links'])->get();
-        return view('plugins.WeathermapNG.index', compact('maps'));
+        return view('WeathermapNG::index', compact('maps'));
     }
 
     public function show(Map $map)
@@ -28,14 +28,14 @@ class MapController
         // Get devices for the editor
         $devices = $this->getDevicesForEditor();
 
-        return view('plugins.WeathermapNG.editor', compact('map', 'devices'));
+        return view('WeathermapNG::editor', compact('map', 'devices'));
     }
 
     public function editorD3(Map $map)
     {
         $map->load(['nodes', 'links']);
         $title = 'WeathermapNG - D3 Editor';
-        return view('plugins.WeathermapNG.editor-d3', compact('map', 'title'));
+        return view('WeathermapNG::editor-d3', compact('map', 'title'));
     }
 
     public function create(Request $request)
@@ -58,6 +58,16 @@ class MapController
             'title' => $validated['title'] ?? $validated['name'],
             'options' => $options,
         ]);
+
+        // Return JSON for AJAX requests
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Map created successfully!',
+                'map' => $map,
+                'redirect' => route('weathermapng.editor', $map)
+            ]);
+        }
 
         return redirect()->route('weathermapng.editor', $map)
                         ->with('success', 'Map created successfully!');
@@ -88,6 +98,14 @@ class MapController
     public function destroy(Map $map)
     {
         $map->delete();
+
+        // Return JSON for AJAX requests
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Map deleted successfully!'
+            ]);
+        }
 
         return redirect()->route('weathermapng.index')
                         ->with('success', 'Map deleted successfully!');

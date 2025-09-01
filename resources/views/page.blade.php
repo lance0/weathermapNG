@@ -175,7 +175,11 @@ $('#createMapForm').on('submit', function(e) {
     .then(data => {
         if (data.success) {
             $('#createMapModal').modal('hide');
-            location.reload();
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else {
+                location.reload();
+            }
         } else {
             alert('Error creating map: ' + (data.message || 'Unknown error'));
         }

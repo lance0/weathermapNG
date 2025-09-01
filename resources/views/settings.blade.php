@@ -17,22 +17,22 @@
             <div class="card">
                 <div class="card-body">
                     <div class="nav flex-column nav-pills" role="tablist">
-                        <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#general-settings" type="button">
+                        <button class="nav-link active" data-toggle="pill" data-target="#general-settings" type="button">
                             <i class="fas fa-sliders-h"></i> General
                         </button>
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#display-settings" type="button">
+                        <button class="nav-link" data-toggle="pill" data-target="#display-settings" type="button">
                             <i class="fas fa-palette"></i> Display
                         </button>
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#snmp-settings" type="button">
+                        <button class="nav-link" data-toggle="pill" data-target="#snmp-settings" type="button">
                             <i class="fas fa-network-wired"></i> SNMP
                         </button>
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#performance-settings" type="button">
+                        <button class="nav-link" data-toggle="pill" data-target="#performance-settings" type="button">
                             <i class="fas fa-tachometer-alt"></i> Performance
                         </button>
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#advanced-settings" type="button">
+                        <button class="nav-link" data-toggle="pill" data-target="#advanced-settings" type="button">
                             <i class="fas fa-tools"></i> Advanced
                         </button>
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#backup-settings" type="button">
+                        <button class="nav-link" data-toggle="pill" data-target="#backup-settings" type="button">
                             <i class="fas fa-database"></i> Backup
                         </button>
                     </div>
@@ -547,7 +547,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Settings Preview</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="preview-content"></div>
@@ -615,7 +615,7 @@ function previewSettings() {
     document.getElementById('preview-content').innerHTML = 
         '<pre>' + JSON.stringify(settings, null, 2) + '</pre>';
     
-    new bootstrap.Modal(document.getElementById('previewModal')).show();
+    $('#previewModal').modal('show');
 }
 
 // Create backup
