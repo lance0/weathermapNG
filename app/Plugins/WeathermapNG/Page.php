@@ -2,11 +2,10 @@
 
 namespace App\Plugins\WeathermapNG;
 
-use LibreNMS\Plugins\Hooks\PageHook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
-class Page extends PageHook
+class Page
 {
     public string $view = 'weathermapng::page';
 
