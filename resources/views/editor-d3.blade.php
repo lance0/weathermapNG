@@ -230,6 +230,11 @@
                                         <input type="number" class="form-control form-control-sm" id="node-y">
                                     </div>
                                 </div>
+                                <div class="d-grid gap-2 mb-2">
+                                    <button class="btn btn-sm btn-primary" id="apply-node-btn">
+                                        <i class="fas fa-check"></i> Apply Changes
+                                    </button>
+                                </div>
                                 <button class="btn btn-sm btn-danger w-100" onclick="editorActions.deleteSelected()">
                                     <i class="fas fa-trash"></i> Delete Node
                                 </button>
@@ -263,6 +268,11 @@
                                     <select class="form-select form-select-sm" id="link-port-b">
                                         <option value="">Auto</option>
                                     </select>
+                                </div>
+                                <div class="d-grid gap-2 mb-2">
+                                    <button class="btn btn-sm btn-primary" id="apply-link-btn">
+                                        <i class="fas fa-check"></i> Apply Changes
+                                    </button>
                                 </div>
                                 <button class="btn btn-sm btn-danger w-100" onclick="editorActions.deleteSelected()">
                                     <i class="fas fa-trash"></i> Delete Link
@@ -502,7 +512,8 @@ const editorState = {
     isDragging: false,
     isLinking: false,
     linkStart: null,
-    clipboard: null
+    clipboard: null,
+    portCache: {}
 };
 
 // Initialize D3.js editor
@@ -639,7 +650,7 @@ class WeathermapEditor {
             .attr('id', d => `node-${d.id}`)
             .attr('transform', d => `translate(${d.x}, ${d.y})`)
             .call(this.drag)
-            .on('click', (event, d) => this.selectNode(event, d))
+            .on('click', (event, d) => this.onNodeClick(event, d))
             .on('dblclick', (event, d) => this.editNode(d));
         
         // Add node circle
@@ -690,8 +701,36 @@ class WeathermapEditor {
             .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 3 : 2);
         
         links.exit().remove();
-        
-        // Render labels
+
+        // Render link labels
+        const linkLabels = this.mapGroup.select('#labels-layer')
+            .selectAll('.link-label')
+            .data(editorState.links.filter(l => (l.label || '').length > 0), d => d.id);
+
+        const linkLabelEnter = linkLabels.enter()
+            .append('text')
+            .attr('class', 'link-label')
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '11px')
+            .attr('fill', '#333')
+            .attr('dy', -4);
+
+        linkLabels.merge(linkLabelEnter)
+            .attr('x', d => {
+                const s = editorState.nodes.find(n => n.id === d.source);
+                const t = editorState.nodes.find(n => n.id === d.target);
+                return s && t ? (s.x + t.x) / 2 : 0;
+            })
+            .attr('y', d => {
+                const s = editorState.nodes.find(n => n.id === d.source);
+                const t = editorState.nodes.find(n => n.id === d.target);
+                return s && t ? (s.y + t.y) / 2 : 0;
+            })
+            .text(d => d.label || '');
+
+        linkLabels.exit().remove();
+
+        // Render node labels
         if (document.getElementById('labelsToggle').checked) {
             const labels = this.mapGroup.select('#labels-layer')
                 .selectAll('.label')
@@ -733,7 +772,57 @@ class WeathermapEditor {
         };
         return icons[icon] || '\uf111'; // fa-circle as default
     }
-    
+
+    // Handle node click for both selection and linking
+    onNodeClick(event, node) {
+        if (editorState.tool === 'add-link') {
+            event.stopPropagation();
+            if (!editorState.linkStart) {
+                editorState.linkStart = node;
+                editorState.selectedElements = [node];
+                this.updatePropertiesPanel();
+                this.showStatus('Select destination node to create link');
+            } else if (editorState.linkStart && editorState.linkStart.id !== node.id) {
+                const srcId = editorState.linkStart.id;
+                const dstId = node.id;
+                fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/link`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ src_node_id: srcId, dst_node_id: dstId })
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.success && data.link) {
+                        const newLink = {
+                            id: data.link.id,
+                            source: data.link.src_node_id,
+                            target: data.link.dst_node_id,
+                            port_id_a: data.link.port_id_a || null,
+                            port_id_b: data.link.port_id_b || null,
+                            style: data.link.style || {},
+                            label: (data.link.style && (data.link.style.label || data.link.style["label"])) || '',
+                            type: 'link'
+                        };
+                        editorState.links.push(newLink);
+                        this.addToHistory();
+                        this.showStatus('Link created');
+                    } else {
+                        this.showStatus('Failed to create link', 'error');
+                    }
+                })
+                .catch(() => this.showStatus('Failed to create link', 'error'))
+                .finally(() => {
+                    editorState.linkStart = null;
+                });
+            }
+            return;
+        }
+        this.selectNode(event, node);
+    }
+
     selectNode(event, node) {
         if (editorState.tool !== 'select') return;
         
@@ -795,16 +884,83 @@ class WeathermapEditor {
                 // Show link properties
                 document.getElementById('link-properties').style.display = 'block';
                 document.getElementById('link-label').value = element.label || '';
-                document.getElementById('link-bandwidth').value = element.bandwidth || '';
+                // Infer units from bandwidth_bps
+                const unitSel = document.getElementById('link-bandwidth-unit');
+                const bwField = document.getElementById('link-bandwidth');
+                if (element.bandwidth_bps && element.bandwidth_bps >= 1e9) {
+                    unitSel.value = 'Gbps';
+                    bwField.value = Math.round(element.bandwidth_bps / 1e9);
+                } else if (element.bandwidth_bps) {
+                    unitSel.value = 'Mbps';
+                    bwField.value = Math.round(element.bandwidth_bps / 1e6);
+                } else {
+                    unitSel.value = 'Mbps';
+                    bwField.value = '';
+                }
+                // Populate ports for endpoints
+                this.populateLinkPorts(element);
             }
         }
+    }
+
+    // Populate port dropdowns for selected link based on endpoint devices
+    async populateLinkPorts(link) {
+        const srcNode = editorState.nodes.find(n => n.id === link.source);
+        const dstNode = editorState.nodes.find(n => n.id === link.target);
+        const selA = document.getElementById('link-port-a');
+        const selB = document.getElementById('link-port-b');
+        const resetSelect = (sel) => {
+            while (sel.options.length > 0) sel.remove(0);
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.text = 'Auto';
+            sel.add(opt);
+        };
+        resetSelect(selA);
+        resetSelect(selB);
+        const loadPorts = async (deviceId) => {
+            if (!deviceId) return [];
+            if (editorState.portCache[deviceId]) {
+                return editorState.portCache[deviceId];
+            }
+            const res = await fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports`);
+            const data = await res.json();
+            const ports = data.ports || [];
+            editorState.portCache[deviceId] = ports;
+            return ports;
+        };
+        try {
+            if (srcNode && srcNode.device_id) {
+                const portsA = await loadPorts(srcNode.device_id);
+                portsA.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.port_id;
+                    opt.text = p.ifName || `Port ${p.port_id}`;
+                    selA.add(opt);
+                });
+            }
+            if (dstNode && dstNode.device_id) {
+                const portsB = await loadPorts(dstNode.device_id);
+                portsB.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.port_id;
+                    opt.text = p.ifName || `Port ${p.port_id}`;
+                    selB.add(opt);
+                });
+            }
+        } catch (e) {
+            this.showStatus('Failed to load ports', 'error');
+        }
+        // Set selected values if present
+        selA.value = link.port_id_a ? String(link.port_id_a) : '';
+        selB.value = link.port_id_b ? String(link.port_id_b) : '';
     }
     
     saveNodePosition(node) {
         // Debounced save to server
         clearTimeout(this.saveTimeout);
         this.saveTimeout = setTimeout(() => {
-            fetch(`{{ url('plugin/WeathermapNG/api/node') }}/${node.id}`, {
+            fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/node/${node.id}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -819,11 +975,29 @@ class WeathermapEditor {
     }
     
     loadMap() {
-        fetch(`{{ url('plugin/WeathermapNG/api/map') }}/${editorState.mapId}`)
+        fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${editorState.mapId}/json`)
             .then(response => response.json())
             .then(data => {
-                editorState.nodes = data.nodes || [];
-                editorState.links = data.links || [];
+                editorState.nodes = (data.nodes || []).map(n => ({
+                    id: n.id,
+                    x: n.x,
+                    y: n.y,
+                    label: n.label,
+                    device_id: n.device_id || null,
+                    icon: 'router',
+                    type: 'node'
+                }));
+                editorState.links = (data.links || []).map(l => ({
+                    id: l.id,
+                    source: l.src,
+                    target: l.dst,
+                    bandwidth_bps: l.bandwidth_bps || null,
+                    port_id_a: l.port_id_a || null,
+                    port_id_b: l.port_id_b || null,
+                    style: l.style || {},
+                    label: (l.style && (l.style.label || l.style["label"])) || '',
+                    type: 'link'
+                }));
                 this.render();
             });
     }
@@ -858,6 +1032,39 @@ class WeathermapEditor {
         document.getElementById('snapToggle').addEventListener('change', (e) => {
             editorState.snap = e.target.checked;
         });
+        
+        // Node property field bindings (live updates) and apply buttons
+        const nodeLabel = document.getElementById('node-label');
+        const nodeDevice = document.getElementById('node-device');
+        const nodeX = document.getElementById('node-x');
+        const nodeY = document.getElementById('node-y');
+        const applyNodeBtn = document.getElementById('apply-node-btn');
+        if (nodeLabel) nodeLabel.addEventListener('input', () => {
+            if (editorState.selectedElements[0]) {
+                editorState.selectedElements[0].label = nodeLabel.value;
+            }
+        });
+        if (nodeDevice) nodeDevice.addEventListener('change', () => {
+            if (editorState.selectedElements[0]) {
+                editorState.selectedElements[0].device_id = nodeDevice.value || null;
+            }
+        });
+        const applyPos = () => {
+            if (editorState.selectedElements[0]) {
+                const n = editorState.selectedElements[0];
+                n.x = parseInt(nodeX.value || '0', 10);
+                n.y = parseInt(nodeY.value || '0', 10);
+                this.updateNodePosition(n);
+                this.updateLinks();
+            }
+        };
+        if (nodeX) nodeX.addEventListener('input', applyPos);
+        if (nodeY) nodeY.addEventListener('input', applyPos);
+        if (applyNodeBtn) applyNodeBtn.addEventListener('click', () => this.applyNodeChanges());
+
+        // Link apply
+        const applyLinkBtn = document.getElementById('apply-link-btn');
+        if (applyLinkBtn) applyLinkBtn.addEventListener('click', () => this.applyLinkChanges());
         
         // Mouse position tracking
         this.svg.on('mousemove', (event) => {
@@ -953,19 +1160,23 @@ class WeathermapEditor {
         this.addToHistory();
         
         // Save to server
-        fetch('{{ url("plugin/WeathermapNG/api/node") }}', {
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/node`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             body: JSON.stringify({
-                map_id: editorState.mapId,
-                ...node
+                label: node.label,
+                x: node.x,
+                y: node.y,
+                device_id: node.device_id || null
             })
         }).then(response => response.json())
           .then(data => {
-              node.id = data.id;
+              if (data && data.success && data.node) {
+                  node.id = data.node.id;
+              }
           });
     }
     
@@ -981,7 +1192,7 @@ class WeathermapEditor {
                 );
                 
                 // Delete from server
-                fetch(`{{ url('plugin/WeathermapNG/api/node') }}/${element.id}`, {
+                fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/node/${element.id}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
@@ -991,7 +1202,7 @@ class WeathermapEditor {
                 editorState.links = editorState.links.filter(l => l !== element);
                 
                 // Delete from server
-                fetch(`{{ url('plugin/WeathermapNG/api/link') }}/${element.id}`, {
+                fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/link/${element.id}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
@@ -1102,21 +1313,34 @@ class WeathermapEditor {
             }
         };
         
-        fetch('{{ url("plugin/WeathermapNG/api/map/save") }}', {
+        fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${editorState.mapId}/save`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify({
+                title: data.title,
+                options: data.options,
+                nodes: editorState.nodes.map(n => ({
+                    label: n.label,
+                    x: n.x,
+                    y: n.y,
+                    device_id: n.device_id || null
+                })),
+                links: editorState.links.map(l => ({
+                    src_node_id: l.source,
+                    dst_node_id: l.target,
+                    port_id_a: l.port_id_a || null,
+                    port_id_b: l.port_id_b || null,
+                    bandwidth_bps: l.bandwidth_bps || null,
+                    style: { ...(l.style || {}), label: l.label || '' }
+                }))
+            })
         }).then(response => response.json())
           .then(data => {
               if (data.success) {
                   this.showStatus('Map saved successfully');
-                  if (!editorState.mapId) {
-                      editorState.mapId = data.id;
-                      window.history.replaceState({}, '', `{{ url('plugin/WeathermapNG/editor') }}/${data.id}`);
-                  }
               } else {
                   this.showStatus('Error saving map: ' + data.message, 'error');
               }
@@ -1129,6 +1353,78 @@ class WeathermapEditor {
         editorState.selectedElements = [];
         this.updatePropertiesPanel();
         this.setTool('select');
+    }
+    
+    // Apply changes from the node properties panel
+    applyNodeChanges() {
+        if (!editorState.selectedElements[0]) return;
+        const n = editorState.selectedElements[0];
+        const payload = {
+            label: n.label,
+            x: Math.round(n.x),
+            y: Math.round(n.y),
+            device_id: n.device_id || null
+        };
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/node/${n.id}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify(payload)
+        }).then(r => r.json())
+          .then(data => {
+              if (data && data.success) {
+                  this.showStatus('Node updated');
+                  this.addToHistory();
+              } else {
+                  this.showStatus('Failed to update node', 'error');
+              }
+          })
+          .catch(() => this.showStatus('Failed to update node', 'error'));
+    }
+
+    // Apply changes from the link properties panel
+    applyLinkChanges() {
+        if (!editorState.selectedElements[0]) return;
+        const l = editorState.selectedElements[0];
+        const bwField = document.getElementById('link-bandwidth');
+        const unitField = document.getElementById('link-bandwidth-unit');
+        const labelField = document.getElementById('link-label');
+        const bwVal = parseFloat(bwField?.value || '0');
+        const unit = unitField?.value || 'Mbps';
+        let bps = null;
+        if (!isNaN(bwVal) && bwVal > 0) {
+            bps = Math.round(bwVal * (unit === 'Gbps' ? 1e9 : 1e6));
+        }
+        const payload = {
+            bandwidth_bps: bps,
+            port_id_a: (document.getElementById('link-port-a')?.value || '') || null,
+            port_id_b: (document.getElementById('link-port-b')?.value || '') || null,
+            style: { ...(l.style || {}), label: (labelField?.value || '') }
+        };
+        l.bandwidth_bps = bps;
+        l.port_id_a = payload.port_id_a ? parseInt(payload.port_id_a, 10) : null;
+        l.port_id_b = payload.port_id_b ? parseInt(payload.port_id_b, 10) : null;
+        l.style = payload.style;
+        l.label = labelField?.value || '';
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/link/${l.id}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify(payload)
+        }).then(r => r.json())
+          .then(data => {
+              if (data && data.success) {
+                  this.showStatus('Link updated');
+                  this.addToHistory();
+              } else {
+                  this.showStatus('Failed to update link', 'error');
+              }
+          })
+          .catch(() => this.showStatus('Failed to update link', 'error'));
     }
     
     showStatus(message, type = 'info') {
