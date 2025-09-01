@@ -116,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 - Alert overlays currently surface active alerts per device and per port where available; additional detail panes and transports remain future work.
+- Added a compatibility migration to backfill missing columns (e.g., `wmng_maps.title`) on older installs. Run migrations on upgrade.
 
 ---
 
