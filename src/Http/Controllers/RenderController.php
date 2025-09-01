@@ -65,7 +65,7 @@ class RenderController
                 } catch (\Exception $e) {}
             }
             // Aggregate node traffic from connected ports
-            $inSum = 0; $outSum = 0;
+            $inSum = 0; $outSum = 0; $source = 'none';
             if (!empty($portsByNode[$node->id])) {
                 foreach (array_unique($portsByNode[$node->id]) as $pid) {
                     try {
@@ -74,6 +74,7 @@ class RenderController
                         $outSum += (int) ($pd['out'] ?? 0);
                     } catch (\Throwable $e) {}
                 }
+                if (($inSum + $outSum) > 0) { $source = 'ports'; }
             }
             // Fallback: if no port data present, sum from link live data already computed above
             if (($inSum + $outSum) === 0) {
@@ -86,6 +87,7 @@ class RenderController
                         }
                     }
                 }
+                if (($inSum + $outSum) > 0) { $source = 'links'; }
             }
             $out['nodes'][$node->id] = [
                 'status' => $status,
@@ -93,6 +95,7 @@ class RenderController
                     'in_bps' => $inSum,
                     'out_bps' => $outSum,
                     'sum_bps' => $inSum + $outSum,
+                    'source' => $source,
                 ],
             ];
             if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
@@ -301,7 +304,7 @@ class RenderController
                         }
                     }
                     // Aggregate node traffic from connected ports
-                    $inSum = 0; $outSum = 0;
+                    $inSum = 0; $outSum = 0; $source = 'none';
                     if (!empty($portsByNode[$node->id])) {
                         foreach (array_unique($portsByNode[$node->id]) as $pid) {
                             try {
@@ -310,6 +313,7 @@ class RenderController
                                 $outSum += (int) ($pd['out'] ?? 0);
                             } catch (\Throwable $e) {}
                         }
+                        if (($inSum + $outSum) > 0) { $source = 'ports'; }
                     }
                     // Fallback to link sums when no port data
                     if (($inSum + $outSum) === 0) {
@@ -322,6 +326,7 @@ class RenderController
                                 }
                             }
                         }
+                        if (($inSum + $outSum) > 0) { $source = 'links'; }
                     }
                     $payload['nodes'][$node->id] = [
                         'status' => $status,
@@ -330,6 +335,7 @@ class RenderController
                             'in_bps' => $inSum,
                             'out_bps' => $outSum,
                             'sum_bps' => $inSum + $outSum,
+                            'source' => $source,
                         ],
                     ];
                     if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
