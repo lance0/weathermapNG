@@ -343,6 +343,10 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="form-check form-switch small mt-2">
+                                    <input class="form-check-input" type="checkbox" id="geo-center-click">
+                                    <label class="form-check-label" for="geo-center-click">Center on canvas click</label>
+                                </div>
                                 <div class="row g-2 mt-2">
                                     <div class="col-6">
                                         <label class="form-label small">Scale</label>
@@ -1141,6 +1145,7 @@ class WeathermapEditor {
                     if (typeof geo.scale !== 'undefined') document.getElementById('geo-scale').value = geo.scale;
                     if (typeof geo.offsetX !== 'undefined') document.getElementById('geo-offset-x').value = geo.offsetX;
                     if (typeof geo.offsetY !== 'undefined') document.getElementById('geo-offset-y').value = geo.offsetY;
+                    // Center-on-click is local UI preference; not persisted (leave unchecked by default)
                     this.renderGeoBackground();
                 }
                 editorState.nodes = (data.nodes || []).map(n => ({
@@ -1186,11 +1191,38 @@ class WeathermapEditor {
             });
         });
         
-        // Canvas click for adding nodes
+        // Canvas click: add node or center geo
         this.svg.on('click', (event) => {
+            const coords = d3.pointer(event, this.mapGroup.node());
             if (editorState.tool === 'add-node') {
-                const coords = d3.pointer(event, this.mapGroup.node());
                 this.addNode(coords[0], coords[1]);
+                return;
+            }
+            // Center geo background on click if enabled
+            const geoEnabled = document.getElementById('geoToggle')?.checked;
+            const centerOnClick = document.getElementById('geo-center-click')?.checked;
+            if (geoEnabled && centerOnClick && this.geoProjection && this.geoFeature) {
+                const width = this.svg.node().clientWidth;
+                const height = this.svg.node().clientHeight;
+                const path = d3.geoPath(this.geoProjection);
+                const b = path.bounds(this.geoFeature);
+                const cx = (b[0][0] + b[1][0]) / 2;
+                const cy = (b[0][1] + b[1][1]) / 2;
+                const dx = coords[0] - cx;
+                const dy = coords[1] - cy;
+                const offXEl = document.getElementById('geo-offset-x');
+                const offYEl = document.getElementById('geo-offset-y');
+                let offX = parseFloat(offXEl?.value || '0') + dx;
+                let offY = parseFloat(offYEl?.value || '0') + dy;
+                // Clamp offsets to reasonable bounds
+                const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+                const limX = width * 2;
+                const limY = height * 2;
+                offX = clamp(offX, -limX, limX);
+                offY = clamp(offY, -limY, limY);
+                if (offXEl) offXEl.value = offX;
+                if (offYEl) offYEl.value = offY;
+                this.renderGeoBackground();
             }
         });
         
@@ -1268,8 +1300,18 @@ class WeathermapEditor {
         if (geoPreset) geoPreset.addEventListener('change', () => this.renderGeoBackground());
         if (geoProj) geoProj.addEventListener('change', () => this.renderGeoBackground());
         if (geoScale) geoScale.addEventListener('input', () => this.renderGeoBackground());
-        if (geoOffX) geoOffX.addEventListener('input', () => this.renderGeoBackground());
-        if (geoOffY) geoOffY.addEventListener('input', () => this.renderGeoBackground());
+        if (geoOffX) geoOffX.addEventListener('input', () => {
+            const width = this.svg.node().clientWidth;
+            const limX = width * 2;
+            geoOffX.value = Math.max(-limX, Math.min(limX, parseFloat(geoOffX.value || '0')));
+            this.renderGeoBackground();
+        });
+        if (geoOffY) geoOffY.addEventListener('input', () => {
+            const height = this.svg.node().clientHeight;
+            const limY = height * 2;
+            geoOffY.value = Math.max(-limY, Math.min(limY, parseFloat(geoOffY.value || '0')));
+            this.renderGeoBackground();
+        });
         
         // Mouse position tracking + link preview
         this.svg.on('mousemove', (event) => {
@@ -1822,6 +1864,9 @@ class WeathermapEditor {
             const [tx, ty] = projection.translate();
             projection.translate([tx + (isFinite(offsetX) ? offsetX : 0), ty + (isFinite(offsetY) ? offsetY : 0)]);
             const path = d3.geoPath(projection);
+            // keep for centering behavior
+            this.geoProjection = projection;
+            this.geoFeature = feature;
 
             // Land
             layer.append('path')
