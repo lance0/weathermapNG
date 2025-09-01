@@ -406,6 +406,10 @@
                                 <label class="form-label small">Label Size</label>
                                 <input type="range" class="form-range" id="label-size" min="10" max="20" value="12">
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Link Width</label>
+                                <input type="range" class="form-range" id="link-width" min="1" max="8" value="2">
+                            </div>
                         </div>
                         
                         <!-- Layers Tab -->
@@ -824,8 +828,10 @@ class WeathermapEditor {
             .on('dblclick', (event, d) => this.editNode(d));
         
         // Add node circle
+        const nsVal = parseInt(document.getElementById('node-size')?.value || '40', 10);
+        const radius = Math.max(6, Math.round(nsVal / 2));
         nodeEnter.append('circle')
-            .attr('r', 20)
+            .attr('r', radius)
             .attr('fill', '#667eea')
             .attr('stroke', '#fff')
             .attr('stroke-width', 2)
@@ -838,21 +844,25 @@ class WeathermapEditor {
             .attr('fill', 'white')
             .attr('font-family', 'Font Awesome 5 Free')
             .attr('font-weight', 900)
-            .attr('font-size', '14px')
+            .attr('font-size', `${Math.max(10, Math.round(radius * 0.7))}px`)
             .text(d => this.getNodeIcon(d.icon));
         
         // Update existing nodes
         const mergedGroups = nodes.merge(nodeEnter)
             .attr('transform', d => `translate(${d.x}, ${d.y})`);
 
+        const nsValUpd = parseInt(document.getElementById('node-size')?.value || '40', 10);
+        const radiusUpd = Math.max(6, Math.round(nsValUpd / 2));
         mergedGroups.select('circle')
             .attr('stroke', d => editorState.selectedElements.includes(d) ? '#ffc107' : '#fff')
             .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 4 : 2)
-            .attr('stroke-dasharray', d => editorState.selectedElements.includes(d) ? '4 2' : null);
+            .attr('stroke-dasharray', d => editorState.selectedElements.includes(d) ? '4 2' : null)
+            .attr('r', radiusUpd);
 
         // Ensure node icon updates when changed
         mergedGroups.select('text')
-            .text(d => editor.getNodeIcon(d.icon));
+            .text(d => editor.getNodeIcon(d.icon))
+            .attr('font-size', `${Math.max(10, Math.round(radiusUpd * 0.7))}px`);
         
         nodes.exit().remove();
         
@@ -871,10 +881,12 @@ class WeathermapEditor {
             .attr('marker-end', 'url(#arrowhead)')
             .on('click', (event, d) => this.selectLink(event, d));
         
+        const linkBase = parseInt(document.getElementById('link-width')?.value || '2', 10);
+        const linkSel = Math.max(linkBase + 2, Math.round(linkBase * 2));
         links.merge(linkEnter)
             .attr('d', d => this.getLinkPath(d))
             .attr('stroke', d => editorState.selectedElements.includes(d) ? '#ffc107' : '#666')
-            .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 4 : 2)
+            .attr('stroke-width', d => editorState.selectedElements.includes(d) ? linkSel : linkBase)
             .attr('stroke-dasharray', d => editorState.selectedElements.includes(d) ? '6 3' : null);
         
         links.exit().remove();
@@ -1314,11 +1326,14 @@ class WeathermapEditor {
                 this.render();
                 // Restore label size option when available
                 try {
-                    const lbl = data.options && data.options.label_size ? parseInt(data.options.label_size, 10) : null;
-                    if (lbl && document.getElementById('label-size')) {
-                        document.getElementById('label-size').value = lbl;
-                        editorState.needsRender = true;
-                    }
+                    const opts = data.options || {};
+                    const lbl = opts.label_size ? parseInt(opts.label_size, 10) : null;
+                    const ns = opts.node_size ? parseInt(opts.node_size, 10) : null;
+                    const lw = opts.link_width ? parseInt(opts.link_width, 10) : null;
+                    if (lbl && document.getElementById('label-size')) document.getElementById('label-size').value = lbl;
+                    if (ns && document.getElementById('node-size')) document.getElementById('node-size').value = ns;
+                    if (lw && document.getElementById('link-width')) document.getElementById('link-width').value = lw;
+                    editorState.needsRender = true;
                 } catch (e) {}
             });
     }
@@ -1496,6 +1511,10 @@ class WeathermapEditor {
         // Label size live update
         const labelSize = document.getElementById('label-size');
         if (labelSize) labelSize.addEventListener('input', () => { editorState.needsRender = true; });
+        const nodeSize = document.getElementById('node-size');
+        if (nodeSize) nodeSize.addEventListener('input', () => { editorState.needsRender = true; });
+        const linkWidth = document.getElementById('link-width');
+        if (linkWidth) linkWidth.addEventListener('input', () => { editorState.needsRender = true; });
 
         // Link validation events
         const bwField = document.getElementById('link-bandwidth');
@@ -1869,7 +1888,10 @@ class WeathermapEditor {
                         scale: parseFloat(document.getElementById('geo-scale')?.value || '1'),
                         offsetX: parseFloat(document.getElementById('geo-offset-x')?.value || '0'),
                         offsetY: parseFloat(document.getElementById('geo-offset-y')?.value || '0')
-                    }
+                    },
+                    node_size: parseInt(document.getElementById('node-size')?.value || '40', 10),
+                    label_size: parseInt(document.getElementById('label-size')?.value || '12', 10),
+                    link_width: parseInt(document.getElementById('link-width')?.value || '2', 10)
                 },
                 nodes: editorState.nodes.map(n => ({
                     label: n.label,
