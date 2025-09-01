@@ -24,6 +24,12 @@ GET /plugin/WeathermapNG/api/maps/{id}/live
 ```
 Returns real-time bandwidth and status data.
 
+#### Save Full Map (D3 editor)
+```http
+POST /plugin/WeathermapNG/api/maps/{id}/save
+Content-Type: application/json
+```
+
 #### Create Map
 ```http
 POST /plugin/WeathermapNG/map
@@ -47,6 +53,51 @@ PUT /plugin/WeathermapNG/map/{id}
 DELETE /plugin/WeathermapNG/map/{id}
 ```
 
+### Map Items (Editor CRUD)
+
+#### Create Node
+```http
+POST /plugin/WeathermapNG/map/{id}/node
+```
+
+#### Update Node
+```http
+PATCH /plugin/WeathermapNG/map/{id}/node/{nodeId}
+```
+
+#### Delete Node
+```http
+DELETE /plugin/WeathermapNG/map/{id}/node/{nodeId}
+```
+
+#### Create Link
+```http
+POST /plugin/WeathermapNG/map/{id}/link
+```
+
+#### Update Link
+```http
+PATCH /plugin/WeathermapNG/map/{id}/link/{linkId}
+```
+
+#### Delete Link
+```http
+DELETE /plugin/WeathermapNG/map/{id}/link/{linkId}
+```
+
+### Discovery
+
+#### Auto-Discover Topology
+```http
+POST /plugin/WeathermapNG/map/{id}/autodiscover
+Content-Type: application/json
+
+{
+  "min_degree": 1,         // optional: minimum neighbor degree
+  "os": "ios"             // optional: filter by device OS
+}
+```
+
 ### Devices
 
 #### Get All Devices
@@ -62,6 +113,7 @@ GET /plugin/WeathermapNG/api/devices/search?q=router
 #### Get Device Ports
 ```http
 GET /plugin/WeathermapNG/api/device/{id}/ports
+?q=ge-0/0/0   // optional: server-side filter
 ```
 
 ### Health & Monitoring
@@ -129,6 +181,12 @@ GET /plugin/WeathermapNG/embed/{id}
 ```http
 GET /plugin/WeathermapNG/public/embed/{id}
 ```
+
+Query parameters supported by the embed view:
+
+- `metric`: `percent` (default), `in`, `out`, `sum`
+- `sse`: `1` to enable Server-Sent Events if available
+- `w`, `h`: override viewport width/height in pixels
 
 ## Response Codes
 

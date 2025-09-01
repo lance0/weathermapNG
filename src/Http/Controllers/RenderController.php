@@ -5,6 +5,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
+use LibreNMS\Plugins\WeathermapNG\Services\AlertService;
 use Illuminate\Http\Request;
 
 class RenderController
@@ -14,11 +15,13 @@ class RenderController
         return response()->json($map->toJsonModel());
     }
 
-    public function live(Map $map, PortUtilService $svc)
+    public function live(Map $map, PortUtilService $svc, AlertService $alerts)
     {
         $out = [
             'ts' => time(),
-            'links' => []
+            'links' => [],
+            'nodes' => [],
+            'alerts' => [ 'nodes' => [], 'links' => [] ],
         ];
 
         foreach ($map->links as $link) {
@@ -27,6 +30,53 @@ class RenderController
                 'port_id_b' => $link->port_id_b,
                 'bandwidth_bps' => $link->bandwidth_bps,
             ]);
+        }
+
+        // Node status (best-effort) and alert overlays
+        $deviceIds = [];
+        foreach ($map->nodes as $node) {
+            if ($node->device_id) $deviceIds[] = (int) $node->device_id;
+        }
+        $deviceIds = array_values(array_unique($deviceIds));
+        $devAlerts = $alerts->deviceAlerts($deviceIds);
+        foreach ($map->nodes as $node) {
+            $status = 'unknown';
+            if ($node->device_id) {
+                try {
+                    if (class_exists('App\\Models\\Device')) {
+                        $dev = \App\Models\Device::find($node->device_id);
+                        if ($dev) $status = ($dev->status ?? 0) ? 'up' : 'down';
+                    } else {
+                        $row = \DB::table('devices')->select('status')->where('device_id', $node->device_id)->first();
+                        if ($row) $status = ($row->status ?? 0) ? 'up' : 'down';
+                    }
+                } catch (\Exception $e) {}
+            }
+            $out['nodes'][$node->id] = [ 'status' => $status ];
+            if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
+                $out['alerts']['nodes'][$node->id] = $devAlerts[(int)$node->device_id];
+            }
+        }
+
+        // Link alerts based on port alerts (entity_type=port) when available
+        $portIds = [];
+        foreach ($map->links as $link) {
+            if ($link->port_id_a) $portIds[] = (int) $link->port_id_a;
+            if ($link->port_id_b) $portIds[] = (int) $link->port_id_b;
+        }
+        $portIds = array_values(array_unique($portIds));
+        $portAlerts = $alerts->portAlerts($portIds);
+        foreach ($map->links as $link) {
+            $count = 0; $sev = null;
+            foreach ([(int)$link->port_id_a, (int)$link->port_id_b] as $pid) {
+                if ($pid && isset($portAlerts[$pid])) {
+                    $count += $portAlerts[$pid]['count'];
+                    $sev = $sev ? $this->maxSeverity($sev, $portAlerts[$pid]['severity']) : $portAlerts[$pid]['severity'];
+                }
+            }
+            if ($count > 0) {
+                $out['alerts']['links'][$link->id] = ['count' => $count, 'severity' => $sev ?? 'warning'];
+            }
         }
 
         return response()->json($out);
@@ -125,7 +175,7 @@ class RenderController
      * Server-Sent Events stream for live map updates
      * GET /plugin/WeathermapNG/api/maps/{map}/sse
      */
-    public function sse(Map $map, PortUtilService $svc, Request $request)
+    public function sse(Map $map, PortUtilService $svc, Request $request, AlertService $alerts)
     {
         $interval = max(1, (int) $request->get('interval', 5));
         $maxSeconds = (int) $request->get('max', 60); // connection duration
@@ -148,6 +198,7 @@ class RenderController
                     'ts' => time(),
                     'links' => [],
                     'nodes' => [],
+                    'alerts' => [ 'nodes' => [], 'links' => [] ],
                 ];
 
                 // Links utilization
@@ -160,6 +211,12 @@ class RenderController
                 }
 
                 // Node statuses and metrics
+                $deviceIds = [];
+                foreach ($map->nodes as $node) {
+                    if ($node->device_id) $deviceIds[] = (int) $node->device_id;
+                }
+                $deviceIds = array_values(array_unique($deviceIds));
+                $devAlerts = $alerts->deviceAlerts($deviceIds);
                 foreach ($map->nodes as $node) {
                     $status = 'unknown';
                     $metrics = ['cpu' => null, 'mem' => null];
@@ -193,6 +250,30 @@ class RenderController
                         'status' => $status,
                         'metrics' => $metrics,
                     ];
+                    if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
+                        $payload['alerts']['nodes'][$node->id] = $devAlerts[(int)$node->device_id];
+                    }
+                }
+
+                // Port/Link alerts
+                $portIds = [];
+                foreach ($map->links as $lnk) {
+                    if ($lnk->port_id_a) $portIds[] = (int) $lnk->port_id_a;
+                    if ($lnk->port_id_b) $portIds[] = (int) $lnk->port_id_b;
+                }
+                $portIds = array_values(array_unique($portIds));
+                $portAlerts = $alerts->portAlerts($portIds);
+                foreach ($map->links as $lnk) {
+                    $count = 0; $sev = null;
+                    foreach ([(int)$lnk->port_id_a, (int)$lnk->port_id_b] as $pid) {
+                        if ($pid && isset($portAlerts[$pid])) {
+                            $count += $portAlerts[$pid]['count'];
+                            $sev = $sev ? $this->maxSeverity($sev, $portAlerts[$pid]['severity']) : $portAlerts[$pid]['severity'];
+                        }
+                    }
+                    if ($count > 0) {
+                        $payload['alerts']['links'][$lnk->id] = ['count' => $count, 'severity' => $sev ?? 'warning'];
+                    }
                 }
 
                 // Emit SSE message
@@ -212,5 +293,12 @@ class RenderController
             'X-Accel-Buffering' => 'no',
             'Connection' => 'keep-alive',
         ]);
+    }
+
+    private function maxSeverity(string $a, string $b): string
+    {
+        $w = ['ok' => 0, 'warning' => 1, 'critical' => 2, 'severe' => 3];
+        $wa = $w[$a] ?? 0; $wb = $w[$b] ?? 0;
+        return $wa >= $wb ? $a : $b;
     }
 }

@@ -95,6 +95,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2025-09-01
+
+### Added
+- D3.js editor enhancements: link creation mode, per-item Apply buttons, debounced position saves, bulk link editing, box-select, inline validation, sliders (node size, label size, link width), device/port autocomplete, geo backgrounds (TopoJSON, projection, scale/offset), export (SVG/PNG), snackbar notifications, and help modal.
+- Live preview in editor: optional polling of live metrics with on-canvas recoloring.
+- Embed viewer upgrades: metric selector (percent/in/out/sum), dynamic legend, PNG export, hover tooltips for link metrics.
+- Auto-discovery: seed nodes/links from LibreNMS topology with filters (min degree, OS) and initial layout.
+- API endpoints: map save (`POST /plugin/WeathermapNG/api/maps/{id}/save`), node/link CRUD, autodiscover (`POST /plugin/WeathermapNG/map/{id}/autodiscover`).
+- Alerts overlay wiring: live/SSE payloads now include alert summaries for nodes and links; embed renders alert badges.
+
+### Changed
+- Editor/Embed JSON mapping standardized; link labels and styles stored in `style` block.
+- Routes consolidated under `plugin/WeathermapNG/...` paths.
+
+### Documentation
+- Updated `API.md` with editor CRUD, save, autodiscover, and embed query params.
+- Expanded `docs/EDITOR_D3.md` with features, backgrounds, live preview, export, and bulk editing.
+- Added `docs/EMBED.md` for metrics, legend, live updates, and export.
+
+### Notes
+- Alert overlays currently surface active alerts per device and per port where available; additional detail panes and transports remain future work.
+
+---
+
 ## [0.1.0] - 2025-01-28 (Pre-release)
 
 ### Added
