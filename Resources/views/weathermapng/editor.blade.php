@@ -34,6 +34,7 @@
                                 height="{{ $map->height ?? config('weathermapng.default_height', 600) }}"
                                 style="border: 1px solid #dee2e6; display: block; margin: 0 auto;">
                         </canvas>
+                        <div id="link-tooltip" style="position:absolute; display:none; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px;"></div>
                     </div>
                 </div>
             </div>
@@ -126,6 +127,41 @@
         </div>
     </div>
 </div>
+
+<!-- Link Configuration Modal -->
+<div class="modal fade" id="linkModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configure Link</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Source Port</label>
+                    <select id="link-src-port" class="form-select"></select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Destination Port</label>
+                    <select id="link-dst-port" class="form-select"></select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Bandwidth (bps)</label>
+                    <input type="number" id="link-bandwidth" class="form-control" min="0" placeholder="e.g. 1000000000 for 1Gbps">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="delete-link-btn" style="display:none;">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="save-link-btn">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -167,6 +203,16 @@ function loadMapData(id) {
                     deviceId: n.device_id || null,
                     interfaceId: n.meta?.interface_id || null,
                 }));
+                // Load links if provided
+                links = Array.isArray(data.links) ? data.links.map(l => ({
+                    dbId: l.id,
+                    srcId: l.src,
+                    dstId: l.dst,
+                    portA: l.port_id_a || null,
+                    portB: l.port_id_b || null,
+                    bw: l.bandwidth_bps || null,
+                    style: l.style || {}
+                })) : [];
                 renderEditor();
             }
         }).catch(() => {});
@@ -210,6 +256,14 @@ function initCanvas() {
                 linkSource = null;
             }
             return;
+        }
+        // open link modal if clicking near an existing link
+        if (!hit) {
+            const near = hitTestLink(pos.x, pos.y);
+            if (near) {
+                openLinkModal(near);
+                return;
+            }
         }
         if (hit) {
             dragging = hit;
@@ -292,7 +346,8 @@ function renderEditor() {
     ctx.strokeStyle = '#eee';
     for (let x = 0; x <= canvas.width; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
     for (let y = 0; y <= canvas.height; y += 20) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-    // draw nodes
+    // draw links first, then nodes
+    links.forEach(drawLink);
     nodes.forEach(drawNode);
 }
 
@@ -424,6 +479,104 @@ function drawNode(node) {
     ctx.fillText(node.label, node.x, node.y - 15);
 }
 
+function findNodeById(id) {
+    return nodes.find(n => n.dbId === id);
+}
+
+function drawLink(link) {
+    const a = findNodeById(link.srcId);
+    const b = findNodeById(link.dstId);
+    if (!a || !b) return;
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#20c997';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    // store simple geometry for hit-testing
+    link.__geom = { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
+}
+
+function hitTestLink(x, y) {
+    const distToSegment = (px, py, x1, y1, x2, y2) => {
+        const dx = x2 - x1, dy = y2 - y1;
+        const len2 = dx*dx + dy*dy;
+        if (len2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1)*dx + (py - y1)*dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const qx = x1 + t*dx, qy = y1 + t*dy;
+        return Math.hypot(px - qx, py - qy);
+    };
+    for (let i = links.length - 1; i >= 0; i--) {
+        const g = links[i].__geom;
+        if (!g) continue;
+        if (distToSegment(x, y, g.x1, g.y1, g.x2, g.y2) < 8) return links[i];
+    }
+    return null;
+}
+
+function openLinkModal(link) {
+    const src = findNodeById(link.srcId);
+    const dst = findNodeById(link.dstId);
+    if (!src || !dst) return;
+    const srcSel = document.getElementById('link-src-port');
+    const dstSel = document.getElementById('link-dst-port');
+    srcSel.innerHTML = '<option value="">No port</option>';
+    dstSel.innerHTML = '<option value="">No port</option>';
+    // load ports
+    const loadPorts = (deviceId, sel, preset) => {
+        if (!deviceId) return;
+        fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports`)
+            .then(r => r.json())
+            .then(d => {
+                (d.ports || []).forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.port_id;
+                    opt.text = p.ifName;
+                    if (preset && preset == p.port_id) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            });
+    };
+    loadPorts(src.deviceId, srcSel, link.portA || null);
+    loadPorts(dst.deviceId, dstSel, link.portB || null);
+    document.getElementById('link-bandwidth').value = link.bw || '';
+    const modal = new bootstrap.Modal(document.getElementById('linkModal'));
+    document.getElementById('delete-link-btn').style.display = link.dbId ? 'inline-block' : 'none';
+    document.getElementById('delete-link-btn').onclick = () => deleteLink(link);
+    document.getElementById('save-link-btn').onclick = () => saveLink(link);
+    modal.show();
+}
+
+function saveLink(link) {
+    const srcPort = document.getElementById('link-src-port').value || null;
+    const dstPort = document.getElementById('link-dst-port').value || null;
+    const bw = parseInt(document.getElementById('link-bandwidth').value || '0', 10) || null;
+    const payload = { port_id_a: srcPort ? parseInt(srcPort, 10) : null, port_id_b: dstPort ? parseInt(dstPort, 10) : null, bandwidth_bps: bw };
+    if (!mapId) return;
+    if (link.dbId) {
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link/${link.dbId}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(payload)
+        }).then(() => { link.portA = payload.port_id_a; link.portB = payload.port_id_b; link.bw = payload.bandwidth_bps; renderEditor(); });
+    } else {
+        // create new
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify({
+                src_node_id: link.srcId, dst_node_id: link.dstId, ...payload, style: {}
+            })
+        }).then(r => r.json()).then(d => { if (d.success && d.link) { link.dbId = d.link.id; link.portA = payload.port_id_a; link.portB = payload.port_id_b; link.bw = payload.bandwidth_bps; renderEditor(); } });
+    }
+}
+
+function deleteLink(link) {
+    if (!link.dbId || !mapId) return;
+    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link/${link.dbId}`, {
+        method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+    }).then(() => { links = links.filter(l => l !== link); renderEditor(); });
+}
+
 function clearCanvas() {
     if (confirm('Are you sure you want to clear the canvas? This will remove all nodes.')) {
         nodes = [];
@@ -474,7 +627,14 @@ function saveMap() {
             device_id: n.deviceId || null,
             meta: { interface_id: n.interfaceId || null }
         })),
-        links: [] // TODO: populate when link UI is added
+        links: links.map(l => ({
+            src_node_id: l.srcId,
+            dst_node_id: l.dstId,
+            port_id_a: l.portA || null,
+            port_id_b: l.portB || null,
+            bandwidth_bps: l.bw || null,
+            style: l.style || {}
+        }))
     };
 
     fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${mapId}/save`, {
