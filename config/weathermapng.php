@@ -14,6 +14,13 @@ return [
     'cache_ttl' => 300,             // Cache TTL in seconds
     'enable_sse' => true,           // Enable Server-Sent Events for live updates
     'client_refresh' => 60,         // Seconds for client polling fallback
+    'snmp' => [
+        'enabled' => false,         // Enable SNMP fallback for live data if RRD/API unavailable
+        'version' => '2c',          // SNMP version
+        'community' => env('WEATHERMAPNG_SNMP_COMMUNITY'),
+        'timeout' => 1,
+        'retries' => 1,
+    ],
     'api_token' => env('LIBRENMS_API_TOKEN'),
     'colors' => [
         'node_up' => '#28a745',

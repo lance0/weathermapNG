@@ -246,6 +246,7 @@ function initCanvas() {
     // Drag + drop support
     let dragging = null;
     let dragOffset = {x:0,y:0};
+    let dragPatchTimer = null;
     canvas.addEventListener('mousedown', (e) => {
         const pos = getMousePos(canvas, e);
         const hit = hitTestNode(pos.x, pos.y);
@@ -281,6 +282,11 @@ function initCanvas() {
         dragging.x = pos.x + dragOffset.x;
         dragging.y = pos.y + dragOffset.y;
         renderEditor();
+        // Debounced persistence while dragging
+        if (mapId && dragging.dbId) {
+            if (dragPatchTimer) clearTimeout(dragPatchTimer);
+            dragPatchTimer = setTimeout(() => { patchNodePos(dragging); }, 300);
+        }
     });
     canvas.addEventListener('mouseup', () => {
         if (dragging && mapId && dragging.dbId) {
@@ -339,6 +345,20 @@ function hitTestNode(x, y) {
     }
     return null;
 }
+
+// Double-click node to open properties
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('map-canvas');
+    canvas.addEventListener('dblclick', (e) => {
+        const pos = getMousePos(canvas, e);
+        const hit = hitTestNode(pos.x, pos.y);
+        if (hit) {
+            selectedNode = hit;
+            populateNodeProperties(hit);
+            renderEditor();
+        }
+    });
+});
 
 function renderEditor() {
     const canvas = document.getElementById('map-canvas');

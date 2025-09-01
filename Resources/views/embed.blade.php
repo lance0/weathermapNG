@@ -78,6 +78,8 @@
             <div>Loading map...</div>
         </div>
         <canvas id="map-canvas"></canvas>
+        <canvas id="heat-canvas" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
+        <canvas id="minimap" width="160" height="120" style="position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.85); border:1px solid #ddd; border-radius:4px;"></canvas>
         <div id="status-bar" class="status-bar" style="display: none;">
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
@@ -114,9 +116,11 @@
         let currentTransport = 'init';
         let eventSourceRef = null;
         let mapData = @json($mapData);
-        let canvas, ctx;
+        let canvas, ctx, heatCanvas, heatCtx, minimap;
         let animationId;
         let lastUpdate = Date.now();
+        let animTick = 0;
+        let bgImg = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
@@ -136,9 +140,20 @@
             const container = document.getElementById('map-container');
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
+            heatCanvas = document.getElementById('heat-canvas');
+            heatCanvas.width = canvas.width;
+            heatCanvas.height = canvas.height;
+            heatCtx = heatCanvas.getContext('2d');
+            minimap = document.getElementById('minimap');
 
             // Hide loading
             document.getElementById('loading').style.display = 'none';
+            const bgUrl = mapData.options?.background_image;
+            if (bgUrl) {
+                bgImg = new Image();
+                bgImg.onload = () => { renderMap(); };
+                bgImg.src = bgUrl;
+            }
         }
 
         function renderMap() {
@@ -148,8 +163,12 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // Draw background
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            if (bgImg) {
+                ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
 
             // Calculate scale to fit map in canvas
             const mapWidth = mapData.width || mapData.metadata?.width || 800;
@@ -182,8 +201,10 @@
 
             ctx.restore();
 
-            // Update status
+            // Update status and overlays
             updateStatus();
+            drawMinimap();
+            drawHeatOverlay();
         }
 
         function drawNode(node) {
@@ -234,8 +255,14 @@
             ctx.lineTo(x2, y2);
             const pct = getLinkPct(link);
             ctx.strokeStyle = getLinkColor(pct);
-            ctx.lineWidth = Math.max(1, (link.width || 2));
+            const width = Math.max(1, (link.width || 2));
+            ctx.lineWidth = width;
+            const dash = Math.max(6, width * 3);
+            ctx.setLineDash([dash, dash]);
+            const speed = Math.max(0.5, Math.min(5, (pct || 10) / 20));
+            ctx.lineDashOffset = - (animTick * speed);
             ctx.stroke();
+            ctx.setLineDash([]);
 
             // Link utilization label
             if (pct !== null && pct !== undefined) {
@@ -299,6 +326,13 @@
                     startSSE();
                 }
             });
+            // start animation loop
+            function tick() {
+                animTick += 1;
+                renderMap();
+                animationId = requestAnimationFrame(tick);
+            }
+            animationId = requestAnimationFrame(tick);
         }
 
         let pollTimer = null;
@@ -428,6 +462,9 @@
                 const container = document.getElementById('map-container');
                 canvas.width = container.clientWidth;
                 canvas.height = container.clientHeight;
+                const heat = document.getElementById('heat-canvas');
+                heat.width = canvas.width;
+                heat.height = canvas.height;
                 renderMap();
             }
         });
@@ -437,7 +474,7 @@
         function storeLinkGeom(link, x1, y1, x2, y2, pct) {
             const inBps = link.live?.in_bps ?? 0;
             const outBps = link.live?.out_bps ?? 0;
-            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps});
+            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps, link});
         }
 
         function distToSegment(px, py, x1, y1, x2, y2) {
@@ -495,6 +532,75 @@
                 tooltip.style.display = 'none';
             }
         });
+        // Click link to open historical graphs
+        document.getElementById('map-canvas').addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            let best = null, bestDist = 10;
+            for (const g of linkGeoms) {
+                const d = distToSegment(x, y, g.x1, g.y1, g.x2, g.y2);
+                if (d < bestDist) { bestDist = d; best = g; }
+            }
+            if (best && best.link) {
+                const pA = best.link.port_id_a || null;
+                const pB = best.link.port_id_b || null;
+                const now = Math.floor(Date.now()/1000);
+                const from = now - 86400;
+                const openGraph = (portId) => {
+                    if (!portId) return;
+                    const url = `{{ url('graph') }}?type=port_bits&id=${portId}&from=${from}&to=${now}`;
+                    window.open(url, '_blank');
+                };
+                if (pA) openGraph(pA);
+                if (pB) openGraph(pB);
+            }
+        });
+
+        function drawMinimap() {
+            if (!minimap || !Array.isArray(mapData.nodes)) return;
+            const mw = mapData.width || 800, mh = mapData.height || 600;
+            const w = minimap.width, h = minimap.height;
+            const s = Math.min(w/mw, h/mh);
+            const ctxm = minimap.getContext('2d');
+            ctxm.clearRect(0,0,w,h);
+            ctxm.fillStyle = '#fafafa'; ctxm.fillRect(0,0,w,h);
+            // draw nodes
+            mapData.nodes.forEach(n => {
+                const x = ((n.position?.x ?? n.x)||0) * s;
+                const y = ((n.position?.y ?? n.y)||0) * s;
+                ctxm.fillStyle = getNodeColor(n);
+                ctxm.fillRect(x-2, y-2, 4, 4);
+            });
+            ctxm.strokeStyle = '#ccc'; ctxm.strokeRect(0,0,w,h);
+        }
+
+        function drawHeatOverlay() {
+            if (!heatCtx) return;
+            heatCtx.clearRect(0,0,heatCanvas.width, heatCanvas.height);
+            // nodes: red glow if down
+            (mapData.nodes||[]).forEach(n => {
+                const status = n.status || 'unknown';
+                if (status === 'down') {
+                    heatCtx.fillStyle = 'rgba(220,53,69,0.2)';
+                    heatCtx.beginPath();
+                    const x = (n.position?.x ?? n.x)||0, y = (n.position?.y ?? n.y)||0;
+                    heatCtx.arc(x, y, 30, 0, Math.PI*2);
+                    heatCtx.fill();
+                }
+            });
+            // links: overlay intensity by pct
+            linkGeoms.forEach(g => {
+                if (g.pct == null) return;
+                const alpha = Math.min(0.35, (g.pct/100)*0.35);
+                heatCtx.strokeStyle = `rgba(255,0,0,${alpha})`;
+                heatCtx.lineWidth = 6;
+                heatCtx.beginPath();
+                heatCtx.moveTo(g.x1, g.y1);
+                heatCtx.lineTo(g.x2, g.y2);
+                heatCtx.stroke();
+            });
+        }
     </script>
 </body>
 </html>
