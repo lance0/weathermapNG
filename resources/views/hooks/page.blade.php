@@ -42,7 +42,7 @@
                 <h3 class="panel-title">
                     Network Maps
                     @if($can_create)
-                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm pull-right">
+                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm float-end">
                             <i class="fa fa-plus"></i> Create New Map
                         </a>
                     @endif
