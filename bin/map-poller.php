@@ -31,6 +31,8 @@ foreach ($bootstrapCandidates as $file) {
             $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
             $kernel->bootstrap();
         } else {
+            // Set init_modules for legacy init.php
+            $init_modules = ['web'];
             require $file;
         }
         $bootstrapLoaded = true;

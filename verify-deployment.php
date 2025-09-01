@@ -72,6 +72,8 @@ if (file_exists($librenms_base . '/vendor/autoload.php')) {
 }
 
 if (file_exists($librenms_base . '/includes/init.php')) {
+    // Set init_modules to avoid warnings
+    $init_modules = ['web'];
     require_once $librenms_base . '/includes/init.php';
     pass("LibreNMS initialized");
 } else {
