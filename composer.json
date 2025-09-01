@@ -31,6 +31,7 @@
       "LibreNMS\\Plugins\\WeathermapNG\\Policies\\": "Policies/",
       "LibreNMS\\Plugins\\WeathermapNG\\Database\\Seeders\\": "database/seeders/",
       "LibreNMS\\Plugins\\WeathermapNG\\Database\\Factories\\": "database/factories/",
+      "LibreNMS\\Plugins\\WeathermapNG\\RRD\\": "lib/RRD/",
       "App\\Plugins\\WeathermapNG\\": "app/Plugins/WeathermapNG/"
     },
     "classmap": [
