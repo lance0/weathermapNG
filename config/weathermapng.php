@@ -12,6 +12,8 @@ return [
     'enable_local_rrd' => true,     // Use local RRD files
     'enable_api_fallback' => true,  // Fallback to LibreNMS API
     'cache_ttl' => 300,             // Cache TTL in seconds
+    'enable_sse' => true,           // Enable Server-Sent Events for live updates
+    'client_refresh' => 60,         // Seconds for client polling fallback
     'api_token' => env('LIBRENMS_API_TOKEN'),
     'colors' => [
         'node_up' => '#28a745',

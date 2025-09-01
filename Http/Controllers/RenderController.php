@@ -75,21 +75,44 @@ class RenderController
             'options' => $data['options'] ?? [],
         ]);
 
-        // Import nodes
+        // Import nodes and build old->new id map if provided
+        $nodeIdMap = [];
         foreach ($data['nodes'] as $nodeData) {
-            Node::create([
+            $new = Node::create([
                 'map_id' => $map->id,
-                'label' => $nodeData['label'],
-                'x' => $nodeData['x'],
-                'y' => $nodeData['y'],
+                'label' => $nodeData['label'] ?? ('node-' . uniqid()),
+                'x' => $nodeData['x'] ?? 0,
+                'y' => $nodeData['y'] ?? 0,
                 'device_id' => $nodeData['device_id'] ?? null,
                 'meta' => $nodeData['meta'] ?? [],
             ]);
+            $oldId = $nodeData['id'] ?? $nodeData['node_id'] ?? null;
+            if ($oldId !== null) {
+                $nodeIdMap[$oldId] = $new->id;
+            }
         }
 
-        // Import links (this would need adjustment based on node IDs)
-        // For now, we'll skip links in import to avoid ID conflicts
-        // In a full implementation, you'd need to map old IDs to new IDs
+        // Import links with node id mapping
+        if (!empty($data['links'])) {
+            foreach ($data['links'] as $linkData) {
+                $oldSrc = $linkData['src'] ?? $linkData['source'] ?? $linkData['src_node_id'] ?? null;
+                $oldDst = $linkData['dst'] ?? $linkData['target'] ?? $linkData['dst_node_id'] ?? null;
+                $srcId = $nodeIdMap[$oldSrc] ?? $oldSrc; // if old ids missing, try as-is
+                $dstId = $nodeIdMap[$oldDst] ?? $oldDst;
+                if (!$srcId || !$dstId) {
+                    continue; // skip malformed
+                }
+                Link::create([
+                    'map_id' => $map->id,
+                    'src_node_id' => $srcId,
+                    'dst_node_id' => $dstId,
+                    'port_id_a' => $linkData['port_id_a'] ?? null,
+                    'port_id_b' => $linkData['port_id_b'] ?? null,
+                    'bandwidth_bps' => $linkData['bandwidth_bps'] ?? null,
+                    'style' => $linkData['style'] ?? [],
+                ]);
+            }
+        }
 
         return response()->json([
             'success' => true,
