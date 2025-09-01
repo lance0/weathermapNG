@@ -1109,6 +1109,18 @@ class WeathermapEditor {
                 // Disable port selects for bulk edits
                 document.getElementById('link-port-a').disabled = allLinks;
                 document.getElementById('link-port-b').disabled = allLinks;
+                // Advanced open/close logic
+                const adv = document.getElementById('link-advanced');
+                const advKey = allLinks ? 'wmng.link.adv.bulk' : 'wmng.link.adv.single';
+                let advPref = null;
+                try { advPref = localStorage.getItem(advKey); } catch (e) {}
+                const hasNonDefault = !allLinks && (!!element.bandwidth_bps || !!element.port_id_a || !!element.port_id_b);
+                const shouldOpen = (advPref === '1') || (advPref === null && hasNonDefault);
+                if (adv) adv.style.display = shouldOpen ? 'block' : 'none';
+                // If we auto-opened due to non-defaults, persist that for next time
+                if (shouldOpen && advPref === null) {
+                    try { localStorage.setItem(advKey, '1'); } catch (e) {}
+                }
                 setBadge(allLinks ? `Bulk Links (${selected.length})` : 'Link', allLinks ? 'bg-warning text-dark' : 'bg-success');
             }
         }
@@ -1425,16 +1437,17 @@ class WeathermapEditor {
             });
         }
 
-        // Link advanced toggle
+        // Link advanced toggle (separate prefs for single vs bulk)
         const advBtn = document.getElementById('toggle-link-advanced');
         const advSection = document.getElementById('link-advanced');
         if (advBtn && advSection) {
-            // Restore last state
-            try { const open = localStorage.getItem('wmng.link.adv') === '1'; advSection.style.display = open ? 'block' : 'none'; } catch (e) {}
             advBtn.addEventListener('click', () => {
                 const show = advSection.style.display === 'none';
                 advSection.style.display = show ? 'block' : 'none';
-                try { localStorage.setItem('wmng.link.adv', show ? '1' : '0'); } catch (e) {}
+                const sel = editorState.selectedElements || [];
+                const allLinks = sel.length > 1 && sel.every(e => e.type === 'link');
+                const key = allLinks ? 'wmng.link.adv.bulk' : 'wmng.link.adv.single';
+                try { localStorage.setItem(key, show ? '1' : '0'); } catch (e) {}
             });
         }
 
