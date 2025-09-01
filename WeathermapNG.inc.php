@@ -27,6 +27,10 @@ if (isset($_GET['other'])) {
 if (isset($_GET['other']) && strpos($_GET['other'], 'ajax/') === 0) {
     header('Content-Type: application/json');
     
+    // Debug logging
+    error_log("WeathermapNG AJAX request: " . $_GET['other']);
+    error_log("POST data: " . json_encode($_POST));
+    
     $action = str_replace('ajax/', '', $_GET['other']);
     
     switch ($action) {
@@ -38,7 +42,7 @@ if (isset($_GET['other']) && strpos($_GET['other'], 'ajax/') === 0) {
                 $height = intval($_POST['height'] ?? 600);
                 
                 if (empty($name)) {
-                    echo json_encode(['success' => false, 'message' => 'Map name is required']);
+                    echo json_encode(['success' => false, 'message' => 'Map name is required', 'debug' => 'Name was empty']);
                     exit;
                 }
                 
@@ -354,7 +358,9 @@ function submitCreateMap() {
         url: baseUrl + '/plugin/v1/WeathermapNG/ajax/create-map',
         method: 'POST',
         data: formData,
+        dataType: 'json',
         success: function(response) {
+            console.log('Success response:', response);
             if (response.success) {
                 alert('Map created successfully!');
                 location.reload();
@@ -362,8 +368,10 @@ function submitCreateMap() {
                 alert('Error: ' + (response.message || 'Failed to create map'));
             }
         },
-        error: function() {
-            alert('Failed to create map. Please check the console for errors.');
+        error: function(xhr, status, error) {
+            console.error('AJAX Error:', status, error);
+            console.error('Response:', xhr.responseText);
+            alert('Failed to create map. Error: ' + error + '\nCheck console for details.');
         }
     });
 }
