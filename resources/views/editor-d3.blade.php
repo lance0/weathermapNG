@@ -343,6 +343,20 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="row g-2 mt-2">
+                                    <div class="col-6">
+                                        <label class="form-label small">Scale</label>
+                                        <input type="range" class="form-range" id="geo-scale" min="0.5" max="5" step="0.1" value="1">
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label small">Offset X</label>
+                                        <input type="number" class="form-control form-control-sm" id="geo-offset-x" value="0">
+                                    </div>
+                                    <div class="col-3">
+                                        <label class="form-label small">Offset Y</label>
+                                        <input type="number" class="form-control form-control-sm" id="geo-offset-y" value="0">
+                                    </div>
+                                </div>
                                 <div class="form-text">Uses TopoJSON from world-atlas/us-atlas (CDN).</div>
                             </div>
                             <div class="mb-3">
@@ -1124,6 +1138,9 @@ class WeathermapEditor {
                     document.getElementById('geoToggle').checked = !!geo.enabled;
                     if (geo.preset) document.getElementById('geo-preset').value = geo.preset;
                     if (geo.projection) document.getElementById('geo-proj').value = geo.projection;
+                    if (typeof geo.scale !== 'undefined') document.getElementById('geo-scale').value = geo.scale;
+                    if (typeof geo.offsetX !== 'undefined') document.getElementById('geo-offset-x').value = geo.offsetX;
+                    if (typeof geo.offsetY !== 'undefined') document.getElementById('geo-offset-y').value = geo.offsetY;
                     this.renderGeoBackground();
                 }
                 editorState.nodes = (data.nodes || []).map(n => ({
@@ -1244,9 +1261,15 @@ class WeathermapEditor {
         const geoToggle = document.getElementById('geoToggle');
         const geoPreset = document.getElementById('geo-preset');
         const geoProj = document.getElementById('geo-proj');
+        const geoScale = document.getElementById('geo-scale');
+        const geoOffX = document.getElementById('geo-offset-x');
+        const geoOffY = document.getElementById('geo-offset-y');
         if (geoToggle) geoToggle.addEventListener('change', () => this.renderGeoBackground());
         if (geoPreset) geoPreset.addEventListener('change', () => this.renderGeoBackground());
         if (geoProj) geoProj.addEventListener('change', () => this.renderGeoBackground());
+        if (geoScale) geoScale.addEventListener('input', () => this.renderGeoBackground());
+        if (geoOffX) geoOffX.addEventListener('input', () => this.renderGeoBackground());
+        if (geoOffY) geoOffY.addEventListener('input', () => this.renderGeoBackground());
         
         // Mouse position tracking + link preview
         this.svg.on('mousemove', (event) => {
@@ -1532,7 +1555,10 @@ class WeathermapEditor {
                     geo: {
                         enabled: document.getElementById('geoToggle')?.checked || false,
                         preset: document.getElementById('geo-preset')?.value || 'none',
-                        projection: document.getElementById('geo-proj')?.value || 'mercator'
+                        projection: document.getElementById('geo-proj')?.value || 'mercator',
+                        scale: parseFloat(document.getElementById('geo-scale')?.value || '1'),
+                        offsetX: parseFloat(document.getElementById('geo-offset-x')?.value || '0'),
+                        offsetY: parseFloat(document.getElementById('geo-offset-y')?.value || '0')
                     }
                 },
                 nodes: editorState.nodes.map(n => ({
@@ -1769,6 +1795,9 @@ class WeathermapEditor {
         const enabled = document.getElementById('geoToggle').checked;
         const preset = document.getElementById('geo-preset').value;
         const projName = document.getElementById('geo-proj').value;
+        const scaleFactor = parseFloat(document.getElementById('geo-scale')?.value || '1');
+        const offsetX = parseFloat(document.getElementById('geo-offset-x')?.value || '0');
+        const offsetY = parseFloat(document.getElementById('geo-offset-y')?.value || '0');
         const layer = this.mapGroup.select('#background-layer');
         layer.selectAll('.geo-layer').remove();
         if (!enabled || preset === 'none') return;
@@ -1787,6 +1816,11 @@ class WeathermapEditor {
             const height = this.svg.node().clientHeight;
             let projection = projName === 'equirect' ? d3.geoEquirectangular() : d3.geoMercator();
             projection.fitSize([width, height], feature);
+            // Apply user scaling and offsets (in pixels)
+            const baseScale = projection.scale();
+            projection.scale(baseScale * (isFinite(scaleFactor) ? scaleFactor : 1));
+            const [tx, ty] = projection.translate();
+            projection.translate([tx + (isFinite(offsetX) ? offsetX : 0), ty + (isFinite(offsetY) ? offsetY : 0)]);
             const path = d3.geoPath(projection);
 
             // Land
