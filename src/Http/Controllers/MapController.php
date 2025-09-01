@@ -278,22 +278,22 @@ class MapController
      */
     public function save(Request $request, Map $map)
     {
-        $data = $request->validate([
-            'title' => 'nullable|string|max:255',
-            'options' => 'array',
-            'options.width' => 'nullable|integer|min:100|max:4096',
-            'options.height' => 'nullable|integer|min:100|max:4096',
-            'options.background' => 'nullable|string',
-            'nodes' => 'array',
-            'nodes.*.label' => 'required|string|max:255',
-            'nodes.*.x' => 'required|numeric',
-            'nodes.*.y' => 'required|numeric',
-            'nodes.*.device_id' => 'nullable|integer',
-            'nodes.*.meta' => 'array',
-            'links' => 'array', // accept loose link shapes; coerce below
-        ]);
-
         try {
+            $data = $request->validate([
+                'title' => 'nullable|string|max:255',
+                'options' => 'array',
+                'options.width' => 'nullable|integer|min:100|max:4096',
+                'options.height' => 'nullable|integer|min:100|max:4096',
+                'options.background' => 'nullable|string',
+                'nodes' => 'array',
+                'nodes.*.label' => 'required|string|max:255',
+                'nodes.*.x' => 'required|numeric',
+                'nodes.*.y' => 'required|numeric',
+                'nodes.*.device_id' => 'nullable|integer',
+                'nodes.*.meta' => 'array',
+                'links' => 'array', // accept loose link shapes; coerce below
+            ]);
+
             \DB::transaction(function () use ($map, $data) {
                 // Update map options/title
                 if (!empty($data['options']) || !empty($data['title'])) {
@@ -355,6 +355,12 @@ class MapController
                     }
                 }
             });
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+                'message' => 'Validation failed',
+            ], 422);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
