@@ -6,6 +6,23 @@
  * Accessible at: /plugin/v1/WeathermapNG
  */
 
+// Handle different page views
+if (isset($_GET['other'])) {
+    // Editor view
+    if (preg_match('/^editor\/(\d+)$/', $_GET['other'], $matches)) {
+        $mapId = intval($matches[1]);
+        include __DIR__ . '/views/editor.php';
+        exit;
+    }
+    
+    // View map
+    if (preg_match('/^view\/(\d+)$/', $_GET['other'], $matches)) {
+        $mapId = intval($matches[1]);
+        include __DIR__ . '/views/view.php';
+        exit;
+    }
+}
+
 // Handle AJAX requests
 if (isset($_GET['other']) && strpos($_GET['other'], 'ajax/') === 0) {
     header('Content-Type: application/json');
@@ -70,6 +87,73 @@ if (isset($_GET['other']) && strpos($_GET['other'], 'ajax/') === 0) {
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
                 }
+            }
+            exit;
+            
+        case 'save-map':
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $id = intval($_POST['id'] ?? 0);
+                $nodes = json_decode($_POST['nodes'] ?? '[]', true);
+                $links = json_decode($_POST['links'] ?? '[]', true);
+                
+                try {
+                    // Delete existing nodes and links
+                    dbDelete('wmng_nodes', 'map_id = ?', [$id]);
+                    dbDelete('wmng_links', 'map_id = ?', [$id]);
+                    
+                    // Insert new nodes
+                    $nodeIdMap = [];
+                    foreach ($nodes as $node) {
+                        $oldId = $node['id'];
+                        $newId = dbInsert([
+                            'map_id' => $id,
+                            'label' => $node['label'],
+                            'x' => $node['x'],
+                            'y' => $node['y'],
+                            'device_id' => $node['device_id'],
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s')
+                        ], 'wmng_nodes');
+                        $nodeIdMap[$oldId] = $newId;
+                    }
+                    
+                    // Insert new links with mapped node IDs
+                    foreach ($links as $link) {
+                        dbInsert([
+                            'map_id' => $id,
+                            'src_node_id' => $nodeIdMap[$link['src_node_id']] ?? $link['src_node_id'],
+                            'dst_node_id' => $nodeIdMap[$link['dst_node_id']] ?? $link['dst_node_id'],
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s')
+                        ], 'wmng_links');
+                    }
+                    
+                    echo json_encode(['success' => true]);
+                } catch (Exception $e) {
+                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                }
+            }
+            exit;
+            
+        case 'get-map-data':
+            $id = intval($_GET['id'] ?? 0);
+            try {
+                $nodes = dbFetchRows("SELECT n.*, d.hostname, d.status 
+                                     FROM wmng_nodes n 
+                                     LEFT JOIN devices d ON n.device_id = d.device_id 
+                                     WHERE n.map_id = ?", [$id]);
+                                     
+                $links = dbFetchRows("SELECT l.*, 
+                                     p1.ifInOctets_rate as in_rate_a, p1.ifOutOctets_rate as out_rate_a,
+                                     p2.ifInOctets_rate as in_rate_b, p2.ifOutOctets_rate as out_rate_b
+                                     FROM wmng_links l
+                                     LEFT JOIN ports p1 ON l.port_id_a = p1.port_id
+                                     LEFT JOIN ports p2 ON l.port_id_b = p2.port_id
+                                     WHERE l.map_id = ?", [$id]);
+                                     
+                echo json_encode(['success' => true, 'nodes' => $nodes, 'links' => $links]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit;
             
@@ -149,11 +233,11 @@ $plugin_dir = '/plugins/WeathermapNG';
                                             <td><?php echo $map['updated_at']; ?></td>
                                             <td>
                                                 <div class="btn-group btn-group-sm">
-                                                    <a href="plugin/v1/WeathermapNG/map/<?php echo $map['id']; ?>" 
+                                                    <a href="/plugin/v1/WeathermapNG/view/<?php echo $map['id']; ?>" 
                                                        class="btn btn-primary" title="View">
                                                         <i class="fas fa-eye"></i>
                                                     </a>
-                                                    <a href="plugin/v1/WeathermapNG/map/<?php echo $map['id']; ?>/edit" 
+                                                    <a href="/plugin/v1/WeathermapNG/editor/<?php echo $map['id']; ?>" 
                                                        class="btn btn-warning" title="Edit">
                                                         <i class="fas fa-edit"></i>
                                                     </a>
