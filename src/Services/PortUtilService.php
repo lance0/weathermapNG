@@ -108,16 +108,8 @@ class PortUtilService
     private function fetchFromRRD($port): ?array
     {
         try {
-            $device = $this->getDeviceInfo($port->device_id ?? $port['device_id']);
-            if (!$device || !isset($device->rrd_path)) {
-                return null;
-            }
-
-            $rrdPath = $device->rrd_path . '/port-' . ($port->ifIndex ?? $port['ifIndex']) . '.rrd';
-
-            if (!file_exists($rrdPath)) {
-                return null;
-            }
+            $rrdPath = $this->resolvePortRrdPath($port);
+            if (!$rrdPath || !file_exists($rrdPath)) return null;
 
             // Get current values
             $inBps = $this->rrdTool->getLastValue($rrdPath, 'traffic_in');
@@ -339,21 +331,54 @@ class PortUtilService
     private function fetchHistoryFromRRD($port, string $metric, string $period): array
     {
         try {
-            $device = $this->getDeviceInfo($port->device_id ?? $port['device_id']);
-            if (!$device || !isset($device->rrd_path)) {
-                return [];
-            }
-
-            $rrdPath = $device->rrd_path . '/port-' . ($port->ifIndex ?? $port['ifIndex']) . '.rrd';
-
-            if (!file_exists($rrdPath)) {
-                return [];
-            }
+            $rrdPath = $this->resolvePortRrdPath($port);
+            if (!$rrdPath || !file_exists($rrdPath)) return [];
 
             return $this->rrdTool->fetch($rrdPath, $metric, $period);
         } catch (\Exception $e) {
             return [];
         }
+    }
+
+    /**
+     * Resolve the correct RRD filepath for a port, trying common LibreNMS patterns.
+     */
+    private function resolvePortRrdPath($port): ?string
+    {
+        // Port fields (object or array access)
+        $deviceId = $port->device_id ?? $port['device_id'] ?? null;
+        $ifIndex  = $port->ifIndex   ?? $port['ifIndex']   ?? null;
+        $portId   = $port->port_id   ?? $port['port_id']   ?? null;
+        if (!$deviceId) return null;
+
+        // Determine device RRD directory
+        $device = $this->getDeviceInfo((int)$deviceId);
+        $rrdBase = config('weathermapng.rrd_base', '/opt/librenms/rrd');
+        $deviceDir = null;
+        if (is_object($device)) {
+            // Prefer explicit rrd_path if available
+            if (!empty($device->rrd_path)) {
+                $deviceDir = rtrim((string)$device->rrd_path, '/');
+            } elseif (!empty($device->hostname)) {
+                $deviceDir = rtrim($rrdBase, '/') . '/' . $device->hostname;
+            }
+        } elseif (is_array($device)) {
+            if (!empty($device['rrd_path'])) {
+                $deviceDir = rtrim((string)$device['rrd_path'], '/');
+            } elseif (!empty($device['hostname'])) {
+                $deviceDir = rtrim($rrdBase, '/') . '/' . $device['hostname'];
+            }
+        }
+        if (!$deviceDir) return null;
+
+        // Try common filename patterns: port-id{port_id}.rrd and port-{ifIndex}.rrd
+        $candidates = [];
+        if ($portId)  $candidates[] = $deviceDir . '/port-id' . $portId . '.rrd';
+        if ($ifIndex) $candidates[] = $deviceDir . '/port-' . $ifIndex . '.rrd';
+        foreach ($candidates as $p) {
+            if (file_exists($p)) return $p;
+        }
+        return null;
     }
 
     /**
