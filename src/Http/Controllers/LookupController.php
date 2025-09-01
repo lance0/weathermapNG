@@ -20,10 +20,19 @@ class LookupController
 
     public function ports(int $id, DevicePortLookup $lookup): JsonResponse
     {
+        $q = trim((string) request()->query('q', ''));
+        $ports = $lookup->portsForDevice($id);
+        if ($q !== '') {
+            $lq = strtolower($q);
+            $ports = array_values(array_filter($ports, function ($p) use ($lq) {
+                $name = strtolower((string)($p['ifName'] ?? ''));
+                $idx = strtolower((string)($p['ifIndex'] ?? ''));
+                return str_contains($name, $lq) || str_contains($idx, $lq);
+            }));
+        }
         return response()->json([
             'device_id' => $id,
-            'ports' => $lookup->portsForDevice($id),
+            'ports' => $ports,
         ]);
     }
 }
-
