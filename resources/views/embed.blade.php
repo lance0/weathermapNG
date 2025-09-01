@@ -115,7 +115,13 @@
         let sseMax = parseInt(param('max', 60), 10) || 60;
         let currentTransport = 'init';
         let eventSourceRef = null;
-        let mapData = @json($mapData);
+        let mapData = {};
+        try {
+            mapData = @json($mapData ?? []);
+        } catch (e) {
+            console.error('Failed to parse map data:', e);
+            mapData = { error: 'Invalid map data' };
+        }
         let canvas, ctx, heatCanvas, heatCtx, minimap;
         let animationId;
         let lastUpdate = Date.now();
@@ -171,8 +177,8 @@
             }
 
             // Calculate scale to fit map in canvas
-            const mapWidth = mapData.width || mapData.metadata?.width || 800;
-            const mapHeight = mapData.height || mapData.metadata?.height || 600;
+            const mapWidth = mapData?.width || (mapData?.metadata && mapData.metadata.width) || 800;
+            const mapHeight = mapData?.height || (mapData?.metadata && mapData.metadata.height) || 600;
             const scaleX = canvas.width / mapWidth;
             const scaleY = canvas.height / mapHeight;
             const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
@@ -284,7 +290,7 @@
             // If up but CPU or MEM high, warn
             const cpu = node.metrics?.cpu;
             const mem = node.metrics?.mem;
-            const warn = (v) => typeof v === 'number' && v >= (WMNG_CONFIG.thresholds?.[1] ?? 80);
+            const warn = (v) => typeof v === 'number' && v >= ((WMNG_CONFIG.thresholds && WMNG_CONFIG.thresholds[1]) || 80);
             if (status === 'up' && (warn(cpu) || warn(mem))) return colors.node_warning || '#ffc107';
             if (status === 'up') return colors.node_up || '#28a745';
             return colors.node_unknown || '#6c757d';
@@ -549,7 +555,8 @@
                 const from = now - 86400;
                 const openGraph = (portId) => {
                     if (!portId) return;
-                    const url = `{{ url('graph') }}?type=port_bits&id=${portId}&from=${from}&to=${now}`;
+                    const graphBaseUrl = '{{ url("graph") }}';
+                    const url = graphBaseUrl + '?type=port_bits&id=' + portId + '&from=' + from + '&to=' + now;
                     window.open(url, '_blank');
                 };
                 if (pA) openGraph(pA);

@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadMapData(id) {
-    fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${id}/json`)
+    fetch('{{ url('plugin/WeathermapNG/api/maps') }}' + '/' + id + '/json')
         .then(r => r.json())
         .then(data => {
             if (data && Array.isArray(data.nodes)) {
@@ -316,7 +316,7 @@ function createLink(srcNode, dstNode) {
         bandwidth_bps: null,
         style: {}
     };
-    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link`, {
+    fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/link, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -377,7 +377,7 @@ function renderEditor() {
 }
 
 function patchNodePos(node) {
-    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node/${node.dbId}`, {
+    fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/node/' + node.dbId, {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
@@ -417,7 +417,7 @@ function loadDevices() {
                     const intSel = document.getElementById('node-prop-interface');
                     intSel.innerHTML = '<option value="">No interface</option>';
                     if (devId) {
-                        fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${devId}/ports`)
+                        fetch(url('plugin/WeathermapNG/api/device') + '/' + devId + '/ports)
                             .then(r => r.json()).then(d => {
                                 (d.ports || []).forEach(p => {
                                     const o = document.createElement('option');
@@ -435,7 +435,7 @@ function loadDevices() {
 }
 
 function loadInterfaces(deviceId) {
-    fetch(`{{ url("plugin/WeathermapNG/api/device") }}/${deviceId}/ports`)
+    fetch(url("plugin/WeathermapNG/api/device") + '/' + deviceId + '/ports)
         .then(response => response.json())
         .then(data => {
             const select = document.getElementById('interface-select');
@@ -482,7 +482,7 @@ function addNode() {
 
     if (mapId) {
         // Create immediately
-        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node`, {
+        fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/node, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -588,7 +588,7 @@ function openLinkModal(link) {
     // load ports
     const loadPorts = (deviceId, sel, preset) => {
         if (!deviceId) return;
-        fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports`)
+        fetch(url('plugin/WeathermapNG/api/device') + '/' + deviceId + '/ports)
             .then(r => r.json())
             .then(d => {
                 (d.ports || []).forEach(p => {
@@ -616,12 +616,12 @@ function saveLink(link) {
     const payload = { port_id_a: srcPort ? parseInt(srcPort, 10) : null, port_id_b: dstPort ? parseInt(dstPort, 10) : null, bandwidth_bps: bw };
     if (!mapId) return;
     if (link.dbId) {
-        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link/${link.dbId}`, {
+        fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/link/' + link.dbId, {
             method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(payload)
         }).then(() => { link.portA = payload.port_id_a; link.portB = payload.port_id_b; link.bw = payload.bandwidth_bps; renderEditor(); });
     } else {
         // create new
-        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link`, {
+        fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/link, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify({
                 src_node_id: link.srcId, dst_node_id: link.dstId, ...payload, style: {}
             })
@@ -631,7 +631,7 @@ function saveLink(link) {
 
 function deleteLink(link) {
     if (!link.dbId || !mapId) return;
-    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link/${link.dbId}`, {
+    fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/link/' + link.dbId, {
         method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
     }).then(() => { links = links.filter(l => l !== link); renderEditor(); });
 }
@@ -696,7 +696,7 @@ function saveMap() {
         }))
     };
 
-    fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${mapId}/save`, {
+    fetch(url('plugin/WeathermapNG/api/maps') + '/' + mapId + '/save, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -748,7 +748,7 @@ function exportConfig() {
 
 function exportJson() {
     if (!mapId) { alert('Save the map first.'); return; }
-    const url = `{{ url('plugin/WeathermapNG/api/maps') }}/${mapId}/export?format=json`;
+    const url = url('plugin/WeathermapNG/api/maps') + '/' + mapId + '/export?format=json;
     window.open(url, '_blank');
 }
 
@@ -764,7 +764,7 @@ function populateNodeProperties(node) {
     // load interfaces if device set
     intSel.innerHTML = '<option value="">No interface</option>';
     if (node.deviceId) {
-        fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${node.deviceId}/ports`)
+        fetch(url('plugin/WeathermapNG/api/device') + '/' + node.deviceId + '/ports)
             .then(r => r.json()).then(d => {
                 (d.ports || []).forEach(p => {
                     const o = document.createElement('option');
@@ -782,7 +782,7 @@ function saveSelectedNode() {
     const deviceId = document.getElementById('node-prop-device').value || null;
     const ifaceId = document.getElementById('node-prop-interface').value || null;
     const payload = { label: label, device_id: deviceId ? parseInt(deviceId, 10) : null, meta: { interface_id: ifaceId ? parseInt(ifaceId, 10) : null } };
-    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node/${selectedNode.dbId}`, {
+    fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/node/' + selectedNode.dbId, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(payload)
     }).then(r => r.json()).then(d => {
         if (d.success) {
@@ -799,7 +799,7 @@ function saveSelectedNode() {
 function deleteSelectedNode() {
     if (!selectedNode || !mapId || !selectedNode.dbId) return;
     if (!confirm('Delete this node and attached links?')) return;
-    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node/${selectedNode.dbId}`, {
+    fetch(url('plugin/WeathermapNG/map') + '/' + mapId + '/node/' + selectedNode.dbId, {
         method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
     }).then(() => {
         nodes = nodes.filter(n => n !== selectedNode);
