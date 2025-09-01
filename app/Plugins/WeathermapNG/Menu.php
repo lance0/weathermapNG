@@ -8,8 +8,8 @@ class Menu
     public function data(): array
     {
         return [
-            'title' => 'WeathermapNG',
-            'url' => '/plugin/weathermapng',
+            'title' => 'Network Maps',
+            'url' => '/plugin/WeathermapNG',
             'icon' => 'fa-network-wired',
         ];
     }

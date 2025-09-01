@@ -183,6 +183,16 @@ if (isset($_REQUEST['ajax_action'])) {
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit;
+            
+        case 'get-stats':
+            try {
+                $nodeCount = dbFetchCell("SELECT COUNT(*) FROM wmng_nodes");
+                $linkCount = dbFetchCell("SELECT COUNT(*) FROM wmng_links");
+                echo json_encode(['success' => true, 'nodes' => $nodeCount, 'links' => $linkCount]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'nodes' => 0, 'links' => 0]);
+            }
+            exit;
     }
     
     echo json_encode(['success' => false, 'message' => 'Unknown action']);

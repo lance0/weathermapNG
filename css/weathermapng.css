@@ -1,15 +1,31 @@
-/* WeathermapNG Styles */
+/**
+ * WeathermapNG Professional CSS Styles
+ * Modern, production-ready styles for network visualization
+ */
 
 :root {
-    --weathermap-primary: #007bff;
-    --weathermap-secondary: #6c757d;
-    --weathermap-success: #28a745;
-    --weathermap-warning: #ffc107;
-    --weathermap-danger: #dc3545;
-    --weathermap-info: #17a2b8;
-    --weathermap-light: #f8f9fa;
-    --weathermap-dark: #343a40;
-    --weathermap-border: #dee2e6;
+    /* Modern gradient colors */
+    --primary-color: #667eea;
+    --secondary-color: #764ba2;
+    --success-color: #48bb78;
+    --warning-color: #f6ad55;
+    --danger-color: #fc8181;
+    --info-color: #4299e1;
+    --dark: #2d3748;
+    --light: #f7fafc;
+    --border-radius: 0.5rem;
+    --transition: all 0.3s ease;
+    
+    /* Legacy compatibility */
+    --weathermap-primary: #667eea;
+    --weathermap-secondary: #764ba2;
+    --weathermap-success: #48bb78;
+    --weathermap-warning: #f6ad55;
+    --weathermap-danger: #fc8181;
+    --weathermap-info: #4299e1;
+    --weathermap-light: #f7fafc;
+    --weathermap-dark: #2d3748;
+    --weathermap-border: #e2e8f0;
 }
 
 /* Main container styles */
@@ -304,5 +320,275 @@
     #map-canvas {
         box-shadow: none;
         border: none;
+    }
+}
+
+/* ===============================================
+   Professional Enhancement Styles
+   =============================================== */
+
+/* Professional Typography */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--dark);
+}
+
+/* Hero Section with Gradient */
+.weathermap-hero {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+    border-radius: 0.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.weathermap-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Map Grid Layout */
+.map-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+/* Enhanced Map Cards */
+.map-card {
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+}
+
+.map-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.map-card-header {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.map-card-body {
+    padding: 1rem;
+}
+
+.map-card-footer {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    display: flex;
+    gap: 0.5rem;
+}
+
+/* Statistics Cards */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Modern Editor Toolbar */
+.editor-toolbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tool-button {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tool-button:hover {
+    background: rgba(255,255,255,0.3);
+    transform: translateY(-1px);
+}
+
+.tool-button.active {
+    background: white;
+    color: var(--primary-color);
+}
+
+/* Enhanced Canvas Area */
+.canvas-container {
+    background: #f0f0f0;
+    background-image: 
+        linear-gradient(rgba(200,200,200,0.2) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200,200,200,0.2) 1px, transparent 1px);
+    background-size: 20px 20px;
+    position: relative;
+    overflow: auto;
+}
+
+#mapCanvas {
+    background: white;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    margin: 20px;
+}
+
+/* Traffic Color Scale for Links */
+.traffic-0 { stroke: #48bb78; }
+.traffic-25 { stroke: #f6e05e; }
+.traffic-50 { stroke: #f6ad55; }
+.traffic-75 { stroke: #fc8181; }
+.traffic-100 { stroke: #9f1239; }
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+/* Minimap */
+.minimap {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 200px;
+    height: 150px;
+    background: white;
+    border: 2px solid var(--primary-color);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+}
+
+/* Context Menu */
+.context-menu {
+    position: absolute;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    z-index: 2000;
+    min-width: 200px;
+    display: none;
+}
+
+.context-menu.show {
+    display: block;
+}
+
+.context-menu-item {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.context-menu-item:hover {
+    background: var(--light);
+    color: var(--primary-color);
+}
+
+/* Zoom Controls */
+.zoom-controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+}
+
+.zoom-btn {
+    padding: 0.5rem;
+    border: none;
+    background: white;
+    cursor: pointer;
+    transition: var(--transition);
+    width: 40px;
+    height: 40px;
+}
+
+.zoom-btn:hover {
+    background: var(--light);
+    color: var(--primary-color);
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
     }
 }
