@@ -469,6 +469,9 @@
                                 <button class="btn btn-sm btn-outline-primary" onclick="editorActions.applyTemplate('ring')">
                                     <i class="fas fa-circle-notch"></i> Ring Topology
                                 </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="editorActions.autoDiscover()">
+                                    <i class="fas fa-magic"></i> Auto-Discover Topology
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -2507,6 +2510,20 @@ const editorActions = {
             editor.addToHistory();
             editor.showStatus(`Applied ${template} template`);
         }
+    },
+    autoDiscover: () => {
+        if (!editorState.mapId) { editor.showStatus('Save map first to enable auto-discovery', 'error'); return; }
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/autodiscover`, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+        }).then(r => r.json()).then(data => {
+            if (data && data.success) {
+                editor.showStatus('Auto-discovery complete');
+                editor.loadMap();
+            } else {
+                editor.showStatus('Auto-discovery failed', 'error');
+            }
+        }).catch(() => editor.showStatus('Auto-discovery failed', 'error'));
     }
 };
 

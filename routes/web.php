@@ -34,6 +34,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::post('plugin/WeathermapNG/map/{map}/nodes', [MapController::class, 'storeNodes'])->name('weathermapng.nodes.store');
     Route::post('plugin/WeathermapNG/map/{map}/links', [MapController::class, 'storeLinks'])->name('weathermapng.links.store');
     Route::post('plugin/WeathermapNG/api/maps/{map}/save', [MapController::class, 'save'])->name('weathermapng.map.save');
+    Route::post('plugin/WeathermapNG/map/{map}/autodiscover', [MapController::class, 'autoDiscover'])->name('weathermapng.map.autodiscover');
     Route::patch('plugin/WeathermapNG/map/{map}/node/{node}', [MapController::class, 'updateNode'])->name('weathermapng.node.update');
     Route::patch('plugin/WeathermapNG/map/{map}/link/{link}', [MapController::class, 'updateLink'])->name('weathermapng.link.update');
     Route::post('plugin/WeathermapNG/map/{map}/node', [MapController::class, 'createNode'])->name('weathermapng.node.create');

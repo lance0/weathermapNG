@@ -416,4 +416,112 @@ class MapController
             return collect([]);
         }
     }
+
+    /**
+     * Auto-discover nodes and links from LibreNMS topology and seed into this map.
+     * Best-effort: uses 'links' table if present to connect ports; falls back to neighbours.
+     */
+    public function autoDiscover(Map $map)
+    {
+        try {
+            // Collect devices
+            $devices = [];
+            if (class_exists('\\App\\Models\\Device')) {
+                $devices = \App\Models\Device::where('disabled', 0)->where('ignore', 0)
+                    ->select('device_id', 'hostname')
+                    ->get()->toArray();
+            } else {
+                $devices = \DB::table('devices')->where('disabled', 0)->where('ignore', 0)
+                    ->select('device_id', 'hostname')->get()->toArray();
+                $devices = array_map(fn($o) => (array)$o, $devices);
+            }
+            // Map existing nodes by device_id to avoid duplicates
+            $existing = $map->nodes()->pluck('id', 'device_id')->filter()->toArray();
+            $nodeIdsByDevice = $existing;
+
+            // Create missing nodes with a rough grid layout
+            $x = 100; $y = 100; $step = 120; $cols = 8; $i = 0;
+            foreach ($devices as $dev) {
+                $did = (int)($dev['device_id'] ?? 0);
+                if (!$did) continue;
+                if (!isset($nodeIdsByDevice[$did])) {
+                    $node = Node::create([
+                        'map_id' => $map->id,
+                        'label' => $dev['hostname'] ?? ('dev-' . $did),
+                        'x' => $x,
+                        'y' => $y,
+                        'device_id' => $did,
+                        'meta' => ['icon' => 'switch'],
+                    ]);
+                    $nodeIdsByDevice[$did] = $node->id;
+                    $i++; $x += $step; if ($i % $cols === 0) { $x = 100; $y += $step; }
+                }
+            }
+
+            // Discover links using 'links' table if present
+            $linksInserted = 0;
+            try {
+                $links = \DB::table('links')->select('local_port_id','remote_port_id')->limit(2000)->get();
+                foreach ($links as $lnk) {
+                    $pa = (int)$lnk->local_port_id; $pb = (int)$lnk->remote_port_id;
+                    if (!$pa || !$pb) continue;
+                    // lookup ports to get device ids
+                    $rowA = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
+                    $rowB = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
+                    if (!$rowA || !$rowB) continue;
+                    $da = (int)$rowA->device_id; $db = (int)$rowB->device_id;
+                    $srcNodeId = $nodeIdsByDevice[$da] ?? null;
+                    $dstNodeId = $nodeIdsByDevice[$db] ?? null;
+                    if (!$srcNodeId || !$dstNodeId) continue;
+                    // avoid duplicates by checking existing link
+                    $exists = $map->links()->where('src_node_id', $srcNodeId)->where('dst_node_id', $dstNodeId)->exists();
+                    if ($exists) continue;
+                    Link::create([
+                        'map_id' => $map->id,
+                        'src_node_id' => $srcNodeId,
+                        'dst_node_id' => $dstNodeId,
+                        'port_id_a' => $pa,
+                        'port_id_b' => $pb,
+                        'bandwidth_bps' => null,
+                        'style' => [],
+                    ]);
+                    $linksInserted++;
+                }
+            } catch (\Exception $e) {
+                // Fallback to neighbours table
+                try {
+                    $neigh = \DB::table('neighbours')->select('port_id','remote_port_id')->limit(2000)->get();
+                    foreach ($neigh as $n) {
+                        $pa = (int)$n->port_id; $pb = (int)$n->remote_port_id;
+                        if (!$pa || !$pb) continue;
+                        $rowA = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
+                        $rowB = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
+                        if (!$rowA || !$rowB) continue;
+                        $da = (int)$rowA->device_id; $db = (int)$rowB->device_id;
+                        $srcNodeId = $nodeIdsByDevice[$da] ?? null;
+                        $dstNodeId = $nodeIdsByDevice[$db] ?? null;
+                        if (!$srcNodeId || !$dstNodeId) continue;
+                        $exists = $map->links()->where('src_node_id', $srcNodeId)->where('dst_node_id', $dstNodeId)->exists();
+                        if ($exists) continue;
+                        Link::create([
+                            'map_id' => $map->id,
+                            'src_node_id' => $srcNodeId,
+                            'dst_node_id' => $dstNodeId,
+                            'port_id_a' => $pa,
+                            'port_id_b' => $pb,
+                            'bandwidth_bps' => null,
+                            'style' => [],
+                        ]);
+                        $linksInserted++;
+                    }
+                } catch (\Exception $e2) {
+                    // no topology available
+                }
+            }
+
+            return response()->json(['success' => true, 'nodes' => count($nodeIdsByDevice), 'links' => $linksInserted]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Auto-discovery failed: ' . $e->getMessage()], 500);
+        }
+    }
 }
