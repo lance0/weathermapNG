@@ -34,7 +34,7 @@
     },
     "routes": {
         "file": "routes.php",
-        "prefix": "plugins/weathermapng"
+        "prefix": "plugin/WeathermapNG"
     },
     "database": {
         "migrations": "database/migrations",
@@ -42,7 +42,7 @@
     },
     "views": {
         "namespace": "weathermapng",
-        "path": "resources/views/weathermapng"
+        "path": "Resources/views/weathermapng"
     },
     "config": {
         "file": "config/weathermapng.php",

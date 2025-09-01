@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class Page extends PageHook
 {
-    public string $view = 'resources.views.page';
+    public string $view = 'weathermapng::page';
     
     public function data(): array
     {

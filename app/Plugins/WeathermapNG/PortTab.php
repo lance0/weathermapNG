@@ -7,7 +7,7 @@ use App\Plugins\Hooks\PortTabHook;
 
 class PortTab extends PortTabHook
 {
-    public string $view = 'resources.views.port-tab';
+    public string $view = 'weathermapng::port-tab';
 
     public function data(Port $port): array
     {

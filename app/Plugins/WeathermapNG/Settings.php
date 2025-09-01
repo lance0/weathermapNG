@@ -6,7 +6,7 @@ use App\Plugins\Hooks\SettingsHook;
 
 class Settings extends SettingsHook
 {
-    public string $view = 'resources.views.settings';
+    public string $view = 'weathermapng::settings';
 
     public function data(array $settings = []): array
     {
