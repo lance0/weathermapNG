@@ -421,18 +421,36 @@ class MapController
      * Auto-discover nodes and links from LibreNMS topology and seed into this map.
      * Best-effort: uses 'links' table if present to connect ports; falls back to neighbours.
      */
-    public function autoDiscover(Map $map)
+    public function autoDiscover(Request $request, Map $map)
     {
         try {
+            $minDegree = max(0, (int) $request->input('min_degree', 0));
+            $osFilter = trim((string) $request->input('os', ''));
+            $osParts = array_filter(array_map('trim', explode(',', $osFilter)));
             // Collect devices
             $devices = [];
             if (class_exists('\\App\\Models\\Device')) {
-                $devices = \App\Models\Device::where('disabled', 0)->where('ignore', 0)
-                    ->select('device_id', 'hostname')
-                    ->get()->toArray();
+                $q = \App\Models\Device::where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
+                if (!empty($osParts)) {
+                    $q->where(function($qb) use ($osParts) {
+                        foreach ($osParts as $i => $part) {
+                            $method = $i === 0 ? 'where' : 'orWhere';
+                            $qb->$method('os', 'like', '%' . $part . '%');
+                        }
+                    });
+                }
+                $devices = $q->get()->toArray();
             } else {
-                $devices = \DB::table('devices')->where('disabled', 0)->where('ignore', 0)
-                    ->select('device_id', 'hostname')->get()->toArray();
+                $q = \DB::table('devices')->where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
+                if (!empty($osParts)) {
+                    $q->where(function($qb) use ($osParts) {
+                        foreach ($osParts as $i => $part) {
+                            $method = $i === 0 ? 'where' : 'orWhere';
+                            $qb->$method('os', 'like', '%' . $part . '%');
+                        }
+                    });
+                }
+                $devices = $q->get()->toArray();
                 $devices = array_map(fn($o) => (array)$o, $devices);
             }
             // Map existing nodes by device_id to avoid duplicates
@@ -444,6 +462,7 @@ class MapController
             foreach ($devices as $dev) {
                 $did = (int)($dev['device_id'] ?? 0);
                 if (!$did) continue;
+                if ($minDegree > 0) { $dval = $deg[$did] ?? 0; if ($dval < $minDegree) continue; }
                 if (!isset($nodeIdsByDevice[$did])) {
                     $node = Node::create([
                         'map_id' => $map->id,
