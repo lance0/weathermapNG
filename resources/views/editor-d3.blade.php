@@ -642,7 +642,9 @@ const editorState = {
     linkStart: null,
     clipboard: null,
     portCache: {},
-    geoCache: {}
+    geoCache: {},
+    marqueeActive: false,
+    marqueeStart: null
 };
 
 // Initialize D3.js editor
@@ -845,7 +847,8 @@ class WeathermapEditor {
 
         mergedGroups.select('circle')
             .attr('stroke', d => editorState.selectedElements.includes(d) ? '#ffc107' : '#fff')
-            .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 3 : 2);
+            .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 4 : 2)
+            .attr('stroke-dasharray', d => editorState.selectedElements.includes(d) ? '4 2' : null);
 
         // Ensure node icon updates when changed
         mergedGroups.select('text')
@@ -871,7 +874,8 @@ class WeathermapEditor {
         links.merge(linkEnter)
             .attr('d', d => this.getLinkPath(d))
             .attr('stroke', d => editorState.selectedElements.includes(d) ? '#ffc107' : '#666')
-            .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 3 : 2);
+            .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 4 : 2)
+            .attr('stroke-dasharray', d => editorState.selectedElements.includes(d) ? '6 3' : null);
         
         links.exit().remove();
 
@@ -1305,6 +1309,55 @@ class WeathermapEditor {
                 this.renderGeoBackground();
             }
         });
+
+        // Marquee select (drag on empty canvas when in select tool)
+        this.svg.on('mousedown', (event) => {
+            if (editorState.tool !== 'select') return;
+            // ignore if clicking on a node/link element
+            if (event.target.closest('.node') || event.target.closest('.link')) return;
+            const start = d3.pointer(event, this.mapGroup.node());
+            editorState.marqueeActive = true;
+            editorState.marqueeStart = { x: start[0], y: start[1], shift: event.shiftKey };
+            const layer = this.mapGroup.select('#selection-layer');
+            let rect = layer.select('#marquee');
+            if (rect.empty()) {
+                rect = layer.append('rect').attr('id', 'marquee').attr('class', 'marquee');
+            }
+            rect.attr('x', start[0]).attr('y', start[1]).attr('width', 0).attr('height', 0);
+        });
+        // Update marquee on mousemove (reuse existing handler)
+        // Finalize on mouseup anywhere
+        document.addEventListener('mouseup', (e) => {
+            if (!editorState.marqueeActive) return;
+            editorState.marqueeActive = false;
+            const end = d3.pointer(e, this.mapGroup.node());
+            const x1 = editorState.marqueeStart.x;
+            const y1 = editorState.marqueeStart.y;
+            const x2 = end[0];
+            const y2 = end[1];
+            const minX = Math.min(x1, x2);
+            const minY = Math.min(y1, y2);
+            const maxX = Math.max(x1, x2);
+            const maxY = Math.max(y1, y2);
+            // Determine selected elements
+            const within = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+            const selectedNodes = editorState.nodes.filter(n => within(n.x, n.y));
+            const selectedLinks = editorState.links.filter(l => {
+                const s = editorState.nodes.find(n => n.id === l.source);
+                const t = editorState.nodes.find(n => n.id === l.target);
+                return s && t && within(s.x, s.y) && within(t.x, t.y);
+            });
+            if (!editorState.marqueeStart.shift) {
+                editorState.selectedElements = [];
+            }
+            // Merge unique
+            const addUnique = (arr, el) => { if (!arr.includes(el)) arr.push(el); };
+            selectedNodes.forEach(n => addUnique(editorState.selectedElements, n));
+            selectedLinks.forEach(l => addUnique(editorState.selectedElements, l));
+            this.updatePropertiesPanel();
+            editorState.needsRender = true;
+            this.mapGroup.select('#selection-layer').select('#marquee').remove();
+        });
         
         // Grid toggle
         document.getElementById('gridToggle').addEventListener('change', (e) => {
@@ -1457,6 +1510,19 @@ class WeathermapEditor {
                 } else {
                     preview.attr('d', path).attr('stroke-width', width);
                 }
+            }
+            // Marquee update
+            if (editorState.marqueeActive && editorState.marqueeStart) {
+                const x1 = editorState.marqueeStart.x;
+                const y1 = editorState.marqueeStart.y;
+                const x2 = coords[0];
+                const y2 = coords[1];
+                const minX = Math.min(x1, x2);
+                const minY = Math.min(y1, y2);
+                const w = Math.abs(x2 - x1);
+                const h = Math.abs(y2 - y1);
+                const rect = this.mapGroup.select('#selection-layer').select('#marquee');
+                rect.attr('x', minX).attr('y', minY).attr('width', w).attr('height', h);
             }
         });
     }
@@ -2327,6 +2393,13 @@ document.addEventListener('DOMContentLoaded', () => {
 .label {
     pointer-events: none;
     user-select: none;
+}
+
+.marquee {
+    fill: rgba(102, 126, 234, 0.1);
+    stroke: #667eea;
+    stroke-width: 1.5px;
+    stroke-dasharray: 4 2;
 }
 
 .snackbar {
