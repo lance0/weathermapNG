@@ -224,7 +224,7 @@ WeathermapNG/
 ## Post-Installation
 
 ### Access the Plugin
-Visit: `https://your-librenms/plugins/weathermapng`
+Visit: `https://your-librenms/plugin/WeathermapNG`
 
 ### Create Your First Map
 1. Click "Create New Map"
@@ -235,10 +235,10 @@ Visit: `https://your-librenms/plugins/weathermapng`
 ### Health Check
 ```bash
 # Check if plugin is healthy
-curl https://your-librenms/plugins/weathermapng/health
+curl https://your-librenms/plugin/weathermapng/health
 
 # View metrics
-curl https://your-librenms/plugins/weathermapng/metrics
+curl https://your-librenms/plugin/weathermapng/api/metrics
 ```
 
 ## Support

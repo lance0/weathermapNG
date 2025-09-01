@@ -2,8 +2,11 @@
 
 namespace App\Plugins\WeathermapNG;
 
-class Settings
+use LibreNMS\Plugins\Hooks\SettingsHook;
+
+class Settings extends SettingsHook
 {
+    public string $view = 'weathermapng::settings';
     public function settings(): array
     {
         return [
