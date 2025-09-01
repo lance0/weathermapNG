@@ -14,7 +14,8 @@
  * a traditional plugin structure. All real functionality is in the hooks.
  */
 
-namespace LibreNMS\Plugins;
+// No namespace to avoid conflicts
+// This file is for compatibility only
 
 class WeathermapNG
 {
