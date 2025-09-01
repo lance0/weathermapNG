@@ -171,11 +171,13 @@ function drawMap() {
 
 // Refresh map data
 function refreshMap() {
-    var baseUrl = window.location.protocol + '//' + window.location.host;
     $.ajax({
-        url: baseUrl + '/plugin/v1/WeathermapNG/ajax/get-map-data',
+        url: '/plugin/v1/WeathermapNG',
         method: 'GET',
-        data: { id: mapId },
+        data: { 
+            id: mapId,
+            ajax_action: 'get-map-data'
+        },
         success: function(response) {
             if (response.success) {
                 nodes = response.nodes;

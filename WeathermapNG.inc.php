@@ -6,136 +6,109 @@
  * Accessible at: /plugin/v1/WeathermapNG
  */
 
-// Handle different page views
-if (isset($_GET['other'])) {
-    // Editor view
-    if (preg_match('/^editor\/(\d+)$/', $_GET['other'], $matches)) {
-        $mapId = intval($matches[1]);
-        include __DIR__ . '/views/editor.php';
-        exit;
-    }
-    
-    // View map
-    if (preg_match('/^view\/(\d+)$/', $_GET['other'], $matches)) {
-        $mapId = intval($matches[1]);
-        include __DIR__ . '/views/view.php';
-        exit;
-    }
-}
-
-// Handle AJAX requests
-if (isset($_GET['other']) && strpos($_GET['other'], 'ajax/') === 0) {
+// Handle AJAX requests FIRST - before any HTML output
+if (isset($_REQUEST['ajax_action'])) {
     header('Content-Type: application/json');
     
-    // Debug logging
-    error_log("WeathermapNG AJAX request: " . $_GET['other']);
-    error_log("POST data: " . json_encode($_POST));
-    
-    $action = str_replace('ajax/', '', $_GET['other']);
+    $action = $_REQUEST['ajax_action'];
     
     switch ($action) {
         case 'create-map':
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                $name = $_POST['name'] ?? '';
-                $description = $_POST['description'] ?? '';
-                $width = intval($_POST['width'] ?? 800);
-                $height = intval($_POST['height'] ?? 600);
-                
-                if (empty($name)) {
-                    echo json_encode(['success' => false, 'message' => 'Map name is required', 'debug' => 'Name was empty']);
+            $name = $_POST['name'] ?? '';
+            $description = $_POST['description'] ?? '';
+            $width = intval($_POST['width'] ?? 800);
+            $height = intval($_POST['height'] ?? 600);
+            
+            if (empty($name)) {
+                echo json_encode(['success' => false, 'message' => 'Map name is required']);
+                exit;
+            }
+            
+            try {
+                // Check if name already exists
+                $existing = dbFetchCell("SELECT COUNT(*) FROM wmng_maps WHERE name = ?", [$name]);
+                if ($existing > 0) {
+                    echo json_encode(['success' => false, 'message' => 'A map with this name already exists']);
                     exit;
                 }
                 
-                try {
-                    // Check if name already exists
-                    $existing = dbFetchCell("SELECT COUNT(*) FROM wmng_maps WHERE name = ?", [$name]);
-                    if ($existing > 0) {
-                        echo json_encode(['success' => false, 'message' => 'A map with this name already exists']);
-                        exit;
-                    }
-                    
-                    // Insert the new map
-                    $result = dbInsert([
-                        'name' => $name,
-                        'description' => $description,
-                        'width' => $width,
-                        'height' => $height,
-                        'options' => json_encode(['background' => '#ffffff']),
-                        'created_at' => date('Y-m-d H:i:s'),
-                        'updated_at' => date('Y-m-d H:i:s')
-                    ], 'wmng_maps');
-                    
-                    if ($result) {
-                        echo json_encode(['success' => true, 'id' => $result]);
-                    } else {
-                        echo json_encode(['success' => false, 'message' => 'Failed to create map']);
-                    }
-                } catch (Exception $e) {
-                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                // Insert the new map
+                $result = dbInsert([
+                    'name' => $name,
+                    'description' => $description,
+                    'width' => $width,
+                    'height' => $height,
+                    'options' => json_encode(['background' => '#ffffff']),
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ], 'wmng_maps');
+                
+                if ($result) {
+                    echo json_encode(['success' => true, 'id' => $result]);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Failed to create map']);
                 }
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit;
             
         case 'delete-map':
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                $id = intval($_POST['id'] ?? 0);
-                
-                if ($id <= 0) {
-                    echo json_encode(['success' => false, 'message' => 'Invalid map ID']);
-                    exit;
-                }
-                
-                try {
-                    $result = dbDelete('wmng_maps', 'id = ?', [$id]);
-                    echo json_encode(['success' => $result > 0]);
-                } catch (Exception $e) {
-                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-                }
+            $id = intval($_POST['id'] ?? 0);
+            
+            if ($id <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid map ID']);
+                exit;
+            }
+            
+            try {
+                $result = dbDelete('wmng_maps', 'id = ?', [$id]);
+                echo json_encode(['success' => $result > 0]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit;
             
         case 'save-map':
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                $id = intval($_POST['id'] ?? 0);
-                $nodes = json_decode($_POST['nodes'] ?? '[]', true);
-                $links = json_decode($_POST['links'] ?? '[]', true);
+            $id = intval($_POST['id'] ?? 0);
+            $nodes = json_decode($_POST['nodes'] ?? '[]', true);
+            $links = json_decode($_POST['links'] ?? '[]', true);
+            
+            try {
+                // Delete existing nodes and links
+                dbDelete('wmng_nodes', 'map_id = ?', [$id]);
+                dbDelete('wmng_links', 'map_id = ?', [$id]);
                 
-                try {
-                    // Delete existing nodes and links
-                    dbDelete('wmng_nodes', 'map_id = ?', [$id]);
-                    dbDelete('wmng_links', 'map_id = ?', [$id]);
-                    
-                    // Insert new nodes
-                    $nodeIdMap = [];
-                    foreach ($nodes as $node) {
-                        $oldId = $node['id'];
-                        $newId = dbInsert([
-                            'map_id' => $id,
-                            'label' => $node['label'],
-                            'x' => $node['x'],
-                            'y' => $node['y'],
-                            'device_id' => $node['device_id'],
-                            'created_at' => date('Y-m-d H:i:s'),
-                            'updated_at' => date('Y-m-d H:i:s')
-                        ], 'wmng_nodes');
-                        $nodeIdMap[$oldId] = $newId;
-                    }
-                    
-                    // Insert new links with mapped node IDs
-                    foreach ($links as $link) {
-                        dbInsert([
-                            'map_id' => $id,
-                            'src_node_id' => $nodeIdMap[$link['src_node_id']] ?? $link['src_node_id'],
-                            'dst_node_id' => $nodeIdMap[$link['dst_node_id']] ?? $link['dst_node_id'],
-                            'created_at' => date('Y-m-d H:i:s'),
-                            'updated_at' => date('Y-m-d H:i:s')
-                        ], 'wmng_links');
-                    }
-                    
-                    echo json_encode(['success' => true]);
-                } catch (Exception $e) {
-                    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                // Insert new nodes
+                $nodeIdMap = [];
+                foreach ($nodes as $node) {
+                    $oldId = $node['id'];
+                    $newId = dbInsert([
+                        'map_id' => $id,
+                        'label' => $node['label'],
+                        'x' => $node['x'],
+                        'y' => $node['y'],
+                        'device_id' => $node['device_id'],
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ], 'wmng_nodes');
+                    $nodeIdMap[$oldId] = $newId;
                 }
+                
+                // Insert new links with mapped node IDs
+                foreach ($links as $link) {
+                    dbInsert([
+                        'map_id' => $id,
+                        'src_node_id' => $nodeIdMap[$link['src_node_id']] ?? $link['src_node_id'],
+                        'dst_node_id' => $nodeIdMap[$link['dst_node_id']] ?? $link['dst_node_id'],
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ], 'wmng_links');
+                }
+                
+                echo json_encode(['success' => true]);
+            } catch (Exception $e) {
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit;
             
@@ -160,12 +133,30 @@ if (isset($_GET['other']) && strpos($_GET['other'], 'ajax/') === 0) {
                 echo json_encode(['success' => false, 'message' => $e->getMessage()]);
             }
             exit;
-            
-        default:
-            echo json_encode(['success' => false, 'message' => 'Unknown action']);
-            exit;
+    }
+    
+    echo json_encode(['success' => false, 'message' => 'Unknown action']);
+    exit;
+}
+
+// Handle different page views
+if (isset($_GET['other'])) {
+    // Editor view
+    if (preg_match('/^editor\/(\d+)$/', $_GET['other'], $matches)) {
+        $mapId = intval($matches[1]);
+        include __DIR__ . '/views/editor.php';
+        exit;
+    }
+    
+    // View map
+    if (preg_match('/^view\/(\d+)$/', $_GET['other'], $matches)) {
+        $mapId = intval($matches[1]);
+        include __DIR__ . '/views/view.php';
+        exit;
     }
 }
+
+// This old AJAX handling code is no longer needed since we handle it at the top with ajax_action parameter
 
 // Check if tables exist
 function weathermapng_tables_exist() {
@@ -332,8 +323,12 @@ php database/setup.php</pre>
 </div>
 
 <script>
-// Ensure we use the correct base URL
-var baseUrl = window.location.protocol + '//' + window.location.host;
+// Get the actual server URL, not the base href
+var actualHost = '<?php echo $_SERVER["HTTP_HOST"]; ?>';
+var baseUrl = window.location.protocol + '//' + actualHost;
+
+// Debug
+console.log('Using base URL:', baseUrl);
 
 function createNewMap() {
     $('#createMapModal').modal('show');
@@ -345,6 +340,7 @@ function submitCreateMap() {
         description: $('#mapDescription').val(),
         width: $('#mapWidth').val(),
         height: $('#mapHeight').val(),
+        ajax_action: 'create-map',
         _token: $('meta[name="csrf-token"]').attr('content') || ''
     };
     
@@ -355,7 +351,7 @@ function submitCreateMap() {
     
     // Create the map directly in the database
     $.ajax({
-        url: baseUrl + '/plugin/v1/WeathermapNG/ajax/create-map',
+        url: '/plugin/v1/WeathermapNG',
         method: 'POST',
         data: formData,
         dataType: 'json',
@@ -379,10 +375,11 @@ function submitCreateMap() {
 function deleteMap(mapId) {
     if (confirm('Are you sure you want to delete this map?')) {
         $.ajax({
-            url: baseUrl + '/plugin/v1/WeathermapNG/ajax/delete-map',
+            url: '/plugin/v1/WeathermapNG',
             method: 'POST',
             data: { 
                 id: mapId,
+                ajax_action: 'delete-map',
                 _token: $('meta[name="csrf-token"]').attr('content') || ''
             },
             success: function(response) {
