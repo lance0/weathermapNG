@@ -89,6 +89,13 @@ class RenderController
                 }
                 if (($inSum + $outSum) > 0) { $source = 'links'; }
             }
+            // Final fallback: sum top ports on the device
+            if (($inSum + $outSum) === 0 && $node->device_id) {
+                $agg = $svc->deviceAggregateBits((int) $node->device_id, 24);
+                $inSum = (int) ($agg['in'] ?? 0);
+                $outSum = (int) ($agg['out'] ?? 0);
+                if (($inSum + $outSum) > 0) { $source = 'device'; }
+            }
             $out['nodes'][$node->id] = [
                 'status' => $status,
                 'traffic' => [
@@ -327,6 +334,13 @@ class RenderController
                             }
                         }
                         if (($inSum + $outSum) > 0) { $source = 'links'; }
+                    }
+                    // Final device-level aggregate
+                    if (($inSum + $outSum) === 0 && $node->device_id) {
+                        $agg = $svc->deviceAggregateBits((int) $node->device_id, 24);
+                        $inSum = (int) ($agg['in'] ?? 0);
+                        $outSum = (int) ($agg['out'] ?? 0);
+                        if (($inSum + $outSum) > 0) { $source = 'device'; }
                     }
                     $payload['nodes'][$node->id] = [
                         'status' => $status,

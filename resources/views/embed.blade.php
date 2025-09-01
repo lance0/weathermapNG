@@ -992,7 +992,8 @@
                 tooltip.style.left = (e.pageX + 10) + 'px';
                 tooltip.style.top = (e.pageY + 10) + 'px';
                 const sum = t.sum_bps ?? n.current_value ?? 0;
-                const src = t.source ? (t.source === 'ports' ? 'ports' : (t.source === 'links' ? 'links' : 'unknown')) : 'unknown';
+                const srcMap = { ports: 'ports', links: 'links', device: 'device', none: 'unknown' };
+                const src = t.source ? (srcMap[t.source] || 'unknown') : 'unknown';
                 tooltip.innerHTML = `${n.label || n.id}<br>` +
                   `In: ${humanBits(t.in_bps ?? 0)}<br>` +
                   `Out: ${humanBits(t.out_bps ?? 0)}<br>` +

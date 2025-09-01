@@ -5,6 +5,7 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use LibreNMS\Plugins\WeathermapNG\RRD\RRDTool;
 use LibreNMS\Plugins\WeathermapNG\RRD\LibreNMSAPI;
 
@@ -353,5 +354,32 @@ class PortUtilService
         } catch (\Exception $e) {
             return [];
         }
+    }
+
+    /**
+     * Aggregate device traffic by summing a subset of ports.
+     * Limits the number of ports for performance; relies on getPortData() caching.
+     */
+    public function deviceAggregateBits(int $deviceId, int $limit = 32): array
+    {
+        $in = 0; $out = 0;
+        try {
+            // Prefer up ports, highest speeds first
+            $ports = DB::table('ports')
+                ->select('port_id', DB::raw('COALESCE(ifHighSpeed*1000000, ifSpeed) as speed'), 'ifOperStatus')
+                ->where('device_id', $deviceId)
+                ->orderByDesc(DB::raw("(ifOperStatus='up')"))
+                ->orderByDesc('speed')
+                ->limit(max(1, $limit))
+                ->get();
+            foreach ($ports as $p) {
+                $pd = $this->getPortData((int) $p->port_id);
+                $in += (int) ($pd['in'] ?? 0);
+                $out += (int) ($pd['out'] ?? 0);
+            }
+        } catch (\Throwable $e) {
+            // Ignore errors; return zeros
+        }
+        return ['in' => $in, 'out' => $out];
     }
 }
