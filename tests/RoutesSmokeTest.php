@@ -30,5 +30,9 @@ class RoutesSmokeTest extends TestCase
         // Device/ports lookup endpoints
         $this->assertStringContainsString("/api/devices", $routes);
         $this->assertStringContainsString("/api/device/{id}/ports", $routes);
+        // Editor save endpoints
+        $this->assertStringContainsString("/api/maps/{map}/save", $routes);
+        $this->assertStringContainsString("/map/{map}/node/{node}", $routes);
+        $this->assertStringContainsString("/map/{map}/link/{link}", $routes);
     }
 }

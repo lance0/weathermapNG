@@ -28,6 +28,9 @@ Route::group(['prefix' => 'plugin/WeathermapNG', 'middleware' => ['web', 'auth']
     Route::delete('/map/{map}', [MapController::class, 'destroy'])->name('weathermapng.map.destroy');
     Route::post('/map/{map}/nodes', [MapController::class, 'storeNodes'])->name('weathermapng.nodes.store');
     Route::post('/map/{map}/links', [MapController::class, 'storeLinks'])->name('weathermapng.links.store');
+    Route::post('/api/maps/{map}/save', [MapController::class, 'save'])->name('weathermapng.map.save');
+    Route::patch('/map/{map}/node/{node}', [MapController::class, 'updateNode'])->name('weathermapng.node.update');
+    Route::patch('/map/{map}/link/{link}', [MapController::class, 'updateLink'])->name('weathermapng.link.update');
 });
 
 // Health and probe endpoints (no auth for k8s/monitoring)
