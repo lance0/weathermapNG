@@ -316,6 +316,32 @@
                                     <option value="gradient-gray">Gradient (Gray)</option>
                                 </select>
                             </div>
+                            <div class="border rounded p-2 mb-3">
+                                <label class="form-label small mb-1">Geographic Background</label>
+                                <div class="form-check form-switch small mb-2">
+                                    <input class="form-check-input" type="checkbox" id="geoToggle">
+                                    <label class="form-check-label" for="geoToggle">Enable</label>
+                                </div>
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <label class="form-label small">Preset</label>
+                                        <select class="form-select form-select-sm" id="geo-preset">
+                                            <option value="none">None</option>
+                                            <option value="world-110m">World (110m)</option>
+                                            <option value="world-50m">World (50m)</option>
+                                            <option value="us-10m">US States (10m)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small">Projection</label>
+                                        <select class="form-select form-select-sm" id="geo-proj">
+                                            <option value="mercator" selected>Mercator</option>
+                                            <option value="equirect">Equirectangular</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-text">Uses TopoJSON from world-atlas/us-atlas (CDN).</div>
+                            </div>
                             <div class="mb-3">
                                 <label class="form-label small">Background</label>
                                 <input type="color" class="form-control form-control-sm" id="map-bg-color" value="#ffffff">
@@ -525,6 +551,7 @@
 @section('scripts')
 <!-- D3.js -->
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/topojson-client@3"></script>
 
 <!-- Editor JavaScript -->
 <script>
@@ -546,7 +573,8 @@ const editorState = {
     isLinking: false,
     linkStart: null,
     clipboard: null,
-    portCache: {}
+    portCache: {},
+    geoCache: {}
 };
 
 // Initialize D3.js editor
@@ -1054,6 +1082,14 @@ class WeathermapEditor {
                 editorState.backgroundPreset = preset;
                 document.getElementById('preset-background').value = preset;
                 this.applyBackgroundPreset(preset);
+                // Apply geographic options
+                const geo = (data.options && data.options.geo) ? data.options.geo : null;
+                if (geo) {
+                    document.getElementById('geoToggle').checked = !!geo.enabled;
+                    if (geo.preset) document.getElementById('geo-preset').value = geo.preset;
+                    if (geo.projection) document.getElementById('geo-proj').value = geo.projection;
+                    this.renderGeoBackground();
+                }
                 editorState.nodes = (data.nodes || []).map(n => ({
                     id: n.id,
                     x: n.x,
@@ -1167,6 +1203,14 @@ class WeathermapEditor {
                 this.applyBackgroundPreset(preset);
             });
         }
+
+        // Geographic background controls
+        const geoToggle = document.getElementById('geoToggle');
+        const geoPreset = document.getElementById('geo-preset');
+        const geoProj = document.getElementById('geo-proj');
+        if (geoToggle) geoToggle.addEventListener('change', () => this.renderGeoBackground());
+        if (geoPreset) geoPreset.addEventListener('change', () => this.renderGeoBackground());
+        if (geoProj) geoProj.addEventListener('change', () => this.renderGeoBackground());
         
         // Mouse position tracking + link preview
         this.svg.on('mousemove', (event) => {
@@ -1446,7 +1490,15 @@ class WeathermapEditor {
             },
             body: JSON.stringify({
                 title: data.title,
-                options: { ...data.options, background_preset: (document.getElementById('preset-background')?.value || 'grid-light') },
+                options: { 
+                    ...data.options, 
+                    background_preset: (document.getElementById('preset-background')?.value || 'grid-light'),
+                    geo: {
+                        enabled: document.getElementById('geoToggle')?.checked || false,
+                        preset: document.getElementById('geo-preset')?.value || 'none',
+                        projection: document.getElementById('geo-proj')?.value || 'mercator'
+                    }
+                },
                 nodes: editorState.nodes.map(n => ({
                     label: n.label,
                     x: n.x,
@@ -1650,6 +1702,67 @@ class WeathermapEditor {
                 break;
             default:
                 bgRect.attr('fill', document.getElementById('map-bg-color').value || '#ffffff');
+        }
+    }
+
+    // Geographic background helpers
+    getGeoPresetInfo(preset) {
+        switch (preset) {
+            case 'world-110m':
+                return { url: 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', object: 'countries' };
+            case 'world-50m':
+                return { url: 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json', object: 'countries' };
+            case 'us-10m':
+                return { url: 'https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json', object: 'states' };
+            default:
+                return null;
+        }
+    }
+
+    async renderGeoBackground() {
+        const enabled = document.getElementById('geoToggle').checked;
+        const preset = document.getElementById('geo-preset').value;
+        const projName = document.getElementById('geo-proj').value;
+        const layer = this.mapGroup.select('#background-layer');
+        layer.selectAll('.geo-layer').remove();
+        if (!enabled || preset === 'none') return;
+
+        const info = this.getGeoPresetInfo(preset);
+        if (!info) return;
+        try {
+            let topo = editorState.geoCache[info.url];
+            if (!topo) {
+                const res = await fetch(info.url);
+                topo = await res.json();
+                editorState.geoCache[info.url] = topo;
+            }
+            const feature = topojson.feature(topo, topo.objects[info.object]);
+            const width = this.svg.node().clientWidth;
+            const height = this.svg.node().clientHeight;
+            let projection = projName === 'equirect' ? d3.geoEquirectangular() : d3.geoMercator();
+            projection.fitSize([width, height], feature);
+            const path = d3.geoPath(projection);
+
+            // Graticule
+            const grat = d3.geoGraticule();
+            layer.append('path')
+                .datum(grat())
+                .attr('class', 'geo-layer')
+                .attr('fill', 'none')
+                .attr('stroke', '#e5e7eb')
+                .attr('stroke-width', 0.5)
+                .attr('d', path);
+
+            // Land
+            layer.append('path')
+                .datum(feature)
+                .attr('class', 'geo-layer')
+                .attr('fill', '#f5faff')
+                .attr('stroke', '#cbd5e1')
+                .attr('stroke-width', 0.8)
+                .attr('d', path);
+        } catch (e) {
+            this.showStatus('Failed to load map preset', 'error');
         }
     }
 }
