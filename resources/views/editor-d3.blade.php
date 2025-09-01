@@ -843,7 +843,7 @@ class WeathermapEditor {
 
         linkLabelGroups.exit().remove();
 
-        // Render node labels
+        // Render node labels (simple, high-contrast text)
         if (document.getElementById('labelsToggle').checked) {
             const nodeLabels = this.mapGroup.select('#labels-layer')
                 .selectAll('.node-label')
@@ -852,29 +852,21 @@ class WeathermapEditor {
             const nodeLabelEnter = nodeLabels.enter()
                 .append('g')
                 .attr('class', 'node-label');
-            nodeLabelEnter.append('rect').attr('class', 'label-bg');
             nodeLabelEnter.append('text')
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '12px')
-                .attr('fill', '#111')
-                .attr('font-weight', '600');
+                .attr('font-size', '13px')
+                .attr('font-weight', '600')
+                .attr('fill', '#ffffff')
+                .attr('stroke', '#000000')
+                .attr('stroke-width', 2)
+                .attr('paint-order', 'stroke fill');
 
             const nodeLabelMerged = nodeLabels.merge(nodeLabelEnter);
-            nodeLabelMerged.each(function(d) {
-                const g = d3.select(this);
-                const text = g.select('text').text(d.label || '');
-                const padding = 4;
-                const x = d.x;
-                const y = d.y + 35; // offset below node
-                text.attr('x', x).attr('y', y);
-                const bbox = text.node().getBBox();
-                g.select('rect')
-                    .attr('x', bbox.x - padding)
-                    .attr('y', bbox.y - padding)
-                    .attr('width', bbox.width + 2 * padding)
-                    .attr('height', bbox.height + 2 * padding)
-                    .attr('rx', 4).attr('ry', 4);
-            });
+            nodeLabelMerged.select('rect').remove(); // remove any old backgrounds
+            nodeLabelMerged.select('text')
+                .attr('x', d => d.x)
+                .attr('y', d => d.y + 35)
+                .text(d => d.label || '');
 
             nodeLabels.exit().remove();
         }
