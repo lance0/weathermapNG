@@ -245,14 +245,14 @@ function assignDevice() {
 }
 
 function saveMap() {
-    var baseUrl = window.location.protocol + '//' + window.location.host;
     $.ajax({
-        url: baseUrl + '/plugin/v1/WeathermapNG/ajax/save-map',
+        url: '/plugin/v1/WeathermapNG',
         method: 'POST',
         data: {
             id: mapId,
             nodes: JSON.stringify(nodes),
             links: JSON.stringify(links),
+            ajax_action: 'save-map',
             _token: $('meta[name="csrf-token"]').attr('content') || ''
         },
         success: function(response) {
