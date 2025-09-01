@@ -32,13 +32,25 @@ class RenderController
             ]);
         }
 
-        // Node status (best-effort) and alert overlays
+        // Node status (best-effort), aggregated traffic, and alert overlays
         $deviceIds = [];
         foreach ($map->nodes as $node) {
             if ($node->device_id) $deviceIds[] = (int) $node->device_id;
         }
         $deviceIds = array_values(array_unique($deviceIds));
         $devAlerts = $alerts->deviceAlerts($deviceIds);
+        // Build per-node port lists from links
+        $portsByNode = [];
+        foreach ($map->links as $lnk) {
+            if ($lnk->src_node_id && $lnk->port_id_a) {
+                $portsByNode[$lnk->src_node_id] = $portsByNode[$lnk->src_node_id] ?? [];
+                $portsByNode[$lnk->src_node_id][] = (int) $lnk->port_id_a;
+            }
+            if ($lnk->dst_node_id && $lnk->port_id_b) {
+                $portsByNode[$lnk->dst_node_id] = $portsByNode[$lnk->dst_node_id] ?? [];
+                $portsByNode[$lnk->dst_node_id][] = (int) $lnk->port_id_b;
+            }
+        }
         foreach ($map->nodes as $node) {
             $status = 'unknown';
             if ($node->device_id) {
@@ -52,7 +64,25 @@ class RenderController
                     }
                 } catch (\Exception $e) {}
             }
-            $out['nodes'][$node->id] = [ 'status' => $status ];
+            // Aggregate node traffic from connected ports
+            $inSum = 0; $outSum = 0;
+            if (!empty($portsByNode[$node->id])) {
+                foreach (array_unique($portsByNode[$node->id]) as $pid) {
+                    try {
+                        $pd = $svc->getPortData((int) $pid);
+                        $inSum += (int) ($pd['in'] ?? 0);
+                        $outSum += (int) ($pd['out'] ?? 0);
+                    } catch (\Throwable $e) {}
+                }
+            }
+            $out['nodes'][$node->id] = [
+                'status' => $status,
+                'traffic' => [
+                    'in_bps' => $inSum,
+                    'out_bps' => $outSum,
+                    'sum_bps' => $inSum + $outSum,
+                ],
+            ];
             if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
                 $out['alerts']['nodes'][$node->id] = $devAlerts[(int)$node->device_id];
             }
@@ -217,6 +247,18 @@ class RenderController
                 }
                 $deviceIds = array_values(array_unique($deviceIds));
                 $devAlerts = $alerts->deviceAlerts($deviceIds);
+                // Build per-node port lists from links
+                $portsByNode = [];
+                foreach ($map->links as $lnk) {
+                    if ($lnk->src_node_id && $lnk->port_id_a) {
+                        $portsByNode[$lnk->src_node_id] = $portsByNode[$lnk->src_node_id] ?? [];
+                        $portsByNode[$lnk->src_node_id][] = (int) $lnk->port_id_a;
+                    }
+                    if ($lnk->dst_node_id && $lnk->port_id_b) {
+                        $portsByNode[$lnk->dst_node_id] = $portsByNode[$lnk->dst_node_id] ?? [];
+                        $portsByNode[$lnk->dst_node_id][] = (int) $lnk->port_id_b;
+                    }
+                }
                 foreach ($map->nodes as $node) {
                     $status = 'unknown';
                     $metrics = ['cpu' => null, 'mem' => null];
@@ -246,9 +288,25 @@ class RenderController
                             $status = 'unknown';
                         }
                     }
+                    // Aggregate node traffic from connected ports
+                    $inSum = 0; $outSum = 0;
+                    if (!empty($portsByNode[$node->id])) {
+                        foreach (array_unique($portsByNode[$node->id]) as $pid) {
+                            try {
+                                $pd = $svc->getPortData((int) $pid);
+                                $inSum += (int) ($pd['in'] ?? 0);
+                                $outSum += (int) ($pd['out'] ?? 0);
+                            } catch (\Throwable $e) {}
+                        }
+                    }
                     $payload['nodes'][$node->id] = [
                         'status' => $status,
                         'metrics' => $metrics,
+                        'traffic' => [
+                            'in_bps' => $inSum,
+                            'out_bps' => $outSum,
+                            'sum_bps' => $inSum + $outSum,
+                        ],
                     ];
                     if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
                         $payload['alerts']['nodes'][$node->id] = $devAlerts[(int)$node->device_id];

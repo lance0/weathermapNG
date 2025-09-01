@@ -691,6 +691,12 @@
                     const id = n.id ?? n.node_id ?? null;
                     if (id && live.nodes[id]) {
                         n.status = live.nodes[id].status || n.status;
+                        // Attach aggregated traffic and expose a simple value for label
+                        if (live.nodes[id].traffic) {
+                            n.traffic = live.nodes[id].traffic;
+                            const sum = Number(live.nodes[id].traffic.sum_bps || 0);
+                            n.current_value = isFinite(sum) ? sum : null;
+                        }
                     }
                 });
             }
