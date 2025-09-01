@@ -1789,16 +1789,6 @@ class WeathermapEditor {
             projection.fitSize([width, height], feature);
             const path = d3.geoPath(projection);
 
-            // Graticule
-            const grat = d3.geoGraticule();
-            layer.append('path')
-                .datum(grat())
-                .attr('class', 'geo-layer')
-                .attr('fill', 'none')
-                .attr('stroke', '#e5e7eb')
-                .attr('stroke-width', 0.5)
-                .attr('d', path);
-
             // Land
             layer.append('path')
                 .datum(feature)
