@@ -25,19 +25,8 @@
     },
   "autoload": {
     "psr-4": {
-      "LibreNMS\\Plugins\\WeathermapNG\\": "src/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Http\\Controllers\\": "Http/Controllers/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Models\\": "Models/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Services\\": "Services/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Policies\\": "Policies/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Database\\Seeders\\": "database/seeders/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Database\\Factories\\": "database/factories/",
-      "LibreNMS\\Plugins\\WeathermapNG\\RRD\\": "lib/RRD/",
-      "App\\Plugins\\WeathermapNG\\": "app/Plugins/WeathermapNG/"
-    },
-    "classmap": [
-      "lib/"
-    ]
+      "LibreNMS\\Plugins\\WeathermapNG\\": "src/"
+    }
   },
   "autoload-dev": {
     "psr-4": {
