@@ -4,11 +4,9 @@ namespace LibreNMS\Plugins\WeathermapNG;
 
 use Illuminate\Support\ServiceProvider;
 use LibreNMS\Interfaces\Plugins\Hooks\MenuEntryHook;
-use LibreNMS\Interfaces\Plugins\Hooks\PageHook;
 use LibreNMS\Interfaces\Plugins\Hooks\SettingsHook;
 use LibreNMS\Interfaces\Plugins\PluginManagerInterface;
 use LibreNMS\Plugins\WeathermapNG\Hooks\MenuEntry;
-use LibreNMS\Plugins\WeathermapNG\Hooks\Page;
 use LibreNMS\Plugins\WeathermapNG\Hooks\Settings;
 
 class WeathermapNGProvider extends ServiceProvider
@@ -20,9 +18,8 @@ class WeathermapNGProvider extends ServiceProvider
     {
         $pluginName = 'WeathermapNG';
 
-        // Register hooks with LibreNMS
+        // Register hooks with LibreNMS (only MenuEntry and Settings are supported)
         $pluginManager->publishHook($pluginName, MenuEntryHook::class, MenuEntry::class);
-        $pluginManager->publishHook($pluginName, PageHook::class, Page::class);
         $pluginManager->publishHook($pluginName, SettingsHook::class, Settings::class);
 
         if (! $pluginManager->pluginEnabled($pluginName)) {
