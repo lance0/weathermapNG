@@ -651,6 +651,14 @@ class WeathermapEditor {
             .attr('transform', d => `translate(${d.x}, ${d.y})`)
             .call(this.drag)
             .on('click', (event, d) => this.onNodeClick(event, d))
+            .on('mouseover', (event, d) => {
+                if (editorState.tool === 'add-link') {
+                    d3.select(event.currentTarget).classed('hover-target', true);
+                }
+            })
+            .on('mouseout', (event, d) => {
+                d3.select(event.currentTarget).classed('hover-target', false);
+            })
             .on('dblclick', (event, d) => this.editNode(d));
         
         // Add node circle
@@ -707,55 +715,76 @@ class WeathermapEditor {
         
         links.exit().remove();
 
-        // Render link labels (tied to Labels toggle)
-        const linkLabels = this.mapGroup.select('#labels-layer')
+        // Render link labels with background (tied to Labels toggle)
+        const linkLabelGroups = this.mapGroup.select('#labels-layer')
             .selectAll('.link-label')
             .data(document.getElementById('labelsToggle').checked
                 ? editorState.links.filter(l => (l.label || '').length > 0)
                 : [], d => d.id);
 
-        const linkLabelEnter = linkLabels.enter()
-            .append('text')
-            .attr('class', 'link-label')
+        const linkLabelEnter = linkLabelGroups.enter()
+            .append('g')
+            .attr('class', 'link-label');
+        linkLabelEnter.append('rect').attr('class', 'label-bg');
+        linkLabelEnter.append('text')
             .attr('text-anchor', 'middle')
             .attr('font-size', '11px')
-            .attr('fill', '#333')
-            .attr('dy', -4);
+            .attr('fill', '#333');
 
-        linkLabels.merge(linkLabelEnter)
-            .attr('x', d => {
-                const s = editorState.nodes.find(n => n.id === d.source);
-                const t = editorState.nodes.find(n => n.id === d.target);
-                return s && t ? (s.x + t.x) / 2 : 0;
-            })
-            .attr('y', d => {
-                const s = editorState.nodes.find(n => n.id === d.source);
-                const t = editorState.nodes.find(n => n.id === d.target);
-                return s && t ? (s.y + t.y) / 2 : 0;
-            })
-            .text(d => d.label || '');
+        const linkLabelMerged = linkLabelGroups.merge(linkLabelEnter);
+        linkLabelMerged.each(function(d) {
+            const g = d3.select(this);
+            const s = editorState.nodes.find(n => n.id === d.source);
+            const t = editorState.nodes.find(n => n.id === d.target);
+            const cx = s && t ? (s.x + t.x) / 2 : 0;
+            const cy = s && t ? (s.y + t.y) / 2 : 0;
+            const text = g.select('text').text(d.label || '');
+            const padding = 4;
+            // Temporarily position text to measure bbox
+            text.attr('x', cx).attr('y', cy - 6);
+            const bbox = text.node().getBBox();
+            g.select('rect')
+                .attr('x', bbox.x - padding)
+                .attr('y', bbox.y - padding)
+                .attr('width', bbox.width + 2 * padding)
+                .attr('height', bbox.height + 2 * padding)
+                .attr('rx', 4).attr('ry', 4);
+        });
 
-        linkLabels.exit().remove();
+        linkLabelGroups.exit().remove();
 
         // Render node labels
         if (document.getElementById('labelsToggle').checked) {
-            const labels = this.mapGroup.select('#labels-layer')
-                .selectAll('.label')
+            const nodeLabels = this.mapGroup.select('#labels-layer')
+                .selectAll('.node-label')
                 .data(editorState.nodes, d => d.id);
-            
-            const labelEnter = labels.enter()
-                .append('text')
-                .attr('class', 'label')
+
+            const nodeLabelEnter = nodeLabels.enter()
+                .append('g')
+                .attr('class', 'node-label');
+            nodeLabelEnter.append('rect').attr('class', 'label-bg');
+            nodeLabelEnter.append('text')
                 .attr('text-anchor', 'middle')
-                .attr('font-size', '12px')
-                .attr('dy', 35);
-            
-            labels.merge(labelEnter)
-                .attr('x', d => d.x)
-                .attr('y', d => d.y)
-                .text(d => d.label);
-            
-            labels.exit().remove();
+                .attr('font-size', '12px');
+
+            const nodeLabelMerged = nodeLabels.merge(nodeLabelEnter);
+            nodeLabelMerged.each(function(d) {
+                const g = d3.select(this);
+                const text = g.select('text').text(d.label || '');
+                const padding = 4;
+                const x = d.x;
+                const y = d.y + 35; // offset below node
+                text.attr('x', x).attr('y', y);
+                const bbox = text.node().getBBox();
+                g.select('rect')
+                    .attr('x', bbox.x - padding)
+                    .attr('y', bbox.y - padding)
+                    .attr('width', bbox.width + 2 * padding)
+                    .attr('height', bbox.height + 2 * padding)
+                    .attr('rx', 4).attr('ry', 4);
+            });
+
+            nodeLabels.exit().remove();
         }
         
         // Update counts
@@ -1863,6 +1892,17 @@ document.addEventListener('DOMContentLoaded', () => {
 .label {
     pointer-events: none;
     user-select: none;
+}
+
+.label-bg {
+    fill: #ffffff;
+    stroke: #dddddd;
+    opacity: 0.9;
+}
+
+.node.hover-target circle {
+    stroke: #17a2b8 !important; /* info */
+    stroke-width: 3 !important;
 }
 
 #minimap {
