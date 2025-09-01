@@ -805,7 +805,7 @@ class WeathermapEditor {
         
         links.exit().remove();
 
-        // Render link labels with background (tied to Labels toggle)
+        // Render link labels (simple, high-contrast text)
         const linkLabelGroups = this.mapGroup.select('#labels-layer')
             .selectAll('.link-label')
             .data(document.getElementById('labelsToggle').checked
@@ -815,31 +815,29 @@ class WeathermapEditor {
         const linkLabelEnter = linkLabelGroups.enter()
             .append('g')
             .attr('class', 'link-label');
-        linkLabelEnter.append('rect').attr('class', 'label-bg');
         linkLabelEnter.append('text')
             .attr('text-anchor', 'middle')
-            .attr('font-size', '11px')
-            .attr('fill', '#333');
+            .attr('font-size', '12px')
+            .attr('font-weight', '600')
+            .attr('fill', '#ffffff')
+            .attr('stroke', '#000000')
+            .attr('stroke-width', 2)
+            .attr('paint-order', 'stroke fill');
 
         const linkLabelMerged = linkLabelGroups.merge(linkLabelEnter);
-        linkLabelMerged.each(function(d) {
-            const g = d3.select(this);
-            const s = editorState.nodes.find(n => n.id === d.source);
-            const t = editorState.nodes.find(n => n.id === d.target);
-            const cx = s && t ? (s.x + t.x) / 2 : 0;
-            const cy = s && t ? (s.y + t.y) / 2 : 0;
-            const text = g.select('text').text(d.label || '');
-            const padding = 4;
-            // Temporarily position text to measure bbox
-            text.attr('x', cx).attr('y', cy - 6);
-            const bbox = text.node().getBBox();
-            g.select('rect')
-                .attr('x', bbox.x - padding)
-                .attr('y', bbox.y - padding)
-                .attr('width', bbox.width + 2 * padding)
-                .attr('height', bbox.height + 2 * padding)
-                .attr('rx', 4).attr('ry', 4);
-        });
+        linkLabelMerged.select('rect').remove(); // remove any old backgrounds if present
+        linkLabelMerged.select('text')
+            .attr('x', d => {
+                const s = editorState.nodes.find(n => n.id === d.source);
+                const t = editorState.nodes.find(n => n.id === d.target);
+                return s && t ? (s.x + t.x) / 2 : 0;
+            })
+            .attr('y', d => {
+                const s = editorState.nodes.find(n => n.id === d.source);
+                const t = editorState.nodes.find(n => n.id === d.target);
+                return s && t ? (s.y + t.y) / 2 - 6 : 0;
+            })
+            .text(d => d.label || '');
 
         linkLabelGroups.exit().remove();
 
