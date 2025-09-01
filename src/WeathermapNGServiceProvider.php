@@ -3,78 +3,55 @@
 namespace LibreNMS\Plugins\WeathermapNG;
 
 use Illuminate\Support\ServiceProvider;
-use LibreNMS\Interfaces\Plugins\PluginManagerInterface;
 
 class WeathermapNGServiceProvider extends ServiceProvider
 {
     /**
-     * Register the service provider.
+     * Register services.
+     *
+     * @return void
      */
-    public function register(): void
+    public function register()
     {
-        // Register plugin configuration
-        $this->mergeConfigFrom(__DIR__ . '/../config/weathermapng.php', 'weathermapng');
+        // Register config
+        $this->mergeConfigFrom(
+            __DIR__ . '/config/weathermapng.php', 'weathermapng'
+        );
     }
 
     /**
-     * Bootstrap the application services.
+     * Bootstrap services.
+     *
+     * @return void
      */
-    public function boot(): void
+    public function boot()
     {
-        $pluginName = 'WeathermapNG';
-        $pluginManager = $this->app->make(PluginManagerInterface::class);
-
-        // Register v2 plugin hooks (use core Hook base classes)
-        // Note: these are only effective if this ServiceProvider is loaded.
-        $pluginManager->publishHook($pluginName, \App\Plugins\Hooks\MenuEntryHook::class, \LibreNMS\Plugins\WeathermapNG\Hooks\Menu::class);
-        $pluginManager->publishHook($pluginName, \App\Plugins\Hooks\PageHook::class, \LibreNMS\Plugins\WeathermapNG\Hooks\Page::class);
-        $pluginManager->publishHook($pluginName, \App\Plugins\Hooks\SettingsHook::class, \LibreNMS\Plugins\WeathermapNG\Hooks\Settings::class);
-        // Optional additional hooks if available
-        if (class_exists(\LibreNMS\Plugins\WeathermapNG\Hooks\DeviceOverview::class)) {
-            $pluginManager->publishHook($pluginName, \App\Plugins\Hooks\DeviceOverviewHook::class, \LibreNMS\Plugins\WeathermapNG\Hooks\DeviceOverview::class);
-        }
-        if (class_exists(\LibreNMS\Plugins\WeathermapNG\Hooks\PortTab::class)) {
-            $pluginManager->publishHook($pluginName, \App\Plugins\Hooks\PortTabHook::class, \LibreNMS\Plugins\WeathermapNG\Hooks\PortTab::class);
-        }
-
-        // Check if plugin is enabled
-        if (!$pluginManager->pluginEnabled($pluginName)) {
-            return;
-        }
-
-        // Register views with correct namespace and path
-        $this->loadViewsFrom(__DIR__ . '/../Resources/views', 'WeathermapNG');
+        // Register views with namespace
+        $this->loadViewsFrom(__DIR__ . '/Resources/views/weathermapng', 'weathermapng');
         
         // Register routes
-        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
-
-        // Register translations if any
-        $this->loadTranslationsFrom(__DIR__ . '/../resources/lang', 'weathermapng');
-
-        // Publish assets (optional)
-        $this->publishes([
-            __DIR__ . '/../css' => public_path('plugins/WeathermapNG/css'),
-            __DIR__ . '/../js' => public_path('plugins/WeathermapNG/js'),
-        ], 'weathermapng-assets');
-
-        // Publish config
-        $this->publishes([
-            __DIR__ . '/../config/weathermapng.php' => config_path('weathermapng.php'),
-        ], 'weathermapng-config');
-
-        // Register console commands if running in console
+        $this->loadRoutesFrom(__DIR__ . '/routes.php');
+        
+        // Register migrations
+        $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
+        
+        // Publish assets if needed
         if ($this->app->runningInConsole()) {
-            $this->commands([
-                // Add any console commands here
-            ]);
+            // Publish config
+            $this->publishes([
+                __DIR__ . '/config/weathermapng.php' => config_path('weathermapng.php'),
+            ], 'weathermapng-config');
+            
+            // Publish views
+            $this->publishes([
+                __DIR__ . '/Resources/views' => resource_path('views/vendor/weathermapng'),
+            ], 'weathermapng-views');
+            
+            // Publish assets
+            $this->publishes([
+                __DIR__ . '/css' => public_path('plugins/WeathermapNG/css'),
+                __DIR__ . '/js' => public_path('plugins/WeathermapNG/js'),
+            ], 'weathermapng-assets');
         }
-    }
-
-    /**
-     * Get the services provided by the provider.
-     */
-    public function provides(): array
-    {
-        return ['weathermapng'];
     }
 }
