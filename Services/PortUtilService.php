@@ -94,6 +94,10 @@ class PortUtilService
             return $this->fetchFromAPI($portId);
         }
 
+        // Last resort: SNMP fetch if enabled
+        $snmp = $this->fetchFromSNMP($portId);
+        if ($snmp) return $snmp;
+
         return ['in' => 0, 'out' => 0];
     }
 
@@ -160,6 +164,93 @@ class PortUtilService
             error_log("PortUtilService API error for port {$portId}: " . $e->getMessage());
             return ['in' => 0, 'out' => 0];
         }
+    }
+
+    /**
+     * Fetch data from SNMP as last-resort fallback.
+     * Requires config('weathermapng.snmp.enabled') and a community string.
+     */
+    private function fetchFromSNMP(int $portId): ?array
+    {
+        $snmpCfg = config('weathermapng.snmp', []);
+        if (!($snmpCfg['enabled'] ?? false)) {
+            return null;
+        }
+        if (!function_exists('snmp2_get')) {
+            return null;
+        }
+        try {
+            // need device hostname and ifIndex for this port
+            $port = $this->getPortInfo($portId);
+            if (!$port) return null;
+            $device = $this->getDeviceInfo($port->device_id ?? $port['device_id']);
+            if (!$device) return null;
+
+            $host = $device->hostname ?? ($device['hostname'] ?? null);
+            $ifIndex = $port->ifIndex ?? ($port['ifIndex'] ?? null);
+            if (!$host || !$ifIndex) return null;
+
+            $community = $snmpCfg['community'] ?? null;
+            if (!$community) return null;
+
+            $base = ".1.3.6.1.2.1.31.1.1.1"; // IF-MIB::ifXTable
+            $oids = [
+                'in' => "$base.6.$ifIndex",   // ifHCInOctets
+                'out' => "$base.10.$ifIndex", // ifHCOutOctets
+            ];
+            $opts = [
+                'timeout' => (int)($snmpCfg['timeout'] ?? 1) * 1000000,
+                'retries' => (int)($snmpCfg['retries'] ?? 1),
+            ];
+            // get counters
+            $rawIn = @snmp2_get($host, $community, $oids['in'], $opts['timeout'], $opts['retries']);
+            $rawOut = @snmp2_get($host, $community, $oids['out'], $opts['timeout'], $opts['retries']);
+            if ($rawIn === false || $rawOut === false) return null;
+            $cntIn = $this->parseSnmpValue($rawIn);
+            $cntOut = $this->parseSnmpValue($rawOut);
+            if ($cntIn === null || $cntOut === null) return null;
+
+            // compute rate from last cached counters
+            $cacheKey = "weathermapng.snmp.counter.$portId";
+            $last = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            $now = microtime(true);
+            \Illuminate\Support\Facades\Cache::put($cacheKey, ['ts' => $now, 'in' => $cntIn, 'out' => $cntOut], 300);
+            if (is_array($last) && isset($last['ts'])) {
+                $dt = max(0.1, $now - $last['ts']);
+                $din = $this->counterDelta($cntIn, $last['in']);
+                $dout = $this->counterDelta($cntOut, $last['out']);
+                return [
+                    'in' => (int) round(($din * 8) / $dt),
+                    'out' => (int) round(($dout * 8) / $dt),
+                ];
+            }
+        } catch (\Exception $e) {
+            return null;
+        }
+        return null; // first run, no rate yet
+    }
+
+    private function parseSnmpValue($val): ?float
+    {
+        if (is_numeric($val)) return (float)$val;
+        if (is_string($val)) {
+            // Values come like: Counter64: 12345
+            if (strpos($val, ':') !== false) {
+                $parts = explode(':', $val, 2);
+                $n = trim($parts[1]);
+                if (is_numeric($n)) return (float)$n;
+            }
+            $n = trim($val);
+            if (is_numeric($n)) return (float)$n;
+        }
+        return null;
+    }
+
+    private function counterDelta($cur, $prev): float
+    {
+        if ($cur >= $prev) return $cur - $prev;
+        // wrap (assume 64-bit)
+        return (float) ((2**64 - $prev) + $cur);
     }
 
     /**

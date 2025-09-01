@@ -9,15 +9,30 @@
 
 // Locate LibreNMS bootstrap
 $bootstrapCandidates = [
+    // Legacy includes/init.php
     '/opt/librenms/includes/init.php',
-    __DIR__ . '/../../../../includes/init.php', // typical when plugin is under html/plugins/WeathermapNG/bin
+    __DIR__ . '/../../../../includes/init.php',
     __DIR__ . '/../../includes/init.php',
+    // Laravel bootstrap for LibreNMS v2+
+    '/opt/librenms/bootstrap/app.php',
+    __DIR__ . '/../../../../bootstrap/app.php',
 ];
 
 $bootstrapLoaded = false;
 foreach ($bootstrapCandidates as $file) {
     if (file_exists($file)) {
-        require $file;
+        if (substr($file, -13) === 'bootstrap/app.php') {
+            // Load vendor autoload
+            $vendor = dirname($file) . '/vendor/autoload.php';
+            if (file_exists($vendor)) {
+                require $vendor;
+            }
+            $app = require $file;
+            $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+            $kernel->bootstrap();
+        } else {
+            require $file;
+        }
         $bootstrapLoaded = true;
         break;
     }
@@ -123,6 +138,44 @@ class MapPoller
         $this->ensureDirectory(dirname($cacheFile));
 
         file_put_contents($cacheFile, json_encode($liveData, JSON_PRETTY_PRINT));
+
+        // Calculate and cache 95th percentile for last day if possible
+        try {
+            $summary = $this->summarizeMap($map);
+            if (!empty($summary)) {
+                \Illuminate\Support\Facades\Cache::put("weathermapng.summary.{$map->id}", $summary, 3600);
+            }
+        } catch (\Exception $e) {
+            // ignore
+        }
+    }
+
+    private function summarizeMap(Map $map): array
+    {
+        $svc = new PortUtilService();
+        $sum = ['links' => []];
+        foreach ($map->links as $link) {
+            $a = $link->port_id_a; $b = $link->port_id_b;
+            if (!$a && !$b) continue;
+            $histIn = $svc->getPortHistory($a ?: $b, 'traffic_in', '24h');
+            $histOut = $svc->getPortHistory($a ?: $b, 'traffic_out', '24h');
+            $p95In = $this->percentile($histIn, 95);
+            $p95Out = $this->percentile($histOut, 95);
+            $sum['links'][$link->id] = [
+                'p95_in_bps' => (int) round($p95In * 8),
+                'p95_out_bps' => (int) round($p95Out * 8),
+            ];
+        }
+        return $sum;
+    }
+
+    private function percentile(array $data, $pct)
+    {
+        if (empty($data)) return 0;
+        $vals = array_map(function($d){ return $d['value'] ?? 0; }, $data);
+        sort($vals);
+        $rank = max(0, min(count($vals)-1, (int) round(($pct/100) * (count($vals)-1))));
+        return $vals[$rank];
     }
 
     private function generateStaticAssets(Map $map)
