@@ -2058,6 +2058,7 @@ class WeathermapEditor {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json',
                 'X-CSRF-TOKEN': '{{ csrf_token() }}'
             },
             body: JSON.stringify({
@@ -2077,30 +2078,36 @@ class WeathermapEditor {
                     label_size: parseInt(document.getElementById('label-size')?.value || '12', 10),
                     link_width: parseInt(document.getElementById('link-width')?.value || '2', 10)
                 },
-                nodes: editorState.nodes.map(n => ({
+                nodes: editorState.nodes.map((n, idx) => ({
+                    id: n.id ?? idx, // include client id to aid server-side mapping
                     label: n.label,
                     x: n.x,
                     y: n.y,
                     device_id: n.device_id || null,
                     meta: { ...(n.meta || {}), icon: n.icon || 'router' }
                 })),
-                links: editorState.links.map(l => ({
-                    src_node_id: l.source,
-                    dst_node_id: l.target,
+                links: editorState.links.map(l => {
+                    const src = (l.source && typeof l.source === 'object') ? (l.source.id ?? l.source.node_id ?? l.source.index ?? l.source) : l.source;
+                    const dst = (l.target && typeof l.target === 'object') ? (l.target.id ?? l.target.node_id ?? l.target.index ?? l.target) : l.target;
+                    return {
+                    src_node_id: src,
+                    dst_node_id: dst,
                     port_id_a: l.port_id_a || null,
                     port_id_b: l.port_id_b || null,
                     bandwidth_bps: l.bandwidth_bps || null,
                     style: { ...(l.style || {}), label: l.label || '' }
-                }))
+                    };
+                })
             })
-        }).then(response => response.json())
-          .then(data => {
-              if (data.success) {
-                  this.showStatus('Map saved successfully');
-              } else {
-                  this.showStatus('Error saving map: ' + data.message, 'error');
-              }
-          });
+        }).then(async response => {
+            let payload = {};
+            try { payload = await response.json(); } catch (e) { payload = { success: false, message: 'Invalid response' }; }
+            if (response.ok && payload.success) {
+                this.showStatus('Map saved successfully');
+            } else {
+                this.showStatus('Error saving map: ' + (payload.message || response.status + ' ' + response.statusText), 'error');
+            }
+        }).catch(err => this.showStatus('Error saving map: ' + err.message, 'error'));
     }
     
     cancelOperation() {
