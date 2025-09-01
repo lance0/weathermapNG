@@ -7,6 +7,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
 use LibreNMS\Plugins\WeathermapNG\Services\AlertService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class RenderController
 {
@@ -95,6 +96,22 @@ class RenderController
                 $inSum = (int) ($agg['in'] ?? 0);
                 $outSum = (int) ($agg['out'] ?? 0);
                 if (($inSum + $outSum) > 0) { $source = 'device'; }
+            }
+            // Heuristic: if device_id not set and we still have 0, try match device by node label
+            if (($inSum + $outSum) === 0 && empty($node->device_id) && !empty($node->label)) {
+                try {
+                    $row = DB::table('devices')
+                        ->select('device_id')
+                        ->where('hostname', $node->label)
+                        ->orWhere('sysName', $node->label)
+                        ->first();
+                    if ($row && isset($row->device_id)) {
+                        $agg = $svc->deviceAggregateBits((int) $row->device_id, 24);
+                        $inSum = (int) ($agg['in'] ?? 0);
+                        $outSum = (int) ($agg['out'] ?? 0);
+                        if (($inSum + $outSum) > 0) { $source = 'device_guess'; }
+                    }
+                } catch (\Throwable $e) {}
             }
             $out['nodes'][$node->id] = [
                 'status' => $status,
@@ -341,6 +358,22 @@ class RenderController
                         $inSum = (int) ($agg['in'] ?? 0);
                         $outSum = (int) ($agg['out'] ?? 0);
                         if (($inSum + $outSum) > 0) { $source = 'device'; }
+                    }
+                    // Heuristic: match device by node label if no device_id
+                    if (($inSum + $outSum) === 0 && empty($node->device_id) && !empty($node->label)) {
+                        try {
+                            $row = DB::table('devices')
+                                ->select('device_id')
+                                ->where('hostname', $node->label)
+                                ->orWhere('sysName', $node->label)
+                                ->first();
+                            if ($row && isset($row->device_id)) {
+                                $agg = $svc->deviceAggregateBits((int) $row->device_id, 24);
+                                $inSum = (int) ($agg['in'] ?? 0);
+                                $outSum = (int) ($agg['out'] ?? 0);
+                                if (($inSum + $outSum) > 0) { $source = 'device_guess'; }
+                            }
+                        } catch (\Throwable $e) {}
                     }
                     $payload['nodes'][$node->id] = [
                         'status' => $status,
