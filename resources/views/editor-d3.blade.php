@@ -1494,13 +1494,39 @@ class WeathermapEditor {
                 editorState.selectedElements[0].device_id = nodeDevice.value || null;
             }
         });
-        if (nodeDeviceSearch && nodeDevice) nodeDeviceSearch.addEventListener('input', () => {
-            const q = nodeDeviceSearch.value.toLowerCase();
-            Array.from(nodeDevice.options).forEach(opt => {
-                if (!opt.value) return; // keep None
-                const txt = opt.text.toLowerCase();
-                opt.style.display = txt.includes(q) ? '' : 'none';
-            });
+        if (nodeDeviceSearch && nodeDevice) nodeDeviceSearch.addEventListener('input', async () => {
+            const q = nodeDeviceSearch.value.trim();
+            if (q.length >= 2) {
+                try {
+                    const res = await fetch(`{{ url('plugin/WeathermapNG/api/devices') }}?q=${encodeURIComponent(q)}`);
+                    const devices = await res.json();
+                    // rebuild options
+                    while (nodeDevice.options.length > 0) nodeDevice.remove(0);
+                    const none = document.createElement('option'); none.value = ''; none.text = 'None'; nodeDevice.add(none);
+                    devices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.device_id;
+                        option.textContent = device.hostname || device.sysName || `Device ${device.device_id}`;
+                        nodeDevice.appendChild(option);
+                    });
+                } catch (e) {
+                    // fallback to client-side filter if fetch fails
+                    const lq = q.toLowerCase();
+                    Array.from(nodeDevice.options).forEach(opt => {
+                        if (!opt.value) return;
+                        const txt = opt.text.toLowerCase();
+                        opt.style.display = txt.includes(lq) ? '' : 'none';
+                    });
+                }
+            } else {
+                // client-side filter for short queries
+                const lq = q.toLowerCase();
+                Array.from(nodeDevice.options).forEach(opt => {
+                    if (!opt.value) return;
+                    const txt = opt.text.toLowerCase();
+                    opt.style.display = txt.includes(lq) ? '' : 'none';
+                });
+            }
         });
         const applyPos = () => {
             if (editorState.selectedElements[0]) {

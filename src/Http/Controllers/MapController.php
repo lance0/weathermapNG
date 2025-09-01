@@ -439,7 +439,7 @@ class MapController
             $existing = $map->nodes()->pluck('id', 'device_id')->filter()->toArray();
             $nodeIdsByDevice = $existing;
 
-            // Create missing nodes with a rough grid layout
+            // Create missing nodes with a temporary rough grid layout (will be repositioned below)
             $x = 100; $y = 100; $step = 120; $cols = 8; $i = 0;
             foreach ($devices as $dev) {
                 $did = (int)($dev['device_id'] ?? 0);
@@ -519,7 +519,58 @@ class MapController
                 }
             }
 
-            return response()->json(['success' => true, 'nodes' => count($nodeIdsByDevice), 'links' => $linksInserted]);
+            // Compute device degrees to inform layout (core vs edge)
+            $deg = [];
+            try {
+                // Prefer links table
+                $rows = \DB::table('links')->select('local_port_id','remote_port_id')->limit(5000)->get();
+                foreach ($rows as $r) {
+                    $pa = (int)$r->local_port_id; $pb = (int)$r->remote_port_id;
+                    if (!$pa || !$pb) continue;
+                    $ra = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
+                    $rb = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
+                    if ($ra) { $d = (int)$ra->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
+                    if ($rb) { $d = (int)$rb->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
+                }
+            } catch (\Exception $e) {
+                try {
+                    $rows = \DB::table('neighbours')->select('port_id','remote_port_id')->limit(5000)->get();
+                    foreach ($rows as $r) {
+                        $pa = (int)$r->port_id; $pb = (int)$r->remote_port_id;
+                        if (!$pa || !$pb) continue;
+                        $ra = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
+                        $rb = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
+                        if ($ra) { $d = (int)$ra->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
+                        if ($rb) { $d = (int)$rb->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
+                    }
+                } catch (\Exception $e2) {}
+            }
+
+            // Layout: center high-degree devices, then rings for the rest
+            $ids = array_keys($nodeIdsByDevice);
+            usort($ids, function($a,$b) use ($deg) { return ($deg[$b] ?? 0) <=> ($deg[$a] ?? 0); });
+            $total = count($ids);
+            if ($total > 0) {
+                $centerX = 800; $centerY = 600; // general center; editor may rescale
+                $ring1 = max(4, (int)ceil($total * 0.15));
+                $ring2 = max(6, (int)ceil($total * 0.35));
+                $radii = [180, 320, 480];
+                $batches = [array_slice($ids, 0, $ring1), array_slice($ids, $ring1, $ring2), array_slice($ids, $ring1 + $ring2)];
+                foreach ($batches as $ri => $batch) {
+                    $n = max(1, count($batch));
+                    $angleStep = 2 * M_PI / $n;
+                    foreach ($batch as $k => $devId) {
+                        $nodeId = $nodeIdsByDevice[$devId] ?? null;
+                        if (!$nodeId) continue;
+                        $angle = $k * $angleStep;
+                        $x = (int)round($centerX + $radii[$ri] * cos($angle));
+                        $y = (int)round($centerY + $radii[$ri] * sin($angle));
+                        Node::where('id', $nodeId)->update(['x' => $x, 'y' => $y]);
+                    }
+                }
+            }
+
+            return response()->json(['success' => true, 'nodes' => count($nodeIdsByDevice), 'links' => $linksInserted, 'layout' => 'rings']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Auto-discovery failed: ' . $e->getMessage()], 500);
         }
