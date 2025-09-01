@@ -224,7 +224,7 @@ $plugin_dir = '/plugins/WeathermapNG';
                                         <?php foreach ($maps as $map): ?>
                                         <tr>
                                             <td>
-                                                <a href="plugin/v1/WeathermapNG/map/<?php echo $map['id']; ?>">
+                                                <a href="/plugin/v1/WeathermapNG/view/<?php echo $map['id']; ?>">
                                                     <?php echo htmlspecialchars($map['name']); ?>
                                                 </a>
                                             </td>
@@ -328,6 +328,9 @@ php database/setup.php</pre>
 </div>
 
 <script>
+// Ensure we use the correct base URL
+var baseUrl = window.location.protocol + '//' + window.location.host;
+
 function createNewMap() {
     $('#createMapModal').modal('show');
 }
@@ -348,7 +351,7 @@ function submitCreateMap() {
     
     // Create the map directly in the database
     $.ajax({
-        url: '/plugin/v1/WeathermapNG/ajax/create-map',
+        url: baseUrl + '/plugin/v1/WeathermapNG/ajax/create-map',
         method: 'POST',
         data: formData,
         success: function(response) {
@@ -368,7 +371,7 @@ function submitCreateMap() {
 function deleteMap(mapId) {
     if (confirm('Are you sure you want to delete this map?')) {
         $.ajax({
-            url: '/plugin/v1/WeathermapNG/ajax/delete-map',
+            url: baseUrl + '/plugin/v1/WeathermapNG/ajax/delete-map',
             method: 'POST',
             data: { 
                 id: mapId,
