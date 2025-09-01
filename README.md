@@ -166,3 +166,7 @@ Pull requests welcome! Please follow PSR-12 coding standards.
 
 - **Issues**: [GitHub Issues](https://github.com/lance0/weathermapNG/issues)
 - **LibreNMS Community**: [community.librenms.org](https://community.librenms.org)
+### Schema / Migrations
+- Ensure the plugin migrations are applied (especially when upgrading):
+  - `php artisan migrate --path=html/plugins/WeathermapNG/database/migrations --force`
+- Upgrades from early versions may miss columns like `wmng_maps.title`. A compatibility migration will add any missing columns automatically.
