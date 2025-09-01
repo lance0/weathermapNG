@@ -6,6 +6,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class MapController
 {
@@ -87,10 +88,11 @@ class MapController
         $options['height'] = $validated['height'] ?? $options['height'] ?? 600;
         $options['background'] = $validated['background'] ?? $options['background'] ?? '#ffffff';
 
-        $map->update([
-            'title' => $validated['title'] ?? $map->title,
-            'options' => $options,
-        ]);
+        $update = ['options' => $options];
+        if (array_key_exists('title', $validated) && Schema::hasColumn('wmng_maps', 'title')) {
+            $update['title'] = $validated['title'] ?? $map->title;
+        }
+        $map->update($update);
 
         return response()->json(['success' => true, 'map' => $map]);
     }
@@ -296,16 +298,18 @@ class MapController
 
             \DB::transaction(function () use ($map, $data) {
                 // Update map options/title
-                if (!empty($data['options']) || !empty($data['title'])) {
+                if (!empty($data['options']) || array_key_exists('title', $data)) {
                     $opts = $map->options ?? [];
                     $opts['width'] = $data['options']['width'] ?? ($opts['width'] ?? 800);
                     $opts['height'] = $data['options']['height'] ?? ($opts['height'] ?? 600);
                     if (isset($data['options']['background'])) {
                         $opts['background'] = $data['options']['background'];
                     }
-                    $map->title = $data['title'] ?? $map->title;
-                    $map->options = $opts;
-                    $map->save();
+                    $changes = ['options' => $opts];
+                    if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
+                        $changes['title'] = $data['title'];
+                    }
+                    $map->fill($changes)->save();
                 }
 
                 // Delete links first, then nodes (FK safety)
