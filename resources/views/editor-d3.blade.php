@@ -171,13 +171,13 @@
                 <div class="card-header">
                     <ul class="nav nav-tabs card-header-tabs" role="tablist">
                         <li class="nav-item">
-                            <a class="nav-link active" data-bs-toggle="tab" href="#properties-tab">Properties</a>
+                            <a class="nav-link active" data-toggle="tab" href="#properties-tab">Properties</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#style-tab">Style</a>
+                            <a class="nav-link" data-toggle="tab" href="#style-tab">Style</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" data-bs-toggle="tab" href="#layers-tab">Layers</a>
+                            <a class="nav-link" data-toggle="tab" href="#layers-tab">Layers</a>
                         </li>
                     </ul>
                 </div>
@@ -399,18 +399,18 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Import Map</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <ul class="nav nav-tabs mb-3">
                     <li class="nav-item">
-                        <a class="nav-link active" data-bs-toggle="tab" href="#import-json">JSON</a>
+                        <a class="nav-link active" data-toggle="tab" href="#import-json">JSON</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="tab" href="#import-csv">CSV</a>
+                        <a class="nav-link" data-toggle="tab" href="#import-csv">CSV</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="tab" href="#import-dot">Graphviz DOT</a>
+                        <a class="nav-link" data-toggle="tab" href="#import-dot">Graphviz DOT</a>
                     </li>
                 </ul>
                 <div class="tab-content">
@@ -435,7 +435,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="editorActions.processImport()">Import</button>
             </div>
         </div>
@@ -448,7 +448,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Keyboard Shortcuts</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
                 <table class="table table-sm">
@@ -1235,8 +1235,7 @@ const editorActions = {
     saveMap: () => editor.saveMap(),
     deleteSelected: () => editor.deleteSelected(),
     showHelp: () => {
-        const modal = new bootstrap.Modal(document.getElementById('shortcutsModal'));
-        modal.show();
+        $('#shortcutsModal').modal('show');
     },
     exportJSON: () => {
         const data = {
@@ -1262,8 +1261,7 @@ const editorActions = {
         URL.revokeObjectURL(url);
     },
     importJSON: () => {
-        const modal = new bootstrap.Modal(document.getElementById('importModal'));
-        modal.show();
+        $('#importModal').modal('show');
     },
     processImport: () => {
         const activeTab = document.querySelector('#importModal .tab-pane.active');

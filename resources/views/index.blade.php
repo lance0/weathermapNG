@@ -9,7 +9,7 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1><i class="fas fa-network-wired"></i> WeathermapNG</h1>
                 <div>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMapModal">
+                    <button class="btn btn-primary" data-toggle="modal" data-target="#createMapModal">
                         <i class="fas fa-plus"></i> Create New Map
                     </button>
                 </div>
@@ -18,14 +18,14 @@
             @if(session('success'))
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
                     {{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <button type="button" class="close" data-dismiss="alert"></button>
                 </div>
             @endif
 
             @if(session('error'))
                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
                     {{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <button type="button" class="close" data-dismiss="alert"></button>
                 </div>
             @endif
 
@@ -76,7 +76,7 @@
                             <i class="fas fa-map fa-4x text-muted mb-3"></i>
                             <h3 class="text-muted">No Maps Found</h3>
                             <p class="text-muted">Create your first network map to get started.</p>
-                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createMapModal">
+                            <button class="btn btn-primary" data-toggle="modal" data-target="#createMapModal">
                                 <i class="fas fa-plus"></i> Create Your First Map
                             </button>
                         </div>
@@ -90,11 +90,11 @@
 <!-- Create Map Modal -->
 <div class="modal fade" id="createMapModal" tabindex="-1">
     <div class="modal-dialog">
-        <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" class="modal-content">
+        <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" class="modal-content" id="createMapForm">
             @csrf
             <div class="modal-header">
                 <h5 class="modal-title">Create New Map</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
@@ -117,7 +117,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary">Create</button>
             </div>
         </form>
@@ -130,7 +130,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Embed Code</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="close" data-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p>Copy and paste this code to embed the map:</p>
@@ -144,7 +144,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" onclick="copyEmbedCode()">Copy HTML</button>
             </div>
         </div>
@@ -155,6 +155,37 @@
 
 @section('scripts')
 <script>
+// Handle create map form submission
+$('#createMapForm').on('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+
+    fetch('{{ url("plugin/WeathermapNG/map") }}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#createMapModal').modal('hide');
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            } else {
+                location.reload();
+            }
+        } else {
+            alert('Error creating map: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error creating map: ' + error.message);
+    });
+});
+
 // Auto-refresh simple stats if present on page (optional)
 document.addEventListener('DOMContentLoaded', function() {
     const refresh = () => {
