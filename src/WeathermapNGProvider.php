@@ -30,30 +30,21 @@ class WeathermapNGProvider extends ServiceProvider
         }
 
         // Load routes
-        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
+        $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
         
         // Load views with namespace
-        $this->loadViewsFrom(__DIR__ . '/../Resources/views', $pluginName);
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', $pluginName);
         
         // Register config
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/weathermapng.php', 'weathermapng'
+            __DIR__ . '/../config/config.php', 'weathermapng'
         );
 
         // Publish assets if running in console
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/../config/weathermapng.php' => config_path('weathermapng.php'),
-            ], 'weathermapng-config');
-            
-            $this->publishes([
-                __DIR__ . '/../Resources/views' => resource_path('views/vendor/WeathermapNG'),
-            ], 'weathermapng-views');
-            
-            $this->publishes([
-                __DIR__ . '/../css' => public_path('plugins/WeathermapNG/css'),
-                __DIR__ . '/../js' => public_path('plugins/WeathermapNG/js'),
-            ], 'weathermapng-assets');
+                __DIR__ . '/../config/config.php' => config_path('weathermapng.php'),
+            ]);
         }
     }
 }

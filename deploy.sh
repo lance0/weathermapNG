@@ -134,22 +134,8 @@ if [ -f "$LIBRENMS_PATH/lnms" ]; then
     ./lnms plugin:enable "$PLUGIN_NAME" 2>/dev/null || warn "Plugin may already be enabled"
 fi
 
-# Step 7.1: Install local v2 hooks (App/Plugins)
-log "Installing v2 hook classes into app/Plugins..."
-APP_PLUGINS_DIR="$LIBRENMS_PATH/app/Plugins/$PLUGIN_NAME"
-SRC_APP_PLUGINS_DIR="$PLUGIN_DIR/app/Plugins/$PLUGIN_NAME"
-if [ -d "$SRC_APP_PLUGINS_DIR" ]; then
-    mkdir -p "$LIBRENMS_PATH/app/Plugins"
-    # Copy hook classes and views
-    rsync -a --delete "$SRC_APP_PLUGINS_DIR/" "$APP_PLUGINS_DIR/" || warn "Failed to sync app/Plugins/$PLUGIN_NAME"
-    # Set ownership if possible
-    if [ -n "$LIBRENMS_USER" ]; then
-        chown -R "$LIBRENMS_USER:$LIBRENMS_USER" "$APP_PLUGINS_DIR" 2>/dev/null || true
-    fi
-    log "v2 hooks synced to $APP_PLUGINS_DIR"
-else
-    warn "Source hooks directory not found: $SRC_APP_PLUGINS_DIR"
-fi
+# Step 7.1: Plugin hooks are now in src/Hooks - no local copying needed
+log "Plugin using composer autoload for hooks..."
 
 # Step 8: Setup cron job for poller
 log "Setting up cron job..."
@@ -203,14 +189,14 @@ else
 fi
 
 # Check if plugin appears in menu
-if [ -f "$PLUGIN_DIR/app/Plugins/WeathermapNG/Menu.php" ]; then
+if [ -f "$PLUGIN_DIR/src/Hooks/MenuEntry.php" ]; then
     log "Menu hook found"
 else
     error "Menu hook not found"
 fi
 
 # Check routes
-if [ -f "$PLUGIN_DIR/routes.php" ]; then
+if [ -f "$PLUGIN_DIR/routes/web.php" ]; then
     log "Routes file exists"
 else
     warn "Routes file not found"
