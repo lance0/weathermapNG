@@ -224,6 +224,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small">Device</label>
+                                    <input type="text" id="node-device-search" class="form-control form-control-sm mb-1" placeholder="Search devices...">
                                     <select class="form-select form-select-sm" id="node-device">
                                         <option value="">None</option>
                                     </select>
@@ -291,6 +292,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small">Port A</label>
+                                    <input type="text" id="link-port-a-search" class="form-control form-control-sm mb-1" placeholder="Filter ports...">
                                     <select class="form-select form-select-sm" id="link-port-a">
                                         <option value="">Auto</option>
                                     </select>
@@ -298,6 +300,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label small">Port B</label>
+                                    <input type="text" id="link-port-b-search" class="form-control form-control-sm mb-1" placeholder="Filter ports...">
                                     <select class="form-select form-select-sm" id="link-port-b">
                                         <option value="">Auto</option>
                                     </select>
@@ -492,10 +495,16 @@
                             <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.showHelp()">
                                 <i class="fas fa-keyboard"></i> Shortcuts
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.exportJSON()">
-                                <i class="fas fa-download"></i> Export
+                            <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.exportJSON()" data-toggle="tooltip" title="Export JSON">
+                                <i class="fas fa-download"></i> Export JSON
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.importJSON()">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.exportSVG()" data-toggle="tooltip" title="Export SVG">
+                                <i class="fas fa-file-code"></i> Export SVG
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.exportPNG()" data-toggle="tooltip" title="Export PNG">
+                                <i class="fas fa-image"></i> Export PNG
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="editorActions.importJSON()" data-toggle="tooltip" title="Import JSON">
                                 <i class="fas fa-upload"></i> Import
                             </button>
                         </div>
@@ -1460,6 +1469,7 @@ class WeathermapEditor {
         // Node property field bindings (live updates) and apply buttons
         const nodeLabel = document.getElementById('node-label');
         const nodeDevice = document.getElementById('node-device');
+        const nodeDeviceSearch = document.getElementById('node-device-search');
         const nodeX = document.getElementById('node-x');
         const nodeY = document.getElementById('node-y');
         const applyNodeBtn = document.getElementById('apply-node-btn');
@@ -1480,6 +1490,14 @@ class WeathermapEditor {
             if (editorState.selectedElements[0]) {
                 editorState.selectedElements[0].device_id = nodeDevice.value || null;
             }
+        });
+        if (nodeDeviceSearch && nodeDevice) nodeDeviceSearch.addEventListener('input', () => {
+            const q = nodeDeviceSearch.value.toLowerCase();
+            Array.from(nodeDevice.options).forEach(opt => {
+                if (!opt.value) return; // keep None
+                const txt = opt.text.toLowerCase();
+                opt.style.display = txt.includes(q) ? '' : 'none';
+            });
         });
         const applyPos = () => {
             if (editorState.selectedElements[0]) {
@@ -1517,6 +1535,15 @@ class WeathermapEditor {
         if (linkWidth) linkWidth.addEventListener('input', () => { editorState.needsRender = true; });
 
         // Link validation events
+        // Port search filters
+        const portASearch = document.getElementById('link-port-a-search');
+        const portBSearch = document.getElementById('link-port-b-search');
+        const selA2 = document.getElementById('link-port-a');
+        const selB2 = document.getElementById('link-port-b');
+        const filterSelect = (sel, q) => { Array.from(sel?.options || []).forEach(o => { if (!o.value) return; o.style.display = (o.text.toLowerCase().includes(q)) ? '' : 'none'; }); };
+        if (portASearch && selA2) portASearch.addEventListener('input', () => filterSelect(selA2, portASearch.value.toLowerCase()));
+        if (portBSearch && selB2) portBSearch.addEventListener('input', () => filterSelect(selB2, portBSearch.value.toLowerCase()));
+
         const bwField = document.getElementById('link-bandwidth');
         const unitField = document.getElementById('link-bandwidth-unit');
         const portA = document.getElementById('link-port-a');
@@ -2234,6 +2261,51 @@ const editorActions = {
         a.download = `weathermap-${editorState.mapId || 'new'}.json`;
         a.click();
         URL.revokeObjectURL(url);
+    },
+    exportSVG: () => {
+        try {
+            const svg = document.getElementById('map-svg');
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svg);
+            if (!source.match(/^<svg[^>]+xmlns=/)) {
+                source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+            const blob = new Blob([source], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `weathermap-${editorState.mapId || 'new'}.svg`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) { editor.showStatus('SVG export failed', 'error'); }
+    },
+    exportPNG: () => {
+        try {
+            const svg = document.getElementById('map-svg');
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svg);
+            if (!source.match(/^<svg[^>]+xmlns=/)) {
+                source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+            const svgBlob = new Blob([source], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const bbox = svg.getBoundingClientRect();
+                canvas.width = Math.max(1, Math.floor(bbox.width));
+                canvas.height = Math.max(1, Math.floor(bbox.height));
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                const a = document.createElement('a');
+                a.href = canvas.toDataURL('image/png');
+                a.download = `weathermap-${editorState.mapId || 'new'}.png`;
+                a.click();
+            };
+            img.onerror = function() { editor.showStatus('PNG export failed', 'error'); };
+            img.src = url;
+        } catch (e) { editor.showStatus('PNG export failed', 'error'); }
     },
     importJSON: () => {
         $('#importModal').modal('show');
