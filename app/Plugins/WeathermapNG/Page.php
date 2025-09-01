@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class Page
 {
-    public string $view = 'weathermapng::page';
+    public string $view = 'plugins/WeathermapNG/resources/views/weathermapng/page';
 
     public function data(Request $request): array
     {
