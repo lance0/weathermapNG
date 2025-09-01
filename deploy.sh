@@ -134,6 +134,23 @@ if [ -f "$LIBRENMS_PATH/lnms" ]; then
     ./lnms plugin:enable "$PLUGIN_NAME" 2>/dev/null || warn "Plugin may already be enabled"
 fi
 
+# Step 7.1: Install local v2 hooks (App/Plugins)
+log "Installing v2 hook classes into app/Plugins..."
+APP_PLUGINS_DIR="$LIBRENMS_PATH/app/Plugins/$PLUGIN_NAME"
+SRC_APP_PLUGINS_DIR="$PLUGIN_DIR/app/Plugins/$PLUGIN_NAME"
+if [ -d "$SRC_APP_PLUGINS_DIR" ]; then
+    mkdir -p "$LIBRENMS_PATH/app/Plugins"
+    # Copy hook classes and views
+    rsync -a --delete "$SRC_APP_PLUGINS_DIR/" "$APP_PLUGINS_DIR/" || warn "Failed to sync app/Plugins/$PLUGIN_NAME"
+    # Set ownership if possible
+    if [ -n "$LIBRENMS_USER" ]; then
+        chown -R "$LIBRENMS_USER:$LIBRENMS_USER" "$APP_PLUGINS_DIR" 2>/dev/null || true
+    fi
+    log "v2 hooks synced to $APP_PLUGINS_DIR"
+else
+    warn "Source hooks directory not found: $SRC_APP_PLUGINS_DIR"
+fi
+
 # Step 8: Setup cron job for poller
 log "Setting up cron job..."
 if [ -f "$PLUGIN_DIR/bin/map-poller.php" ]; then
