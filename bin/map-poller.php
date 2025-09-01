@@ -7,6 +7,12 @@
  * Run this via cron every 5 minutes.
  */
 
+// Locate LibreNMS bootstrap and plugin autoloader
+$pluginAutoload = __DIR__ . '/../vendor/autoload.php';
+if (file_exists($pluginAutoload)) {
+    require $pluginAutoload; // ensures PSR-4 autoload for plugin classes (RRDTool, Services, Models)
+}
+
 // Locate LibreNMS bootstrap
 $bootstrapCandidates = [
     // Legacy includes/init.php
