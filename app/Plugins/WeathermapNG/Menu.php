@@ -9,7 +9,7 @@ class Menu
     {
         return [
             'title' => 'WeathermapNG',
-            'url' => '/plugin/WeathermapNG',
+            'url' => '/plugin/weathermapng',
             'icon' => 'fa-network-wired',
         ];
     }
