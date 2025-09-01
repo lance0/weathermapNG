@@ -1544,8 +1544,31 @@ class WeathermapEditor {
         const selA2 = document.getElementById('link-port-a');
         const selB2 = document.getElementById('link-port-b');
         const filterSelect = (sel, q) => { Array.from(sel?.options || []).forEach(o => { if (!o.value) return; o.style.display = (o.text.toLowerCase().includes(q)) ? '' : 'none'; }); };
-        if (portASearch && selA2) portASearch.addEventListener('input', () => filterSelect(selA2, portASearch.value.toLowerCase()));
-        if (portBSearch && selB2) portBSearch.addEventListener('input', () => filterSelect(selB2, portBSearch.value.toLowerCase()));
+        const fetchAndFillPorts = async (deviceId, q, sel) => {
+            if (!deviceId || !sel) return;
+            try {
+                const res = await fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                const ports = data.ports || [];
+                while (sel.options.length > 0) sel.remove(0);
+                const opt0 = document.createElement('option'); opt0.value = ''; opt0.text = 'Auto'; sel.add(opt0);
+                ports.forEach(p => { const o=document.createElement('option'); o.value=p.port_id; o.text=p.ifName || `Port ${p.port_id}`; sel.add(o); });
+            } catch (e) {}
+        };
+        if (portASearch && selA2) portASearch.addEventListener('input', async () => {
+            const q = portASearch.value.toLowerCase();
+            const link = editorState.selectedElements.find(e => e.type === 'link');
+            const srcNode = link ? editorState.nodes.find(n => n.id === link.source) : null;
+            if (q.length >= 2 && srcNode?.device_id) { await fetchAndFillPorts(srcNode.device_id, q, selA2); }
+            else { filterSelect(selA2, q); }
+        });
+        if (portBSearch && selB2) portBSearch.addEventListener('input', async () => {
+            const q = portBSearch.value.toLowerCase();
+            const link = editorState.selectedElements.find(e => e.type === 'link');
+            const dstNode = link ? editorState.nodes.find(n => n.id === link.target) : null;
+            if (q.length >= 2 && dstNode?.device_id) { await fetchAndFillPorts(dstNode.device_id, q, selB2); }
+            else { filterSelect(selB2, q); }
+        });
 
         const bwField = document.getElementById('link-bandwidth');
         const unitField = document.getElementById('link-bandwidth-unit');
