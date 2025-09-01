@@ -20,7 +20,7 @@ class PageController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('weathermapng::page', [
+        return view('WeathermapNG::page', [
             'title' => 'Network Weather Maps',
             'maps' => $maps,
             'can_create' => true,
@@ -37,7 +37,7 @@ class PageController extends Controller
             $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($id);
         }
 
-        return view('weathermapng::editor', [
+        return view('WeathermapNG::editor', [
             'title' => $map ? 'Edit Map: ' . $map->name : 'Create New Map',
             'map' => $map,
             'mapId' => $id,
@@ -55,7 +55,7 @@ class PageController extends Controller
             abort(404, 'Map not found');
         }
 
-        return view('weathermapng::view', [
+        return view('WeathermapNG::view', [
             'title' => 'View Map: ' . $map->name,
             'map' => $map,
             'mapId' => $id,
@@ -67,7 +67,7 @@ class PageController extends Controller
      */
     public function settings(Request $request)
     {
-        return view('weathermapng::settings', [
+        return view('WeathermapNG::settings', [
             'title' => 'WeathermapNG Settings',
             'settings' => config('weathermapng'),
         ]);

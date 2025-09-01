@@ -19,7 +19,7 @@ class Settings implements SettingsHook
     public function handle(string $pluginName, array $settings): array
     {
         return [
-            'content_view' => "WeathermapNG::settings",
+            'content_view' => "{$pluginName}::settings",
             'settings' => $settings,
         ];
     }
