@@ -1,9 +1,10 @@
 <?php
 
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class {
+return new class extends Migration {
     public function up()
     {
         Schema::create('wmng_maps', function (Blueprint $t) {
