@@ -879,10 +879,12 @@ class WeathermapEditor {
                         if (v >= 1e3) return (v/1e3).toFixed(2) + ' Kb/s';
                         return (v||0) + ' b/s';
                     };
+                    const src = tr.source ? (tr.source === 'ports' ? 'ports' : (tr.source === 'links' ? 'links' : 'unknown')) : 'unknown';
                     tip.innerHTML = `${d.label || ('Node ' + d.id)}<br>` +
                         `In: ${human(tr.in_bps||0)}<br>` +
                         `Out: ${human(tr.out_bps||0)}<br>` +
-                        `Sum: ${human(tr.sum_bps||0)}`;
+                        `Sum: ${human(tr.sum_bps||0)}<br>` +
+                        `<span style="opacity:0.75;">Source: ${src}</span>`;
                     tip.style.display = 'block';
                     tip.style.left = (event.pageX + 10) + 'px';
                     tip.style.top = (event.pageY + 10) + 'px';

@@ -992,10 +992,12 @@
                 tooltip.style.left = (e.pageX + 10) + 'px';
                 tooltip.style.top = (e.pageY + 10) + 'px';
                 const sum = t.sum_bps ?? n.current_value ?? 0;
+                const src = t.source ? (t.source === 'ports' ? 'ports' : (t.source === 'links' ? 'links' : 'unknown')) : 'unknown';
                 tooltip.innerHTML = `${n.label || n.id}<br>` +
                   `In: ${humanBits(t.in_bps ?? 0)}<br>` +
                   `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
-                  `Sum: ${humanBits(sum ?? 0)}`;
+                  `Sum: ${humanBits(sum ?? 0)}<br>` +
+                  `<span style="opacity:0.75;">Source: ${src}</span>`;
             } else if (best) {
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.pageX + 10) + 'px';
