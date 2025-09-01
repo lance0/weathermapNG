@@ -50,6 +50,9 @@ chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 5. Connect nodes to create links
 6. Save - your map now shows live traffic!
 
+### D3 Editor Guide
+- See docs/EDITOR_D3.md for routes, features, data mapping, and tips for the advanced D3 editor.
+
 ## 🔧 Architecture
 
 WeathermapNG follows LibreNMS v2 plugin architecture:

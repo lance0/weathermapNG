@@ -1054,6 +1054,8 @@ class WeathermapEditor {
                     // Clear preview
                     this.mapGroup.select('#selection-layer').select('#link-preview').remove();
                 }
+                // Toggle linking class for subtle dimming
+                this.mapGroup.classed('linking', editorState.tool === 'add-link');
             });
         });
         
@@ -1128,6 +1130,10 @@ class WeathermapEditor {
                 const s = editorState.linkStart;
                 const preview = this.mapGroup.select('#selection-layer').select('#link-preview');
                 const path = `M${s.x},${s.y}L${coords[0]},${coords[1]}`;
+                const dx = coords[0] - s.x;
+                const dy = coords[1] - s.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                const width = dist > 400 ? 3.5 : dist > 200 ? 2.5 : 1.8;
                 if (preview.empty()) {
                     this.mapGroup.select('#selection-layer')
                         .append('path')
@@ -1135,10 +1141,11 @@ class WeathermapEditor {
                         .attr('fill', 'none')
                         .attr('stroke', '#999')
                         .attr('stroke-dasharray', '4 2')
+                        .attr('stroke-width', width)
                         .attr('pointer-events', 'none')
                         .attr('d', path);
                 } else {
-                    preview.attr('d', path);
+                    preview.attr('d', path).attr('stroke-width', width);
                 }
             }
         });
@@ -1423,6 +1430,7 @@ class WeathermapEditor {
         editorState.linkStart = null;
         // Clear preview
         this.mapGroup.select('#selection-layer').select('#link-preview').remove();
+        this.mapGroup.classed('linking', false);
         editorState.selectedElements = [];
         this.updatePropertiesPanel();
         this.setTool('select');
@@ -1898,12 +1906,19 @@ document.addEventListener('DOMContentLoaded', () => {
     fill: #ffffff;
     stroke: #dddddd;
     opacity: 0.9;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,0.2));
 }
 
 .node.hover-target circle {
     stroke: #17a2b8 !important; /* info */
     stroke-width: 3 !important;
 }
+
+/* Subtle dimming while in linking mode */
+#map-group.linking .node { opacity: 0.75; }
+#map-group.linking .node.hover-target { opacity: 1; }
+#map-group.linking .link { opacity: 0.5; }
+#map-group.linking .link-label { opacity: 0.7; }
 
 #minimap {
     cursor: pointer;
