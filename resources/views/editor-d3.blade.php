@@ -291,17 +291,19 @@
                                     </div>
                                     <div class="form-text" id="link-bw-help"></div>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3 position-relative">
                                     <label class="form-label small">Port A</label>
                                     <input type="text" id="link-port-a-search" class="form-control form-control-sm mb-1" placeholder="Filter ports...">
+                                    <div id="link-port-a-suggestions" class="autocomplete-list" style="display:none;"></div>
                                     <select class="form-select form-select-sm" id="link-port-a">
                                         <option value="">Auto</option>
                                     </select>
                                     <div class="form-text" id="link-port-a-help"></div>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3 position-relative">
                                     <label class="form-label small">Port B</label>
                                     <input type="text" id="link-port-b-search" class="form-control form-control-sm mb-1" placeholder="Filter ports...">
+                                    <div id="link-port-b-suggestions" class="autocomplete-list" style="display:none;"></div>
                                     <select class="form-select form-select-sm" id="link-port-b">
                                         <option value="">Auto</option>
                                     </select>
@@ -394,14 +396,18 @@
                                 <label class="form-label small">Background Image</label>
                                 <input type="file" class="form-control form-control-sm" id="map-bg-image" accept="image/*">
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label small">Link Style</label>
-                                <select class="form-select form-select-sm" id="link-style">
-                                    <option value="straight">Straight</option>
-                                    <option value="curved">Curved</option>
-                                    <option value="orthogonal">Orthogonal</option>
-                                </select>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Link Style</label>
+                            <select class="form-select form-select-sm" id="link-style">
+                                <option value="straight">Straight</option>
+                                <option value="curved">Curved</option>
+                                <option value="orthogonal">Orthogonal</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 form-check form-switch small">
+                            <input class="form-check-input" type="checkbox" id="previewLiveToggle">
+                            <label class="form-check-label" for="previewLiveToggle">Preview Live Utilization</label>
+                        </div>
                             <div class="mb-3">
                                 <label class="form-label small">Node Size</label>
                                 <input type="range" class="form-range" id="node-size" min="20" max="60" value="40">
@@ -661,7 +667,10 @@ const editorState = {
     portCache: {},
     geoCache: {},
     marqueeActive: false,
-    marqueeStart: null
+    marqueeStart: null,
+    livePreview: false,
+    liveData: null,
+    liveTimer: null
 };
 
 // Initialize D3.js editor
@@ -898,7 +907,13 @@ class WeathermapEditor {
         const linkSel = Math.max(linkBase + 2, Math.round(linkBase * 2));
         links.merge(linkEnter)
             .attr('d', d => this.getLinkPath(d))
-            .attr('stroke', d => editorState.selectedElements.includes(d) ? '#ffc107' : '#666')
+            .attr('stroke', d => {
+                if (editorState.livePreview) {
+                    const pct = this.getLinkPct(d);
+                    return this.getLinkColorByPct(pct);
+                }
+                return editorState.selectedElements.includes(d) ? '#ffc107' : '#666';
+            })
             .attr('stroke-width', d => editorState.selectedElements.includes(d) ? linkSel : linkBase)
             .attr('stroke-dasharray', d => editorState.selectedElements.includes(d) ? '6 3' : null);
         
@@ -1469,6 +1484,15 @@ class WeathermapEditor {
             editorState.snap = e.target.checked;
             try { localStorage.setItem('wmng.snap', editorState.snap ? '1' : '0'); } catch (e) {}
         });
+
+        // Live preview toggle
+        const liveToggle = document.getElementById('previewLiveToggle');
+        if (liveToggle) {
+            liveToggle.addEventListener('change', (e) => {
+                editorState.livePreview = e.target.checked;
+                if (editorState.livePreview) { this.startLivePreview(); } else { this.stopLivePreview(); }
+            });
+        }
         
         // Node property field bindings (live updates) and apply buttons
         const nodeLabel = document.getElementById('node-label');
@@ -1600,6 +1624,17 @@ class WeathermapEditor {
             const srcNode = link ? editorState.nodes.find(n => n.id === link.source) : null;
             if (q.length >= 2 && srcNode?.device_id) { await fetchAndFillPorts(srcNode.device_id, q, selA2); }
             else { filterSelect(selA2, q); }
+            // suggestions dropdown
+            const sug = document.getElementById('link-port-a-suggestions');
+            if (!sug) return;
+            while (sug.firstChild) sug.removeChild(sug.firstChild);
+            if (q.length < 2) { sug.style.display='none'; return; }
+            Array.from(selA2.options).slice(1, 11).forEach((opt, idx) => {
+                if (opt.style.display==='none') return;
+                const div = document.createElement('div'); div.className='autocomplete-item'; div.textContent=opt.text; div.onclick=()=>{ selA2.value=opt.value; selA2.dispatchEvent(new Event('change')); sug.style.display='none'; portASearch.value=opt.text; };
+                sug.appendChild(div);
+            });
+            sug.style.display = sug.children.length ? 'block' : 'none';
         });
         if (portBSearch && selB2) portBSearch.addEventListener('input', async () => {
             const q = portBSearch.value.toLowerCase();
@@ -1607,6 +1642,16 @@ class WeathermapEditor {
             const dstNode = link ? editorState.nodes.find(n => n.id === link.target) : null;
             if (q.length >= 2 && dstNode?.device_id) { await fetchAndFillPorts(dstNode.device_id, q, selB2); }
             else { filterSelect(selB2, q); }
+            const sug = document.getElementById('link-port-b-suggestions');
+            if (!sug) return;
+            while (sug.firstChild) sug.removeChild(sug.firstChild);
+            if (q.length < 2) { sug.style.display='none'; return; }
+            Array.from(selB2.options).slice(1, 11).forEach((opt, idx) => {
+                if (opt.style.display==='none') return;
+                const div = document.createElement('div'); div.className='autocomplete-item'; div.textContent=opt.text; div.onclick=()=>{ selB2.value=opt.value; selB2.dispatchEvent(new Event('change')); sug.style.display='none'; portBSearch.value=opt.text; };
+                sug.appendChild(div);
+            });
+            sug.style.display = sug.children.length ? 'block' : 'none';
         });
 
         const bwField = document.getElementById('link-bandwidth');
