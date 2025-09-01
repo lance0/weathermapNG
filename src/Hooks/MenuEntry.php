@@ -27,7 +27,8 @@ class MenuEntry implements MenuEntryHook
             // Tables might not exist yet
         }
 
-        return ["WeathermapNG::menu", [
+        // Return view name with plugin namespace and data
+        return ["{$pluginName}::menu", [
             'title' => 'Network Maps',
             'url' => url('plugin/WeathermapNG'),
             'icon' => 'fa-network-wired',
