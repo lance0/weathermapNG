@@ -24,14 +24,15 @@
     },
   "autoload": {
     "psr-4": {
-      "LibreNMS\\Plugins\\WeathermapNG\\": "lib/",
+      "LibreNMS\\Plugins\\WeathermapNG\\": "src/",
       "LibreNMS\\Plugins\\WeathermapNG\\Http\\Controllers\\": "Http/Controllers/",
       "LibreNMS\\Plugins\\WeathermapNG\\Models\\": "Models/",
       "LibreNMS\\Plugins\\WeathermapNG\\Services\\": "Services/",
       "LibreNMS\\Plugins\\WeathermapNG\\Policies\\": "Policies/",
       "LibreNMS\\Plugins\\WeathermapNG\\API\\": "lib/API/",
       "LibreNMS\\Plugins\\WeathermapNG\\RRD\\": "lib/RRD/",
-      "LibreNMS\\Plugins\\WeathermapNG\\Database\\Factories\\": "database/factories/"
+      "LibreNMS\\Plugins\\WeathermapNG\\Database\\Factories\\": "database/factories/",
+      "App\\Plugins\\WeathermapNG\\": "app/Plugins/WeathermapNG/"
     }
   },
   "autoload-dev": {
@@ -67,6 +68,11 @@
       "author": "LibreNMS Community",
       "email": "info@librenms.org",
       "homepage": "https://github.com/lance0/weathermapNG"
+    },
+    "laravel": {
+      "providers": [
+        "LibreNMS\\Plugins\\WeathermapNG\\WeathermapNGServiceProvider"
+      ]
     }
   }
 }

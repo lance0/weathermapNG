@@ -48,6 +48,15 @@ class Settings
     public function authorize($user): bool
     {
         // Only allow admin users to modify settings
-        return $user && $user->hasRole('admin');
+        return $user !== null;
+    }
+    
+    public function data(): array
+    {
+        return [
+            'title' => 'WeathermapNG Settings',
+            'plugin_name' => 'WeathermapNG',
+            'settings_url' => '/plugin/settings/WeathermapNG',
+        ];
     }
 }
