@@ -879,7 +879,7 @@ class WeathermapEditor {
                         if (v >= 1e3) return (v/1e3).toFixed(2) + ' Kb/s';
                         return (v||0) + ' b/s';
                     };
-                    const srcMap = { ports: 'ports', links: 'links', device: 'device', none: 'unknown' };
+                    const srcMap = { ports: 'ports', links: 'links', device: 'device', device_guess: 'device*', none: 'unknown' };
                     const src = tr.source ? (srcMap[tr.source] || 'unknown') : 'unknown';
                     tip.innerHTML = `${d.label || ('Node ' + d.id)}<br>` +
                         `In: ${human(tr.in_bps||0)}<br>` +
