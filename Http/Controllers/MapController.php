@@ -145,6 +145,109 @@ class MapController
     }
 
     /**
+     * Create a single node immediately
+     */
+    public function createNode(Request $request, Map $map)
+    {
+        $data = $this->validate($request, [
+            'label' => 'required|string|max:255',
+            'x' => 'required|numeric',
+            'y' => 'required|numeric',
+            'device_id' => 'nullable|integer',
+            'meta' => 'array',
+        ]);
+
+        $node = Node::create([
+            'map_id' => $map->id,
+            'label' => $data['label'],
+            'x' => $data['x'],
+            'y' => $data['y'],
+            'device_id' => $data['device_id'] ?? null,
+            'meta' => $data['meta'] ?? [],
+        ]);
+
+        return response()->json(['success' => true, 'node' => $node]);
+    }
+
+    /**
+     * Delete a single node
+     */
+    public function deleteNode(Map $map, Node $node)
+    {
+        if ($node->map_id !== $map->id) {
+            return response()->json(['success' => false, 'message' => 'Node does not belong to map'], 400);
+        }
+        // cascade delete links attached to this node
+        $map->links()->where('src_node_id', $node->id)->orWhere('dst_node_id', $node->id)->delete();
+        $node->delete();
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Create a single link immediately
+     */
+    public function createLink(Request $request, Map $map)
+    {
+        $data = $this->validate($request, [
+            'src_node_id' => 'required|integer|exists:wmng_nodes,id',
+            'dst_node_id' => 'required|integer|exists:wmng_nodes,id',
+            'port_id_a' => 'nullable|integer',
+            'port_id_b' => 'nullable|integer',
+            'bandwidth_bps' => 'nullable|integer',
+            'style' => 'array',
+        ]);
+
+        // Validate port-device pairing if ports are provided
+        if (($data['port_id_a'] ?? null) || ($data['port_id_b'] ?? null)) {
+            $src = Node::find($data['src_node_id']);
+            $dst = Node::find($data['dst_node_id']);
+            if (!$src || !$dst || $src->map_id !== $map->id || $dst->map_id !== $map->id) {
+                return response()->json(['success' => false, 'message' => 'Invalid node(s)'], 422);
+            }
+            try {
+                if (($data['port_id_a'] ?? null) && class_exists('\\App\\Models\\Port')) {
+                    $pa = \App\Models\Port::find($data['port_id_a']);
+                    if (!$pa || ($src->device_id && $pa->device_id != $src->device_id)) {
+                        return response()->json(['success' => false, 'message' => 'Source port does not belong to source device'], 422);
+                    }
+                }
+                if (($data['port_id_b'] ?? null) && class_exists('\\App\\Models\\Port')) {
+                    $pb = \App\Models\Port::find($data['port_id_b']);
+                    if (!$pb || ($dst->device_id && $pb->device_id != $dst->device_id)) {
+                        return response()->json(['success' => false, 'message' => 'Destination port does not belong to destination device'], 422);
+                    }
+                }
+            } catch (\Exception $e) {
+                // If we cannot validate via models, skip strict check
+            }
+        }
+
+        $link = Link::create([
+            'map_id' => $map->id,
+            'src_node_id' => $data['src_node_id'],
+            'dst_node_id' => $data['dst_node_id'],
+            'port_id_a' => $data['port_id_a'] ?? null,
+            'port_id_b' => $data['port_id_b'] ?? null,
+            'bandwidth_bps' => $data['bandwidth_bps'] ?? null,
+            'style' => $data['style'] ?? [],
+        ]);
+
+        return response()->json(['success' => true, 'link' => $link]);
+    }
+
+    /**
+     * Delete a single link
+     */
+    public function deleteLink(Map $map, Link $link)
+    {
+        if ($link->map_id !== $map->id) {
+            return response()->json(['success' => false, 'message' => 'Link does not belong to map'], 400);
+        }
+        $link->delete();
+        return response()->json(['success' => true]);
+    }
+
+    /**
      * Combined save endpoint to persist map options, nodes, and links
      * POST /plugin/WeathermapNG/api/maps/{map}/save
      */

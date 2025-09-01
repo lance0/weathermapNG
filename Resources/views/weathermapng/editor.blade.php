@@ -67,6 +67,9 @@
                         <button class="btn btn-primary" onclick="addNode()">
                             <i class="fas fa-plus-circle"></i> Add Node
                         </button>
+                        <button class="btn btn-outline-primary" id="link-mode-btn" onclick="toggleLinkMode()">
+                            <i class="fas fa-link"></i> Link Mode: Off
+                        </button>
                         <button class="btn btn-warning" onclick="clearCanvas()">
                             <i class="fas fa-trash"></i> Clear Canvas
                         </button>
@@ -132,9 +135,12 @@ let selectedDevice = null;
 let selectedInterface = null;
 let nodeCounter = 1;
 let mapId = {{ $map->id ?? 'null' }};
+let linkMode = false;
+let linkSource = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     initCanvas();
+    if (mapId) loadMapData(mapId);
     loadDevices();
 
     // Device selection handler
@@ -147,6 +153,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+function loadMapData(id) {
+    fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${id}/json`)
+        .then(r => r.json())
+        .then(data => {
+            if (data && Array.isArray(data.nodes)) {
+                nodes = data.nodes.map(n => ({
+                    dbId: n.id,
+                    label: n.label,
+                    x: n.x,
+                    y: n.y,
+                    deviceId: n.device_id || null,
+                    interfaceId: n.meta?.interface_id || null,
+                }));
+                renderEditor();
+            }
+        }).catch(() => {});
+}
 
 function initCanvas() {
     const canvas = document.getElementById('map-canvas');
@@ -171,6 +195,116 @@ function initCanvas() {
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
     }
+    // Drag + drop support
+    let dragging = null;
+    let dragOffset = {x:0,y:0};
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getMousePos(canvas, e);
+        const hit = hitTestNode(pos.x, pos.y);
+        if (linkMode && hit) {
+            if (!linkSource) {
+                linkSource = hit;
+            } else if (linkSource !== hit) {
+                // create link
+                createLink(linkSource, hit);
+                linkSource = null;
+            }
+            return;
+        }
+        if (hit) {
+            dragging = hit;
+            dragOffset.x = hit.x - pos.x;
+            dragOffset.y = hit.y - pos.y;
+        }
+    });
+    canvas.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        const pos = getMousePos(canvas, e);
+        dragging.x = pos.x + dragOffset.x;
+        dragging.y = pos.y + dragOffset.y;
+        renderEditor();
+    });
+    canvas.addEventListener('mouseup', () => {
+        if (dragging && mapId && dragging.dbId) {
+            // persist position
+            patchNodePos(dragging);
+        }
+        dragging = null;
+    });
+}
+
+function toggleLinkMode() {
+    linkMode = !linkMode;
+    linkSource = null;
+    document.getElementById('link-mode-btn').textContent = `Link Mode: ${linkMode ? 'On' : 'Off'}`;
+}
+
+function createLink(srcNode, dstNode) {
+    if (!mapId) {
+        alert('Save map first to create links.');
+        return;
+    }
+    const payload = {
+        src_node_id: srcNode.dbId,
+        dst_node_id: dstNode.dbId,
+        port_id_a: srcNode.interfaceId || null,
+        port_id_b: dstNode.interfaceId || null,
+        bandwidth_bps: null,
+        style: {}
+    };
+    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/link`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (!d.success) {
+            alert('Failed to create link: ' + (d.message || 'Unknown error'));
+        } else {
+            renderEditor();
+        }
+    }).catch(err => alert('Failed to create link: ' + err.message));
+}
+
+function getMousePos(canvas, evt) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+}
+
+function hitTestNode(x, y) {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = x - n.x, dy = y - n.y;
+        if (Math.hypot(dx, dy) <= 12) return n;
+    }
+    return null;
+}
+
+function renderEditor() {
+    const canvas = document.getElementById('map-canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    // background + grid
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#eee';
+    for (let x = 0; x <= canvas.width; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+    for (let y = 0; y <= canvas.height; y += 20) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+    // draw nodes
+    nodes.forEach(drawNode);
+}
+
+function patchNodePos(node) {
+    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node/${node.dbId}`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify({ x: node.x, y: node.y })
+    }).catch(() => {});
 }
 
 function loadDevices() {
@@ -238,8 +372,32 @@ function addNode() {
         y: Math.random() * 300 + 100
     };
 
-    nodes.push(node);
-    drawNode(node);
+    if (mapId) {
+        // Create immediately
+        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}/node`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            },
+            body: JSON.stringify({
+                label: node.label,
+                x: node.x,
+                y: node.y,
+                device_id: node.deviceId || null,
+                meta: { interface_id: node.interfaceId || null }
+            })
+        }).then(r => r.json()).then(d => {
+            if (d && d.success && d.node) {
+                node.dbId = d.node.id;
+            }
+            nodes.push(node);
+            renderEditor();
+        }).catch(() => { nodes.push(node); renderEditor(); });
+    } else {
+        nodes.push(node);
+        renderEditor();
+    }
 
     // Reset selections
     document.getElementById('device-select').value = '';

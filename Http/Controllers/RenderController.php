@@ -159,9 +159,10 @@ class RenderController
                     ]);
                 }
 
-                // Node statuses
+                // Node statuses and metrics
                 foreach ($map->nodes as $node) {
                     $status = 'unknown';
+                    $metrics = ['cpu' => null, 'mem' => null];
                     if ($node->device_id) {
                         try {
                             if (class_exists('App\\Models\\Device')) {
@@ -175,12 +176,22 @@ class RenderController
                                     $status = ($row->status ?? 0) ? 'up' : 'down';
                                 }
                             }
+                            // Best-effort metrics from DB
+                            try {
+                                $cpu = \DB::table('processors')->where('device_id', $node->device_id)->avg('processor_usage');
+                                if ($cpu !== null) { $metrics['cpu'] = round((float) $cpu, 2); }
+                            } catch (\Exception $e) {}
+                            try {
+                                $mem = \DB::table('mempools')->where('device_id', $node->device_id)->avg('mempool_perc');
+                                if ($mem !== null) { $metrics['mem'] = round((float) $mem, 2); }
+                            } catch (\Exception $e) {}
                         } catch (\Exception $e) {
                             $status = 'unknown';
                         }
                     }
                     $payload['nodes'][$node->id] = [
                         'status' => $status,
+                        'metrics' => $metrics,
                     ];
                 }
 
