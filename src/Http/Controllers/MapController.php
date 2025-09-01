@@ -290,55 +290,76 @@ class MapController
             'nodes.*.y' => 'required|numeric',
             'nodes.*.device_id' => 'nullable|integer',
             'nodes.*.meta' => 'array',
-            'links' => 'array',
-            'links.*.src_node_id' => 'required|integer',
-            'links.*.dst_node_id' => 'required|integer',
-            'links.*.port_id_a' => 'nullable|integer',
-            'links.*.port_id_b' => 'nullable|integer',
-            'links.*.bandwidth_bps' => 'nullable|integer',
-            'links.*.style' => 'array',
+            'links' => 'array', // accept loose link shapes; coerce below
         ]);
 
-        // Update map options/title
-        if (!empty($data['options']) || !empty($data['title'])) {
-            $opts = $map->options ?? [];
-            $opts['width'] = $data['options']['width'] ?? ($opts['width'] ?? 800);
-            $opts['height'] = $data['options']['height'] ?? ($opts['height'] ?? 600);
-            if (isset($data['options']['background'])) {
-                $opts['background'] = $data['options']['background'];
-            }
-            $map->title = $data['title'] ?? $map->title;
-            $map->options = $opts;
-            $map->save();
-        }
+        try {
+            \DB::transaction(function () use ($map, $data) {
+                // Update map options/title
+                if (!empty($data['options']) || !empty($data['title'])) {
+                    $opts = $map->options ?? [];
+                    $opts['width'] = $data['options']['width'] ?? ($opts['width'] ?? 800);
+                    $opts['height'] = $data['options']['height'] ?? ($opts['height'] ?? 600);
+                    if (isset($data['options']['background'])) {
+                        $opts['background'] = $data['options']['background'];
+                    }
+                    $map->title = $data['title'] ?? $map->title;
+                    $map->options = $opts;
+                    $map->save();
+                }
 
-        if (isset($data['nodes'])) {
-            $map->nodes()->delete();
-            foreach ($data['nodes'] as $n) {
-                Node::create([
-                    'map_id' => $map->id,
-                    'label' => $n['label'],
-                    'x' => $n['x'],
-                    'y' => $n['y'],
-                    'device_id' => $n['device_id'] ?? null,
-                    'meta' => $n['meta'] ?? [],
-                ]);
-            }
-        }
+                // Delete links first, then nodes (FK safety)
+                $map->links()->delete();
+                $map->nodes()->delete();
 
-        if (isset($data['links'])) {
-            $map->links()->delete();
-            foreach ($data['links'] as $l) {
-                Link::create([
-                    'map_id' => $map->id,
-                    'src_node_id' => $l['src_node_id'],
-                    'dst_node_id' => $l['dst_node_id'],
-                    'port_id_a' => $l['port_id_a'] ?? null,
-                    'port_id_b' => $l['port_id_b'] ?? null,
-                    'bandwidth_bps' => $l['bandwidth_bps'] ?? null,
-                    'style' => $l['style'] ?? [],
-                ]);
-            }
+                // Create nodes and build id mapping (client -> new id)
+                $nodeIdMap = [];
+                if (!empty($data['nodes'])) {
+                    foreach ($data['nodes'] as $idx => $n) {
+                        $new = Node::create([
+                            'map_id' => $map->id,
+                            'label' => $n['label'],
+                            'x' => $n['x'],
+                            'y' => $n['y'],
+                            'device_id' => $n['device_id'] ?? null,
+                            'meta' => $n['meta'] ?? [],
+                        ]);
+                        $clientKey = $n['id'] ?? $n['node_id'] ?? $n['_id'] ?? (string)$idx;
+                        $nodeIdMap[(string)$clientKey] = $new->id;
+                    }
+                }
+
+                // Create links using id mapping
+                if (!empty($data['links'])) {
+                    foreach ($data['links'] as $l) {
+                        $srcKey = $l['src_node_id'] ?? $l['src'] ?? $l['source'] ?? null;
+                        $dstKey = $l['dst_node_id'] ?? $l['dst'] ?? $l['target'] ?? null;
+                        // Handle D3 objects {source: {id}, target: {id}}
+                        if (is_array($srcKey)) { $srcKey = $srcKey['id'] ?? $srcKey['node_id'] ?? null; }
+                        if (is_array($dstKey)) { $dstKey = $dstKey['id'] ?? $dstKey['node_id'] ?? null; }
+                        $srcId = $nodeIdMap[(string)$srcKey] ?? (is_numeric($srcKey) ? (int)$srcKey : null);
+                        $dstId = $nodeIdMap[(string)$dstKey] ?? (is_numeric($dstKey) ? (int)$dstKey : null);
+                        if (!$srcId || !$dstId) {
+                            // skip invalid links rather than failing the whole save
+                            continue;
+                        }
+                        Link::create([
+                            'map_id' => $map->id,
+                            'src_node_id' => $srcId,
+                            'dst_node_id' => $dstId,
+                            'port_id_a' => $l['port_id_a'] ?? null,
+                            'port_id_b' => $l['port_id_b'] ?? null,
+                            'bandwidth_bps' => $l['bandwidth_bps'] ?? $l['bandwidth'] ?? null,
+                            'style' => $l['style'] ?? [],
+                        ]);
+                    }
+                }
+            });
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save map: ' . $e->getMessage(),
+            ], 500);
         }
 
         return response()->json(['success' => true]);
