@@ -165,6 +165,13 @@
         let animTick = 0;
         let bgImg = null;
         let currentMetric = (param('metric', 'percent') || 'percent').toLowerCase();
+        // Navigation (pan/zoom)
+        const navEnabled = (param('nav', '1') !== '0');
+        const MIN_ZOOM = parseFloat(param('minz', '0.5')) || 0.5;
+        const MAX_ZOOM = parseFloat(param('maxz', '4')) || 4;
+        let baseScale = 1, baseOffsetX = 0, baseOffsetY = 0;
+        let userScale = 1, userOffsetX = 0, userOffsetY = 0;
+        let isPanning = false, panLastX = 0, panLastY = 0;
         
         // Flow animation particles
         let particles = [];
@@ -186,6 +193,7 @@
                 if (ms) { ms.value = currentMetric; ms.addEventListener('change', () => { currentMetric = ms.value; renderLegend(); renderMap(); }); }
                 const ex = document.getElementById('export-png');
                 if (ex) ex.addEventListener('click', exportPNG);
+                if (navEnabled) initNavControls();
             } else {
                 showError(mapData.error || 'Failed to load map');
             }
@@ -234,18 +242,20 @@
             const mapHeight = mapData?.height || (mapData?.metadata && mapData.metadata.height) || 600;
             const scaleX = canvas.width / mapWidth;
             const scaleY = canvas.height / mapHeight;
-            const scale = Math.min(scaleX, scaleY, 1); // Don't scale up
+            baseScale = Math.min(scaleX, scaleY, 1); // Don't scale up
 
-            // Center the map
-            const offsetX = (canvas.width - mapWidth * scale) / 2;
-            const offsetY = (canvas.height - mapHeight * scale) / 2;
+            // Center the map (base)
+            baseOffsetX = (canvas.width - mapWidth * baseScale) / 2;
+            baseOffsetY = (canvas.height - mapHeight * baseScale) / 2;
 
-            // Expose transform for hit testing
-            viewScale = scale; viewOffsetX = offsetX; viewOffsetY = offsetY;
+            // Effective transform for rendering and hit testing
+            viewScale = baseScale * userScale;
+            viewOffsetX = baseOffsetX + userOffsetX;
+            viewOffsetY = baseOffsetY + userOffsetY;
 
             ctx.save();
-            ctx.translate(offsetX, offsetY);
-            ctx.scale(scale, scale);
+            ctx.translate(viewOffsetX, viewOffsetY);
+            ctx.scale(viewScale, viewScale);
 
             // Draw links first (behind nodes)
             if (Array.isArray(mapData.links)) {
@@ -270,6 +280,75 @@
                 drawHeatOverlay();
             }
         }
+
+        function initNavControls() {
+            const controls = document.getElementById('controls');
+            if (controls) {
+                const group = document.createElement('div');
+                group.style.display = 'inline-flex';
+                group.style.gap = '4px';
+                group.style.marginLeft = '6px';
+                group.innerHTML = `
+                  <button id="zoom-in" title="Zoom In (+)" style="background:#fff; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">+</nbutton>
+                  <button id="zoom-out" title="Zoom Out (-)" style="background:#fff; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">−</nbutton>
+                  <button id="zoom-reset" title="Reset" style="background:#fff; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">Reset</nbutton>
+                `;
+                // Fix accidental newlines in buttons
+                group.innerHTML = group.innerHTML.replaceAll('\nbutton','button');
+                controls.appendChild(group);
+                const c = canvas;
+                document.getElementById('zoom-in').addEventListener('click', () => zoomAt(c.width/2, c.height/2, 1.2));
+                document.getElementById('zoom-out').addEventListener('click', () => zoomAt(c.width/2, c.height/2, 1/1.2));
+                document.getElementById('zoom-reset').addEventListener('click', resetView);
+            }
+            // Wheel zoom
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const factor = e.deltaY > 0 ? 0.9 : 1.1;
+                zoomAt(x, y, factor);
+            }, { passive: false });
+            // Drag to pan
+            canvas.addEventListener('mousedown', (e) => {
+                isPanning = true; panLastX = e.clientX; panLastY = e.clientY; canvas.style.cursor = 'grabbing';
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+                const dx = e.clientX - panLastX; const dy = e.clientY - panLastY;
+                panLastX = e.clientX; panLastY = e.clientY;
+                userOffsetX += dx; userOffsetY += dy;
+                renderMap();
+            });
+            window.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; canvas.style.cursor = 'default'; } });
+            // Double-click zoom (Shift to zoom out)
+            canvas.addEventListener('dblclick', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const factor = e.shiftKey ? 0.9 : 1.1;
+                zoomAt(x, y, factor);
+            });
+        }
+
+        function zoomAt(cx, cy, factor) {
+            const newUserScale = clamp(userScale * factor, MIN_ZOOM, MAX_ZOOM);
+            factor = newUserScale / userScale;
+            // world coords before zoom
+            const wx = (cx - (baseOffsetX + userOffsetX)) / (baseScale * userScale);
+            const wy = (cy - (baseOffsetY + userOffsetY)) / (baseScale * userScale);
+            userScale = newUserScale;
+            // adjust offsets to keep cursor stable
+            const vx = wx * (baseScale * userScale) + baseOffsetX;
+            const vy = wy * (baseScale * userScale) + baseOffsetY;
+            userOffsetX = cx - vx;
+            userOffsetY = cy - vy;
+            renderMap();
+        }
+
+        function resetView() { userScale = 1; userOffsetX = 0; userOffsetY = 0; renderMap(); }
+        function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
         const nodeGeoms = [];
         function drawNode(node) {
