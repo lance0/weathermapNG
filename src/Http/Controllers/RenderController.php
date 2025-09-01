@@ -36,7 +36,7 @@ class RenderController
     {
         $mapData = $map->toJsonModel();
         $mapId = $map->id;
-        return view('plugins.WeathermapNG.embed', compact('mapData', 'mapId'));
+        return view('WeathermapNG::embed', compact('mapData', 'mapId'));
     }
 
     public function export(Map $map, Request $request)
