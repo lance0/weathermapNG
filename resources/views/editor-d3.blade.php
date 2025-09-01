@@ -222,9 +222,10 @@
                                     <label class="form-label small">Label</label>
                                     <input type="text" class="form-control form-control-sm" id="node-label">
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3 position-relative">
                                     <label class="form-label small">Device</label>
-                                    <input type="text" id="node-device-search" class="form-control form-control-sm mb-1" placeholder="Search devices...">
+                                    <input type="text" id="node-device-search" class="form-control form-control-sm mb-1" placeholder="Search devices..." autocomplete="off">
+                                    <div id="node-device-suggestions" class="autocomplete-list" style="display:none;"></div>
                                     <select class="form-select form-select-sm" id="node-device">
                                         <option value="">None</option>
                                     </select>
@@ -469,7 +470,7 @@
                                 <button class="btn btn-sm btn-outline-primary" onclick="editorActions.applyTemplate('ring')">
                                     <i class="fas fa-circle-notch"></i> Ring Topology
                                 </button>
-                                <button class="btn btn-sm btn-outline-success" onclick="editorActions.autoDiscover()">
+                                <button class="btn btn-sm btn-outline-success" data-toggle="modal" data-target="#autoDiscoverModal">
                                     <i class="fas fa-magic"></i> Auto-Discover Topology
                                 </button>
                             </div>
@@ -1494,40 +1495,52 @@ class WeathermapEditor {
                 editorState.selectedElements[0].device_id = nodeDevice.value || null;
             }
         });
-        if (nodeDeviceSearch && nodeDevice) nodeDeviceSearch.addEventListener('input', async () => {
-            const q = nodeDeviceSearch.value.trim();
-            if (q.length >= 2) {
-                try {
-                    const res = await fetch(`{{ url('plugin/WeathermapNG/api/devices') }}?q=${encodeURIComponent(q)}`);
-                    const devices = await res.json();
-                    // rebuild options
-                    while (nodeDevice.options.length > 0) nodeDevice.remove(0);
-                    const none = document.createElement('option'); none.value = ''; none.text = 'None'; nodeDevice.add(none);
-                    devices.forEach(device => {
-                        const option = document.createElement('option');
-                        option.value = device.device_id;
-                        option.textContent = device.hostname || device.sysName || `Device ${device.device_id}`;
-                        nodeDevice.appendChild(option);
-                    });
-                } catch (e) {
-                    // fallback to client-side filter if fetch fails
-                    const lq = q.toLowerCase();
-                    Array.from(nodeDevice.options).forEach(opt => {
-                        if (!opt.value) return;
-                        const txt = opt.text.toLowerCase();
-                        opt.style.display = txt.includes(lq) ? '' : 'none';
-                    });
-                }
-            } else {
-                // client-side filter for short queries
-                const lq = q.toLowerCase();
-                Array.from(nodeDevice.options).forEach(opt => {
-                    if (!opt.value) return;
-                    const txt = opt.text.toLowerCase();
-                    opt.style.display = txt.includes(lq) ? '' : 'none';
+        if (nodeDeviceSearch && nodeDevice) {
+            // Debounced server autocomplete with keyboard navigation
+            let ddTimer = null; let activeIdx = -1; let results = [];
+            const sug = document.getElementById('node-device-suggestions');
+            const hideSug = () => { if (sug) { sug.style.display = 'none'; sug.innerHTML=''; activeIdx = -1; } };
+            const renderSug = () => {
+                if (!sug) return; sug.innerHTML='';
+                results.forEach((dev, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'autocomplete-item' + (idx===activeIdx ? ' active' : '');
+                    item.textContent = dev.hostname || dev.sysName || `Device ${dev.device_id}`;
+                    item.onclick = () => selectDev(dev);
+                    sug.appendChild(item);
                 });
-            }
-        });
+                sug.style.display = results.length ? 'block' : 'none';
+            };
+            const selectDev = (dev) => {
+                // ensure option exists in select and select it
+                let opt = Array.from(nodeDevice.options).find(o => o.value == dev.device_id);
+                if (!opt) { opt = document.createElement('option'); opt.value = dev.device_id; opt.textContent = dev.hostname || dev.sysName || `Device ${dev.device_id}`; nodeDevice.appendChild(opt); }
+                nodeDevice.value = String(dev.device_id);
+                nodeDevice.dispatchEvent(new Event('change'));
+                nodeDeviceSearch.value = opt.textContent;
+                hideSug();
+            };
+            nodeDeviceSearch.addEventListener('keydown', (e) => {
+                if (!results.length) return;
+                if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % results.length; renderSug(); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx - 1 + results.length) % results.length; renderSug(); }
+                else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0) selectDev(results[activeIdx]); }
+                else if (e.key === 'Escape') { hideSug(); }
+            });
+            nodeDeviceSearch.addEventListener('blur', () => setTimeout(hideSug, 150));
+            nodeDeviceSearch.addEventListener('input', () => {
+                const q = nodeDeviceSearch.value.trim();
+                clearTimeout(ddTimer);
+                ddTimer = setTimeout(async () => {
+                    if (q.length < 2) { hideSug(); return; }
+                    try {
+                        const res = await fetch(`{{ url('plugin/WeathermapNG/api/devices') }}?q=${encodeURIComponent(q)}`);
+                        results = await res.json();
+                        activeIdx = -1; renderSug();
+                    } catch (e) { hideSug(); }
+                }, 200);
+            });
+        }
         const applyPos = () => {
             if (editorState.selectedElements[0]) {
                 const n = editorState.selectedElements[0];
@@ -2598,6 +2611,50 @@ document.addEventListener('DOMContentLoaded', () => {
     try { $('[data-toggle="tooltip"]').tooltip(); } catch (e) {}
 });
 </script>
+<!-- Auto-Discover Modal -->
+<div class="modal fade" id="autoDiscoverModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Auto-Discover Topology</h5>
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label small">Minimum Links (degree)</label>
+          <input type="number" class="form-control form-control-sm" id="ad-min-degree" min="0" value="0">
+          <div class="form-text">Only include devices with at least this many links.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">OS filter (comma separated)</label>
+          <input type="text" class="form-control form-control-sm" id="ad-os" placeholder="e.g., ios, junos, arista">
+          <div class="form-text">Include only devices whose OS contains these keywords.</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" id="ad-run-btn">Run Discovery</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('ad-run-btn')?.addEventListener('click', async () => {
+      try {
+        const minDeg = parseInt(document.getElementById('ad-min-degree').value || '0', 10);
+        const os = (document.getElementById('ad-os').value || '').trim();
+        if (!editorState.mapId) { editor.showStatus('Save map first', 'error'); return; }
+        const res = await fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/autodiscover`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+          body: JSON.stringify({ min_degree: isFinite(minDeg) ? minDeg : 0, os: os })
+        });
+        const data = await res.json();
+        if (data && data.success) { editor.showStatus('Auto-discovery complete'); editor.loadMap(); }
+        else { editor.showStatus('Auto-discovery failed', 'error'); }
+      } catch (e) { editor.showStatus('Auto-discovery failed', 'error'); }
+      try { $('#autoDiscoverModal').modal('hide'); } catch(e) {}
+    });
+  </script>
+</div>
 @endsection
 
 @section('styles')
@@ -2638,6 +2695,29 @@ document.addEventListener('DOMContentLoaded', () => {
 .label {
     pointer-events: none;
     user-select: none;
+}
+
+/* Autocomplete dropdown */
+.autocomplete-list {
+    position: absolute;
+    top: 52px;
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 180px;
+    overflow-y: auto;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.autocomplete-item {
+    padding: 6px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.autocomplete-item:hover, .autocomplete-item.active {
+    background: #f1f5ff;
 }
 
 .marquee {
