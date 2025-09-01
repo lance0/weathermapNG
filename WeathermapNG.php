@@ -17,6 +17,7 @@
 // No namespace to avoid conflicts
 // This file is for compatibility only
 
+if (!class_exists('WeathermapNG')) {
 class WeathermapNG
 {
     public $name = 'WeathermapNG';
@@ -90,3 +91,4 @@ class WeathermapNG
         ];
     }
 }
+} // end if class_exists
