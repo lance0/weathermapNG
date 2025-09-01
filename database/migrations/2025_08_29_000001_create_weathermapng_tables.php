@@ -10,6 +10,9 @@ return new class {
             $t->id();
             $t->string('name')->unique();
             $t->string('title')->nullable();
+            $t->text('description')->nullable();
+            $t->unsignedInteger('width')->default(800);
+            $t->unsignedInteger('height')->default(600);
             $t->json('options')->nullable(); // bg, thresholds, scale
             $t->timestamps();
         });

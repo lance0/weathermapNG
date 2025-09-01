@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use App\Plugins\WeathermapNG\Models\Map;
+use App\Plugins\WeathermapNG\Models\Node;
+use App\Plugins\WeathermapNG\Models\Link;
 
 class WeathermapNGController extends Controller
 {
@@ -64,25 +67,18 @@ class WeathermapNGController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:wmng_maps,name',
+            'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'width' => 'required|integer|min:400|max:2000',
             'height' => 'required|integer|min:300|max:1500',
         ]);
-        
+
         try {
-            $id = DB::table('wmng_maps')->insertGetId([
-                'name' => $validated['name'],
-                'description' => $validated['description'] ?? '',
-                'width' => $validated['width'],
-                'height' => $validated['height'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            
-            return response()->json(['success' => true, 'id' => $id]);
+            $map = Map::create($validated);
+            return response()->json(['success' => true, 'id' => $map->id]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Failed to create map'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to create map: ' . $e->getMessage()], 500);
         }
     }
 
@@ -92,26 +88,19 @@ class WeathermapNGController extends Controller
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'required|string|max:255|unique:wmng_maps,name,' . $id,
+            'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'width' => 'required|integer|min:400|max:2000',
             'height' => 'required|integer|min:300|max:1500',
         ]);
-        
+
         try {
-            DB::table('wmng_maps')
-                ->where('id', $id)
-                ->update([
-                    'name' => $validated['name'],
-                    'description' => $validated['description'] ?? '',
-                    'width' => $validated['width'],
-                    'height' => $validated['height'],
-                    'updated_at' => now(),
-                ]);
-            
+            $map = Map::findOrFail($id);
+            $map->update($validated);
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Failed to update map'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to update map: ' . $e->getMessage()], 500);
         }
     }
 
@@ -121,13 +110,12 @@ class WeathermapNGController extends Controller
     public function destroy($id)
     {
         try {
-            DB::table('wmng_maps')->where('id', $id)->delete();
-            DB::table('wmng_nodes')->where('map_id', $id)->delete();
-            DB::table('wmng_links')->where('map_id', $id)->delete();
-            
+            $map = Map::findOrFail($id);
+            $map->delete(); // This will cascade delete nodes and links due to foreign key constraints
+
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Failed to delete map'], 500);
+            return response()->json(['success' => false, 'message' => 'Failed to delete map: ' . $e->getMessage()], 500);
         }
     }
 
@@ -137,20 +125,13 @@ class WeathermapNGController extends Controller
     public function data($id): JsonResponse
     {
         $map = $this->getMap($id);
-        
+
         if (!$map) {
             return response()->json(['error' => 'Map not found'], 404);
         }
-        
-        $nodes = DB::table('wmng_nodes')->where('map_id', $id)->get();
-        $links = DB::table('wmng_links')->where('map_id', $id)->get();
-        
-        // TODO: Add real-time data from LibreNMS
-        
+
         return response()->json([
-            'map' => $map,
-            'nodes' => $nodes,
-            'links' => $links,
+            'map' => $map->toJsonModel(),
             'timestamp' => now(),
         ]);
     }
@@ -255,10 +236,9 @@ class WeathermapNGController extends Controller
         if (!$this->tablesExist()) {
             return collect([]);
         }
-        
+
         try {
-            return DB::table('wmng_maps')
-                ->select('id', 'name', 'description', 'width', 'height', 'updated_at')
+            return Map::select('id', 'name', 'title', 'description', 'width', 'height', 'updated_at')
                 ->orderBy('name')
                 ->get();
         } catch (\Exception $e) {
@@ -274,9 +254,9 @@ class WeathermapNGController extends Controller
         if (!$this->tablesExist()) {
             return null;
         }
-        
+
         try {
-            return DB::table('wmng_maps')->where('id', $id)->first();
+            return Map::find($id);
         } catch (\Exception $e) {
             return null;
         }
