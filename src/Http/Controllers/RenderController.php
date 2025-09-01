@@ -75,6 +75,18 @@ class RenderController
                     } catch (\Throwable $e) {}
                 }
             }
+            // Fallback: if no port data present, sum from link live data already computed above
+            if (($inSum + $outSum) === 0) {
+                foreach ($map->links as $lnk) {
+                    if ($lnk->src_node_id == $node->id || $lnk->dst_node_id == $node->id) {
+                        $ld = $out['links'][$lnk->id] ?? null;
+                        if (is_array($ld)) {
+                            $inSum += (int) ($ld['in_bps'] ?? 0);
+                            $outSum += (int) ($ld['out_bps'] ?? 0);
+                        }
+                    }
+                }
+            }
             $out['nodes'][$node->id] = [
                 'status' => $status,
                 'traffic' => [
@@ -297,6 +309,18 @@ class RenderController
                                 $inSum += (int) ($pd['in'] ?? 0);
                                 $outSum += (int) ($pd['out'] ?? 0);
                             } catch (\Throwable $e) {}
+                        }
+                    }
+                    // Fallback to link sums when no port data
+                    if (($inSum + $outSum) === 0) {
+                        foreach ($map->links as $lnk) {
+                            if ($lnk->src_node_id == $node->id || $lnk->dst_node_id == $node->id) {
+                                $ld = $payload['links'][$lnk->id] ?? null;
+                                if (is_array($ld)) {
+                                    $inSum += (int) ($ld['in_bps'] ?? 0);
+                                    $outSum += (int) ($ld['out_bps'] ?? 0);
+                                }
+                            }
                         }
                     }
                     $payload['nodes'][$node->id] = [
