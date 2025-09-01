@@ -672,11 +672,16 @@ class WeathermapEditor {
             .text(d => this.getNodeIcon(d.icon));
         
         // Update existing nodes
-        nodes.merge(nodeEnter)
-            .attr('transform', d => `translate(${d.x}, ${d.y})`)
-            .select('circle')
+        const mergedGroups = nodes.merge(nodeEnter)
+            .attr('transform', d => `translate(${d.x}, ${d.y})`);
+
+        mergedGroups.select('circle')
             .attr('stroke', d => editorState.selectedElements.includes(d) ? '#ffc107' : '#fff')
             .attr('stroke-width', d => editorState.selectedElements.includes(d) ? 3 : 2);
+
+        // Ensure node icon updates when changed
+        mergedGroups.select('text')
+            .text(d => editor.getNodeIcon(d.icon));
         
         nodes.exit().remove();
         
@@ -702,10 +707,12 @@ class WeathermapEditor {
         
         links.exit().remove();
 
-        // Render link labels
+        // Render link labels (tied to Labels toggle)
         const linkLabels = this.mapGroup.select('#labels-layer')
             .selectAll('.link-label')
-            .data(editorState.links.filter(l => (l.label || '').length > 0), d => d.id);
+            .data(document.getElementById('labelsToggle').checked
+                ? editorState.links.filter(l => (l.label || '').length > 0)
+                : [], d => d.id);
 
         const linkLabelEnter = linkLabels.enter()
             .append('text')
@@ -816,6 +823,8 @@ class WeathermapEditor {
                 .catch(() => this.showStatus('Failed to create link', 'error'))
                 .finally(() => {
                     editorState.linkStart = null;
+                    // Clear preview
+                    this.mapGroup.select('#selection-layer').select('#link-preview').remove();
                 });
             }
             return;
@@ -984,7 +993,8 @@ class WeathermapEditor {
                     y: n.y,
                     label: n.label,
                     device_id: n.device_id || null,
-                    icon: 'router',
+                    icon: (n.meta && n.meta.icon) ? n.meta.icon : 'router',
+                    meta: n.meta || {},
                     type: 'node'
                 }));
                 editorState.links = (data.links || []).map(l => ({
@@ -1010,6 +1020,11 @@ class WeathermapEditor {
                 btn.classList.add('active');
                 editorState.tool = btn.dataset.tool;
                 this.svg.style('cursor', this.getToolCursor());
+                if (editorState.tool !== 'add-link') {
+                    editorState.linkStart = null;
+                    // Clear preview
+                    this.mapGroup.select('#selection-layer').select('#link-preview').remove();
+                }
             });
         });
         
@@ -1039,6 +1054,14 @@ class WeathermapEditor {
         const nodeX = document.getElementById('node-x');
         const nodeY = document.getElementById('node-y');
         const applyNodeBtn = document.getElementById('apply-node-btn');
+        // Icon buttons
+        document.querySelectorAll('#node-properties [data-icon]')?.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (editorState.selectedElements[0]) {
+                    editorState.selectedElements[0].icon = btn.getAttribute('data-icon');
+                }
+            });
+        });
         if (nodeLabel) nodeLabel.addEventListener('input', () => {
             if (editorState.selectedElements[0]) {
                 editorState.selectedElements[0].label = nodeLabel.value;
@@ -1066,11 +1089,29 @@ class WeathermapEditor {
         const applyLinkBtn = document.getElementById('apply-link-btn');
         if (applyLinkBtn) applyLinkBtn.addEventListener('click', () => this.applyLinkChanges());
         
-        // Mouse position tracking
+        // Mouse position tracking + link preview
         this.svg.on('mousemove', (event) => {
             const coords = d3.pointer(event, this.mapGroup.node());
             document.getElementById('coords').textContent = 
                 `X: ${Math.round(coords[0])}, Y: ${Math.round(coords[1])}`;
+            // Link preview
+            if (editorState.tool === 'add-link' && editorState.linkStart) {
+                const s = editorState.linkStart;
+                const preview = this.mapGroup.select('#selection-layer').select('#link-preview');
+                const path = `M${s.x},${s.y}L${coords[0]},${coords[1]}`;
+                if (preview.empty()) {
+                    this.mapGroup.select('#selection-layer')
+                        .append('path')
+                        .attr('id', 'link-preview')
+                        .attr('fill', 'none')
+                        .attr('stroke', '#999')
+                        .attr('stroke-dasharray', '4 2')
+                        .attr('pointer-events', 'none')
+                        .attr('d', path);
+                } else {
+                    preview.attr('d', path);
+                }
+            }
         });
     }
     
@@ -1326,7 +1367,8 @@ class WeathermapEditor {
                     label: n.label,
                     x: n.x,
                     y: n.y,
-                    device_id: n.device_id || null
+                    device_id: n.device_id || null,
+                    meta: { ...(n.meta || {}), icon: n.icon || 'router' }
                 })),
                 links: editorState.links.map(l => ({
                     src_node_id: l.source,
@@ -1350,6 +1392,8 @@ class WeathermapEditor {
     cancelOperation() {
         editorState.isLinking = false;
         editorState.linkStart = null;
+        // Clear preview
+        this.mapGroup.select('#selection-layer').select('#link-preview').remove();
         editorState.selectedElements = [];
         this.updatePropertiesPanel();
         this.setTool('select');
@@ -1363,7 +1407,8 @@ class WeathermapEditor {
             label: n.label,
             x: Math.round(n.x),
             y: Math.round(n.y),
-            device_id: n.device_id || null
+            device_id: n.device_id || null,
+            meta: { ...(n.meta || {}), icon: n.icon || 'router' }
         };
         fetch(`{{ url('plugin/WeathermapNG/map') }}/${editorState.mapId}/node/${n.id}`, {
             method: 'PATCH',
