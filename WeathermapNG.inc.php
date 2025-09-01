@@ -253,7 +253,8 @@ function submitCreateMap() {
         name: $('#mapName').val(),
         description: $('#mapDescription').val(),
         width: $('#mapWidth').val(),
-        height: $('#mapHeight').val()
+        height: $('#mapHeight').val(),
+        _token: $('meta[name="csrf-token"]').attr('content') || ''
     };
     
     if (!formData.name) {
@@ -263,7 +264,7 @@ function submitCreateMap() {
     
     // Create the map directly in the database
     $.ajax({
-        url: 'plugin/v1/WeathermapNG/ajax/create-map',
+        url: '/plugin/v1/WeathermapNG/ajax/create-map',
         method: 'POST',
         data: formData,
         success: function(response) {
@@ -283,9 +284,12 @@ function submitCreateMap() {
 function deleteMap(mapId) {
     if (confirm('Are you sure you want to delete this map?')) {
         $.ajax({
-            url: 'plugin/v1/WeathermapNG/ajax/delete-map',
+            url: '/plugin/v1/WeathermapNG/ajax/delete-map',
             method: 'POST',
-            data: { id: mapId },
+            data: { 
+                id: mapId,
+                _token: $('meta[name="csrf-token"]').attr('content') || ''
+            },
             success: function(response) {
                 if (response.success) {
                     alert('Map deleted successfully!');
