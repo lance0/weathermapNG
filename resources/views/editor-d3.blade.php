@@ -206,6 +206,10 @@
                     <div class="tab-content">
                         <!-- Properties Tab -->
                         <div class="tab-pane fade show active" id="properties-tab">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="mb-0">Properties</h6>
+                                <span id="prop-mode-badge" class="badge bg-secondary">None</span>
+                            </div>
                             <div id="no-selection" class="text-muted text-center py-4">
                                 <i class="fas fa-mouse-pointer fa-2x mb-2"></i>
                                 <p>Select an element to edit properties</p>
@@ -251,7 +255,7 @@
                                         <input type="number" class="form-control form-control-sm" id="node-y">
                                     </div>
                                 </div>
-                                <div class="d-grid gap-2 mb-2">
+                                <div class="sticky-apply d-grid gap-2 mb-2 pt-2">
                                     <button class="btn btn-sm btn-primary" id="apply-node-btn">
                                         <i class="fas fa-check"></i> Apply Changes
                                     </button>
@@ -263,11 +267,17 @@
                             
                             <!-- Link Properties (hidden by default) -->
                             <div id="link-properties" style="display: none;">
-                                <h6 class="mb-3">Link Properties</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">Link Properties</h6>
+                                    <button class="btn btn-xs btn-link p-0" id="toggle-link-advanced" type="button">
+                                        Advanced
+                                    </button>
+                                </div>
                                 <div class="mb-3">
                                     <label class="form-label small">Label</label>
                                     <input type="text" class="form-control form-control-sm" id="link-label">
                                 </div>
+                                <div id="link-advanced" style="display:none;">
                                 <div class="mb-3">
                                     <label class="form-label small">Bandwidth</label>
                                     <div class="input-group input-group-sm">
@@ -293,7 +303,8 @@
                                     </select>
                                     <div class="form-text" id="link-port-b-help"></div>
                                 </div>
-                                <div class="d-grid gap-2 mb-2">
+                                </div>
+                                <div class="sticky-apply d-grid gap-2 mb-2 pt-2">
                                     <button class="btn btn-sm btn-primary" id="apply-link-btn">
                                         <i class="fas fa-check"></i> Apply Changes
                                     </button>
@@ -1020,9 +1031,15 @@ class WeathermapEditor {
         document.getElementById('no-selection').style.display = selected.length === 0 ? 'block' : 'none';
         document.getElementById('node-properties').style.display = 'none';
         document.getElementById('link-properties').style.display = 'none';
+        const modeBadge = document.getElementById('prop-mode-badge');
+        const setBadge = (text, cls) => { if (modeBadge) { modeBadge.textContent = text; modeBadge.className = `badge ${cls}`; } };
         
         // Bulk link edit support
         const allLinks = selected.length > 1 && selected.every(e => e.type === 'link');
+
+        if (selected.length === 0) {
+            setBadge('None', 'bg-secondary');
+        }
 
         if (selected.length === 1 || allLinks) {
             const element = selected[0];
@@ -1034,6 +1051,7 @@ class WeathermapEditor {
                 document.getElementById('node-device').value = element.device_id || '';
                 document.getElementById('node-x').value = Math.round(element.x);
                 document.getElementById('node-y').value = Math.round(element.y);
+                setBadge('Node', 'bg-primary');
             } else if (element.type === 'link' || allLinks) {
                 // Show link properties
                 document.getElementById('link-properties').style.display = 'block';
@@ -1059,6 +1077,7 @@ class WeathermapEditor {
                 // Disable port selects for bulk edits
                 document.getElementById('link-port-a').disabled = allLinks;
                 document.getElementById('link-port-b').disabled = allLinks;
+                setBadge(allLinks ? `Bulk Links (${selected.length})` : 'Link', allLinks ? 'bg-warning text-dark' : 'bg-success');
             }
         }
     }
@@ -1322,6 +1341,19 @@ class WeathermapEditor {
                 const preset = presetSel.value;
                 editorState.backgroundPreset = preset;
                 this.applyBackgroundPreset(preset);
+            });
+        }
+
+        // Link advanced toggle
+        const advBtn = document.getElementById('toggle-link-advanced');
+        const advSection = document.getElementById('link-advanced');
+        if (advBtn && advSection) {
+            // Restore last state
+            try { const open = localStorage.getItem('wmng.link.adv') === '1'; advSection.style.display = open ? 'block' : 'none'; } catch (e) {}
+            advBtn.addEventListener('click', () => {
+                const show = advSection.style.display === 'none';
+                advSection.style.display = show ? 'block' : 'none';
+                try { localStorage.setItem('wmng.link.adv', show ? '1' : '0'); } catch (e) {}
             });
         }
 
