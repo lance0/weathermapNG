@@ -44,7 +44,57 @@ if (isset($_REQUEST['ajax_action'])) {
                 ], 'wmng_maps');
                 
                 if ($result) {
-                    echo json_encode(['success' => true, 'id' => $result]);
+                    // Add some sample nodes to get started
+                    $node1 = dbInsert([
+                        'map_id' => $result,
+                        'label' => 'Router 1',
+                        'x' => 200,
+                        'y' => 200,
+                        'device_id' => null,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ], 'wmng_nodes');
+                    
+                    $node2 = dbInsert([
+                        'map_id' => $result,
+                        'label' => 'Router 2',
+                        'x' => 600,
+                        'y' => 200,
+                        'device_id' => null,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ], 'wmng_nodes');
+                    
+                    $node3 = dbInsert([
+                        'map_id' => $result,
+                        'label' => 'Switch 1',
+                        'x' => 400,
+                        'y' => 400,
+                        'device_id' => null,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ], 'wmng_nodes');
+                    
+                    // Add sample links
+                    if ($node1 && $node2 && $node3) {
+                        dbInsert([
+                            'map_id' => $result,
+                            'src_node_id' => $node1,
+                            'dst_node_id' => $node3,
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s')
+                        ], 'wmng_links');
+                        
+                        dbInsert([
+                            'map_id' => $result,
+                            'src_node_id' => $node2,
+                            'dst_node_id' => $node3,
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'updated_at' => date('Y-m-d H:i:s')
+                        ], 'wmng_links');
+                    }
+                    
+                    echo json_encode(['success' => true, 'id' => $result, 'message' => 'Map created with sample nodes']);
                 } else {
                     echo json_encode(['success' => false, 'message' => 'Failed to create map']);
                 }
@@ -274,6 +324,14 @@ php database/setup.php</pre>
                             <li><strong>Status:</strong> <span class="label label-success">Active</span></li>
                             <li><strong>Documentation:</strong> <a href="https://github.com/lance0/weathermapNG" target="_blank">GitHub Repository</a></li>
                         </ul>
+                        <hr>
+                        <h4>Quick Actions</h4>
+                        <button class="btn btn-info btn-sm" onclick="runPoller()">
+                            <i class="fas fa-sync"></i> Run Map Poller
+                        </button>
+                        <button class="btn btn-warning btn-sm" onclick="showInstructions()">
+                            <i class="fas fa-question-circle"></i> Setup Instructions
+                        </button>
                     </div>
                 </div>
             </div>
@@ -395,5 +453,25 @@ function deleteMap(mapId) {
             }
         });
     }
+}
+
+function runPoller() {
+    alert('Running map poller...\nExecute this command on the server:\nphp /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php');
+}
+
+function showInstructions() {
+    var instructions = 'WeathermapNG Setup Instructions:\n\n';
+    instructions += '1. Create a map using the "Create New Map" button\n';
+    instructions += '2. Click "Edit" to open the map editor\n';
+    instructions += '3. Add nodes by clicking "Add Node" then clicking on the canvas\n';
+    instructions += '4. Connect nodes by clicking "Add Link" then clicking two nodes\n';
+    instructions += '5. Assign LibreNMS devices to nodes using the device dropdown\n';
+    instructions += '6. Click "Save" to save your changes\n';
+    instructions += '7. Click "View" to see the live map with traffic data\n\n';
+    instructions += 'To enable automatic updates:\n';
+    instructions += 'Add this to your crontab:\n';
+    instructions += '*/5 * * * * librenms php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php';
+    
+    alert(instructions);
 }
 </script>
