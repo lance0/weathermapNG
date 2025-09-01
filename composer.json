@@ -11,9 +11,9 @@
     "php": ">=8.0",
     "ext-gd": "*",
     "ext-json": "*",
-    "illuminate/support": "^8.0|^9.0|^10.0",
-    "illuminate/http": "^8.0|^9.0|^10.0",
-    "illuminate/database": "^8.0|^9.0|^10.0",
+    "illuminate/support": "^8.0|^9.0|^10.0|^11.0",
+    "illuminate/http": "^8.0|^9.0|^10.0|^11.0",
+    "illuminate/database": "^8.0|^9.0|^10.0|^11.0",
     "librenms/plugin-interfaces": "^1.0"
   },
     "require-dev": {
