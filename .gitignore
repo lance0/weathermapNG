@@ -58,3 +58,6 @@ yarn-error.log*
 *.bak
 *.backup
 *~
+
+# Local references and example plugin trees
+librenms-example-plugin-main/

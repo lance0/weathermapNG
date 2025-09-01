@@ -6,7 +6,8 @@ use App\Plugins\Hooks\MenuEntryHook;
 
 class Menu extends MenuEntryHook
 {
-    public string $view = 'weathermapng::menu';
+    // Use relative view path; core will prefix with 'WeathermapNG::'
+    public string $view = 'resources.views.menu';
 
     public function data(): array
     {

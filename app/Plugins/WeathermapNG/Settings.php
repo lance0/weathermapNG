@@ -6,7 +6,8 @@ use App\Plugins\Hooks\SettingsHook;
 
 class Settings extends SettingsHook
 {
-    public string $view = 'weathermapng::settings';
+    // Use relative view path; core will prefix with 'WeathermapNG::'
+    public string $view = 'resources.views.settings';
 
     public function data(array $settings = []): array
     {
