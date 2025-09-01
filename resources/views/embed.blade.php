@@ -287,11 +287,13 @@
             ctx.fillText(node.label || node.id, x, y - radius - 5);
 
             // Status indicator
-            if (node.current_value !== null) {
+            if (node.current_value !== null && node.current_value !== undefined) {
                 ctx.font = '10px Arial';
                 ctx.fillStyle = '#666';
                 const value = formatValue(node.current_value);
-                ctx.fillText(value, x, y + radius + 15);
+                if (value) {
+                    ctx.fillText(value, x, y + radius + 15);
+                }
             }
 
             // Alert badge (if any)
@@ -446,7 +448,8 @@
             
             // Update and draw forward particles
             ctx.save();
-            linkParticles.forward.forEach(particle => {
+            if (linkParticles.forward && Array.isArray(linkParticles.forward)) {
+                linkParticles.forward.forEach(particle => {
                 particle.progress += (particle.speed * 0.005);
                 if (particle.progress > 1) particle.progress -= 1;
                 
@@ -465,10 +468,12 @@
                 ctx.beginPath();
                 ctx.arc(px, py, particle.size, 0, Math.PI * 2);
                 ctx.fill();
-            });
+                });
+            }
             
             // Update and draw backward particles
-            linkParticles.backward.forEach(particle => {
+            if (linkParticles.backward && Array.isArray(linkParticles.backward)) {
+                linkParticles.backward.forEach(particle => {
                 particle.progress += (particle.speed * 0.005);
                 if (particle.progress > 1) particle.progress -= 1;
                 
@@ -487,7 +492,8 @@
                 ctx.beginPath();
                 ctx.arc(px, py, particle.size, 0, Math.PI * 2);
                 ctx.fill();
-            });
+                });
+            }
             ctx.restore();
         }
 
@@ -707,6 +713,12 @@
         }
 
         function formatValue(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            if (typeof value !== 'number') {
+                return String(value);
+            }
             if (value >= 1000000000) {
                 return (value / 1000000000).toFixed(1) + 'G';
             } else if (value >= 1000000) {
