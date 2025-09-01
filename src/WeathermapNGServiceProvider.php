@@ -15,7 +15,7 @@ class WeathermapNGServiceProvider extends ServiceProvider
     {
         // Register config
         $this->mergeConfigFrom(
-            __DIR__ . '/config/weathermapng.php', 'weathermapng'
+            __DIR__ . '/../config/weathermapng.php', 'weathermapng'
         );
     }
 
@@ -27,30 +27,30 @@ class WeathermapNGServiceProvider extends ServiceProvider
     public function boot()
     {
         // Register views with namespace
-        $this->loadViewsFrom(__DIR__ . '/Resources/views/weathermapng', 'weathermapng');
+        $this->loadViewsFrom(__DIR__ . '/../Resources/views/weathermapng', 'weathermapng');
         
         // Register routes
-        $this->loadRoutesFrom(__DIR__ . '/routes.php');
+        $this->loadRoutesFrom(__DIR__ . '/../routes.php');
         
         // Register migrations
-        $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
+        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
         
         // Publish assets if needed
         if ($this->app->runningInConsole()) {
             // Publish config
             $this->publishes([
-                __DIR__ . '/config/weathermapng.php' => config_path('weathermapng.php'),
+                __DIR__ . '/../config/weathermapng.php' => config_path('weathermapng.php'),
             ], 'weathermapng-config');
             
             // Publish views
             $this->publishes([
-                __DIR__ . '/Resources/views' => resource_path('views/vendor/weathermapng'),
+                __DIR__ . '/../Resources/views' => resource_path('views/vendor/weathermapng'),
             ], 'weathermapng-views');
             
             // Publish assets
             $this->publishes([
-                __DIR__ . '/css' => public_path('plugins/WeathermapNG/css'),
-                __DIR__ . '/js' => public_path('plugins/WeathermapNG/js'),
+                __DIR__ . '/../css' => public_path('plugins/WeathermapNG/css'),
+                __DIR__ . '/../js' => public_path('plugins/WeathermapNG/js'),
             ], 'weathermapng-assets');
         }
     }
