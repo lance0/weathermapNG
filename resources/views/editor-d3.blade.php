@@ -551,16 +551,42 @@
     </div>
 </div>
 
-<!-- Keyboard Shortcuts Modal -->
+<!-- Help & Shortcuts Modal -->
 <div class="modal fade" id="shortcutsModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Keyboard Shortcuts</h5>
+                <h5 class="modal-title">Help & Shortcuts</h5>
                 <button type="button" class="close" data-dismiss="modal">&times;</button>
             </div>
             <div class="modal-body">
-                <table class="table table-sm">
+                <h6 class="mb-2">Tools</h6>
+                <ul class="small mb-3">
+                    <li><i class="fas fa-mouse-pointer"></i> Select (V) — select/edit, Shift+Click to multi-select</li>
+                    <li><i class="fas fa-hand-paper"></i> Pan (H) — drag canvas, scroll to zoom</li>
+                    <li><i class="fas fa-plus-circle"></i> Add Node (N) — click to place node</li>
+                    <li><i class="fas fa-link"></i> Add Link (L) — click source, then destination</li>
+                    <li><i class="fas fa-font"></i> Add Text (T) — add annotation (coming soon)</li>
+                    <li><i class="fas fa-trash"></i> Delete — removes selected items</li>
+                </ul>
+
+                <h6 class="mb-2">Canvas</h6>
+                <ul class="small mb-3">
+                    <li>Zoom: mouse wheel or buttons (top-right)</li>
+                    <li>Fit to Screen: zoom to fit visible content</li>
+                    <li>Grid: toggle background grid; Snap: snap nodes to grid</li>
+                </ul>
+
+                <h6 class="mb-2">Geographic Background</h6>
+                <ul class="small mb-3">
+                    <li>Enable TopoJSON presets; choose projection</li>
+                    <li>Scale/Offset to size/position the map</li>
+                    <li>Center on canvas click: shift geo center to click point</li>
+                    <li>Reset/Fit Geo: quick restore of geo sizing/position</li>
+                </ul>
+
+                <h6 class="mb-2">Shortcuts</h6>
+                <table class="table table-sm mb-3">
                     <tr><td><kbd>V</kbd></td><td>Select tool</td></tr>
                     <tr><td><kbd>H</kbd></td><td>Pan tool</td></tr>
                     <tr><td><kbd>N</kbd></td><td>Add node</td></tr>
@@ -580,7 +606,9 @@
                     <tr><td><kbd>Escape</kbd></td><td>Cancel operation</td></tr>
                     <tr><td><kbd>Arrow Keys</kbd></td><td>Move selected</td></tr>
                     <tr><td><kbd>Shift+Click</kbd></td><td>Multi-select</td></tr>
+                    <tr><td><kbd>?</kbd></td><td>Open Help</td></tr>
                 </table>
+                <div class="small text-muted">See docs/EDITOR_D3.md for more details.</div>
             </div>
         </div>
     </div>
@@ -1443,6 +1471,7 @@ class WeathermapEditor {
                     case 'n': this.setTool('add-node'); break;
                     case 'l': this.setTool('add-link'); break;
                     case 't': this.setTool('add-text'); break;
+                    case '?': try { $('#shortcutsModal').modal('show'); } catch(err) {} break;
                     case 'g': document.getElementById('gridToggle').click(); break;
                     case 's': 
                         if (!e.ctrlKey) document.getElementById('snapToggle').click(); 
@@ -2356,6 +2385,14 @@ kbd {
     border-radius: 3px;
     padding: 2px 4px;
     font-size: 0.9em;
+}
+
+/* Sticky apply rows in property panels */
+.sticky-apply {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(to top, rgba(255,255,255,1), rgba(255,255,255,0.85));
+    z-index: 2;
 }
 </style>
 @endsection
