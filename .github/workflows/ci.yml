@@ -21,7 +21,7 @@ jobs:
           extensions: gd, json, mbstring
 
       - name: Cache Composer dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: vendor
           key: ${{ runner.os }}-php81-composer-${{ hashFiles('**/composer.lock') }}
