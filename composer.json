@@ -22,7 +22,7 @@
         "phpunit/phpunit": "^9.0|^10.0",
         "mockery/mockery": "^1.4",
         "fakerphp/faker": "^1.20",
-        "squizlabs/php_codesniffer": "^3.6",
+        "squizlabs/php_codesniffer": "^4.0",
         "phpmd/phpmd": "^2.12"
     },
   "autoload": {
