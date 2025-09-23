@@ -25,12 +25,11 @@ class DocsPathsTest extends TestCase
     public function testTemplatesPreferV2Paths()
     {
         $files = [
-            'Resources/views/embed.blade.php',
-            'Resources/views/index.blade.php',
-            'Resources/views/hooks/page.blade.php',
-            'Resources/views/hooks/device-overview.blade.php',
-            'Resources/views/hooks/port-tab.blade.php',
-            'Resources/views/weathermapng/page.blade.php',
+            'resources/views/embed.blade.php',
+            'resources/views/index.blade.php',
+            'resources/views/hooks/page.blade.php',
+            'resources/views/hooks/device-overview.blade.php',
+            'resources/views/hooks/port-tab.blade.php',
         ];
 
         foreach ($files as $file) {

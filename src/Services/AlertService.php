@@ -17,7 +17,9 @@ class AlertService
     public function deviceAlerts(array $deviceIds): array
     {
         $out = [];
-        if (empty($deviceIds)) return $out;
+        if (empty($deviceIds)) {
+            return $out;
+        }
 
         try {
             // Attempt modern schema: alerts table with device_id
@@ -27,9 +29,13 @@ class AlertService
                 ->get();
             foreach ($rows as $r) {
                 $devId = (int) ($r->device_id ?? 0);
-                if (!$devId) continue;
+                if (!$devId) {
+                    continue;
+                }
                 $sev = $this->normalizeSeverity($r->severity ?? null);
-                if (!isset($out[$devId])) $out[$devId] = ['count' => 0, 'severity' => 'warning'];
+                if (!isset($out[$devId])) {
+                    $out[$devId] = ['count' => 0, 'severity' => 'warning'];
+                }
                 $out[$devId]['count']++;
                 $out[$devId]['severity'] = $this->maxSeverity($out[$devId]['severity'], $sev);
             }
@@ -46,9 +52,13 @@ class AlertService
                 ->get();
             foreach ($rows as $r) {
                 $devId = (int) ($r->entity_id ?? 0);
-                if (!$devId) continue;
+                if (!$devId) {
+                    continue;
+                }
                 $sev = $this->normalizeSeverity($r->severity ?? null);
-                if (!isset($out[$devId])) $out[$devId] = ['count' => 0, 'severity' => 'warning'];
+                if (!isset($out[$devId])) {
+                    $out[$devId] = ['count' => 0, 'severity' => 'warning'];
+                }
                 $out[$devId]['count']++;
                 $out[$devId]['severity'] = $this->maxSeverity($out[$devId]['severity'], $sev);
             }
@@ -62,7 +72,9 @@ class AlertService
     public function portAlerts(array $portIds): array
     {
         $out = [];
-        if (empty($portIds)) return $out;
+        if (empty($portIds)) {
+            return $out;
+        }
 
         try {
             // entity-based schema is most common for ports
@@ -73,9 +85,13 @@ class AlertService
                 ->get();
             foreach ($rows as $r) {
                 $pid = (int) ($r->entity_id ?? 0);
-                if (!$pid) continue;
+                if (!$pid) {
+                    continue;
+                }
                 $sev = $this->normalizeSeverity($r->severity ?? null);
-                if (!isset($out[$pid])) $out[$pid] = ['count' => 0, 'severity' => 'warning'];
+                if (!isset($out[$pid])) {
+                    $out[$pid] = ['count' => 0, 'severity' => 'warning'];
+                }
                 $out[$pid]['count']++;
                 $out[$pid]['severity'] = $this->maxSeverity($out[$pid]['severity'], $sev);
             }
@@ -91,7 +107,9 @@ class AlertService
                 ->get();
             foreach ($rows as $r) {
                 $pid = (int) ($r->port_id ?? 0);
-                if (!$pid) continue;
+                if (!$pid) {
+                    continue;
+                }
                 $out[$pid] = ['count' => 1, 'severity' => 'critical'];
             }
         } catch (\Throwable $e) {
@@ -103,12 +121,20 @@ class AlertService
 
     private function normalizeSeverity($sev): string
     {
-        if ($sev === null) return 'warning';
+        if ($sev === null) {
+            return 'warning';
+        }
         if (is_numeric($sev)) {
             $n = (int) $sev;
-            if ($n >= 3) return 'severe';
-            if ($n >= 2) return 'critical';
-            if ($n >= 1) return 'warning';
+            if ($n >= 3) {
+                return 'severe';
+            }
+            if ($n >= 2) {
+                return 'critical';
+            }
+            if ($n >= 1) {
+                return 'warning';
+            }
             return 'ok';
         }
         $s = strtolower((string) $sev);
@@ -122,4 +148,3 @@ class AlertService
         return $wa >= $wb ? $a : $b;
     }
 }
-

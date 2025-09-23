@@ -339,8 +339,12 @@ class MapController
                         $srcKey = $l['src_node_id'] ?? $l['src'] ?? $l['source'] ?? null;
                         $dstKey = $l['dst_node_id'] ?? $l['dst'] ?? $l['target'] ?? null;
                         // Handle D3 objects {source: {id}, target: {id}}
-                        if (is_array($srcKey)) { $srcKey = $srcKey['id'] ?? $srcKey['node_id'] ?? null; }
-                        if (is_array($dstKey)) { $dstKey = $dstKey['id'] ?? $dstKey['node_id'] ?? null; }
+                        if (is_array($srcKey)) {
+                            $srcKey = $srcKey['id'] ?? $srcKey['node_id'] ?? null;
+                        }
+                        if (is_array($dstKey)) {
+                            $dstKey = $dstKey['id'] ?? $dstKey['node_id'] ?? null;
+                        }
                         $srcId = $nodeIdMap[(string)$srcKey] ?? (is_numeric($srcKey) ? (int)$srcKey : null);
                         $dstId = $nodeIdMap[(string)$dstKey] ?? (is_numeric($dstKey) ? (int)$dstKey : null);
                         if (!$srcId || !$dstId) {
@@ -463,7 +467,7 @@ class MapController
             if (class_exists('\\App\\Models\\Device')) {
                 $q = \App\Models\Device::where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
                 if (!empty($osParts)) {
-                    $q->where(function($qb) use ($osParts) {
+                    $q->where(function ($qb) use ($osParts) {
                         foreach ($osParts as $i => $part) {
                             $method = $i === 0 ? 'where' : 'orWhere';
                             $qb->$method('os', 'like', '%' . $part . '%');
@@ -474,7 +478,7 @@ class MapController
             } else {
                 $q = \DB::table('devices')->where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
                 if (!empty($osParts)) {
-                    $q->where(function($qb) use ($osParts) {
+                    $q->where(function ($qb) use ($osParts) {
                         foreach ($osParts as $i => $part) {
                             $method = $i === 0 ? 'where' : 'orWhere';
                             $qb->$method('os', 'like', '%' . $part . '%');
@@ -489,11 +493,22 @@ class MapController
             $nodeIdsByDevice = $existing;
 
             // Create missing nodes with a temporary rough grid layout (will be repositioned below)
-            $x = 100; $y = 100; $step = 120; $cols = 8; $i = 0;
+            $x = 100;
+            $y = 100;
+            $step = 120;
+            $cols = 8;
+            $i = 0;
             foreach ($devices as $dev) {
                 $did = (int)($dev['device_id'] ?? 0);
-                if (!$did) continue;
-                if ($minDegree > 0) { $dval = $deg[$did] ?? 0; if ($dval < $minDegree) continue; }
+                if (!$did) {
+                    continue;
+                }
+                if ($minDegree > 0) {
+                    $dval = $deg[$did] ?? 0;
+                    if ($dval < $minDegree) {
+                        continue;
+                    }
+                }
                 if (!isset($nodeIdsByDevice[$did])) {
                     $node = Node::create([
                         'map_id' => $map->id,
@@ -504,28 +519,43 @@ class MapController
                         'meta' => ['icon' => 'switch'],
                     ]);
                     $nodeIdsByDevice[$did] = $node->id;
-                    $i++; $x += $step; if ($i % $cols === 0) { $x = 100; $y += $step; }
+                    $i++;
+                    $x += $step;
+                    if ($i % $cols === 0) {
+                        $x = 100;
+                        $y += $step;
+                    }
                 }
             }
 
             // Discover links using 'links' table if present
             $linksInserted = 0;
             try {
-                $links = \DB::table('links')->select('local_port_id','remote_port_id')->limit(2000)->get();
+                $links = \DB::table('links')->select('local_port_id', 'remote_port_id')->limit(2000)->get();
                 foreach ($links as $lnk) {
-                    $pa = (int)$lnk->local_port_id; $pb = (int)$lnk->remote_port_id;
-                    if (!$pa || !$pb) continue;
+                    $pa = (int)$lnk->local_port_id;
+                    $pb = (int)$lnk->remote_port_id;
+                    if (!$pa || !$pb) {
+                        continue;
+                    }
                     // lookup ports to get device ids
                     $rowA = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
                     $rowB = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                    if (!$rowA || !$rowB) continue;
-                    $da = (int)$rowA->device_id; $db = (int)$rowB->device_id;
+                    if (!$rowA || !$rowB) {
+                        continue;
+                    }
+                    $da = (int)$rowA->device_id;
+                    $db = (int)$rowB->device_id;
                     $srcNodeId = $nodeIdsByDevice[$da] ?? null;
                     $dstNodeId = $nodeIdsByDevice[$db] ?? null;
-                    if (!$srcNodeId || !$dstNodeId) continue;
+                    if (!$srcNodeId || !$dstNodeId) {
+                        continue;
+                    }
                     // avoid duplicates by checking existing link
                     $exists = $map->links()->where('src_node_id', $srcNodeId)->where('dst_node_id', $dstNodeId)->exists();
-                    if ($exists) continue;
+                    if ($exists) {
+                        continue;
+                    }
                     Link::create([
                         'map_id' => $map->id,
                         'src_node_id' => $srcNodeId,
@@ -540,19 +570,29 @@ class MapController
             } catch (\Exception $e) {
                 // Fallback to neighbours table
                 try {
-                    $neigh = \DB::table('neighbours')->select('port_id','remote_port_id')->limit(2000)->get();
+                    $neigh = \DB::table('neighbours')->select('port_id', 'remote_port_id')->limit(2000)->get();
                     foreach ($neigh as $n) {
-                        $pa = (int)$n->port_id; $pb = (int)$n->remote_port_id;
-                        if (!$pa || !$pb) continue;
+                        $pa = (int)$n->port_id;
+                        $pb = (int)$n->remote_port_id;
+                        if (!$pa || !$pb) {
+                            continue;
+                        }
                         $rowA = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
                         $rowB = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                        if (!$rowA || !$rowB) continue;
-                        $da = (int)$rowA->device_id; $db = (int)$rowB->device_id;
+                        if (!$rowA || !$rowB) {
+                            continue;
+                        }
+                        $da = (int)$rowA->device_id;
+                        $db = (int)$rowB->device_id;
                         $srcNodeId = $nodeIdsByDevice[$da] ?? null;
                         $dstNodeId = $nodeIdsByDevice[$db] ?? null;
-                        if (!$srcNodeId || !$dstNodeId) continue;
+                        if (!$srcNodeId || !$dstNodeId) {
+                            continue;
+                        }
                         $exists = $map->links()->where('src_node_id', $srcNodeId)->where('dst_node_id', $dstNodeId)->exists();
-                        if ($exists) continue;
+                        if ($exists) {
+                            continue;
+                        }
                         Link::create([
                             'map_id' => $map->id,
                             'src_node_id' => $srcNodeId,
@@ -573,35 +613,57 @@ class MapController
             $deg = [];
             try {
                 // Prefer links table
-                $rows = \DB::table('links')->select('local_port_id','remote_port_id')->limit(5000)->get();
+                $rows = \DB::table('links')->select('local_port_id', 'remote_port_id')->limit(5000)->get();
                 foreach ($rows as $r) {
-                    $pa = (int)$r->local_port_id; $pb = (int)$r->remote_port_id;
-                    if (!$pa || !$pb) continue;
+                    $pa = (int)$r->local_port_id;
+                    $pb = (int)$r->remote_port_id;
+                    if (!$pa || !$pb) {
+                        continue;
+                    }
                     $ra = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
                     $rb = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                    if ($ra) { $d = (int)$ra->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
-                    if ($rb) { $d = (int)$rb->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
+                    if ($ra) {
+                        $d = (int)$ra->device_id;
+                        $deg[$d] = ($deg[$d] ?? 0) + 1;
+                    }
+                    if ($rb) {
+                        $d = (int)$rb->device_id;
+                        $deg[$d] = ($deg[$d] ?? 0) + 1;
+                    }
                 }
             } catch (\Exception $e) {
                 try {
-                    $rows = \DB::table('neighbours')->select('port_id','remote_port_id')->limit(5000)->get();
+                    $rows = \DB::table('neighbours')->select('port_id', 'remote_port_id')->limit(5000)->get();
                     foreach ($rows as $r) {
-                        $pa = (int)$r->port_id; $pb = (int)$r->remote_port_id;
-                        if (!$pa || !$pb) continue;
+                        $pa = (int)$r->port_id;
+                        $pb = (int)$r->remote_port_id;
+                        if (!$pa || !$pb) {
+                            continue;
+                        }
                         $ra = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
                         $rb = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                        if ($ra) { $d = (int)$ra->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
-                        if ($rb) { $d = (int)$rb->device_id; $deg[$d] = ($deg[$d] ?? 0) + 1; }
+                        if ($ra) {
+                            $d = (int)$ra->device_id;
+                            $deg[$d] = ($deg[$d] ?? 0) + 1;
+                        }
+                        if ($rb) {
+                            $d = (int)$rb->device_id;
+                            $deg[$d] = ($deg[$d] ?? 0) + 1;
+                        }
                     }
-                } catch (\Exception $e2) {}
+                } catch (\Exception $e2) {
+                }
             }
 
             // Layout: center high-degree devices, then rings for the rest
             $ids = array_keys($nodeIdsByDevice);
-            usort($ids, function($a,$b) use ($deg) { return ($deg[$b] ?? 0) <=> ($deg[$a] ?? 0); });
+            usort($ids, function ($a, $b) use ($deg) {
+                return ($deg[$b] ?? 0) <=> ($deg[$a] ?? 0);
+            });
             $total = count($ids);
             if ($total > 0) {
-                $centerX = 800; $centerY = 600; // general center; editor may rescale
+                $centerX = 800;
+                $centerY = 600; // general center; editor may rescale
                 $ring1 = max(4, (int)ceil($total * 0.15));
                 $ring2 = max(6, (int)ceil($total * 0.35));
                 $radii = [180, 320, 480];
@@ -611,7 +673,9 @@ class MapController
                     $angleStep = 2 * M_PI / $n;
                     foreach ($batch as $k => $devId) {
                         $nodeId = $nodeIdsByDevice[$devId] ?? null;
-                        if (!$nodeId) continue;
+                        if (!$nodeId) {
+                            continue;
+                        }
                         $angle = $k * $angleStep;
                         $x = (int)round($centerX + $radii[$ri] * cos($angle));
                         $y = (int)round($centerY + $radii[$ri] * sin($angle));

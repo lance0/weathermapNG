@@ -17,16 +17,16 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.1
+           php-version: 8.2
           extensions: gd, json, mbstring
 
       - name: Cache Composer dependencies
         uses: actions/cache@v3
         with:
           path: vendor
-          key: ${{ runner.os }}-php81-composer-${{ hashFiles('**/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-php81-composer-
+           key: ${{ runner.os }}-php82-composer-${{ hashFiles('**/composer.lock') }}
+           restore-keys: |
+             ${{ runner.os }}-php82-composer-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
