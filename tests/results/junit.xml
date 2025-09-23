@@ -1,44 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="/home/lance/weathermapNG/phpunit.xml" tests="5" assertions="0" errors="5" failures="0" skipped="0" time="0.005026">
-    <testsuite name="All Tests" tests="5" assertions="0" errors="5" failures="0" skipped="0" time="0.005026">
-      <testsuite name="LibMapTest" file="/home/lance/weathermapNG/tests/LibMapTest.php" tests="2" assertions="0" errors="2" failures="0" skipped="0" time="0.004680">
-        <testcase name="test_parses_example_config" file="/home/lance/weathermapNG/tests/LibMapTest.php" line="15" class="LibMapTest" classname="LibMapTest" assertions="0" time="0.004523">
-          <error type="Error">LibMapTest::test_parses_example_config
-Error: Class "LibreNMS\Plugins\WeathermapNG\Map" not found
+  <testsuite name="/home/lance/weathermapNG/phpunit.xml" tests="27" assertions="102" errors="4" failures="2" skipped="0" time="0.024060">
+    <testsuite name="All Tests" tests="27" assertions="102" errors="4" failures="2" skipped="0" time="0.024060">
+      <testsuite name="DocsPathsTest" file="/home/lance/weathermapNG/tests/DocsPathsTest.php" tests="2" assertions="25" errors="0" failures="0" skipped="0" time="0.002641">
+        <testcase name="testDocsUseV2Paths" file="/home/lance/weathermapNG/tests/DocsPathsTest.php" line="15" class="DocsPathsTest" classname="DocsPathsTest" assertions="15" time="0.002100"/>
+        <testcase name="testTemplatesPreferV2Paths" file="/home/lance/weathermapNG/tests/DocsPathsTest.php" line="25" class="DocsPathsTest" classname="DocsPathsTest" assertions="10" time="0.000542"/>
+      </testsuite>
+      <testsuite name="LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest" file="/home/lance/weathermapNG/tests/InstallationTest.php" tests="5" assertions="17" errors="0" failures="1" skipped="0" time="0.004859">
+        <testcase name="testPluginCanBeInstantiated" file="/home/lance/weathermapNG/tests/InstallationTest.php" line="10" class="LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest" classname="LibreNMS.Plugins.WeathermapNG.Tests.InstallationTest" assertions="1" time="0.000532"/>
+        <testcase name="testPluginHasRequiredMethods" file="/home/lance/weathermapNG/tests/InstallationTest.php" line="16" class="LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest" classname="LibreNMS.Plugins.WeathermapNG.Tests.InstallationTest" assertions="5" time="0.000128"/>
+        <testcase name="testPluginInfoIsCorrect" file="/home/lance/weathermapNG/tests/InstallationTest.php" line="27" class="LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest" classname="LibreNMS.Plugins.WeathermapNG.Tests.InstallationTest" assertions="4" time="0.000165"/>
+        <testcase name="testRequirementsCheckMethodExists" file="/home/lance/weathermapNG/tests/InstallationTest.php" line="38" class="LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest" classname="LibreNMS.Plugins.WeathermapNG.Tests.InstallationTest" assertions="3" time="0.000254"/>
+        <testcase name="testDefaultConfigStructure" file="/home/lance/weathermapNG/tests/InstallationTest.php" line="53" class="LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest" classname="LibreNMS.Plugins.WeathermapNG.Tests.InstallationTest" assertions="4" time="0.003780">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">LibreNMS\Plugins\WeathermapNG\Tests\InstallationTest::testDefaultConfigStructure
+Failed asserting that an array has the key 'colors'.
 
-/home/lance/weathermapNG/tests/LibMapTest.php:17</error>
-        </testcase>
-        <testcase name="test_to_array_structure_is_reasonable" file="/home/lance/weathermapNG/tests/LibMapTest.php" line="45" class="LibMapTest" classname="LibMapTest" assertions="0" time="0.000157">
-          <error type="Error">LibMapTest::test_to_array_structure_is_reasonable
-Error: Class "LibreNMS\Plugins\WeathermapNG\Map" not found
-
-/home/lance/weathermapNG/tests/LibMapTest.php:47</error>
+/home/lance/weathermapNG/tests/InstallationTest.php:66</failure>
         </testcase>
       </testsuite>
-      <testsuite name="LinkUtilizationTest" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" tests="2" assertions="0" errors="2" failures="0" skipped="0" time="0.000250">
-        <testcase name="test_link_utilization_uses_max_direction" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" line="27" class="LinkUtilizationTest" classname="LinkUtilizationTest" assertions="0" time="0.000150">
-          <error type="Error">LinkUtilizationTest::test_link_utilization_uses_max_direction
-Error: Class "LibreNMS\Plugins\WeathermapNG\Node" not found
+      <testsuite name="LibMapTest" file="/home/lance/weathermapNG/tests/LibMapTest.php" tests="2" assertions="3" errors="1" failures="1" skipped="0" time="0.007436">
+        <testcase name="test_parses_example_config" file="/home/lance/weathermapNG/tests/LibMapTest.php" line="15" class="LibMapTest" classname="LibMapTest" assertions="2" time="0.007002">
+          <error type="Error">LibMapTest::test_parses_example_config
+Error: Call to a member function connection() on null
 
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:1820
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:1786
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:1577
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:1496
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:1532
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:1485
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:2335
+/home/lance/weathermapNG/tests/LibMapTest.php:21</error>
+        </testcase>
+        <testcase name="test_to_array_structure_is_reasonable" file="/home/lance/weathermapNG/tests/LibMapTest.php" line="45" class="LibMapTest" classname="LibMapTest" assertions="1" time="0.000434">
+          <failure type="PHPUnit\Framework\ExpectationFailedException">LibMapTest::test_to_array_structure_is_reasonable
+Failed asserting that an array has the key 'id'.
+
+/home/lance/weathermapNG/tests/LibMapTest.php:50</failure>
+        </testcase>
+      </testsuite>
+      <testsuite name="LinkUtilizationTest" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" tests="2" assertions="0" errors="2" failures="0" skipped="0" time="0.000270">
+        <testcase name="test_link_utilization_uses_max_direction" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" line="27" class="LinkUtilizationTest" classname="LinkUtilizationTest" assertions="0" time="0.000183">
+          <error type="TypeError">LinkUtilizationTest::test_link_utilization_uses_max_direction
+TypeError: Illuminate\Database\Eloquent\Model::__construct(): Argument #1 ($attributes) must be of type array, string given, called in /home/lance/weathermapNG/tests/LinkUtilizationTest.php on line 11
+
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:234
 /home/lance/weathermapNG/tests/LinkUtilizationTest.php:11
 /home/lance/weathermapNG/tests/LinkUtilizationTest.php:29</error>
         </testcase>
-        <testcase name="test_link_status_thresholds" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" line="43" class="LinkUtilizationTest" classname="LinkUtilizationTest" assertions="0" time="0.000100">
-          <error type="Error">LinkUtilizationTest::test_link_status_thresholds
-Error: Class "LibreNMS\Plugins\WeathermapNG\Node" not found
+        <testcase name="test_link_status_thresholds" file="/home/lance/weathermapNG/tests/LinkUtilizationTest.php" line="43" class="LinkUtilizationTest" classname="LinkUtilizationTest" assertions="0" time="0.000088">
+          <error type="TypeError">LinkUtilizationTest::test_link_status_thresholds
+TypeError: Illuminate\Database\Eloquent\Model::__construct(): Argument #1 ($attributes) must be of type array, string given, called in /home/lance/weathermapNG/tests/LinkUtilizationTest.php on line 11
 
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:234
 /home/lance/weathermapNG/tests/LinkUtilizationTest.php:11
 /home/lance/weathermapNG/tests/LinkUtilizationTest.php:45</error>
         </testcase>
       </testsuite>
-      <testsuite name="NodeDataTest" file="/home/lance/weathermapNG/tests/NodeDataTest.php" tests="1" assertions="0" errors="1" failures="0" skipped="0" time="0.000096">
-        <testcase name="test_current_avg_max_values" file="/home/lance/weathermapNG/tests/NodeDataTest.php" line="8" class="NodeDataTest" classname="NodeDataTest" assertions="0" time="0.000096">
-          <error type="Error">NodeDataTest::test_current_avg_max_values
-Error: Class "LibreNMS\Plugins\WeathermapNG\Node" not found
+      <testsuite name="NodeDataTest" file="/home/lance/weathermapNG/tests/NodeDataTest.php" tests="1" assertions="0" errors="1" failures="0" skipped="0" time="0.000080">
+        <testcase name="test_current_avg_max_values" file="/home/lance/weathermapNG/tests/NodeDataTest.php" line="8" class="NodeDataTest" classname="NodeDataTest" assertions="0" time="0.000080">
+          <error type="TypeError">NodeDataTest::test_current_avg_max_values
+TypeError: Illuminate\Database\Eloquent\Model::__construct(): Argument #1 ($attributes) must be of type array, string given, called in /home/lance/weathermapNG/tests/NodeDataTest.php on line 10
 
+/home/lance/weathermapNG/vendor/illuminate/database/Eloquent/Model.php:234
 /home/lance/weathermapNG/tests/NodeDataTest.php:10</error>
         </testcase>
+      </testsuite>
+      <testsuite name="RoutesSmokeTest" file="/home/lance/weathermapNG/tests/RoutesSmokeTest.php" tests="2" assertions="22" errors="0" failures="0" skipped="0" time="0.001818">
+        <testcase name="testControllersExist" file="/home/lance/weathermapNG/tests/RoutesSmokeTest.php" line="7" class="RoutesSmokeTest" classname="RoutesSmokeTest" assertions="3" time="0.001515"/>
+        <testcase name="testRoutesFileContainsExpectedPaths" file="/home/lance/weathermapNG/tests/RoutesSmokeTest.php" line="14" class="RoutesSmokeTest" classname="RoutesSmokeTest" assertions="19" time="0.000303"/>
+      </testsuite>
+      <testsuite name="InstallFunctionsTest" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" tests="13" assertions="35" errors="0" failures="0" skipped="0" time="0.006955">
+        <testcase name="testPHPVersionCheck" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="39" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="1" time="0.001067"/>
+        <testcase name="testRequiredExtensions" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="47" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="4" time="0.000393"/>
+        <testcase name="testConfigFileCreation" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="59" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="5" time="0.000734"/>
+        <testcase name="testOutputDirectoryCreation" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="90" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="3" time="0.000550"/>
+        <testcase name="testPermissionSetting" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="103" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="2" time="0.000464"/>
+        <testcase name="testDockerDetection" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="121" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="2" time="0.000359"/>
+        <testcase name="testLibreNMSPathDetection" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="135" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="2" time="0.000798"/>
+        <testcase name="testComposerFileValidation" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="155" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="3" time="0.000410"/>
+        <testcase name="testLogFileCreation" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="179" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="3" time="0.000389"/>
+        <testcase name="testPluginJsonStructure" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="200" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="4" time="0.000383"/>
+        <testcase name="testRequiredFilesExistence" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="227" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="4" time="0.000410"/>
+        <testcase name="testEnvironmentVariables" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="246" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="1" time="0.000370"/>
+        <testcase name="testScriptExecutability" file="/home/lance/weathermapNG/tests/unit/InstallFunctionsTest.php" line="258" class="InstallFunctionsTest" classname="InstallFunctionsTest" assertions="1" time="0.000628"/>
       </testsuite>
     </testsuite>
   </testsuite>

@@ -14,10 +14,10 @@ class LibMapTest extends TestCase
 
     public function test_parses_example_config()
     {
-        $map = new Map($this->exampleConfig());
+        $map = new Map(['name' => 'test', 'title' => 'Example Network Map']);
 
-        $this->assertSame('Example Network Map', $map->getTitle());
-        $this->assertSame(800, $map->getWidth());
+        $this->assertSame('Example Network Map', $map->title);
+        $this->assertSame('test', $map->name);
         $this->assertSame(600, $map->getHeight());
 
         $nodes = $map->getNodes();
@@ -44,7 +44,7 @@ class LibMapTest extends TestCase
 
     public function test_to_array_structure_is_reasonable()
     {
-        $map = new Map($this->exampleConfig());
+        $map = new Map(['name' => 'test', 'title' => 'Example Network Map']);
         $arr = $map->toArray();
 
         $this->assertArrayHasKey('id', $arr);

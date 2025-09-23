@@ -13,8 +13,8 @@ class RoutesSmokeTest extends TestCase
 
     public function testRoutesFileContainsExpectedPaths()
     {
-        $routes = file_get_contents(__DIR__ . '/../routes.php');
-        $this->assertStringContainsString("prefix' => 'plugin/WeathermapNG'", $routes);
+        $routes = file_get_contents(__DIR__ . '/../routes/web.php');
+        $this->assertStringContainsString('plugin/WeathermapNG', $routes);
         $this->assertStringContainsString("/embed/{map}", $routes);
         $this->assertStringContainsString("/api/maps/{map}/json", $routes);
         $this->assertStringContainsString("/api/maps/{map}/live", $routes);

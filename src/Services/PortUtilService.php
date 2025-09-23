@@ -97,7 +97,9 @@ class PortUtilService
 
         // Last resort: SNMP fetch if enabled
         $snmp = $this->fetchFromSNMP($portId);
-        if ($snmp) return $snmp;
+        if ($snmp) {
+            return $snmp;
+        }
 
         return ['in' => 0, 'out' => 0];
     }
@@ -109,7 +111,9 @@ class PortUtilService
     {
         try {
             $rrdPath = $this->resolvePortRrdPath($port);
-            if (!$rrdPath || !file_exists($rrdPath)) return null;
+            if (!$rrdPath || !file_exists($rrdPath)) {
+                return null;
+            }
 
             // Get current values
             $inBps = $this->rrdTool->getLastValue($rrdPath, 'traffic_in');
@@ -175,16 +179,24 @@ class PortUtilService
         try {
             // need device hostname and ifIndex for this port
             $port = $this->getPortInfo($portId);
-            if (!$port) return null;
+            if (!$port) {
+                return null;
+            }
             $device = $this->getDeviceInfo($port->device_id ?? $port['device_id']);
-            if (!$device) return null;
+            if (!$device) {
+                return null;
+            }
 
             $host = $device->hostname ?? ($device['hostname'] ?? null);
             $ifIndex = $port->ifIndex ?? ($port['ifIndex'] ?? null);
-            if (!$host || !$ifIndex) return null;
+            if (!$host || !$ifIndex) {
+                return null;
+            }
 
             $community = $snmpCfg['community'] ?? null;
-            if (!$community) return null;
+            if (!$community) {
+                return null;
+            }
 
             $base = ".1.3.6.1.2.1.31.1.1.1"; // IF-MIB::ifXTable
             $oids = [
@@ -198,10 +210,14 @@ class PortUtilService
             // get counters
             $rawIn = @snmp2_get($host, $community, $oids['in'], $opts['timeout'], $opts['retries']);
             $rawOut = @snmp2_get($host, $community, $oids['out'], $opts['timeout'], $opts['retries']);
-            if ($rawIn === false || $rawOut === false) return null;
+            if ($rawIn === false || $rawOut === false) {
+                return null;
+            }
             $cntIn = $this->parseSnmpValue($rawIn);
             $cntOut = $this->parseSnmpValue($rawOut);
-            if ($cntIn === null || $cntOut === null) return null;
+            if ($cntIn === null || $cntOut === null) {
+                return null;
+            }
 
             // compute rate from last cached counters
             $cacheKey = "weathermapng.snmp.counter.$portId";
@@ -225,25 +241,33 @@ class PortUtilService
 
     private function parseSnmpValue($val): ?float
     {
-        if (is_numeric($val)) return (float)$val;
+        if (is_numeric($val)) {
+            return (float)$val;
+        }
         if (is_string($val)) {
             // Values come like: Counter64: 12345
             if (strpos($val, ':') !== false) {
                 $parts = explode(':', $val, 2);
                 $n = trim($parts[1]);
-                if (is_numeric($n)) return (float)$n;
+                if (is_numeric($n)) {
+                    return (float)$n;
+                }
             }
             $n = trim($val);
-            if (is_numeric($n)) return (float)$n;
+            if (is_numeric($n)) {
+                return (float)$n;
+            }
         }
         return null;
     }
 
     private function counterDelta($cur, $prev): float
     {
-        if ($cur >= $prev) return $cur - $prev;
+        if ($cur >= $prev) {
+            return $cur - $prev;
+        }
         // wrap (assume 64-bit)
-        return (float) ((2**64 - $prev) + $cur);
+        return (float) ((2 ** 64 - $prev) + $cur);
     }
 
     /**
@@ -332,7 +356,9 @@ class PortUtilService
     {
         try {
             $rrdPath = $this->resolvePortRrdPath($port);
-            if (!$rrdPath || !file_exists($rrdPath)) return [];
+            if (!$rrdPath || !file_exists($rrdPath)) {
+                return [];
+            }
 
             return $this->rrdTool->fetch($rrdPath, $metric, $period);
         } catch (\Exception $e) {
@@ -349,7 +375,9 @@ class PortUtilService
         $deviceId = $port->device_id ?? $port['device_id'] ?? null;
         $ifIndex  = $port->ifIndex   ?? $port['ifIndex']   ?? null;
         $portId   = $port->port_id   ?? $port['port_id']   ?? null;
-        if (!$deviceId) return null;
+        if (!$deviceId) {
+            return null;
+        }
 
         // Determine device RRD directory
         $device = $this->getDeviceInfo((int)$deviceId);
@@ -369,14 +397,22 @@ class PortUtilService
                 $deviceDir = rtrim($rrdBase, '/') . '/' . $device['hostname'];
             }
         }
-        if (!$deviceDir) return null;
+        if (!$deviceDir) {
+            return null;
+        }
 
         // Try common filename patterns: port-id{port_id}.rrd and port-{ifIndex}.rrd
         $candidates = [];
-        if ($portId)  $candidates[] = $deviceDir . '/port-id' . $portId . '.rrd';
-        if ($ifIndex) $candidates[] = $deviceDir . '/port-' . $ifIndex . '.rrd';
+        if ($portId) {
+            $candidates[] = $deviceDir . '/port-id' . $portId . '.rrd';
+        }
+        if ($ifIndex) {
+            $candidates[] = $deviceDir . '/port-' . $ifIndex . '.rrd';
+        }
         foreach ($candidates as $p) {
-            if (file_exists($p)) return $p;
+            if (file_exists($p)) {
+                return $p;
+            }
         }
         return null;
     }
@@ -387,7 +423,8 @@ class PortUtilService
      */
     public function deviceAggregateBits(int $deviceId, int $limit = 32): array
     {
-        $in = 0; $out = 0;
+        $in = 0;
+        $out = 0;
         try {
             // Prefer up ports, highest speeds first
             $ports = DB::table('ports')

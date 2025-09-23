@@ -2,7 +2,7 @@
   "name": "librenms/weathermapng",
   "description": "Next-generation Weathermap plugin for LibreNMS",
   "type": "librenms-plugin",
-  "version": "1.0.0",
+    "version": "1.1.0",
   "license": "Unlicense",
   "authors": [
     { "name": "LibreNMS Community", "email": "info@librenms.org" }
@@ -33,10 +33,7 @@
   "autoload-dev": {
     "psr-4": {
       "LibreNMS\\Plugins\\WeathermapNG\\Tests\\": "tests/"
-    },
-    "files": [
-      "verify.php"
-    ]
+    }
   },
     "scripts": {
         "test": "phpunit",
@@ -60,7 +57,7 @@
   "extra": {
     "librenms": {
       "plugin-name": "WeathermapNG",
-      "version": "1.0.0",
+  "version": "1.1.0",
       "description": "Modern interactive network weathermap for LibreNMS",
       "author": "LibreNMS Community",
       "email": "info@librenms.org",

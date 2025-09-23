@@ -50,7 +50,7 @@ class PageController extends Controller
     public function view(Request $request, $id)
     {
         $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($id);
-        
+
         if (!$map) {
             abort(404, 'Map not found');
         }

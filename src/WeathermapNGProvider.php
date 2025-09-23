@@ -28,13 +28,14 @@ class WeathermapNGProvider extends ServiceProvider
 
         // Load routes
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
-        
+
         // Load views with namespace
         $this->loadViewsFrom(__DIR__ . '/../resources/views', $pluginName);
-        
+
         // Register config
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/config.php', 'weathermapng'
+            __DIR__ . '/../config/config.php',
+            'weathermapng'
         );
 
         // Publish assets if running in console

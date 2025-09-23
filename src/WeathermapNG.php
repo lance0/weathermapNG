@@ -1,23 +1,7 @@
 <?php
-/**
- * WeathermapNG Plugin Bootstrap
- *
- * Compatibility file for verification scripts and traditional plugin expectations.
- *
- * IMPORTANT: This plugin uses LibreNMS 24.x hook-based architecture.
- * The actual plugin functionality is implemented via hooks in:
- * - app/Plugins/WeathermapNG/Menu.php
- * - app/Plugins/WeathermapNG/Page.php
- * - app/Plugins/WeathermapNG/Settings.php
- *
- * This file exists solely for compatibility with tools that expect
- * a traditional plugin structure. All real functionality is in the hooks.
- */
 
-// No namespace to avoid conflicts
-// This file is for compatibility only
+namespace LibreNMS\Plugins\WeathermapNG;
 
-if (!class_exists('WeathermapNG')) {
 class WeathermapNG
 {
     public $name = 'WeathermapNG';
@@ -73,7 +57,7 @@ class WeathermapNG
                 'settings' => 'app/Plugins/WeathermapNG/Settings.php'
             ],
             'note' => 'This plugin uses LibreNMS 24.x hook-based architecture. ' .
-                     'Functionality is implemented via hooks, not this bootstrap file.'
+                      'Functionality is implemented via hooks, not this bootstrap file.'
         ];
     }
 
@@ -90,5 +74,31 @@ class WeathermapNG
             'architecture' => 'Hook-based (LibreNMS 24.x+)'
         ];
     }
+
+    public function checkRequirements()
+    {
+        $requirements = [
+            'php' => version_compare(PHP_VERSION, '8.0.0', '>='),
+            'gd' => extension_loaded('gd'),
+            'json' => extension_loaded('json'),
+            'pdo' => extension_loaded('pdo'),
+            'mbstring' => extension_loaded('mbstring'),
+        ];
+
+        return $requirements;
+    }
+
+    public function getDefaultConfig()
+    {
+        return [
+            'default_width' => 800,
+            'default_height' => 600,
+            'poll_interval' => 300,
+            'thresholds' => [50, 80, 95],
+            'rrd_base' => '/opt/librenms/rrd',
+            'enable_local_rrd' => true,
+            'enable_api_fallback' => true,
+            'cache_ttl' => 300,
+        ];
+    }
 }
-} // end if class_exists

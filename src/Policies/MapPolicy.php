@@ -1,4 +1,5 @@
 <?php
+
 namespace LibreNMS\Plugins\WeathermapNG\Policies;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;

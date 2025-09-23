@@ -1,4 +1,5 @@
 <?php
+
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -36,7 +37,6 @@ class InstallController extends Controller
                     'redirect' => url('plugin/WeathermapNG')
                 ]);
             }
-
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
@@ -78,7 +78,9 @@ class InstallController extends Controller
     private function checkRequirementsMet($requirements)
     {
         foreach ($requirements as $req) {
-            if (!$req['status']) return false;
+            if (!$req['status']) {
+                return false;
+            }
         }
         return true;
     }

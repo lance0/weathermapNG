@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 class HealthController
 {
     private ?Logger $logger = null;
-    
+
     protected function getLogger(): Logger
     {
         if ($this->logger === null) {
@@ -171,7 +171,7 @@ class HealthController
             ];
         }
     }
-    
+
     /**
      * Readiness probe for container orchestration
      * GET /plugin/WeathermapNG/ready
@@ -181,20 +181,20 @@ class HealthController
         try {
             // Check database connectivity
             DB::connection()->getPdo();
-            
+
             // Check critical directories
             $outputDir = config('weathermapng.output_dir', __DIR__ . '/../../../output/maps/');
             if (!is_dir($outputDir)) {
                 throw new \Exception('Output directory not found');
             }
-            
+
             return response()->json([
                 'ready' => true,
                 'timestamp' => now()->toISOString()
             ]);
         } catch (\Exception $e) {
             $this->getLogger()->error('Readiness check failed', ['error' => $e->getMessage()]);
-            
+
             return response()->json([
                 'ready' => false,
                 'error' => $e->getMessage(),
@@ -202,7 +202,7 @@ class HealthController
             ], 503);
         }
     }
-    
+
     /**
      * Liveness probe for container orchestration
      * GET /plugin/WeathermapNG/live
@@ -215,7 +215,7 @@ class HealthController
             'pid' => getmypid()
         ]);
     }
-    
+
     /**
      * Prometheus metrics endpoint
      * GET /plugin/WeathermapNG/metrics
@@ -223,44 +223,44 @@ class HealthController
     public function metrics(Request $request)
     {
         $metrics = [];
-        
+
         // Database metrics
         try {
             $mapCount = Map::count();
             $nodeCount = DB::table('wmng_nodes')->count();
             $linkCount = DB::table('wmng_links')->count();
-            
+
             $metrics[] = "# HELP weathermapng_maps_total Total number of maps";
             $metrics[] = "# TYPE weathermapng_maps_total gauge";
             $metrics[] = "weathermapng_maps_total $mapCount";
-            
+
             $metrics[] = "# HELP weathermapng_nodes_total Total number of nodes";
             $metrics[] = "# TYPE weathermapng_nodes_total gauge";
             $metrics[] = "weathermapng_nodes_total $nodeCount";
-            
+
             $metrics[] = "# HELP weathermapng_links_total Total number of links";
             $metrics[] = "# TYPE weathermapng_links_total gauge";
             $metrics[] = "weathermapng_links_total $linkCount";
         } catch (\Exception $e) {
             $this->getLogger()->error('Failed to collect metrics', ['error' => $e->getMessage()]);
         }
-        
+
         // Memory metrics
         $memoryUsage = memory_get_usage(true);
         $memoryPeak = memory_get_peak_usage(true);
-        
+
         $metrics[] = "# HELP weathermapng_memory_usage_bytes Current memory usage";
         $metrics[] = "# TYPE weathermapng_memory_usage_bytes gauge";
         $metrics[] = "weathermapng_memory_usage_bytes $memoryUsage";
-        
+
         $metrics[] = "# HELP weathermapng_memory_peak_bytes Peak memory usage";
         $metrics[] = "# TYPE weathermapng_memory_peak_bytes gauge";
         $metrics[] = "weathermapng_memory_peak_bytes $memoryPeak";
-        
+
         return response(implode("\n", $metrics) . "\n")
             ->header('Content-Type', 'text/plain; version=0.0.4');
     }
-    
+
     /**
      * Detailed health check
      * GET /plugin/WeathermapNG/health/detailed
@@ -269,25 +269,25 @@ class HealthController
     {
         $startTime = microtime(true);
         $checks = [];
-        
+
         // Database check
         $checks['database'] = $this->checkDatabase();
-        
+
         // Filesystem check
         $checks['filesystem'] = $this->checkFilesystem();
-        
+
         // Dependencies check
         $checks['dependencies'] = $this->checkDependencies();
-        
+
         // Configuration check
         $checks['configuration'] = $this->checkConfiguration();
-        
+
         // Performance metrics
         $checks['performance'] = $this->getPerformanceMetrics();
-        
+
         // Overall status
         $overallStatus = $this->determineOverallStatus($checks);
-        
+
         $response = [
             'status' => $overallStatus,
             'timestamp' => now()->toISOString(),
@@ -295,33 +295,33 @@ class HealthController
             'checks' => $checks,
             'response_time_ms' => round((microtime(true) - $startTime) * 1000, 2)
         ];
-        
+
         $statusCode = $overallStatus === 'healthy' ? 200 : 503;
-        
+
         if ($overallStatus !== 'healthy') {
             $this->getLogger()->warning('Health check detected issues', $response);
         }
-        
+
         return response()->json($response, $statusCode);
     }
-    
+
     private function checkDatabase(): array
     {
         try {
             $start = microtime(true);
             DB::connection()->getPdo();
             $responseTime = round((microtime(true) - $start) * 1000, 2);
-            
+
             // Check tables exist
             $tables = ['wmng_maps', 'wmng_nodes', 'wmng_links'];
             $missingTables = [];
-            
+
             foreach ($tables as $table) {
                 if (!\Schema::hasTable($table)) {
                     $missingTables[] = $table;
                 }
             }
-            
+
             if (!empty($missingTables)) {
                 return [
                     'status' => 'degraded',
@@ -329,7 +329,7 @@ class HealthController
                     'response_time_ms' => $responseTime
                 ];
             }
-            
+
             return [
                 'status' => 'healthy',
                 'response_time_ms' => $responseTime
@@ -341,11 +341,11 @@ class HealthController
             ];
         }
     }
-    
+
     private function checkFilesystem(): array
     {
         $checks = [];
-        
+
         // Check output directory
         $outputDir = config('weathermapng.output_dir', __DIR__ . '/../../../output/maps/');
         if (is_dir($outputDir)) {
@@ -353,11 +353,11 @@ class HealthController
         } else {
             $checks['output_directory'] = 'missing';
         }
-        
+
         // Check config directory
         $configDir = __DIR__ . '/../../../config';
         $checks['config_directory'] = is_dir($configDir) ? 'exists' : 'missing';
-        
+
         // Check log writability
         $logPath = config('logging.output', '/var/log/librenms/weathermapng.log');
         $logDir = dirname($logPath);
@@ -366,31 +366,31 @@ class HealthController
         } else {
             $checks['log_directory'] = 'missing';
         }
-        
-        $status = in_array('missing', $checks) || in_array('not_writable', $checks) 
-            ? 'degraded' 
+
+        $status = in_array('missing', $checks) || in_array('not_writable', $checks)
+            ? 'degraded'
             : 'healthy';
-        
+
         return [
             'status' => $status,
             'directories' => $checks
         ];
     }
-    
+
     private function checkDependencies(): array
     {
         $checks = [];
-        
+
         // Check PHP extensions
         $requiredExtensions = ['gd', 'json', 'pdo', 'mbstring'];
         $missingExtensions = [];
-        
+
         foreach ($requiredExtensions as $extension) {
             if (!extension_loaded($extension)) {
                 $missingExtensions[] = $extension;
             }
         }
-        
+
         if (!empty($missingExtensions)) {
             $checks['php_extensions'] = [
                 'status' => 'missing',
@@ -399,41 +399,41 @@ class HealthController
         } else {
             $checks['php_extensions'] = ['status' => 'loaded'];
         }
-        
+
         // Check Composer dependencies
         $vendorDir = __DIR__ . '/../../../vendor';
         $checks['composer'] = is_dir($vendorDir) ? 'installed' : 'missing';
-        
-        $status = !empty($missingExtensions) || $checks['composer'] === 'missing' 
-            ? 'unhealthy' 
+
+        $status = !empty($missingExtensions) || $checks['composer'] === 'missing'
+            ? 'unhealthy'
             : 'healthy';
-        
+
         return [
             'status' => $status,
             'checks' => $checks
         ];
     }
-    
+
     private function checkConfiguration(): array
     {
         $issues = [];
-        
+
         // Check for .env file
         if (!file_exists(__DIR__ . '/../../../.env')) {
             $issues[] = '.env file missing (using defaults)';
         }
-        
+
         // Check critical config values
         if (empty(config('weathermapng'))) {
             $issues[] = 'WeathermapNG configuration missing';
         }
-        
+
         return [
             'status' => empty($issues) ? 'healthy' : 'degraded',
             'issues' => $issues
         ];
     }
-    
+
     private function getPerformanceMetrics(): array
     {
         return [
@@ -443,12 +443,12 @@ class HealthController
             'load_average' => sys_getloadavg()
         ];
     }
-    
+
     private function determineOverallStatus(array $checks): string
     {
         $unhealthyCount = 0;
         $degradedCount = 0;
-        
+
         foreach ($checks as $check) {
             if (isset($check['status'])) {
                 if ($check['status'] === 'unhealthy') {
@@ -458,16 +458,16 @@ class HealthController
                 }
             }
         }
-        
+
         if ($unhealthyCount > 0) {
             return 'unhealthy';
         } elseif ($degradedCount > 0) {
             return 'degraded';
         }
-        
+
         return 'healthy';
     }
-    
+
     private function getVersion(): string
     {
         $composerJson = __DIR__ . '/../../../composer.json';
