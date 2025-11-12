@@ -32,7 +32,7 @@ services:
       bash -c "
         echo 'Starting LibreNMS with WeathermapNG...' &&
         cd /opt/librenms/html/plugins/WeathermapNG &&
-        ./install.sh &&
+        ./quick-install.sh &&
         echo 'WeathermapNG installed successfully!' &&
         /opt/librenms/librenms.sh
       "

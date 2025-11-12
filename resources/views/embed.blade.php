@@ -35,11 +35,18 @@
             width: 100%;
             height: 100%;
             color: #6c757d;
+            background: #f8f9fa;
         }
 
         .loading i {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .loading span {
+            font-size: 0.875rem;
+            font-weight: 500;
         }
 
         .error {
@@ -48,6 +55,8 @@
             align-items: center;
             justify-content: center;
             width: 100%;
+            height: 100%;
+            background: #f8f9fa;
             height: 100%;
             color: #dc3545;
         }

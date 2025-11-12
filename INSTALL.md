@@ -1,27 +1,51 @@
-# Installation Guide
+# Detailed Installation Guide
 
-## Quick Install (2 minutes)
+## Automated Install (Recommended)
+
+For most users, use the automated installer:
 
 ```bash
-# 1. Clone the plugin
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git WeathermapNG
+cd WeathermapNG && ./quick-install.sh
+```
 
-# 2. Install dependencies
+## Manual Installation
+
+If you prefer manual control or the automated script doesn't work:
+
+### 1. Clone and Dependencies
+```bash
+cd /opt/librenms/html/plugins
+git clone https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
-composer install --no-dev
+composer install --no-dev --optimize-autoloader
+```
 
-# 3. Clear caches (IMPORTANT!)
+### 2. Database Setup
+```bash
+php database/setup.php
+```
+
+### 3. LibreNMS Configuration
+```bash
 cd /opt/librenms
 php artisan cache:clear
-php artisan route:clear
 php artisan view:clear
-
-# 4. Set permissions
+php artisan config:clear
 chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 ```
 
-Visit: `https://your-server/plugin/WeathermapNG`
+### 4. Enable Plugin
+```bash
+./lnms plugin:enable WeathermapNG
+```
+
+### 5. Setup Background Polling (Optional)
+```bash
+# Add to cron for automatic updates
+echo "*/5 * * * * librenms php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php" | sudo tee -a /etc/cron.d/librenms
+```
 
 ## Common Issues & Solutions
 
