@@ -528,6 +528,11 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     const ctx = canvas.getContext('2d');
     const miniCanvas = document.getElementById('minimapCanvas');
     const miniCtx = miniCanvas.getContext('2d');
+
+    // Size minimap canvas to match its container
+    const minimapContainer = miniCanvas.parentElement;
+    miniCanvas.width = minimapContainer.clientWidth;
+    miniCanvas.height = minimapContainer.clientHeight;
     
     let nodes = <?php echo json_encode($nodes); ?>;
     let links = <?php echo json_encode($links); ?>;
@@ -569,8 +574,69 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         canvas.addEventListener('dblclick', handleDoubleClick);
         canvas.addEventListener('contextmenu', handleRightClick);
         canvas.addEventListener('wheel', handleWheel);
-        
+
+        // Minimap click handler
+        miniCanvas.addEventListener('click', handleMinimapClick);
+
         document.addEventListener('keydown', handleKeyDown);
+    }
+
+    // Minimap click handler
+    function handleMinimapClick(event) {
+        const rect = miniCanvas.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const clickY = event.clientY - rect.top;
+
+        // Calculate bounds of all elements (same logic as updateMinimap)
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        nodes.forEach(node => {
+            minX = Math.min(minX, node.x - 20);
+            minY = Math.min(minY, node.y - 20);
+            maxX = Math.max(maxX, node.x + 20);
+            maxY = Math.max(maxY, node.y + 20);
+        });
+
+        links.forEach(link => {
+            const srcNode = nodes.find(n => n.id == link.src_node_id);
+            const dstNode = nodes.find(n => n.id == link.dst_node_id);
+            if (srcNode && dstNode) {
+                minX = Math.min(minX, srcNode.x, dstNode.x);
+                minY = Math.min(minY, srcNode.y, dstNode.y);
+                maxX = Math.max(maxX, srcNode.x, dstNode.x);
+                maxY = Math.max(maxY, srcNode.y, dstNode.y);
+            }
+        });
+
+        // Add padding
+        const padding = 50;
+        minX -= padding;
+        minY -= padding;
+        maxX += padding;
+        maxY += padding;
+
+        const mapWidth = maxX - minX || canvas.width;
+        const mapHeight = maxY - minY || canvas.height;
+
+        // Calculate scale to fit minimap
+        const scaleX = miniCanvas.width / mapWidth;
+        const scaleY = miniCanvas.height / mapHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        // Center the map in minimap
+        const offsetX = (miniCanvas.width - mapWidth * scale) / 2;
+        const offsetY = (miniCanvas.height - mapHeight * scale) / 2;
+
+        // Convert click position to map coordinates
+        const mapX = minX + (clickX - offsetX) / scale;
+        const mapY = minY + (clickY - offsetY) / scale;
+
+        // Center the viewport on the clicked position
+        pan.x = -mapX + canvas.width / 2 / zoom;
+        pan.y = -mapY + canvas.height / 2 / zoom;
+
+        drawMap();
+        updateMinimap();
     }
 
     // Drawing Functions
@@ -713,6 +779,9 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
             ctx.textBaseline = 'middle';
             ctx.fillText(link.bandwidth, midX, midY);
         }
+
+        // Update minimap after drawing
+        updateMinimap();
     }
 
     function drawGrid() {
@@ -1121,6 +1190,100 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         updateLinkCount();
     }
 
+    function duplicateSelectedElement() {
+        if (!selectedElement) return;
+
+        if (selectedElement.type === 'node') {
+            // Duplicate node with offset
+            const offset = 30; // pixels to offset the duplicate
+            const newNode = {
+                id: 'node_' + Date.now(),
+                map_id: mapId,
+                label: selectedElement.label + ' (copy)',
+                x: selectedElement.x + offset,
+                y: selectedElement.y + offset,
+                device_id: selectedElement.device_id,
+                meta: { ...selectedElement.meta }
+            };
+
+            nodes.push(newNode);
+            selectedElement = newNode; // Select the new node
+            saveHistory();
+            drawMap();
+            updateStatus(`Duplicated node: ${newNode.label}`);
+            updateNodeCount();
+        } else if (selectedElement.type === 'link') {
+            // Duplicate link (create another link between same nodes)
+            const newLink = {
+                id: 'link_' + Date.now(),
+                map_id: mapId,
+                src_node_id: selectedElement.src_node_id,
+                dst_node_id: selectedElement.dst_node_id,
+                bandwidth: selectedElement.bandwidth,
+                style: { ...selectedElement.style }
+            };
+
+            links.push(newLink);
+            selectedElement = newLink; // Select the new link
+            saveHistory();
+            drawMap();
+            updateStatus('Duplicated link');
+            updateLinkCount();
+        }
+    }
+
+    function bringToFront(element) {
+        if (!element) return;
+
+        if (element.type === 'node') {
+            // Move node to end of array (drawn last = on top)
+            const index = nodes.findIndex(n => n.id === element.id);
+            if (index !== -1) {
+                const node = nodes.splice(index, 1)[0];
+                nodes.push(node);
+                saveHistory();
+                drawMap();
+                updateStatus(`Brought node to front: ${node.label}`);
+            }
+        } else if (element.type === 'link') {
+            // Move link to end of array (drawn last = on top)
+            const index = links.findIndex(l => l.id === element.id);
+            if (index !== -1) {
+                const link = links.splice(index, 1)[0];
+                links.push(link);
+                saveHistory();
+                drawMap();
+                updateStatus('Brought link to front');
+            }
+        }
+    }
+
+    function sendToBack(element) {
+        if (!element) return;
+
+        if (element.type === 'node') {
+            // Move node to beginning of array (drawn first = behind)
+            const index = nodes.findIndex(n => n.id === element.id);
+            if (index !== -1) {
+                const node = nodes.splice(index, 1)[0];
+                nodes.unshift(node);
+                saveHistory();
+                drawMap();
+                updateStatus(`Sent node to back: ${node.label}`);
+            }
+        } else if (element.type === 'link') {
+            // Move link to beginning of array (drawn first = behind)
+            const index = links.findIndex(l => l.id === element.id);
+            if (index !== -1) {
+                const link = links.splice(index, 1)[0];
+                links.unshift(link);
+                saveHistory();
+                drawMap();
+                updateStatus('Sent link to back');
+            }
+        }
+    }
+
     // Properties
     function showProperties(element) {
         const panel = document.getElementById('propertiesPanel');
@@ -1306,7 +1469,103 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     }
 
     function updateMinimap() {
-        // TODO: Implement minimap
+        const miniCtx = miniCanvas.getContext('2d');
+        const miniWidth = miniCanvas.width;
+        const miniHeight = miniCanvas.height;
+
+        // Clear minimap
+        miniCtx.fillStyle = '#f8f9fa';
+        miniCtx.fillRect(0, 0, miniWidth, miniHeight);
+
+        // Calculate bounds of all elements
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        nodes.forEach(node => {
+            minX = Math.min(minX, node.x - 20);
+            minY = Math.min(minY, node.y - 20);
+            maxX = Math.max(maxX, node.x + 20);
+            maxY = Math.max(maxY, node.y + 20);
+        });
+
+        links.forEach(link => {
+            const srcNode = nodes.find(n => n.id == link.src_node_id);
+            const dstNode = nodes.find(n => n.id == link.dst_node_id);
+            if (srcNode && dstNode) {
+                minX = Math.min(minX, srcNode.x, dstNode.x);
+                minY = Math.min(minY, srcNode.y, dstNode.y);
+                maxX = Math.max(maxX, srcNode.x, dstNode.x);
+                maxY = Math.max(maxY, srcNode.y, dstNode.y);
+            }
+        });
+
+        // Add padding
+        const padding = 50;
+        minX -= padding;
+        minY -= padding;
+        maxX += padding;
+        maxY += padding;
+
+        const mapWidth = maxX - minX || canvas.width;
+        const mapHeight = maxY - minY || canvas.height;
+
+        // Calculate scale to fit minimap
+        const scaleX = miniWidth / mapWidth;
+        const scaleY = miniHeight / mapHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        // Center the map in minimap
+        const offsetX = (miniWidth - mapWidth * scale) / 2;
+        const offsetY = (miniHeight - mapHeight * scale) / 2;
+
+        // Draw links
+        miniCtx.strokeStyle = '#6c757d';
+        miniCtx.lineWidth = 1;
+        links.forEach(link => {
+            const srcNode = nodes.find(n => n.id == link.src_node_id);
+            const dstNode = nodes.find(n => n.id == link.dst_node_id);
+            if (srcNode && dstNode) {
+                const x1 = offsetX + (srcNode.x - minX) * scale;
+                const y1 = offsetY + (srcNode.y - minY) * scale;
+                const x2 = offsetX + (dstNode.x - minX) * scale;
+                const y2 = offsetY + (dstNode.y - minY) * scale;
+
+                miniCtx.beginPath();
+                miniCtx.moveTo(x1, y1);
+                miniCtx.lineTo(x2, y2);
+                miniCtx.stroke();
+            }
+        });
+
+        // Draw nodes
+        nodes.forEach(node => {
+            const x = offsetX + (node.x - minX) * scale;
+            const y = offsetY + (node.y - minY) * scale;
+            const radius = 3;
+
+            miniCtx.fillStyle = node == selectedElement ? '#dc3545' : '#007bff';
+            miniCtx.beginPath();
+            miniCtx.arc(x, y, radius, 0, 2 * Math.PI);
+            miniCtx.fill();
+        });
+
+        // Draw viewport rectangle
+        const viewportWidth = canvas.width / zoom;
+        const viewportHeight = canvas.height / zoom;
+        const viewportX = -pan.x;
+        const viewportY = -pan.y;
+
+        const rectX = offsetX + (viewportX - minX) * scale;
+        const rectY = offsetY + (viewportY - minY) * scale;
+        const rectWidth = viewportWidth * scale;
+        const rectHeight = viewportHeight * scale;
+
+        miniCtx.strokeStyle = '#28a745';
+        miniCtx.lineWidth = 2;
+        miniCtx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+
+        // Fill viewport with semi-transparent overlay
+        miniCtx.fillStyle = 'rgba(40, 167, 69, 0.1)';
+        miniCtx.fillRect(rectX, rectY, rectWidth, rectHeight);
     }
 
     function updateStatus(message) {
@@ -1346,16 +1605,16 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
                 }
                 break;
             case 'duplicate':
-                // TODO: Implement duplication
+                duplicateSelectedElement();
                 break;
             case 'delete':
                 deleteSelectedElement();
                 break;
             case 'bring-front':
-                // TODO: Implement z-order
+                bringToFront(selectedElement);
                 break;
             case 'send-back':
-                // TODO: Implement z-order
+                sendToBack(selectedElement);
                 break;
         }
         hideContextMenu();

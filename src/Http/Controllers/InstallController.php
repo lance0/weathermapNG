@@ -22,7 +22,7 @@ class InstallController extends Controller
         return view('WeathermapNG::install.index', compact('requirements', 'steps'));
     }
 
-    public function install(Request $request)
+    public function install()
     {
         try {
             $plugin = new WeathermapNG();

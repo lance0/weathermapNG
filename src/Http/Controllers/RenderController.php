@@ -25,128 +25,204 @@ class RenderController
             'alerts' => [ 'nodes' => [], 'links' => [] ],
         ];
 
+        $out['links'] = $this->buildLinkUtilizationData($map, $svc);
+        $deviceIds = $this->collectDeviceIdsFromNodes($map);
+        $devAlerts = $alerts->deviceAlerts($deviceIds);
+        $portsByNode = $this->buildPortsByNodeMapping($map);
+
+        $out['nodes'] = $this->buildNodeStatusData($map, $portsByNode, $out['links'], $svc);
+        $out['alerts'] = $this->buildCompleteAlertData($map, $devAlerts, $alerts);
+
+        return response()->json($out);
+    }
+
+    private function buildLinkUtilizationData(Map $map, PortUtilService $svc): array
+    {
+        $linkData = [];
         foreach ($map->links as $link) {
-            $out['links'][$link->id] = $svc->linkUtilBits([
+            $linkData[$link->id] = $svc->linkUtilBits([
                 'port_id_a' => $link->port_id_a,
                 'port_id_b' => $link->port_id_b,
                 'bandwidth_bps' => $link->bandwidth_bps,
             ]);
         }
+        return $linkData;
+    }
 
-        // Node status (best-effort), aggregated traffic, and alert overlays
+    private function collectDeviceIdsFromNodes(Map $map): array
+    {
         $deviceIds = [];
         foreach ($map->nodes as $node) {
             if ($node->device_id) {
                 $deviceIds[] = (int) $node->device_id;
             }
         }
-        $deviceIds = array_values(array_unique($deviceIds));
-        $devAlerts = $alerts->deviceAlerts($deviceIds);
-        // Build per-node port lists from links
+        return array_values(array_unique($deviceIds));
+    }
+
+    private function buildPortsByNodeMapping(Map $map): array
+    {
         $portsByNode = [];
-        foreach ($map->links as $lnk) {
-            if ($lnk->src_node_id && $lnk->port_id_a) {
-                $portsByNode[$lnk->src_node_id] = $portsByNode[$lnk->src_node_id] ?? [];
-                $portsByNode[$lnk->src_node_id][] = (int) $lnk->port_id_a;
+        foreach ($map->links as $link) {
+            if ($link->src_node_id && $link->port_id_a) {
+                $portsByNode[$link->src_node_id][] = (int) $link->port_id_a;
             }
-            if ($lnk->dst_node_id && $lnk->port_id_b) {
-                $portsByNode[$lnk->dst_node_id] = $portsByNode[$lnk->dst_node_id] ?? [];
-                $portsByNode[$lnk->dst_node_id][] = (int) $lnk->port_id_b;
+            if ($link->dst_node_id && $link->port_id_b) {
+                $portsByNode[$link->dst_node_id][] = (int) $link->port_id_b;
             }
         }
+        return $portsByNode;
+    }
+
+    private function buildNodeStatusData(Map $map, array $portsByNode, array $linkData, PortUtilService $svc): array
+    {
+        $nodeData = [];
         foreach ($map->nodes as $node) {
-            $status = 'unknown';
-            if ($node->device_id) {
+            $nodeData[$node->id] = $this->calculateNodeStatusAndTraffic(
+                $node,
+                $portsByNode[$node->id] ?? [],
+                $linkData,
+                $svc
+            );
+        }
+        return $nodeData;
+    }
+
+    private function calculateNodeStatusAndTraffic($node, array $portIds, array $linkData, PortUtilService $svc): array
+    {
+        $status = $this->getNodeDeviceStatus($node);
+        $trafficData = $this->aggregateNodeTraffic($node, $portIds, $linkData, $svc);
+
+        return array_merge([
+            'status' => $status,
+            'device_id' => $node->device_id,
+        ], $trafficData);
+    }
+
+    private function getNodeDeviceStatus($node): string
+    {
+        if (!$node->device_id) {
+            return 'unknown';
+        }
+
+        try {
+            if (class_exists('App\\Models\\Device')) {
+                $device = \App\Models\Device::find($node->device_id);
+                if ($device) {
+                    return ($device->status ?? 0) ? 'up' : 'down';
+                }
+            } else {
+                $row = \DB::table('devices')->select('status')->where('device_id', $node->device_id)->first();
+                if ($row) {
+                    return ($row->status ?? 0) ? 'up' : 'down';
+                }
+            }
+        } catch (\Exception $e) {
+        }
+
+        return 'unknown';
+    }
+
+    private function aggregateNodeTraffic($node, array $portIds, array $linkData, PortUtilService $svc): array
+    {
+        $inboundSum = 0;
+        $outboundSum = 0;
+        $dataSource = 'none';
+
+        // First try to aggregate from directly connected ports
+        if (!empty($portIds)) {
+            foreach (array_unique($portIds) as $portId) {
                 try {
-                    if (class_exists('App\\Models\\Device')) {
-                        $dev = \App\Models\Device::find($node->device_id);
-                        if ($dev) {
-                            $status = ($dev->status ?? 0) ? 'up' : 'down';
-                        }
-                    } else {
-                        $row = \DB::table('devices')->select('status')->where('device_id', $node->device_id)->first();
-                        if ($row) {
-                            $status = ($row->status ?? 0) ? 'up' : 'down';
-                        }
-                    }
-                } catch (\Exception $e) {
-                }
-            }
-            // Aggregate node traffic from connected ports
-            $inSum = 0;
-            $outSum = 0;
-            $source = 'none';
-            if (!empty($portsByNode[$node->id])) {
-                foreach (array_unique($portsByNode[$node->id]) as $pid) {
-                    try {
-                        $pd = $svc->getPortData((int) $pid);
-                        $inSum += (int) ($pd['in'] ?? 0);
-                        $outSum += (int) ($pd['out'] ?? 0);
-                    } catch (\Throwable $e) {
-                    }
-                }
-                if (($inSum + $outSum) > 0) {
-                    $source = 'ports';
-                }
-            }
-            // Fallback: if no port data present, sum from link live data already computed above
-            if (($inSum + $outSum) === 0) {
-                foreach ($map->links as $lnk) {
-                    if ($lnk->src_node_id == $node->id || $lnk->dst_node_id == $node->id) {
-                        $ld = $out['links'][$lnk->id] ?? null;
-                        if (is_array($ld)) {
-                            $inSum += (int) ($ld['in_bps'] ?? 0);
-                            $outSum += (int) ($ld['out_bps'] ?? 0);
-                        }
-                    }
-                }
-                if (($inSum + $outSum) > 0) {
-                    $source = 'links';
-                }
-            }
-            // Final fallback: sum top ports on the device
-            if (($inSum + $outSum) === 0 && $node->device_id) {
-                $agg = $svc->deviceAggregateBits((int) $node->device_id, 24);
-                $inSum = (int) ($agg['in'] ?? 0);
-                $outSum = (int) ($agg['out'] ?? 0);
-                if (($inSum + $outSum) > 0) {
-                    $source = 'device';
-                }
-            }
-            // Heuristic: if device_id not set and we still have 0, try match device by node label
-            if (($inSum + $outSum) === 0 && empty($node->device_id) && !empty($node->label)) {
-                try {
-                    $row = DB::table('devices')
-                        ->select('device_id')
-                        ->where('hostname', $node->label)
-                        ->orWhere('sysName', $node->label)
-                        ->first();
-                    if ($row && isset($row->device_id)) {
-                        $agg = $svc->deviceAggregateBits((int) $row->device_id, 24);
-                        $inSum = (int) ($agg['in'] ?? 0);
-                        $outSum = (int) ($agg['out'] ?? 0);
-                        if (($inSum + $outSum) > 0) {
-                            $source = 'device_guess';
-                        }
-                    }
+                    $portData = $svc->getPortData((int) $portId);
+                    $inboundSum += (int) ($portData['in'] ?? 0);
+                    $outboundSum += (int) ($portData['out'] ?? 0);
                 } catch (\Throwable $e) {
                 }
             }
-            $out['nodes'][$node->id] = [
-                'status' => $status,
-                'traffic' => [
-                    'in_bps' => $inSum,
-                    'out_bps' => $outSum,
-                    'sum_bps' => $inSum + $outSum,
-                    'source' => $source,
-                ],
-            ];
-            if ($node->device_id && isset($devAlerts[(int)$node->device_id])) {
-                $out['alerts']['nodes'][$node->id] = $devAlerts[(int)$node->device_id];
+            if (($inboundSum + $outboundSum) > 0) {
+                $dataSource = 'ports';
             }
         }
 
-        // Link alerts based on port alerts (entity_type=port) when available
+        // Fallback: sum from link data if no direct port data
+        if (($inboundSum + $outboundSum) === 0) {
+            foreach ($linkData as $linkId => $linkInfo) {
+                // Find links connected to this node
+                $link = collect($node->map->links)->first(fn($lnk) => $lnk->id == $linkId);
+                if ($link && ($link->src_node_id == $node->id || $link->dst_node_id == $node->id)) {
+                    $inboundSum += (int) ($linkInfo['in_bps'] ?? 0);
+                    $outboundSum += (int) ($linkInfo['out_bps'] ?? 0);
+                }
+            }
+            if (($inboundSum + $outboundSum) > 0) {
+                $dataSource = 'links';
+            }
+        }
+
+        // Final fallback: sum top ports on the device
+        if (($inboundSum + $outboundSum) === 0 && $node->device_id) {
+            $agg = $svc->deviceAggregateBits((int) $node->device_id, 24);
+            $inboundSum = (int) ($agg['in'] ?? 0);
+            $outboundSum = (int) ($agg['out'] ?? 0);
+            if (($inboundSum + $outboundSum) > 0) {
+                $dataSource = 'device';
+            }
+        }
+
+        // Heuristic: if device_id not set and we still have 0, try match device by node label
+        if (($inboundSum + $outboundSum) === 0 && empty($node->device_id) && !empty($node->label)) {
+            try {
+                $row = \DB::table('devices')
+                    ->select('device_id')
+                    ->where('hostname', $node->label)
+                    ->orWhere('sysName', $node->label)
+                    ->first();
+                if ($row && isset($row->device_id)) {
+                    $agg = $svc->deviceAggregateBits((int) $row->device_id, 24);
+                    $inboundSum = (int) ($agg['in'] ?? 0);
+                    $outboundSum = (int) ($agg['out'] ?? 0);
+                    if (($inboundSum + $outboundSum) > 0) {
+                        $dataSource = 'device_guess';
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        return [
+            'traffic' => [
+                'in_bps' => $inboundSum,
+                'out_bps' => $outboundSum,
+                'sum_bps' => $inboundSum + $outboundSum,
+                'source' => $dataSource,
+            ],
+        ];
+    }
+
+    private function buildCompleteAlertData(Map $map, array $deviceAlerts, AlertService $alerts): array
+    {
+        $alertData = [
+            'nodes' => [],
+            'links' => [],
+        ];
+
+        // Add device alerts to nodes
+        foreach ($map->nodes as $node) {
+            if ($node->device_id && isset($deviceAlerts[(int)$node->device_id])) {
+                $alertData['nodes'][$node->id] = $deviceAlerts[(int)$node->device_id];
+            }
+        }
+
+        // Add link alerts based on port alerts
+        $alertData['links'] = $this->buildLinkAlertData($map, $alerts);
+
+        return $alertData;
+    }
+
+    private function buildLinkAlertData(Map $map, AlertService $alerts): array
+    {
+        $linkAlerts = [];
+
         $portIds = [];
         foreach ($map->links as $link) {
             if ($link->port_id_a) {
@@ -158,21 +234,29 @@ class RenderController
         }
         $portIds = array_values(array_unique($portIds));
         $portAlerts = $alerts->portAlerts($portIds);
+
         foreach ($map->links as $link) {
-            $count = 0;
-            $sev = null;
-            foreach ([(int)$link->port_id_a, (int)$link->port_id_b] as $pid) {
-                if ($pid && isset($portAlerts[$pid])) {
-                    $count += $portAlerts[$pid]['count'];
-                    $sev = $sev ? $this->maxSeverity($sev, $portAlerts[$pid]['severity']) : $portAlerts[$pid]['severity'];
+            $alertCount = 0;
+            $maxSeverity = null;
+
+            foreach ([(int)$link->port_id_a, (int)$link->port_id_b] as $portId) {
+                if ($portId && isset($portAlerts[$portId])) {
+                    $alertCount += $portAlerts[$portId]['count'];
+                    $maxSeverity = $maxSeverity
+                        ? $this->maxSeverity($maxSeverity, $portAlerts[$portId]['severity'])
+                        : $portAlerts[$portId]['severity'];
                 }
             }
-            if ($count > 0) {
-                $out['alerts']['links'][$link->id] = ['count' => $count, 'severity' => $sev ?? 'warning'];
+
+            if ($alertCount > 0) {
+                $linkAlerts[$link->id] = [
+                    'count' => $alertCount,
+                    'severity' => $maxSeverity ?? 'warning'
+                ];
             }
         }
 
-        return response()->json($out);
+        return $linkAlerts;
     }
 
     public function embed(Map $map)

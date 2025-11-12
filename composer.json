@@ -2,7 +2,7 @@
   "name": "librenms/weathermapng",
   "description": "Next-generation Weathermap plugin for LibreNMS",
   "type": "librenms-plugin",
-    "version": "1.1.0",
+    "version": "1.2.1",
   "license": "Unlicense",
   "authors": [
     { "name": "LibreNMS Community", "email": "info@librenms.org" }
@@ -40,9 +40,9 @@
         "test:unit": "phpunit --testsuite Unit",
         "test:feature": "phpunit --testsuite Feature",
         "test:coverage": "phpunit --coverage-html tests/coverage/html",
-        "lint": "phpcs --standard=PSR12 Http/ Models/ Services/ lib/",
-        "lint-fix": "phpcbf --standard=PSR12 Http/ Models/ Services/ lib/",
-        "analyze": "phpmd Http,Models,Services text codesize,unusedcode,naming",
+        "lint": "phpcs --standard=PSR12 src/Http/ src/Models/ src/Services/",
+        "lint-fix": "phpcbf --standard=PSR12 src/Http/ src/Models/ src/Services/",
+        "analyze": "phpmd src/Http,src/Models,src/Services text codesize,unusedcode,naming",
         "quality": [
             "@lint",
             "@analyze",
@@ -55,10 +55,10 @@
   "minimum-stability": "stable",
   "prefer-stable": true,
   "extra": {
-    "librenms": {
-      "plugin-name": "WeathermapNG",
-  "version": "1.1.0",
-      "description": "Modern interactive network weathermap for LibreNMS",
+      "librenms": {
+        "plugin-name": "WeathermapNG",
+  "version": "1.2.1",
+        "description": "Modern interactive network weathermap for LibreNMS",
       "author": "LibreNMS Community",
       "email": "info@librenms.org",
       "homepage": "https://github.com/lance0/weathermapNG"

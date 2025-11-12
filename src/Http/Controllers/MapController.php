@@ -32,13 +32,6 @@ class MapController
         return view('WeathermapNG::editor', compact('map', 'devices'));
     }
 
-    public function editorD3(Map $map)
-    {
-        $map->load(['nodes', 'links']);
-        $title = 'WeathermapNG - D3 Editor';
-        return view('WeathermapNG::editor-d3', compact('map', 'title'));
-    }
-
     public function create(Request $request)
     {
         $validated = $request->validate([
@@ -233,14 +226,14 @@ class MapController
             }
             try {
                 if (($data['port_id_a'] ?? null) && class_exists('\\App\\Models\\Port')) {
-                    $pa = \App\Models\Port::find($data['port_id_a']);
-                    if (!$pa || ($src->device_id && $pa->device_id != $src->device_id)) {
+                    $sourcePort = \App\Models\Port::find($data['port_id_a']);
+                    if (!$sourcePort || ($src->device_id && $sourcePort->device_id != $src->device_id)) {
                         return response()->json(['success' => false, 'message' => 'Source port does not belong to source device'], 422);
                     }
                 }
                 if (($data['port_id_b'] ?? null) && class_exists('\\App\\Models\\Port')) {
-                    $pb = \App\Models\Port::find($data['port_id_b']);
-                    if (!$pb || ($dst->device_id && $pb->device_id != $dst->device_id)) {
+                    $destinationPort = \App\Models\Port::find($data['port_id_b']);
+                    if (!$destinationPort || ($dst->device_id && $destinationPort->device_id != $dst->device_id)) {
                         return response()->json(['success' => false, 'message' => 'Destination port does not belong to destination device'], 422);
                     }
                 }
@@ -281,102 +274,117 @@ class MapController
     public function save(Request $request, Map $map)
     {
         try {
-            $data = $request->validate([
-                'title' => 'nullable|string|max:255',
-                'options' => 'array',
-                'options.width' => 'nullable|integer|min:100|max:4096',
-                'options.height' => 'nullable|integer|min:100|max:4096',
-                'options.background' => 'nullable|string',
-                'nodes' => 'array',
-                'nodes.*.label' => 'required|string|max:255',
-                'nodes.*.x' => 'required|numeric',
-                'nodes.*.y' => 'required|numeric',
-                'nodes.*.device_id' => 'nullable|integer',
-                'nodes.*.meta' => 'array',
-                'links' => 'array', // accept loose link shapes; coerce below
-            ]);
+            $validatedData = $this->validateSaveRequest($request);
 
-            \DB::transaction(function () use ($map, $data) {
-                // Update map options/title
-                if (!empty($data['options']) || array_key_exists('title', $data)) {
-                    $opts = $map->options ?? [];
-                    $opts['width'] = $data['options']['width'] ?? ($opts['width'] ?? 800);
-                    $opts['height'] = $data['options']['height'] ?? ($opts['height'] ?? 600);
-                    if (isset($data['options']['background'])) {
-                        $opts['background'] = $data['options']['background'];
-                    }
-                    $changes = ['options' => $opts];
-                    if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
-                        $changes['title'] = $data['title'];
-                    }
-                    $map->fill($changes)->save();
-                }
-
-                // Delete links first, then nodes (FK safety)
-                $map->links()->delete();
-                $map->nodes()->delete();
-
-                // Create nodes and build id mapping (client -> new id)
-                $nodeIdMap = [];
-                if (!empty($data['nodes'])) {
-                    foreach ($data['nodes'] as $idx => $n) {
-                        $new = Node::create([
-                            'map_id' => $map->id,
-                            'label' => $n['label'],
-                            'x' => $n['x'],
-                            'y' => $n['y'],
-                            'device_id' => $n['device_id'] ?? null,
-                            'meta' => $n['meta'] ?? [],
-                        ]);
-                        $clientKey = $n['id'] ?? $n['node_id'] ?? $n['_id'] ?? (string)$idx;
-                        $nodeIdMap[(string)$clientKey] = $new->id;
-                    }
-                }
-
-                // Create links using id mapping
-                if (!empty($data['links'])) {
-                    foreach ($data['links'] as $l) {
-                        $srcKey = $l['src_node_id'] ?? $l['src'] ?? $l['source'] ?? null;
-                        $dstKey = $l['dst_node_id'] ?? $l['dst'] ?? $l['target'] ?? null;
-                        // Handle D3 objects {source: {id}, target: {id}}
-                        if (is_array($srcKey)) {
-                            $srcKey = $srcKey['id'] ?? $srcKey['node_id'] ?? null;
-                        }
-                        if (is_array($dstKey)) {
-                            $dstKey = $dstKey['id'] ?? $dstKey['node_id'] ?? null;
-                        }
-                        $srcId = $nodeIdMap[(string)$srcKey] ?? (is_numeric($srcKey) ? (int)$srcKey : null);
-                        $dstId = $nodeIdMap[(string)$dstKey] ?? (is_numeric($dstKey) ? (int)$dstKey : null);
-                        if (!$srcId || !$dstId) {
-                            // skip invalid links rather than failing the whole save
-                            continue;
-                        }
-                        Link::create([
-                            'map_id' => $map->id,
-                            'src_node_id' => $srcId,
-                            'dst_node_id' => $dstId,
-                            'port_id_a' => $l['port_id_a'] ?? null,
-                            'port_id_b' => $l['port_id_b'] ?? null,
-                            'bandwidth_bps' => $l['bandwidth_bps'] ?? $l['bandwidth'] ?? null,
-                            'style' => $l['style'] ?? [],
-                        ]);
-                    }
-                }
+            \DB::transaction(function () use ($map, $validatedData) {
+                $this->updateMapProperties($map, $validatedData);
+                $this->replaceMapContent($map, $validatedData);
             });
-        } catch (\Illuminate\Validation\ValidationException $e) {
+
+            return response()->json(['success' => true, 'message' => 'Map saved successfully']);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'errors' => $e->errors(),
-                'message' => 'Validation failed',
-            ], 422);
-        } catch (\Throwable $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to save map: ' . $e->getMessage(),
+                'message' => 'Failed to save map: ' . $e->getMessage()
             ], 500);
         }
+    }
 
-        return response()->json(['success' => true]);
+    private function validateSaveRequest(Request $request): array
+    {
+        return $request->validate([
+            'title' => 'nullable|string|max:255',
+            'options' => 'array',
+            'options.width' => 'nullable|integer|min:100|max:4096',
+            'options.height' => 'nullable|integer|min:100|max:4096',
+            'options.background' => 'nullable|string',
+            'nodes' => 'array',
+            'nodes.*.label' => 'required|string|max:255',
+            'nodes.*.x' => 'required|numeric',
+            'nodes.*.y' => 'required|numeric',
+            'nodes.*.device_id' => 'nullable|integer',
+            'nodes.*.meta' => 'array',
+            'links' => 'array',
+        ]);
+    }
+
+    private function updateMapProperties(Map $map, array $data): void
+    {
+        if (!empty($data['options']) || array_key_exists('title', $data)) {
+            $updates = [];
+
+            if (!empty($data['options'])) {
+                $updates['options'] = $this->mergeMapOptions($map->options ?? [], $data['options']);
+            }
+
+            if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
+                $updates['title'] = $data['title'];
+            }
+
+            if (!empty($updates)) {
+                $map->fill($updates)->save();
+            }
+        }
+    }
+
+    private function mergeMapOptions(array $currentOptions, array $newOptions): array
+    {
+        return array_merge($currentOptions, array_filter([
+            'width' => $newOptions['width'] ?? $currentOptions['width'] ?? 800,
+            'height' => $newOptions['height'] ?? $currentOptions['height'] ?? 600,
+            'background' => $newOptions['background'] ?? $currentOptions['background'] ?? null,
+        ], fn($value) => $value !== null));
+    }
+
+    private function replaceMapContent(Map $map, array $data): void
+    {
+        // Delete existing content (links first due to FK constraints)
+        $map->links()->delete();
+        $map->nodes()->delete();
+
+        $nodeIdMap = $this->createNodes($map, $data['nodes'] ?? []);
+        $this->createLinks($map, $data['links'] ?? [], $nodeIdMap);
+    }
+
+    private function createNodes(Map $map, array $nodesData): array
+    {
+        $nodeIdMap = [];
+
+        foreach ($nodesData as $index => $nodeData) {
+            $node = Node::create([
+                'map_id' => $map->id,
+                'label' => $nodeData['label'],
+                'x' => $nodeData['x'],
+                'y' => $nodeData['y'],
+                'device_id' => $nodeData['device_id'] ?? null,
+                'meta' => $nodeData['meta'] ?? [],
+            ]);
+
+            $clientKey = $nodeData['id'] ?? $nodeData['node_id'] ?? $nodeData['_id'] ?? (string)$index;
+            $nodeIdMap[$clientKey] = $node->id;
+        }
+
+        return $nodeIdMap;
+    }
+
+    private function createLinks(Map $map, array $linksData, array $nodeIdMap): void
+    {
+        foreach ($linksData as $linkData) {
+            $sourceId = $this->resolveNodeId($linkData['src_node_id'] ?? $linkData['source'] ?? null, $nodeIdMap);
+            $targetId = $this->resolveNodeId($linkData['dst_node_id'] ?? $linkData['target'] ?? null, $nodeIdMap);
+
+            if ($sourceId && $targetId) {
+                Link::create([
+                    'map_id' => $map->id,
+                    'src_node_id' => $sourceId,
+                    'dst_node_id' => $targetId,
+                    'port_id_a' => $linkData['port_id_a'] ?? $linkData['port_a'] ?? null,
+                    'port_id_b' => $linkData['port_id_b'] ?? $linkData['port_b'] ?? null,
+                    'bandwidth_bps' => $linkData['bandwidth_bps'] ?? $linkData['bandwidth'] ?? null,
+                    'style' => $linkData['style'] ?? [],
+                ]);
+            }
+        }
     }
 
     /**
@@ -459,234 +467,252 @@ class MapController
     public function autoDiscover(Request $request, Map $map)
     {
         try {
-            $minDegree = max(0, (int) $request->input('min_degree', 0));
-            $osFilter = trim((string) $request->input('os', ''));
-            $osParts = array_filter(array_map('trim', explode(',', $osFilter)));
-            // Collect devices
-            $devices = [];
-            if (class_exists('\\App\\Models\\Device')) {
-                $q = \App\Models\Device::where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
-                if (!empty($osParts)) {
-                    $q->where(function ($qb) use ($osParts) {
-                        foreach ($osParts as $i => $part) {
-                            $method = $i === 0 ? 'where' : 'orWhere';
-                            $qb->$method('os', 'like', '%' . $part . '%');
-                        }
-                    });
-                }
-                $devices = $q->get()->toArray();
-            } else {
-                $q = \DB::table('devices')->where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
-                if (!empty($osParts)) {
-                    $q->where(function ($qb) use ($osParts) {
-                        foreach ($osParts as $i => $part) {
-                            $method = $i === 0 ? 'where' : 'orWhere';
-                            $qb->$method('os', 'like', '%' . $part . '%');
-                        }
-                    });
-                }
-                $devices = $q->get()->toArray();
-                $devices = array_map(fn($o) => (array)$o, $devices);
-            }
-            // Map existing nodes by device_id to avoid duplicates
-            $existing = $map->nodes()->pluck('id', 'device_id')->filter()->toArray();
-            $nodeIdsByDevice = $existing;
+            $params = $this->validateAutoDiscoverRequest($request);
+            $devices = $this->discoverDevices($params);
+            $existingNodes = $this->getExistingNodeMapping($map);
 
-            // Create missing nodes with a temporary rough grid layout (will be repositioned below)
-            $x = 100;
-            $y = 100;
-            $step = 120;
-            $cols = 8;
-            $i = 0;
-            foreach ($devices as $dev) {
-                $did = (int)($dev['device_id'] ?? 0);
-                if (!$did) {
-                    continue;
-                }
-                if ($minDegree > 0) {
-                    $dval = $deg[$did] ?? 0;
-                    if ($dval < $minDegree) {
-                        continue;
-                    }
-                }
-                if (!isset($nodeIdsByDevice[$did])) {
-                    $node = Node::create([
-                        'map_id' => $map->id,
-                        'label' => $dev['hostname'] ?? ('dev-' . $did),
-                        'x' => $x,
-                        'y' => $y,
-                        'device_id' => $did,
-                        'meta' => ['icon' => 'switch'],
-                    ]);
-                    $nodeIdsByDevice[$did] = $node->id;
-                    $i++;
-                    $x += $step;
-                    if ($i % $cols === 0) {
-                        $x = 100;
-                        $y += $step;
-                    }
-                }
-            }
+            $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
+            $connectivityData = $this->buildConnectivityGraph($nodeMapping);
+            $this->createDiscoveredLinks($map, $connectivityData, $nodeMapping);
+            $this->applyLayoutAlgorithm($map, $nodeMapping, $connectivityData['links']);
 
-            // Discover links using 'links' table if present
-            $linksInserted = 0;
-            try {
-                $links = \DB::table('links')->select('local_port_id', 'remote_port_id')->limit(2000)->get();
-                foreach ($links as $lnk) {
-                    $pa = (int)$lnk->local_port_id;
-                    $pb = (int)$lnk->remote_port_id;
-                    if (!$pa || !$pb) {
-                        continue;
-                    }
-                    // lookup ports to get device ids
-                    $rowA = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
-                    $rowB = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                    if (!$rowA || !$rowB) {
-                        continue;
-                    }
-                    $da = (int)$rowA->device_id;
-                    $db = (int)$rowB->device_id;
-                    $srcNodeId = $nodeIdsByDevice[$da] ?? null;
-                    $dstNodeId = $nodeIdsByDevice[$db] ?? null;
-                    if (!$srcNodeId || !$dstNodeId) {
-                        continue;
-                    }
-                    // avoid duplicates by checking existing link
-                    $exists = $map->links()->where('src_node_id', $srcNodeId)->where('dst_node_id', $dstNodeId)->exists();
-                    if ($exists) {
-                        continue;
-                    }
-                    Link::create([
-                        'map_id' => $map->id,
-                        'src_node_id' => $srcNodeId,
-                        'dst_node_id' => $dstNodeId,
-                        'port_id_a' => $pa,
-                        'port_id_b' => $pb,
-                        'bandwidth_bps' => null,
-                        'style' => [],
-                    ]);
-                    $linksInserted++;
-                }
-            } catch (\Exception $e) {
-                // Fallback to neighbours table
-                try {
-                    $neigh = \DB::table('neighbours')->select('port_id', 'remote_port_id')->limit(2000)->get();
-                    foreach ($neigh as $n) {
-                        $pa = (int)$n->port_id;
-                        $pb = (int)$n->remote_port_id;
-                        if (!$pa || !$pb) {
-                            continue;
-                        }
-                        $rowA = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
-                        $rowB = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                        if (!$rowA || !$rowB) {
-                            continue;
-                        }
-                        $da = (int)$rowA->device_id;
-                        $db = (int)$rowB->device_id;
-                        $srcNodeId = $nodeIdsByDevice[$da] ?? null;
-                        $dstNodeId = $nodeIdsByDevice[$db] ?? null;
-                        if (!$srcNodeId || !$dstNodeId) {
-                            continue;
-                        }
-                        $exists = $map->links()->where('src_node_id', $srcNodeId)->where('dst_node_id', $dstNodeId)->exists();
-                        if ($exists) {
-                            continue;
-                        }
-                        Link::create([
-                            'map_id' => $map->id,
-                            'src_node_id' => $srcNodeId,
-                            'dst_node_id' => $dstNodeId,
-                            'port_id_a' => $pa,
-                            'port_id_b' => $pb,
-                            'bandwidth_bps' => null,
-                            'style' => [],
-                        ]);
-                        $linksInserted++;
-                    }
-                } catch (\Exception $e2) {
-                    // no topology available
-                }
-            }
-
-            // Compute device degrees to inform layout (core vs edge)
-            $deg = [];
-            try {
-                // Prefer links table
-                $rows = \DB::table('links')->select('local_port_id', 'remote_port_id')->limit(5000)->get();
-                foreach ($rows as $r) {
-                    $pa = (int)$r->local_port_id;
-                    $pb = (int)$r->remote_port_id;
-                    if (!$pa || !$pb) {
-                        continue;
-                    }
-                    $ra = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
-                    $rb = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                    if ($ra) {
-                        $d = (int)$ra->device_id;
-                        $deg[$d] = ($deg[$d] ?? 0) + 1;
-                    }
-                    if ($rb) {
-                        $d = (int)$rb->device_id;
-                        $deg[$d] = ($deg[$d] ?? 0) + 1;
-                    }
-                }
-            } catch (\Exception $e) {
-                try {
-                    $rows = \DB::table('neighbours')->select('port_id', 'remote_port_id')->limit(5000)->get();
-                    foreach ($rows as $r) {
-                        $pa = (int)$r->port_id;
-                        $pb = (int)$r->remote_port_id;
-                        if (!$pa || !$pb) {
-                            continue;
-                        }
-                        $ra = \DB::table('ports')->select('device_id')->where('port_id', $pa)->first();
-                        $rb = \DB::table('ports')->select('device_id')->where('port_id', $pb)->first();
-                        if ($ra) {
-                            $d = (int)$ra->device_id;
-                            $deg[$d] = ($deg[$d] ?? 0) + 1;
-                        }
-                        if ($rb) {
-                            $d = (int)$rb->device_id;
-                            $deg[$d] = ($deg[$d] ?? 0) + 1;
-                        }
-                    }
-                } catch (\Exception $e2) {
-                }
-            }
-
-            // Layout: center high-degree devices, then rings for the rest
-            $ids = array_keys($nodeIdsByDevice);
-            usort($ids, function ($a, $b) use ($deg) {
-                return ($deg[$b] ?? 0) <=> ($deg[$a] ?? 0);
-            });
-            $total = count($ids);
-            if ($total > 0) {
-                $centerX = 800;
-                $centerY = 600; // general center; editor may rescale
-                $ring1 = max(4, (int)ceil($total * 0.15));
-                $ring2 = max(6, (int)ceil($total * 0.35));
-                $radii = [180, 320, 480];
-                $batches = [array_slice($ids, 0, $ring1), array_slice($ids, $ring1, $ring2), array_slice($ids, $ring1 + $ring2)];
-                foreach ($batches as $ri => $batch) {
-                    $n = max(1, count($batch));
-                    $angleStep = 2 * M_PI / $n;
-                    foreach ($batch as $k => $devId) {
-                        $nodeId = $nodeIdsByDevice[$devId] ?? null;
-                        if (!$nodeId) {
-                            continue;
-                        }
-                        $angle = $k * $angleStep;
-                        $x = (int)round($centerX + $radii[$ri] * cos($angle));
-                        $y = (int)round($centerY + $radii[$ri] * sin($angle));
-                        Node::where('id', $nodeId)->update(['x' => $x, 'y' => $y]);
-                    }
-                }
-            }
-
-            return response()->json(['success' => true, 'nodes' => count($nodeIdsByDevice), 'links' => $linksInserted, 'layout' => 'rings']);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Auto-discovery failed: ' . $e->getMessage()], 500);
+            return response()->json(['success' => true, 'message' => 'Auto-discovery completed']);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Auto-discovery failed: ' . $e->getMessage(),
+            ], 500);
         }
+    }
+
+    private function validateAutoDiscoverRequest(Request $request): array
+    {
+        return [
+            'minDegree' => max(0, (int) $request->input('min_degree', 0)),
+            'osFilter' => array_filter(array_map('trim', explode(',', trim((string) $request->input('os', ''))))),
+        ];
+    }
+
+    private function discoverDevices(array $params): array
+    {
+        $query = $this->buildDeviceQuery($params['osFilter']);
+        $devices = $query->get()->toArray();
+
+        // Ensure consistent array format
+        return array_map(fn($device) => (array) $device, $devices);
+    }
+
+    private function buildDeviceQuery(array $osFilters)
+    {
+        $baseQuery = class_exists('\\App\\Models\\Device')
+            ? \App\Models\Device::where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os')
+            : \DB::table('devices')->where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os');
+
+        if (!empty($osFilters)) {
+            $baseQuery->where(function ($query) use ($osFilters) {
+                foreach ($osFilters as $index => $filter) {
+                    $method = $index === 0 ? 'where' : 'orWhere';
+                    $query->$method('os', 'like', '%' . $filter . '%');
+                }
+            });
+        }
+
+        return $baseQuery;
+    }
+
+    private function getExistingNodeMapping(Map $map): array
+    {
+        return $map->nodes()->pluck('id', 'device_id')->filter()->toArray();
+    }
+
+    private function createMissingNodes(Map $map, array $devices, array $existingNodes, int $minDegree): array
+    {
+        $nodeMapping = $existingNodes;
+        $deviceDegrees = $this->calculateDeviceDegrees($devices);
+
+        $layout = new GridLayout(100, 100, 120, 8);
+
+        foreach ($devices as $device) {
+            $deviceId = (int) ($device['device_id'] ?? 0);
+            if (!$deviceId || isset($nodeMapping[$deviceId])) {
+                continue;
+            }
+
+            if ($minDegree > 0 && ($deviceDegrees[$deviceId] ?? 0) < $minDegree) {
+                continue;
+            }
+
+            $position = $layout->getNextPosition();
+
+            $node = Node::create([
+                'map_id' => $map->id,
+                'label' => $device['hostname'] ?? "Device {$deviceId}",
+                'x' => $position['x'],
+                'y' => $position['y'],
+                'device_id' => $deviceId,
+                'meta' => [],
+            ]);
+
+            $nodeMapping[$deviceId] = $node->id;
+        }
+
+        return $nodeMapping;
+    }
+
+    private function calculateDeviceDegrees(array $devices): array
+    {
+        $degrees = [];
+        $deviceIds = array_column($devices, 'device_id');
+
+        $portsQuery = class_exists('\\App\\Models\\Port')
+            ? \App\Models\Port::whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up')
+            : \DB::table('ports')->whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up');
+
+        $ports = $portsQuery->select('device_id')->get()->toArray();
+        $ports = array_map(fn($port) => (array) $port, $ports);
+
+        foreach ($ports as $port) {
+            $degrees[$port['device_id']] = ($degrees[$port['device_id']] ?? 0) + 1;
+        }
+
+        return $degrees;
+    }
+
+    private function buildConnectivityGraph(array $nodeMapping): array
+    {
+        $deviceIds = array_keys($nodeMapping);
+        $ports = $this->getActivePorts($deviceIds);
+        $portsByDevice = $this->groupPortsByDevice($ports);
+
+        return [
+            'portsByDevice' => $portsByDevice,
+            'links' => $this->discoverLinks($portsByDevice, $nodeMapping),
+        ];
+    }
+
+    private function getActivePorts(array $deviceIds): array
+    {
+        $query = class_exists('\\App\\Models\\Port')
+            ? \App\Models\Port::whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up')
+            : \DB::table('ports')->whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up');
+
+        $ports = $query->select('device_id', 'ifIndex', 'ifDescr')->get()->toArray();
+        return array_map(fn($port) => (array) $port, $ports);
+    }
+
+    private function groupPortsByDevice(array $ports): array
+    {
+        $grouped = [];
+        foreach ($ports as $port) {
+            $grouped[$port['device_id']][] = $port;
+        }
+        return $grouped;
+    }
+
+    private function discoverLinks(array $portsByDevice, array $nodeMapping): array
+    {
+        $links = [];
+
+        foreach ($portsByDevice as $deviceId => $devicePorts) {
+            foreach ($devicePorts as $port) {
+                $neighbor = $this->findPortNeighbor($port);
+                if ($neighbor && isset($nodeMapping[$neighbor['device_id']])) {
+                    $linkKey = $this->createLinkKey($deviceId, $neighbor['device_id']);
+
+                    if (!isset($links[$linkKey])) {
+                        $links[$linkKey] = [
+                            'device_a' => min($deviceId, $neighbor['device_id']),
+                            'device_b' => max($deviceId, $neighbor['device_id']),
+                            'ports' => []
+                        ];
+                    }
+
+                    $links[$linkKey]['ports'][] = [
+                        'device_id' => $deviceId,
+                        'port_id' => $port['ifIndex'],
+                        'neighbor_device_id' => $neighbor['device_id'],
+                        'neighbor_port_id' => $neighbor['ifIndex'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        return $links;
+    }
+
+    private function createLinkKey(int $deviceA, int $deviceB): string
+    {
+        return min($deviceA, $deviceB) . '-' . max($deviceA, $deviceB);
+    }
+
+    private function createDiscoveredLinks(Map $map, array $connectivityData, array $nodeMapping): void
+    {
+        foreach ($connectivityData['links'] as $linkData) {
+            $nodeAId = $nodeMapping[$linkData['device_a']];
+            $nodeBId = $nodeMapping[$linkData['device_b']];
+
+            $ports = $this->findLinkPorts($linkData['ports']);
+
+            Link::create([
+                'map_id' => $map->id,
+                'src_node_id' => $nodeAId,
+                'dst_node_id' => $nodeBId,
+                'port_id_a' => $ports['port_a'],
+                'port_id_b' => $ports['port_b'],
+                'bandwidth_bps' => null,
+                'style' => [],
+            ]);
+        }
+    }
+
+    private function findLinkPorts(array $portData): array
+    {
+        $ports = ['port_a' => null, 'port_b' => null];
+
+        foreach ($portData as $portInfo) {
+            $deviceId = $portInfo['device_id'];
+            $portId = $this->findPortId($deviceId, $portInfo['port_id']);
+
+            if ($portInfo['device_id'] === $portData[0]['device_id']) {
+                $ports['port_a'] = $portId;
+            } else {
+                $ports['port_b'] = $portId;
+            }
+        }
+
+        return $ports;
+    }
+}
+
+/**
+ * Simple grid layout utility for auto-discovered nodes
+ */
+class GridLayout
+{
+    private int $startX;
+    private int $startY;
+    private int $step;
+    private int $columns;
+    private int $currentIndex = 0;
+
+    public function __construct(int $startX, int $startY, int $step, int $columns)
+    {
+        $this->startX = $startX;
+        $this->startY = $startY;
+        $this->step = $step;
+        $this->columns = $columns;
+    }
+
+    public function getNextPosition(): array
+    {
+        $row = intdiv($this->currentIndex, $this->columns);
+        $col = $this->currentIndex % $this->columns;
+
+        $x = $this->startX + ($col * $this->step);
+        $y = $this->startY + ($row * $this->step);
+
+        $this->currentIndex++;
+
+        return ['x' => $x, 'y' => $y];
     }
 }

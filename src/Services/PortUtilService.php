@@ -225,12 +225,12 @@ class PortUtilService
             $now = microtime(true);
             \Illuminate\Support\Facades\Cache::put($cacheKey, ['ts' => $now, 'in' => $cntIn, 'out' => $cntOut], 300);
             if (is_array($last) && isset($last['ts'])) {
-                $dt = max(0.1, $now - $last['ts']);
+                $deltaTime = max(0.1, $now - $last['ts']);
                 $din = $this->counterDelta($cntIn, $last['in']);
                 $dout = $this->counterDelta($cntOut, $last['out']);
                 return [
-                    'in' => (int) round(($din * 8) / $dt),
-                    'out' => (int) round(($dout * 8) / $dt),
+                    'in' => (int) round(($din * 8) / $deltaTime),
+                    'out' => (int) round(($dout * 8) / $deltaTime),
                 ];
             }
         } catch (\Exception $e) {
@@ -248,14 +248,14 @@ class PortUtilService
             // Values come like: Counter64: 12345
             if (strpos($val, ':') !== false) {
                 $parts = explode(':', $val, 2);
-                $n = trim($parts[1]);
-                if (is_numeric($n)) {
-                    return (float)$n;
+                $number = trim($parts[1]);
+                if (is_numeric($number)) {
+                    return (float)$number;
                 }
             }
-            $n = trim($val);
-            if (is_numeric($n)) {
-                return (float)$n;
+            $number = trim($val);
+            if (is_numeric($number)) {
+                return (float)$number;
             }
         }
         return null;
@@ -423,8 +423,8 @@ class PortUtilService
      */
     public function deviceAggregateBits(int $deviceId, int $limit = 32): array
     {
-        $in = 0;
-        $out = 0;
+        $inbound = 0;
+        $outbound = 0;
         try {
             // Prefer up ports, highest speeds first
             $ports = DB::table('ports')
@@ -434,14 +434,14 @@ class PortUtilService
                 ->orderByDesc('speed')
                 ->limit(max(1, $limit))
                 ->get();
-            foreach ($ports as $p) {
-                $pd = $this->getPortData((int) $p->port_id);
-                $in += (int) ($pd['in'] ?? 0);
-                $out += (int) ($pd['out'] ?? 0);
+            foreach ($ports as $port) {
+                $portData = $this->getPortData((int) $port->port_id);
+                $inbound += (int) ($portData['in'] ?? 0);
+                $outbound += (int) ($portData['out'] ?? 0);
             }
         } catch (\Throwable $e) {
             // Ignore errors; return zeros
         }
-        return ['in' => $in, 'out' => $out];
+        return ['in' => $inbound, 'out' => $outbound];
     }
 }

@@ -53,10 +53,6 @@
                                                    class="btn btn-primary" title="View" target="_blank">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
-                                                <a href="{{ url('plugin/WeathermapNG/editor-d3/' . $map->id) }}"
-                                                   class="btn btn-success" title="D3 Editor">
-                                                    <i class="fas fa-project-diagram"></i>
-                                                </a>
                                                 <button onclick="deleteMap({{ $map->id }}, '{{ $map->name }}')"
                                                         class="btn btn-danger" title="Delete">
                                                     <i class="fas fa-trash"></i>

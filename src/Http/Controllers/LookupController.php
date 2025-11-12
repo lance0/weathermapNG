@@ -10,9 +10,9 @@ class LookupController
 {
     public function devices(Request $request, DevicePortLookup $lookup): JsonResponse
     {
-        $q = trim((string) $request->query('q', ''));
-        if ($q !== '') {
-            return response()->json($lookup->deviceAutocomplete($q));
+        $query = trim((string) $request->query('q', ''));
+        if ($query !== '') {
+            return response()->json($lookup->deviceAutocomplete($query));
         }
 
         return response()->json($lookup->getAllDevices());
@@ -20,14 +20,14 @@ class LookupController
 
     public function ports(int $id, DevicePortLookup $lookup): JsonResponse
     {
-        $q = trim((string) request()->query('q', ''));
+        $query = trim((string) request()->query('q', ''));
         $ports = $lookup->portsForDevice($id);
-        if ($q !== '') {
-            $lq = strtolower($q);
-            $ports = array_values(array_filter($ports, function ($p) use ($lq) {
-                $name = strtolower((string)($p['ifName'] ?? ''));
-                $idx = strtolower((string)($p['ifIndex'] ?? ''));
-                return str_contains($name, $lq) || str_contains($idx, $lq);
+        if ($query !== '') {
+            $lowercaseQuery = strtolower($query);
+            $ports = array_values(array_filter($ports, function ($port) use ($lowercaseQuery) {
+                $name = strtolower((string)($port['ifName'] ?? ''));
+                $idx = strtolower((string)($port['ifIndex'] ?? ''));
+                return str_contains($name, $lowercaseQuery) || str_contains($idx, $lowercaseQuery);
             }));
         }
         return response()->json([
