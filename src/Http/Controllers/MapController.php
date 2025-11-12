@@ -5,6 +5,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
+use LibreNMS\Plugins\WeathermapNG\Services\GridLayout;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 
@@ -228,13 +229,19 @@ class MapController
                 if (($data['port_id_a'] ?? null) && class_exists('\\App\\Models\\Port')) {
                     $sourcePort = \App\Models\Port::find($data['port_id_a']);
                     if (!$sourcePort || ($src->device_id && $sourcePort->device_id != $src->device_id)) {
-                        return response()->json(['success' => false, 'message' => 'Source port does not belong to source device'], 422);
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Source port does not belong to source device'
+                        ], 422);
                     }
                 }
                 if (($data['port_id_b'] ?? null) && class_exists('\\App\\Models\\Port')) {
                     $destinationPort = \App\Models\Port::find($data['port_id_b']);
                     if (!$destinationPort || ($dst->device_id && $destinationPort->device_id != $dst->device_id)) {
-                        return response()->json(['success' => false, 'message' => 'Destination port does not belong to destination device'], 422);
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Destination port does not belong to destination device'
+                        ], 422);
                     }
                 }
             } catch (\Exception $e) {
@@ -565,8 +572,12 @@ class MapController
         $deviceIds = array_column($devices, 'device_id');
 
         $portsQuery = class_exists('\\App\\Models\\Port')
-            ? \App\Models\Port::whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up')
-            : \DB::table('ports')->whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up');
+            ? \App\Models\Port::whereIn('device_id', $deviceIds)
+                ->where('ifOperStatus', 'up')
+                ->where('ifAdminStatus', 'up')
+            : \DB::table('ports')->whereIn('device_id', $deviceIds)
+                ->where('ifOperStatus', 'up')
+                ->where('ifAdminStatus', 'up');
 
         $ports = $portsQuery->select('device_id')->get()->toArray();
         $ports = array_map(fn($port) => (array) $port, $ports);
@@ -586,15 +597,19 @@ class MapController
 
         return [
             'portsByDevice' => $portsByDevice,
-            'links' => $this->discoverLinks($portsByDevice, $nodeMapping),
+            'links' => $this->discoverLinks($portsByDevice, $nodeMapping)
         ];
     }
 
     private function getActivePorts(array $deviceIds): array
     {
         $query = class_exists('\\App\\Models\\Port')
-            ? \App\Models\Port::whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up')
-            : \DB::table('ports')->whereIn('device_id', $deviceIds)->where('ifOperStatus', 'up')->where('ifAdminStatus', 'up');
+            ? \App\Models\Port::whereIn('device_id', $deviceIds)
+                ->where('ifOperStatus', 'up')
+                ->where('ifAdminStatus', 'up')
+            : \DB::table('ports')->whereIn('device_id', $deviceIds)
+                ->where('ifOperStatus', 'up')
+                ->where('ifAdminStatus', 'up');
 
         $ports = $query->select('device_id', 'ifIndex', 'ifDescr')->get()->toArray();
         return array_map(fn($port) => (array) $port, $ports);
@@ -681,38 +696,5 @@ class MapController
         }
 
         return $ports;
-    }
-}
-
-/**
- * Simple grid layout utility for auto-discovered nodes
- */
-class GridLayout
-{
-    private int $startX;
-    private int $startY;
-    private int $step;
-    private int $columns;
-    private int $currentIndex = 0;
-
-    public function __construct(int $startX, int $startY, int $step, int $columns)
-    {
-        $this->startX = $startX;
-        $this->startY = $startY;
-        $this->step = $step;
-        $this->columns = $columns;
-    }
-
-    public function getNextPosition(): array
-    {
-        $row = intdiv($this->currentIndex, $this->columns);
-        $col = $this->currentIndex % $this->columns;
-
-        $x = $this->startX + ($col * $this->step);
-        $y = $this->startY + ($row * $this->step);
-
-        $this->currentIndex++;
-
-        return ['x' => $x, 'y' => $y];
     }
 }

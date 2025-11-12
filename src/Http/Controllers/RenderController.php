@@ -419,21 +419,28 @@ class RenderController
                                     $status = ($dev->status ?? 0) ? 'up' : 'down';
                                 }
                             } else {
-                                $row = \DB::table('devices')->select('status')->where('device_id', $node->device_id)->first();
+                                $row = \DB::table('devices')
+                                    ->select('status')
+                                    ->where('device_id', $node->device_id)
+                                    ->first();
                                 if ($row) {
                                     $status = ($row->status ?? 0) ? 'up' : 'down';
                                 }
                             }
                             // Best-effort metrics from DB
                             try {
-                                $cpu = \DB::table('processors')->where('device_id', $node->device_id)->avg('processor_usage');
+                                $cpu = \DB::table('processors')
+                                    ->where('device_id', $node->device_id)
+                                    ->avg('processor_usage');
                                 if ($cpu !== null) {
                                     $metrics['cpu'] = round((float) $cpu, 2);
                                 }
                             } catch (\Exception $e) {
                             }
                             try {
-                                $mem = \DB::table('mempools')->where('device_id', $node->device_id)->avg('mempool_perc');
+                                $mem = \DB::table('mempools')
+                                    ->where('device_id', $node->device_id)
+                                    ->avg('mempool_perc');
                                 if ($mem !== null) {
                                     $metrics['mem'] = round((float) $mem, 2);
                                 }
@@ -533,10 +540,12 @@ class RenderController
                 foreach ($map->links as $lnk) {
                     $count = 0;
                     $sev = null;
-                    foreach ([(int)$lnk->port_id_a, (int)$lnk->port_id_b] as $pid) {
+                    foreach ([(int) $lnk->port_id_a, (int) $lnk->port_id_b] as $pid) {
                         if ($pid && isset($portAlerts[$pid])) {
                             $count += $portAlerts[$pid]['count'];
-                            $sev = $sev ? $this->maxSeverity($sev, $portAlerts[$pid]['severity']) : $portAlerts[$pid]['severity'];
+                            $sev = $sev
+                                ? $this->maxSeverity($sev, $portAlerts[$pid]['severity'])
+                                : $portAlerts[$pid]['severity'];
                         }
                     }
                     if ($count > 0) {
