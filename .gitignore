@@ -61,6 +61,3 @@ yarn-error.log*
 
 # Local references and example plugin trees
 librenms-example-plugin-main/
-
-# Claude development notes (local only)
-CLAUDE.md
