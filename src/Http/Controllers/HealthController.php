@@ -50,7 +50,7 @@ class HealthController
 
     private function getHttpStatusCode(string $status): int
     {
-        return match($status) {
+        return match ($status) {
             'healthy' => 200,
             'warning' => 200,
             'unhealthy' => 503,
