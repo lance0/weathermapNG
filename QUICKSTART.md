@@ -1,14 +1,20 @@
 # WeathermapNG Quick Start Guide
 
-## 🚀 Quick Deployment (One Command)
+## 🚀 One-Command Installation (Recommended)
 
 ```bash
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-cd WeathermapNG && ./deploy.sh
+cd WeathermapNG && ./quick-install.sh
 ```
 
-That's it! The deployment script handles everything automatically.
+**That's it!** The script automatically handles dependencies, database setup, and configuration.
+
+## ✅ Post-Installation
+
+1. **Visit**: `https://your-server/plugin/WeathermapNG`
+2. **Create Map**: Click "Create New Map"
+3. **Add Devices**: Use the device dropdown or drag-and-drop editor
 
 ## 📋 What the Deployment Script Does
 

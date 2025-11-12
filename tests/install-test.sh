@@ -88,12 +88,12 @@ test_script_syntax() {
     test_start "Installation script syntax"
     
     # Check if we're in the project root or need to find files
-    if [ -f "install.sh" ]; then
+    if [ -f "quick-install.sh" ]; then
         # We're in project root
-        if bash -n install.sh 2>"$TEST_LOG"; then
-            test_pass "install.sh syntax valid"
+        if bash -n quick-install.sh 2>"$TEST_LOG"; then
+            test_pass "quick-install.sh syntax valid"
         else
-            test_fail "install.sh syntax" "$(cat $TEST_LOG)"
+            test_fail "quick-install.sh syntax" "$(cat $TEST_LOG)"
         fi
         
         if php -l verify.php &>"$TEST_LOG"; then
@@ -192,27 +192,10 @@ test_installation_modes() {
     test_start "Installation mode detection"
     
     # When run from project root, files should be here
-    if [ -f "install.sh" ]; then
-        # Test help output
-        if ./install.sh --help | grep -q "express"; then
-            test_pass "Express mode documented"
-        else
-            test_fail "Express mode" "Not documented in help"
-        fi
-        
-        if ./install.sh --help | grep -q "custom"; then
-            test_pass "Custom mode documented"
-        else
-            test_fail "Custom mode" "Not documented in help"
-        fi
-        
-        if ./install.sh --help | grep -q "docker"; then
-            test_pass "Docker mode documented"
-        else
-            test_fail "Docker mode" "Not documented in help"
-        fi
+    if [ -f "quick-install.sh" ]; then
+        test_pass "Quick install script exists"
     else
-        test_fail "install.sh" "Script not found"
+        test_fail "quick-install.sh" "Script not found"
     fi
 }
 
@@ -225,7 +208,7 @@ test_file_integrity() {
         "WeathermapNG.php"
         "composer.json"
         "routes/web.php"
-        "install.sh"
+        "quick-install.sh"
         "verify.php"
         "INSTALL.md"
         "README.md"

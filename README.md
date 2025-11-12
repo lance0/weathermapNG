@@ -11,158 +11,134 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 - **Professional Tools**: Templates, keyboard shortcuts, undo/redo
 - **Export/Import**: JSON format for sharing maps
 
-## 🚀 Quick Installation (2 minutes)
+## 🚀 Installation (Choose Your Method)
+
+### Method 1: One-Command Install (Recommended - 1 minute)
+
+```bash
+# Clone and install automatically
+cd /opt/librenms/html/plugins
+git clone https://github.com/lance0/weathermapNG.git WeathermapNG
+cd WeathermapNG && ./quick-install.sh
+```
+
+**That's it!** The script automatically:
+- ✅ Installs dependencies
+- ✅ Sets up database tables
+- ✅ Configures permissions
+- ✅ Clears caches
+- ✅ Enables the plugin
+- ✅ Sets up background polling
+
+### Method 2: Manual Install
+
+For users who prefer manual control:
+
+```bash
+# 1. Clone and install
+cd /opt/librenms/html/plugins
+git clone https://github.com/lance0/weathermapNG.git WeathermapNG
+cd WeathermapNG
+composer install --no-dev
+
+# 2. Setup database
+php database/setup.php
+
+# 3. Configure LibreNMS
+cd /opt/librenms
+php artisan cache:clear
+php artisan view:clear
+chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+
+# 4. Enable plugin
+./lnms plugin:enable WeathermapNG
+```
 
 ### Requirements
 - LibreNMS (latest stable)
 - PHP 8.2+
 - Composer
+- MySQL/MariaDB
 
-### Install Steps
+**Visit**: `https://your-librenms/plugin/WeathermapNG`
 
+## 🎯 Getting Started
+
+### Create Your First Map
+
+1. **Access the Plugin**: Visit `https://your-librenms/plugin/WeathermapNG`
+2. **Create Map**: Click **"Create New Map"**
+3. **Configure**: Enter name, title, and dimensions
+4. **Design**: Use the canvas editor to add devices and connections
+5. **Save**: Your map is now live with real-time traffic data!
+
+### Quick Tips
+- **Add Devices**: Use the device dropdown to populate your map automatically
+- **Manual Layout**: Drag nodes to position them perfectly
+- **Live Preview**: See traffic updates in real-time
+- **Export**: Save maps as JSON for backup/sharing
+
+## 🔧 Troubleshooting
+
+### Plugin Not Showing
 ```bash
-# 1. Clone the plugin
-cd /opt/librenms/html/plugins
-git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-
-# 2. Install dependencies
-cd WeathermapNG
-composer install --no-dev
-
-# 3. Clear LibreNMS caches
+# Clear LibreNMS caches
 cd /opt/librenms
 php artisan cache:clear
-php artisan route:clear
 php artisan view:clear
-
-# 4. Set permissions
-chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 ```
 
-**That's it!** Visit `https://your-librenms/plugin/WeathermapNG`
-
-## 📝 Creating Your First Map
-
-1. Click **"Create New Map"**
-2. Enter a name and title
-3. Use the **Canvas Editor** with drag-and-drop interface and professional tools
-4. Add devices from the dropdown
-5. Connect nodes to create links
-6. Save - your map now shows live traffic!
-
-### Embed Viewer
-- See `docs/EMBED.md` for metric options, legend, live updates, and export.
-
-## 🔧 Architecture
-
-WeathermapNG follows LibreNMS v2 plugin architecture:
-
-```
-WeathermapNG/
-├── src/
-│   ├── WeathermapNGProvider.php    # Service provider
-│   ├── Hooks/                       # LibreNMS hooks
-│   │   ├── MenuEntry.php           # Menu integration
-│   │   └── Settings.php            # Settings page
-│   ├── Http/Controllers/           # Web controllers
-│   ├── Models/                     # Database models
-│   └── Services/                   # Business logic
-├── resources/views/                # Blade templates
-├── routes/web.php                  # Route definitions
-├── database/migrations/            # Database schema
-└── composer.json                   # Package definition
-```
-
-## 🎯 Key Components
-
-### Data Collection
-- **PortUtilService**: Fetches bandwidth data from RRD/API/SNMP
-- **Background Poller**: Pre-processes data for performance
-- **Caching**: Redis/file-based with configurable TTL
-
-### Visualization
-- **Canvas Editor**: HTML5 canvas with professional editing tools
-- **Live Updates**: SSE for real-time, polling fallback
-
-### Integration
-- Uses LibreNMS authentication
-- Integrates with device/port database
-- Follows LibreNMS Bootstrap 4 UI patterns
-
-## 🐛 Troubleshooting
-
-### View/Page Not Found Errors
+### Permission Errors
 ```bash
-cd /opt/librenms
-php artisan view:clear
-php artisan cache:clear
+# Fix ownership
+sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+```
+
+### Database Issues
+```bash
+# Run setup again
+cd /opt/librenms/html/plugins/WeathermapNG
+php database/setup.php
 ```
 
 ### Maps Not Updating
-Check the poller is running:
+- Check cron job: `crontab -u librenms -l | grep weathermap`
+- Verify poller: `ps aux | grep map-poller`
+
+## 🔄 Updating
+
 ```bash
-php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php
+cd /opt/librenms/html/plugins/WeathermapNG
+git pull
+composer install --no-dev
+cd /opt/librenms
+php artisan cache:clear
+php artisan view:clear
 ```
-
-Add to cron for automatic updates:
-```bash
-*/5 * * * * librenms php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php
-```
-
-### Permission Issues
-```bash
-chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
-chmod -R 755 /opt/librenms/html/plugins/WeathermapNG
-```
-
-## 📊 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|---------|------------|
-| `/plugin/WeathermapNG` | GET | Main interface |
-| `/plugin/WeathermapNG/map` | POST | Create map |
-| `/plugin/WeathermapNG/embed/{id}` | GET | Embed view |
-| `/plugin/WeathermapNG/api/maps/{id}/json` | GET | Map data |
-| `/plugin/WeathermapNG/api/maps/{id}/live` | GET | Live data |
-| `/plugin/WeathermapNG/api/maps/{id}/sse` | GET | SSE stream |
 
 ## 🔌 Embedding Maps
 
 ```html
-<iframe src="https://your-librenms/plugin/WeathermapNG/embed/1" 
+<iframe src="https://your-librenms/plugin/WeathermapNG/embed/1"
         width="800" height="600" frameborder="0">
 </iframe>
 ```
 
-## ⚙️ Configuration
+## 📚 Documentation
 
-Edit `config/weathermapng.php`:
-
-```php
-return [
-    'poll_interval' => 300,          // Update interval (seconds)
-    'thresholds' => [50, 80, 95],    // Utilization thresholds (%)
-    'colors' => [
-        'link_normal' => '#28a745',   // Green
-        'link_warning' => '#ffc107',  // Yellow  
-        'link_critical' => '#dc3545'  // Red
-    ]
-];
-```
-
-## 📝 License
-
-Unlicense - Public Domain
+- **[Detailed Installation Guide](INSTALL.md)** - Advanced setup and troubleshooting
+- **[API Documentation](API.md)** - REST API reference
+- **[Configuration Guide](config/weathermapng.php)** - All settings explained
 
 ## 🤝 Contributing
 
-Pull requests welcome! Please follow PSR-12 coding standards.
+Pull requests welcome! Please follow PSR-12 coding standards and include tests.
 
 ## 🆘 Support
 
 - **Issues**: [GitHub Issues](https://github.com/lance0/weathermapNG/issues)
 - **LibreNMS Community**: [community.librenms.org](https://community.librenms.org)
-### Schema / Migrations
-- Ensure the plugin migrations are applied (especially when upgrading):
-  - `php artisan migrate --path=html/plugins/WeathermapNG/database/migrations --force`
-- Upgrades from early versions may miss columns like `wmng_maps.title`. A compatibility migration will add any missing columns automatically.
+
+## 📝 License
+
+Unlicense - Public Domain

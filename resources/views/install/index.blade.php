@@ -98,7 +98,7 @@
                         <h6><i class="fas fa-terminal"></i> Alternative: Command Line Installation</h6>
                         <p class="text-muted small">For advanced users or automated deployments:</p>
                         <div class="bg-light p-3 rounded">
-                            <code>cd /opt/librenms/html/plugins/WeathermapNG<br>./install.sh</code>
+                            <code>cd /opt/librenms/html/plugins/WeathermapNG<br>./quick-install.sh</code>
                         </div>
                     </div>
                 </div>

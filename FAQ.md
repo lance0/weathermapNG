@@ -9,7 +9,7 @@
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git
 cd WeathermapNG
-./install.sh
+./quick-install.sh
 ```
 
 ### The plugin doesn't show up?
