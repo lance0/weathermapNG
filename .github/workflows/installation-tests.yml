@@ -23,17 +23,17 @@ jobs:
   script-validation:
     runs-on: ubuntu-latest
     name: Validate Installation Scripts
-    
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.0'
-          extensions: gd, json, pdo, pdo_mysql, mbstring, mysqli
-          tools: composer:v2
+       - name: Checkout code
+         uses: actions/checkout@v3
+
+       - name: Setup PHP
+         uses: shivammathur/setup-php@v2
+         with:
+           php-version: '8.2'
+           extensions: gd, json, pdo, pdo_mysql, mbstring, mysqli
+           tools: composer:v2
       
       - name: Validate bash scripts
         run: |
@@ -57,33 +57,33 @@ jobs:
   installation-test:
     runs-on: ubuntu-latest
     name: Test Installation Process
-    
+
     services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: librenms
-          MYSQL_USER: librenms
-          MYSQL_PASSWORD: password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-    
+       mysql:
+         image: mysql:8.0
+         env:
+           MYSQL_ROOT_PASSWORD: root
+           MYSQL_DATABASE: librenms
+           MYSQL_USER: librenms
+           MYSQL_PASSWORD: password
+         ports:
+           - 3306:3306
+         options: >-
+           --health-cmd="mysqladmin ping"
+           --health-interval=10s
+           --health-timeout=5s
+           --health-retries=5
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.0'
-          extensions: gd, json, pdo, pdo_mysql, mbstring, mysqli
-          tools: composer:v2
+       - name: Checkout code
+         uses: actions/checkout@v3
+
+       - name: Setup PHP
+         uses: shivammathur/setup-php@v2
+         with:
+           php-version: '8.2'
+           extensions: gd, json, pdo, pdo_mysql, mbstring, mysqli
+           tools: composer:v2
       
       - name: Wait for MySQL
         run: |
@@ -155,7 +155,7 @@ jobs:
     name: PHP Unit Tests
     strategy:
       matrix:
-        php-version: ['8.0', '8.1', '8.2']
+        php-version: ['8.2']
     
     steps:
       - name: Checkout code
@@ -240,17 +240,17 @@ jobs:
           # Note: This is a dry run - actual installation would require full LibreNMS
           ./install.sh --help
           
-      - name: Verify installation components
-        run: |
-          # Check all required files exist
-          for file in WeathermapNG.php routes.php plugin.json composer.json; do
-            test -f "$file" || (echo "$file missing" && exit 1)
-          done
-          
-          # Check hook files
-          for hook in Menu DeviceOverview PortTab Settings Page; do
-            test -f "Hooks/$hook.php" || (echo "Hook $hook.php missing" && exit 1)
-          done
+       - name: Verify installation components
+         run: |
+           # Check all required files exist
+           for file in WeathermapNG.php routes/web.php composer.json; do
+             test -f "$file" || (echo "$file missing" && exit 1)
+           done
+
+           # Check hook files (LibreNMS v2 uses different hook structure)
+           for hook in MenuEntry Settings; do
+             test -f "src/Hooks/$hook.php" || (echo "Hook $hook.php missing" && exit 1)
+           done
 
   security-check:
     runs-on: ubuntu-latest

@@ -14,16 +14,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-           php-version: 8.2
-          extensions: gd, json, mbstring
+       - name: Setup PHP
+         uses: shivammathur/setup-php@v2
+         with:
+           php-version: '8.2'
+           extensions: gd, json, mbstring, pdo, pdo_mysql
+           ini-values: memory_limit=256M
 
-      - name: Cache Composer dependencies
-        uses: actions/cache@v3
-        with:
-          path: vendor
+       - name: Cache Composer dependencies
+         uses: actions/cache@v3
+         with:
+           path: vendor
            key: ${{ runner.os }}-php82-composer-${{ hashFiles('**/composer.lock') }}
            restore-keys: |
              ${{ runner.os }}-php82-composer-

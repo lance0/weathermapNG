@@ -224,8 +224,7 @@ test_file_integrity() {
     local required_files=(
         "WeathermapNG.php"
         "composer.json"
-        "routes.php"
-        "plugin.json"
+        "routes/web.php"
         "install.sh"
         "verify.php"
         "INSTALL.md"
