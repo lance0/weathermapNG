@@ -38,7 +38,7 @@ class WeathermapNG
 
     public function getVersion()
     {
-        return '1.1.0';
+        return '1.2.1';
     }
 
     public function getInfo()
@@ -95,10 +95,50 @@ class WeathermapNG
             'default_height' => 600,
             'poll_interval' => 300,
             'thresholds' => [50, 80, 95],
+            'scale' => 'bits',
             'rrd_base' => '/opt/librenms/rrd',
+            'rrdcached' => ['socket' => null],
             'enable_local_rrd' => true,
             'enable_api_fallback' => true,
             'cache_ttl' => 300,
+            'enable_sse' => true,
+            'client_refresh' => 60,
+            'snmp' => [
+                'enabled' => false,
+                'version' => '2c',
+                'community' => null,
+                'timeout' => 1,
+                'retries' => 1,
+            ],
+            'api_token' => null,
+            'colors' => [
+                'node_up' => '#28a745',
+                'node_down' => '#dc3545',
+                'node_warning' => '#ffc107',
+                'node_unknown' => '#6c757d',
+                'link_normal' => '#28a745',
+                'link_warning' => '#ffc107',
+                'link_critical' => '#dc3545',
+                'background' => '#ffffff',
+            ],
+            'rendering' => [
+                'image_format' => 'png',
+                'quality' => 90,
+                'font_size' => 10,
+                'node_radius' => 10,
+                'link_width' => 2,
+            ],
+            'security' => [
+                'allow_embed' => true,
+                'embed_domains' => ['localhost', '*.yourdomain.com'],
+                'max_image_size' => 2048,
+            ],
+            'editor' => [
+                'grid_size' => 20,
+                'snap_to_grid' => true,
+                'auto_save' => true,
+                'auto_save_interval' => 30,
+            ],
         ];
     }
 }

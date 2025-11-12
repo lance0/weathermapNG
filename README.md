@@ -5,7 +5,7 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 ## ✨ Features
 
 - **Real-time Visualization**: Live traffic data with animated flow indicators
-- **Dual Editors**: Simple canvas editor + advanced D3.js editor
+- **Canvas Editor**: Interactive HTML5 canvas editor with professional tools
 - **Multiple Data Sources**: RRD files → LibreNMS API → SNMP fallback
 - **Server-Sent Events**: Real-time updates without polling
 - **Professional Tools**: Templates, keyboard shortcuts, undo/redo
@@ -45,13 +45,10 @@ chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 
 1. Click **"Create New Map"**
 2. Enter a name and title
-3. Use the **D3.js Editor** for advanced features or **Simple Editor** for basic maps
+3. Use the **Canvas Editor** with drag-and-drop interface and professional tools
 4. Add devices from the dropdown
 5. Connect nodes to create links
 6. Save - your map now shows live traffic!
-
-### D3 Editor Guide
-- See `docs/EDITOR_D3.md` for routes, features, data mapping, and tips for the advanced D3 editor.
 
 ### Embed Viewer
 - See `docs/EMBED.md` for metric options, legend, live updates, and export.
@@ -84,8 +81,7 @@ WeathermapNG/
 - **Caching**: Redis/file-based with configurable TTL
 
 ### Visualization
-- **Canvas Renderer**: HTML5 canvas with animations
-- **D3.js Editor**: SVG-based with professional tools
+- **Canvas Editor**: HTML5 canvas with professional editing tools
 - **Live Updates**: SSE for real-time, polling fallback
 
 ### Integration

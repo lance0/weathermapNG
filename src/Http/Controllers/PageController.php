@@ -10,7 +10,7 @@ class PageController extends Controller
     /**
      * Display the main plugin page
      */
-    public function index(Request $request)
+    public function index()
     {
         // Get all maps with counts
         $maps = \Illuminate\Support\Facades\DB::table('wmng_maps')
@@ -30,7 +30,7 @@ class PageController extends Controller
     /**
      * Display the editor page
      */
-    public function editor(Request $request, $id = null)
+    public function editor($id = null)
     {
         $map = null;
         if ($id) {
@@ -47,7 +47,7 @@ class PageController extends Controller
     /**
      * Display the view page
      */
-    public function view(Request $request, $id)
+    public function view($id)
     {
         $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($id);
 
@@ -65,7 +65,7 @@ class PageController extends Controller
     /**
      * Display the settings page
      */
-    public function settings(Request $request)
+    public function settings()
     {
         return view('WeathermapNG::settings', [
             'title' => 'WeathermapNG Settings',

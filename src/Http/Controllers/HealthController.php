@@ -24,89 +24,41 @@ class HealthController
      * Basic health check endpoint (v2)
      * GET /plugin/WeathermapNG/health
      */
-    public function check(Request $request)
+    public function check()
     {
         $health = [
             'status' => 'healthy',
             'timestamp' => now()->toISOString(),
-            'version' => '1.0.0',
+            'version' => $this->getVersion(),
             'checks' => []
         ];
 
-        // Database connectivity check
-        try {
-            $mapCount = Map::count();
-            $health['checks']['database'] = [
-                'status' => 'healthy',
-                'message' => "Database connected, {$mapCount} maps found"
-            ];
-        } catch (\Exception $e) {
-            $health['status'] = 'unhealthy';
-            $health['checks']['database'] = [
-                'status' => 'unhealthy',
-                'message' => 'Database connection failed: ' . $e->getMessage()
-            ];
-            $this->getLogger()->error('Health check database failure', ['error' => $e->getMessage()]);
-        }
-
-        // RRD access check
-        try {
-            $rrdPath = config('weathermapng.rrd_base', '/opt/librenms/rrd');
-            $health['checks']['rrd'] = [
-                'status' => is_readable($rrdPath) ? 'healthy' : 'warning',
-                'message' => is_readable($rrdPath)
-                    ? 'RRD directory accessible'
-                    : 'RRD directory not accessible'
-            ];
-        } catch (\Exception $e) {
-            $health['checks']['rrd'] = [
-                'status' => 'warning',
-                'message' => 'RRD check failed: ' . $e->getMessage()
-            ];
-        }
-
-        // Output directory check
-        try {
-            $outputDir = config('weathermapng.output_dir', __DIR__ . '/../../../output/maps/');
-            $health['checks']['output'] = [
-                'status' => is_writable($outputDir) ? 'healthy' : 'warning',
-                'message' => is_writable($outputDir)
-                    ? 'Output directory writable'
-                    : 'Output directory not writable'
-            ];
-        } catch (\Exception $e) {
-            $health['checks']['output'] = [
-                'status' => 'warning',
-                'message' => 'Output directory check failed: ' . $e->getMessage()
-            ];
-        }
-
-        // API token check
-        $apiToken = config('weathermapng.api_token');
-        $health['checks']['api_token'] = [
-            'status' => $apiToken ? 'healthy' : 'warning',
-            'message' => $apiToken
-                ? 'API token configured'
-                : 'API token not configured (API fallback may not work)'
+        // Run all health checks
+        $checks = [
+            'database' => $this->checkDatabase(),
+            'filesystem' => $this->checkFilesystem(),
+            'dependencies' => $this->checkDependencies(),
+            'configuration' => $this->checkConfiguration(),
         ];
 
-        // Determine overall status
-        foreach ($health['checks'] as $check) {
-            if ($check['status'] === 'unhealthy') {
-                $health['status'] = 'unhealthy';
-                break;
-            } elseif ($check['status'] === 'warning' && $health['status'] === 'healthy') {
-                $health['status'] = 'warning';
-            }
-        }
+        $health['checks'] = $checks;
+        $health['status'] = $this->determineOverallStatus($checks);
 
-        $statusCode = $health['status'] === 'healthy' ? 200 :
-                     ($health['status'] === 'warning' ? 200 : 503);
-
+        $statusCode = $this->getHttpStatusCode($health['status']);
         return response()->json($health, $statusCode);
     }
 
-    public function stats(Request $request)
+    private function getHttpStatusCode(string $status): int
+    {
+        return match($status) {
+            'healthy' => 200,
+            'warning' => 200,
+            'unhealthy' => 503,
+            default => 200,
+        };
+    }
+
+    public function stats()
     {
         $stats = [
             'maps' => Map::count(),
@@ -176,7 +128,7 @@ class HealthController
      * Readiness probe for container orchestration
      * GET /plugin/WeathermapNG/ready
      */
-    public function ready(Request $request)
+    public function ready()
     {
         try {
             // Check database connectivity
@@ -207,7 +159,7 @@ class HealthController
      * Liveness probe for container orchestration
      * GET /plugin/WeathermapNG/live
      */
-    public function live(Request $request)
+    public function live()
     {
         return response()->json([
             'alive' => true,
@@ -220,7 +172,7 @@ class HealthController
      * Prometheus metrics endpoint
      * GET /plugin/WeathermapNG/metrics
      */
-    public function metrics(Request $request)
+    public function metrics()
     {
         $metrics = [];
 
@@ -265,7 +217,7 @@ class HealthController
      * Detailed health check
      * GET /plugin/WeathermapNG/health/detailed
      */
-    public function detailed(Request $request)
+    public function detailed()
     {
         $startTime = microtime(true);
         $checks = [];
@@ -308,36 +260,16 @@ class HealthController
     private function checkDatabase(): array
     {
         try {
-            $start = microtime(true);
-            DB::connection()->getPdo();
-            $responseTime = round((microtime(true) - $start) * 1000, 2);
-
-            // Check tables exist
-            $tables = ['wmng_maps', 'wmng_nodes', 'wmng_links'];
-            $missingTables = [];
-
-            foreach ($tables as $table) {
-                if (!\Schema::hasTable($table)) {
-                    $missingTables[] = $table;
-                }
-            }
-
-            if (!empty($missingTables)) {
-                return [
-                    'status' => 'degraded',
-                    'message' => 'Missing tables: ' . implode(', ', $missingTables),
-                    'response_time_ms' => $responseTime
-                ];
-            }
-
+            $mapCount = Map::count();
             return [
                 'status' => 'healthy',
-                'response_time_ms' => $responseTime
+                'message' => "Database connected, {$mapCount} maps found"
             ];
-        } catch (\Exception $e) {
+        } catch (\Exception $exception) {
+            $this->getLogger()->error('Health check database failure', ['error' => $exception->getMessage()]);
             return [
                 'status' => 'unhealthy',
-                'error' => $e->getMessage()
+                'message' => 'Database connection failed: ' . $exception->getMessage()
             ];
         }
     }
@@ -346,71 +278,67 @@ class HealthController
     {
         $checks = [];
 
-        // Check output directory
+        // RRD access check
+        $rrdPath = config('weathermapng.rrd_base', '/opt/librenms/rrd');
+        $checks['rrd'] = [
+            'status' => is_readable($rrdPath) ? 'healthy' : 'warning',
+            'message' => is_readable($rrdPath)
+                ? 'RRD directory accessible'
+                : 'RRD directory not accessible'
+        ];
+
+        // Output directory check
         $outputDir = config('weathermapng.output_dir', __DIR__ . '/../../../output/maps/');
-        if (is_dir($outputDir)) {
-            $checks['output_directory'] = is_writable($outputDir) ? 'writable' : 'not_writable';
-        } else {
-            $checks['output_directory'] = 'missing';
+        $checks['output'] = [
+            'status' => is_writable($outputDir) ? 'healthy' : 'warning',
+            'message' => is_writable($outputDir)
+                ? 'Output directory writable'
+                : 'Output directory not writable'
+        ];
+
+        // Return the most severe status
+        $overallStatus = 'healthy';
+        $messages = [];
+
+        foreach ($checks as $check) {
+            $messages[] = $check['message'];
+            if ($check['status'] === 'unhealthy') {
+                $overallStatus = 'unhealthy';
+            } elseif ($check['status'] === 'warning' && $overallStatus === 'healthy') {
+                $overallStatus = 'warning';
+            }
         }
-
-        // Check config directory
-        $configDir = __DIR__ . '/../../../config';
-        $checks['config_directory'] = is_dir($configDir) ? 'exists' : 'missing';
-
-        // Check log writability
-        $logPath = config('logging.output', '/var/log/librenms/weathermapng.log');
-        $logDir = dirname($logPath);
-        if (is_dir($logDir)) {
-            $checks['log_directory'] = is_writable($logDir) ? 'writable' : 'not_writable';
-        } else {
-            $checks['log_directory'] = 'missing';
-        }
-
-        $status = in_array('missing', $checks) || in_array('not_writable', $checks)
-            ? 'degraded'
-            : 'healthy';
 
         return [
-            'status' => $status,
-            'directories' => $checks
+            'status' => $overallStatus,
+            'message' => implode('; ', $messages)
         ];
     }
 
     private function checkDependencies(): array
     {
-        $checks = [];
+        $missingDeps = [];
 
-        // Check PHP extensions
-        $requiredExtensions = ['gd', 'json', 'pdo', 'mbstring'];
-        $missingExtensions = [];
-
-        foreach ($requiredExtensions as $extension) {
-            if (!extension_loaded($extension)) {
-                $missingExtensions[] = $extension;
-            }
+        // Check GD extension
+        if (!extension_loaded('gd')) {
+            $missingDeps[] = 'GD extension';
         }
 
-        if (!empty($missingExtensions)) {
-            $checks['php_extensions'] = [
-                'status' => 'missing',
-                'missing' => $missingExtensions
+        // Check JSON extension
+        if (!extension_loaded('json')) {
+            $missingDeps[] = 'JSON extension';
+        }
+
+        if (empty($missingDeps)) {
+            return [
+                'status' => 'healthy',
+                'message' => 'All required PHP extensions loaded'
             ];
-        } else {
-            $checks['php_extensions'] = ['status' => 'loaded'];
         }
-
-        // Check Composer dependencies
-        $vendorDir = __DIR__ . '/../../../vendor';
-        $checks['composer'] = is_dir($vendorDir) ? 'installed' : 'missing';
-
-        $status = !empty($missingExtensions) || $checks['composer'] === 'missing'
-            ? 'unhealthy'
-            : 'healthy';
 
         return [
-            'status' => $status,
-            'checks' => $checks
+            'status' => 'unhealthy',
+            'message' => 'Missing PHP extensions: ' . implode(', ', $missingDeps)
         ];
     }
 
@@ -418,21 +346,28 @@ class HealthController
     {
         $issues = [];
 
-        // Check for .env file
-        if (!file_exists(__DIR__ . '/../../../.env')) {
-            $issues[] = '.env file missing (using defaults)';
+        // API token check
+        $apiToken = config('weathermapng.api_token');
+        if (!$apiToken) {
+            $issues[] = 'API token not configured (API fallback may not work)';
         }
 
-        // Check critical config values
-        if (empty(config('weathermapng'))) {
-            $issues[] = 'WeathermapNG configuration missing';
+        if (empty($issues)) {
+            return [
+                'status' => 'healthy',
+                'message' => 'Configuration is valid'
+            ];
         }
 
         return [
-            'status' => empty($issues) ? 'healthy' : 'degraded',
-            'issues' => $issues
+            'status' => 'warning',
+            'message' => implode('; ', $issues)
         ];
     }
+
+
+
+
 
     private function getPerformanceMetrics(): array
     {
@@ -446,23 +381,16 @@ class HealthController
 
     private function determineOverallStatus(array $checks): string
     {
-        $unhealthyCount = 0;
-        $degradedCount = 0;
-
         foreach ($checks as $check) {
-            if (isset($check['status'])) {
-                if ($check['status'] === 'unhealthy') {
-                    $unhealthyCount++;
-                } elseif ($check['status'] === 'degraded') {
-                    $degradedCount++;
-                }
+            if (($check['status'] ?? 'healthy') === 'unhealthy') {
+                return 'unhealthy';
             }
         }
 
-        if ($unhealthyCount > 0) {
-            return 'unhealthy';
-        } elseif ($degradedCount > 0) {
-            return 'degraded';
+        foreach ($checks as $check) {
+            if (($check['status'] ?? 'healthy') === 'warning') {
+                return 'warning';
+            }
         }
 
         return 'healthy';

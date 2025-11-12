@@ -1,9 +1,9 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use LibreNMS\Plugins\WeathermapNG\Map;
-use LibreNMS\Plugins\WeathermapNG\Node;
-use LibreNMS\Plugins\WeathermapNG\Link;
+use LibreNMS\Plugins\WeathermapNG\Models\Map;
+use LibreNMS\Plugins\WeathermapNG\Models\Node;
+use LibreNMS\Plugins\WeathermapNG\Models\Link;
 
 class LibMapTest extends TestCase
 {
@@ -12,51 +12,55 @@ class LibMapTest extends TestCase
         return __DIR__ . '/../config/maps/example.conf';
     }
 
-    public function test_parses_example_config()
+    public function test_map_model_basic_functionality()
     {
-        $map = new Map(['name' => 'test', 'title' => 'Example Network Map']);
+        // Skip test if Laravel Eloquent is not available (plugin runs within LibreNMS)
+        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
+            $this->markTestSkipped('Laravel Eloquent not available in test environment');
+        }
+
+        // Test that we can create a Map model instance
+        $map = new Map([
+            'name' => 'test',
+            'title' => 'Example Network Map',
+            'options' => ['width' => 800, 'height' => 600]
+        ]);
 
         $this->assertSame('Example Network Map', $map->title);
         $this->assertSame('test', $map->name);
-        $this->assertSame(600, $map->getHeight());
-
-        $nodes = $map->getNodes();
-        $links = $map->getLinks();
-
-        $this->assertNotEmpty($nodes);
-        $this->assertNotEmpty($links);
-
-        $this->assertArrayHasKey('router1', $nodes);
-        $this->assertArrayHasKey('router2', $nodes);
-        $this->assertArrayHasKey('switch1', $nodes);
-
-        $router1 = $map->getNode('router1');
-        $this->assertInstanceOf(Node::class, $router1);
-        $this->assertSame('Core Router 1', $router1->getLabel());
-        $this->assertSame(['x' => 200, 'y' => 150], $router1->getPosition());
-
-        $link = $map->getLink('router1-router2');
-        $this->assertInstanceOf(Link::class, $link);
-        $this->assertSame('router1', $link->getSourceId());
-        $this->assertSame('router2', $link->getTargetId());
-        $this->assertSame(1000000000, $link->getBandwidth());
+        $this->assertSame(600, $map->height);
+        $this->assertSame(800, $map->width);
+        $this->assertSame('#ffffff', $map->background);
     }
 
-    public function test_to_array_structure_is_reasonable()
+    public function test_map_to_json_model_structure()
     {
-        $map = new Map(['name' => 'test', 'title' => 'Example Network Map']);
-        $arr = $map->toArray();
+        // Skip test if Laravel Eloquent is not available (plugin runs within LibreNMS)
+        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
+            $this->markTestSkipped('Laravel Eloquent not available in test environment');
+        }
 
-        $this->assertArrayHasKey('id', $arr);
-        $this->assertArrayHasKey('title', $arr);
-        $this->assertArrayHasKey('width', $arr);
-        $this->assertArrayHasKey('height', $arr);
-        $this->assertArrayHasKey('nodes', $arr);
-        $this->assertArrayHasKey('links', $arr);
-        $this->assertArrayHasKey('metadata', $arr);
+        $map = new Map([
+            'id' => 1,
+            'name' => 'test',
+            'title' => 'Example Network Map',
+            'options' => ['width' => 800, 'height' => 600]
+        ]);
 
-        $this->assertGreaterThan(0, $arr['metadata']['total_nodes']);
-        $this->assertGreaterThan(0, $arr['metadata']['total_links']);
+        $json = $map->toJsonModel();
+
+        $this->assertArrayHasKey('id', $json);
+        $this->assertArrayHasKey('title', $json);
+        $this->assertArrayHasKey('width', $json);
+        $this->assertArrayHasKey('height', $json);
+        $this->assertArrayHasKey('background', $json);
+        $this->assertArrayHasKey('nodes', $json);
+        $this->assertArrayHasKey('links', $json);
+
+        $this->assertSame(1, $json['id']);
+        $this->assertSame('Example Network Map', $json['title']);
+        $this->assertSame(800, $json['width']);
+        $this->assertSame(600, $json['height']);
     }
 }
 

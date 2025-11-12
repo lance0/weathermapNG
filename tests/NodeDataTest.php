@@ -1,24 +1,43 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use LibreNMS\Plugins\WeathermapNG\Node;
+use LibreNMS\Plugins\WeathermapNG\Models\Node;
 
 class NodeDataTest extends TestCase
 {
-    public function test_current_avg_max_values()
+    public function test_node_model_attributes()
     {
-        $n = new Node('n1', ['label' => 'n1']);
-        $now = time();
-        $series = [
-            ['timestamp' => $now - 300, 'value' => 0],
-            ['timestamp' => $now - 200, 'value' => 10],
-            ['timestamp' => $now - 100, 'value' => 20],
-            ['timestamp' => $now, 'value' => 30],
-        ];
-        $n->setData($series);
+        // Skip test if Laravel Eloquent is not available (plugin runs within LibreNMS)
+        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
+            $this->markTestSkipped('Laravel Eloquent not available in test environment');
+        }
 
-        $this->assertSame(30, $n->getCurrentValue());
-        $this->assertSame(30, $n->getMaxValue());
-        $this->assertEquals(20, $n->getAverageValue()); // (10+20+30)/3 - ignores zero in code
+        $node = new Node([
+            'id' => 1,
+            'map_id' => 1,
+            'label' => 'Test Node',
+            'x' => 100,
+            'y' => 200,
+            'device_id' => null,
+            'meta' => ['key' => 'value']
+        ]);
+
+        $this->assertEquals(1, $node->id);
+        $this->assertEquals('Test Node', $node->label);
+        $this->assertEquals(100, $node->x);
+        $this->assertEquals(200, $node->y);
+        $this->assertNull($node->device_id);
+        $this->assertEquals(['key' => 'value'], $node->meta);
+    }
+
+    public function test_node_status_without_device()
+    {
+        // Skip test if Laravel Eloquent is not available (plugin runs within LibreNMS)
+        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
+            $this->markTestSkipped('Laravel Eloquent not available in test environment');
+        }
+
+        $node = new Node(['device_id' => null]);
+        $this->assertEquals('unknown', $node->status);
     }
 }

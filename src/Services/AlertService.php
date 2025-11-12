@@ -125,26 +125,26 @@ class AlertService
             return 'warning';
         }
         if (is_numeric($sev)) {
-            $n = (int) $sev;
-            if ($n >= 3) {
+            $numericSeverity = (int) $sev;
+            if ($numericSeverity >= 3) {
                 return 'severe';
             }
-            if ($n >= 2) {
+            if ($numericSeverity >= 2) {
                 return 'critical';
             }
-            if ($n >= 1) {
+            if ($numericSeverity >= 1) {
                 return 'warning';
             }
             return 'ok';
         }
-        $s = strtolower((string) $sev);
-        return in_array($s, ['ok', 'warning', 'critical', 'severe']) ? $s : 'warning';
+        $stringSeverity = strtolower((string) $sev);
+        return in_array($stringSeverity, ['ok', 'warning', 'critical', 'severe']) ? $stringSeverity : 'warning';
     }
 
-    private function maxSeverity(string $a, string $b): string
+    private function maxSeverity(string $severityA, string $severityB): string
     {
-        $wa = self::SEV_WEIGHT[$a] ?? 0;
-        $wb = self::SEV_WEIGHT[$b] ?? 0;
-        return $wa >= $wb ? $a : $b;
+        $weightA = self::SEV_WEIGHT[$severityA] ?? 0;
+        $weightB = self::SEV_WEIGHT[$severityB] ?? 0;
+        return $weightA >= $weightB ? $severityA : $severityB;
     }
 }
