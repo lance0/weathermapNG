@@ -11,27 +11,39 @@ use PHPUnit\Framework\TestCase;
 
 class IntegrationTest extends TestCase
 {
-    /** @test */
-    public function core_classes_can_be_instantiated()
+    public function test_core_classes_exist()
     {
-        // This test verifies that the core classes can be instantiated
-        // and have the expected methods
-
-        // Test that we can create the main controller classes
-        $mapController = new MapController();
-        $renderController = new RenderController();
-
-        $this->assertInstanceOf(MapController::class, $mapController);
-        $this->assertInstanceOf(RenderController::class, $renderController);
-
-        // Test that core classes exist
-        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController'));
-        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController'));
-        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\PortUtilService'));
+        $this->assertTrue(class_exists(Map::class));
+        $this->assertTrue(class_exists(Node::class));
+        $this->assertTrue(class_exists(Link::class));
     }
 
-    // Note: Full integration testing requires Laravel framework with database
-    // This basic test verifies that core components can be instantiated together
-    // Comprehensive integration testing would require full Laravel test environment
-    // with database migrations, factories, and HTTP request simulation
+    public function test_controllers_exist()
+    {
+        $this->assertTrue(class_exists(MapController::class));
+        $this->assertTrue(class_exists(RenderController::class));
+    }
+
+    public function test_services_exist()
+    {
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\PortUtilService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\AlertService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\SseStreamService'));
+    }
+
+    public function test_render_controller_with_dependencies()
+    {
+        $mapDataBuilder = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder::class
+        );
+
+        $sseStreamService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\SseStreamService::class
+        );
+
+        $controller = new RenderController($mapDataBuilder, $sseStreamService);
+
+        $this->assertInstanceOf(RenderController::class, $controller);
+    }
 }

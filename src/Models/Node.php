@@ -31,19 +31,8 @@ class Node extends Model
             return null;
         }
 
-        // Try to get device name from LibreNMS
-        try {
-            if (class_exists('\App\Models\Device')) {
-                $device = \App\Models\Device::find($this->device_id);
-                return $device ? $device->hostname : null;
-            }
-
-            // Fallback for older versions
-            $device = dbFetchRow("SELECT hostname FROM devices WHERE device_id = ?", [$this->device_id]);
-            return $device ? $device['hostname'] : null;
-        } catch (\Exception $e) {
-            return null;
-        }
+        $device = $this->fetchDevice($this->device_id);
+        return $device ? $device->hostname : null;
     }
 
     public function getStatusAttribute()
@@ -52,36 +41,38 @@ class Node extends Model
             return 'unknown';
         }
 
-        try {
-            if (class_exists('\App\Models\Device')) {
-                $device = \App\Models\Device::find($this->device_id);
-                if (!$device) {
-                    return 'unknown';
-                }
+        $device = $this->fetchDevice($this->device_id);
+        return $this->parseDeviceStatus($device);
+    }
 
-                // Handle both string and numeric status values
-                $status = $device->status;
-                if (is_numeric($status)) {
-                    return (int)$status === 1 ? 'up' : 'down';
-                }
-                return strtolower($status) === 'up' ? 'up' : 'down';
-            }
+    private function fetchDevice(int $deviceId)
+    {
+        if (class_exists('App\\Models\\Device')) {
+            return \App\Models\Device::find($deviceId);
+        }
 
-            // Fallback for older LibreNMS versions
-            $device = dbFetchRow("SELECT status FROM devices WHERE device_id = ?", [$this->device_id]);
-            if (!$device) {
-                return 'unknown';
-            }
+        return dbFetchRow("SELECT hostname, status FROM devices WHERE device_id = ?", [$deviceId]);
+    }
 
-            // Handle both string and numeric status values
-            $status = $device['status'];
-            if (is_numeric($status)) {
-                return (int)$status === 1 ? 'up' : 'down';
-            }
-            return strtolower($status) === 'up' ? 'up' : 'down';
-        } catch (\Exception $e) {
+    private function parseDeviceStatus($device): string
+    {
+        if (!$device) {
             return 'unknown';
         }
+
+        $status = is_object($device) ? ($device->status ?? null) : ($device['status'] ?? null);
+
+        return $this->convertStatusToString($status);
+    }
+
+    private function convertStatusToString($status): string
+    {
+        if (is_numeric($status)) {
+            return (int) $status === 1 ? 'up' : 'down';
+        }
+
+        $statusLower = strtolower($status);
+        return $statusLower === 'up' ? 'up' : 'down';
     }
 
     public function toArray()

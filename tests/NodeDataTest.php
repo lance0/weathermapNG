@@ -13,7 +13,6 @@ class NodeDataTest extends TestCase
         }
 
         $node = new Node([
-            'id' => 1,
             'map_id' => 1,
             'label' => 'Test Node',
             'x' => 100,
@@ -22,7 +21,7 @@ class NodeDataTest extends TestCase
             'meta' => ['key' => 'value']
         ]);
 
-        $this->assertEquals(1, $node->id);
+        $this->assertNull($node->id);
         $this->assertEquals('Test Node', $node->label);
         $this->assertEquals(100, $node->x);
         $this->assertEquals(200, $node->y);

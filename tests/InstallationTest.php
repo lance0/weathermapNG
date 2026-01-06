@@ -31,7 +31,7 @@ class InstallationTest extends TestCase
 
         $this->assertEquals('WeathermapNG', $info['name']);
         $this->assertEquals('Modern interactive network weathermap for LibreNMS', $info['description']);
-        $this->assertEquals('1.2.1', $info['version']);
+        $this->assertEquals('1.2.2', $info['version']);
         $this->assertEquals('LibreNMS Community', $info['author']);
     }
 

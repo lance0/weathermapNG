@@ -12,17 +12,37 @@ class MapControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->controller = new MapController();
+
+        $mapService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
+        );
+
+        $nodeService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\NodeService::class
+        );
+
+        $linkService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\LinkService::class
+        );
+
+        $autoDiscoveryService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService::class
+        );
+
+        $this->controller = new MapController(
+            $mapService,
+            $nodeService,
+            $linkService,
+            $autoDiscoveryService
+        );
     }
 
-    /** @test */
-    public function controller_can_be_instantiated()
+    public function test_controller_can_be_instantiated()
     {
         $this->assertInstanceOf(MapController::class, $this->controller);
     }
 
-    /** @test */
-    public function controller_has_required_methods()
+    public function test_controller_has_required_methods()
     {
         $this->assertTrue(method_exists($this->controller, 'index'));
         $this->assertTrue(method_exists($this->controller, 'create'));
@@ -31,9 +51,34 @@ class MapControllerTest extends TestCase
         $this->assertTrue(method_exists($this->controller, 'createNode'));
         $this->assertTrue(method_exists($this->controller, 'createLink'));
         $this->assertTrue(method_exists($this->controller, 'save'));
+        $this->assertTrue(method_exists($this->controller, 'autoDiscover'));
     }
 
-    // Note: Full integration tests for controllers require Laravel framework
-    // These basic tests verify the controller structure and methods exist
-    // Comprehensive testing would require Laravel test environment
+    public function test_services_are_injected()
+    {
+        $mapService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
+        );
+
+        $nodeService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\NodeService::class
+        );
+
+        $linkService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\LinkService::class
+        );
+
+        $autoDiscoveryService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService::class
+        );
+
+        $controller = new MapController(
+            $mapService,
+            $nodeService,
+            $linkService,
+            $autoDiscoveryService
+        );
+
+        $this->assertInstanceOf(MapController::class, $controller);
+    }
 }

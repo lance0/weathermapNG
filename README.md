@@ -5,11 +5,11 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 ## ✨ Features
 
 - **Real-time Visualization**: Live traffic data with animated flow indicators
-- **Canvas Editor**: Interactive HTML5 canvas editor with professional tools
+- **Interactive Editor**: Professional map editor with device integration
 - **Multiple Data Sources**: RRD files → LibreNMS API → SNMP fallback
 - **Server-Sent Events**: Real-time updates without polling
-- **Professional Tools**: Templates, keyboard shortcuts, undo/redo
-- **Export/Import**: JSON format for sharing maps
+- **Import/Export**: JSON format for backup and sharing maps
+- **Embed Support**: Embed maps in dashboards with live updates
 
 ## 🚀 Installation (Choose Your Method)
 
@@ -128,7 +128,8 @@ php artisan view:clear
 
 - **[Detailed Installation Guide](INSTALL.md)** - Advanced setup and troubleshooting
 - **[API Documentation](API.md)** - REST API reference
-- **[Configuration Guide](config/weathermapng.php)** - All settings explained
+- **[Embed Viewer Guide](docs/EMBED.md)** - Embedding maps and metrics
+- **[Configuration Reference](config/weathermapng.php)** - All settings explained
 
 ## 🤝 Contributing
 

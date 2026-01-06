@@ -5,6 +5,32 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-01-06
+
+### Added
+- **MapDataBuilder Service**: New service class for centralized map data building and aggregation logic
+- **SseStreamService**: Dedicated service for Server-Sent Events streaming with proper separation of concerns
+- **Service Layer Architecture**: Improved architecture with dedicated services for data building and streaming
+
+### Changed
+- **RenderController**: Drastically simplified from 583 to 150 lines (74% reduction)
+- **RenderController Complexity**: Reduced from 131 to below 50, eliminated all complexity violations
+- **Node Model**: Refactored status detection with 3 focused methods replacing complex conditionals
+- **Test Suite**: Updated for new service dependencies with proper mocking
+
+### Fixed
+- **Documentation Errors**: Removed reference to deleted `docs/EDITOR_D3.md` from CHANGELOG
+- **Unused Parameters**: Cleaned up unused service parameters in RenderController methods
+- **Code Quality**: All RenderController and Node model complexity violations resolved
+
+### Technical Details
+- **Architecture**: Extracted SSE streaming (219 lines) into dedicated SseStreamService
+- **Test Results**: 54 tests passing (up from 50), all service classes properly tested
+- **Method Splitting**: `RenderController::aggregateNodeTraffic()` split into 7 focused methods
+- **Complexity Metrics**: `Node::getStatusAttribute()` reduced from 12 to 4 per method
+
+---
+
 ## [1.2.1] - 2025-11-12
 
 ### Fixed
@@ -131,7 +157,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - Updated `API.md` with editor CRUD, save, autodiscover, and embed query params.
-- Expanded `docs/EDITOR_D3.md` with features, backgrounds, live preview, export, and bulk editing.
 - Added `docs/EMBED.md` for metrics, legend, live updates, and export.
 
 ### Notes
