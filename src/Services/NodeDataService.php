@@ -4,7 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
-use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class NodeDataService
 {
@@ -52,26 +52,18 @@ class NodeDataService
         return $linkData;
     }
 
-    public function buildAlertData(Map $map): array
+    public function buildAlertData(): array
     {
-        $deviceIds = [];
-        foreach ($map->nodes as $node) {
-            if ($node->device_id) {
-                $deviceIds[] = (int) $node->device_id;
-            }
-        }
-
-        $deviceIds = array_values(array_unique($deviceIds));
-
+        // Placeholder for future implementation
         return [
             'nodes' => [],
             'links' => [],
         ];
     }
 
-    public function stream(Map $map, int $interval, int $maxSeconds): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function stream(Map $map, int $interval, int $maxSeconds): StreamedResponse
     {
-        return response()->stream(
+        return \response()->stream(
             function () use ($map, $interval, $maxSeconds) {
                 $this->configureOutputBuffering();
                 $this->streamLoop($map, $interval, $maxSeconds);
@@ -129,7 +121,7 @@ class NodeDataService
             'ts' => time(),
             'links' => $this->buildLinkData($map),
             'nodes' => $this->buildNodeData($map),
-            'alerts' => $this->buildAlertData($map),
+            'alerts' => $this->buildAlertData(),
         ];
     }
 

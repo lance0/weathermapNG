@@ -6,6 +6,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class MapNodeController
 {
@@ -16,7 +17,7 @@ class MapNodeController
         $this->nodeService = $nodeService;
     }
 
-    public function store(Request $request, Map $map)
+    public function store(Request $request, Map $map): JsonResponse
     {
         $validated = $request->validate([
             'nodes' => 'required|array',
@@ -31,7 +32,7 @@ class MapNodeController
         return response()->json(['success' => true]);
     }
 
-    public function create(Request $request, Map $map)
+    public function create(Request $request, Map $map): JsonResponse
     {
         $data = $request->validate([
             'label' => 'required|string|max:255',
@@ -46,7 +47,7 @@ class MapNodeController
         return response()->json(['success' => true, 'node' => $node]);
     }
 
-    public function update(Request $request, Map $map, Node $node)
+    public function update(Request $request, Map $map, Node $node): JsonResponse
     {
         $data = $request->validate([
             'label' => 'sometimes|string|max:255',
@@ -64,7 +65,7 @@ class MapNodeController
         }
     }
 
-    public function delete(Map $map, Node $node)
+    public function delete(Map $map, Node $node): JsonResponse
     {
         try {
             $this->nodeService->deleteNode($map, $node);

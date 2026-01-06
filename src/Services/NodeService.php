@@ -5,6 +5,8 @@ namespace LibreNMS\Plugins\WeathermapNG\Services;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class NodeService
 {
@@ -12,9 +14,9 @@ class NodeService
     {
         return Node::create([
             'map_id' => $map->id,
-            'label' => $data['label'],
-            'x' => $data['x'],
-            'y' => $data['y'],
+            'label' => $data['label'] ?? 'New Node',
+            'x' => $data['x'] ?? 0,
+            'y' => $data['y'] ?? 0,
             'device_id' => $data['device_id'] ?? null,
             'meta' => $data['meta'] ?? [],
         ]);
@@ -34,34 +36,48 @@ class NodeService
     {
         $this->validateNodeOwnership($map, $node);
 
-        $map->links()
-            ->where('src_node_id', $node->id)
-            ->orWhere('dst_node_id', $node->id)
-            ->delete();
+        try {
+            DB::transaction(function () use ($node, $map) {
+                $map->links()
+                    ->where('src_node_id', $node->id)
+                    ->orWhere('dst_node_id', $node->id)
+                    ->delete();
 
-        $node->delete();
+                $node->delete();
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to delete node {$node->id}: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function storeNodes(Map $map, array $nodesData): void
     {
-        $map->nodes()->delete();
+        try {
+            DB::transaction(function () use ($map, $nodesData) {
+                $map->nodes()->delete();
 
-        foreach ($nodesData as $nodeData) {
-            Node::create([
-                'map_id' => $map->id,
-                'label' => $nodeData['label'],
-                'x' => $nodeData['x'],
-                'y' => $nodeData['y'],
-                'device_id' => $nodeData['device_id'] ?? null,
-                'meta' => $nodeData['meta'] ?? [],
-            ]);
+                foreach ($nodesData as $nodeData) {
+                    Node::create([
+                        'map_id' => $map->id,
+                        'label' => $nodeData['label'] ?? 'Node',
+                        'x' => $nodeData['x'] ?? 0,
+                        'y' => $nodeData['y'] ?? 0,
+                        'device_id' => $nodeData['device_id'] ?? null,
+                        'meta' => $nodeData['meta'] ?? [],
+                    ]);
+                }
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to store nodes for map {$map->id}: " . $e->getMessage());
+            throw $e;
         }
     }
 
     private function validateNodeOwnership(Map $map, Node $node): void
     {
         if ($node->map_id !== $map->id) {
-            throw new \RuntimeException('Node does not belong to map');
+            throw new \RuntimeException("Node {$node->id} does not belong to map {$map->id}");
         }
     }
 }

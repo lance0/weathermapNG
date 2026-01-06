@@ -6,6 +6,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use LibreNMS\Plugins\WeathermapNG\Services\LinkService;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class MapLinkController
 {
@@ -16,7 +17,7 @@ class MapLinkController
         $this->linkService = $linkService;
     }
 
-    public function store(Request $request, Map $map)
+    public function store(Request $request, Map $map): JsonResponse
     {
         $validated = $request->validate([
             'links' => 'required|array',
@@ -32,7 +33,7 @@ class MapLinkController
         return response()->json(['success' => true]);
     }
 
-    public function create(Request $request, Map $map)
+    public function create(Request $request, Map $map): JsonResponse
     {
         $data = $request->validate([
             'src_node_id' => 'required|integer|exists:wmng_nodes,id',
@@ -51,7 +52,7 @@ class MapLinkController
         }
     }
 
-    public function update(Request $request, Map $map, Link $link)
+    public function update(Request $request, Map $map, Link $link): JsonResponse
     {
         $data = $request->validate([
             'src_node_id' => 'sometimes|integer',
@@ -70,7 +71,7 @@ class MapLinkController
         }
     }
 
-    public function delete(Map $map, Link $link)
+    public function delete(Map $map, Link $link): JsonResponse
     {
         try {
             $this->linkService->deleteLink($map, $link);

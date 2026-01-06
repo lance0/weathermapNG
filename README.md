@@ -124,12 +124,58 @@ php artisan view:clear
 </iframe>
 ```
 
+## 🏗️ Architecture
+
+WeathermapNG follows a modular service-oriented architecture to ensure high performance and maintainability.
+
+### Service Layer
+
+- **NodeDataService**: Handles all node-related data aggregation, metrics, and traffic calculations.
+- **DeviceDataService**: Manages device status detection and hostname-based traffic guessing.
+- **LinkDataService**: Processes link alerts and port-level alert aggregation.
+- **DeviceMetricsService**: Specialized service for fetching CPU and memory utilization.
+- **MapService**: Handles Map CRUD operations and JSON import/export logic.
+- **NodeService**: Dedicated service for Node creation, updates, and validation.
+- **LinkService**: Manages Link life-cycle and port-to-device pairing validation.
+- **SseStreamService**: Manages real-time data streaming via Server-Sent Events.
+- **AutoDiscoveryService**: Implements topology discovery algorithms and graph building.
+- **PortUtilService**: Provides a unified interface for RRD, API, and SNMP data sources.
+
+### Data Sources
+
+The plugin uses a multi-tier fallback strategy for traffic data:
+1. **Local RRD**: Fast, direct file access if available on the same host.
+2. **LibreNMS API**: Fallback to the internal API for distributed setups.
+3. **SNMP**: Direct on-demand polling for critical real-time updates (optional).
+
+## 🛠️ Development
+
+### Prerequisites
+
+- PHP 8.2+
+- Composer
+- LibreNMS development environment
+
+### Running Tests
+
+```bash
+composer test
+```
+
+### Code Quality
+
+```bash
+composer quality
+```
+
 ## 📚 Documentation
 
 - **[Detailed Installation Guide](INSTALL.md)** - Advanced setup and troubleshooting
 - **[API Documentation](API.md)** - REST API reference
 - **[Embed Viewer Guide](docs/EMBED.md)** - Embedding maps and metrics
 - **[Configuration Reference](config/weathermapng.php)** - All settings explained
+
+---
 
 ## 🤝 Contributing
 

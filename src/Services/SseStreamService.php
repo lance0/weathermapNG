@@ -3,6 +3,7 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SseStreamService
 {
@@ -13,7 +14,7 @@ class SseStreamService
         $this->nodeDataService = $nodeDataService;
     }
 
-    public function stream(Map $map, int $interval, int $maxSeconds): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function stream(Map $map, int $interval, int $maxSeconds): StreamedResponse
     {
         return \response()->stream(
             function () use ($map, $interval, $maxSeconds) {
@@ -73,7 +74,7 @@ class SseStreamService
             'ts' => time(),
             'links' => $this->nodeDataService->buildLinkData($map),
             'nodes' => $this->nodeDataService->buildNodeData($map),
-            'alerts' => $this->nodeDataService->buildAlertData($map),
+            'alerts' => $this->nodeDataService->buildAlertData(),
         ];
     }
 

@@ -7,6 +7,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 
 class MapService
@@ -44,15 +45,29 @@ class MapService
 
     public function deleteMap(Map $map): void
     {
-        $map->delete();
+        try {
+            DB::transaction(function () use ($map) {
+                $map->links()->delete();
+                $map->nodes()->delete();
+                $map->delete();
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to delete map {$map->id}: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function saveMap(Map $map, array $data): void
     {
-        DB::transaction(function () use ($map, $data) {
-            $this->updateMapProperties($map, $data);
-            $this->replaceMapContent($map, $data);
-        });
+        try {
+            DB::transaction(function () use ($map, $data) {
+                $this->updateMapProperties($map, $data);
+                $this->replaceMapContent($map, $data);
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to save map {$map->id}: " . $e->getMessage());
+            throw new \RuntimeException("Failed to save map: " . $e->getMessage(), 0, $e);
+        }
     }
 
     private function updateMapProperties(Map $map, array $data): void
@@ -101,9 +116,9 @@ class MapService
         foreach ($nodesData as $index => $nodeData) {
             $node = Node::create([
                 'map_id' => $map->id,
-                'label' => $nodeData['label'],
-                'x' => $nodeData['x'],
-                'y' => $nodeData['y'],
+                'label' => $nodeData['label'] ?? 'Node',
+                'x' => $nodeData['x'] ?? 0,
+                'y' => $nodeData['y'] ?? 0,
                 'device_id' => $nodeData['device_id'] ?? null,
                 'meta' => $nodeData['meta'] ?? [],
             ]);
@@ -137,35 +152,50 @@ class MapService
         }
     }
 
-    private function resolveNodeId(?string $clientId, array $nodeIdMap): ?int
+    private function resolveNodeId($clientId, array $nodeIdMap): ?int
     {
         if ($clientId === null) {
             return null;
         }
 
-        return $nodeIdMap[$clientId] ?? (int)$clientId;
+        return $nodeIdMap[$clientId] ?? (is_numeric($clientId) ? (int)$clientId : null);
     }
 
     public function importMap(Request $request, array $validated): Map
     {
         $file = $request->file('file');
+        if (!$file) {
+            throw new \InvalidArgumentException('No file uploaded');
+        }
+
         $content = file_get_contents($file->getRealPath());
         $data = json_decode($content, true);
 
-        if (!$data || !isset($data['nodes']) || !isset($data['links'])) {
-            throw new \InvalidArgumentException('Invalid map file format');
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \InvalidArgumentException('Invalid JSON in map file: ' . json_last_error_msg());
         }
 
-        $map = $this->createMap([
-            'name' => $validated['name'],
-            'title' => $validated['title'] ?? $validated['name'],
-            'width' => $data['options']['width'] ?? null,
-            'height' => $data['options']['height'] ?? null,
-        ]);
+        if (!$data || !isset($data['nodes']) || !isset($data['links'])) {
+            throw new \InvalidArgumentException('Invalid map file format: missing nodes or links');
+        }
 
-        $nodeIdMap = $this->createNodes($map, $data['nodes']);
-        $this->createLinks($map, $data['links'], $nodeIdMap);
+        try {
+            return DB::transaction(function () use ($data, $validated) {
+                $map = $this->createMap([
+                    'name' => $validated['name'],
+                    'title' => $validated['title'] ?? $validated['name'],
+                    'width' => $data['options']['width'] ?? null,
+                    'height' => $data['options']['height'] ?? null,
+                ]);
 
-        return $map;
+                $nodeIdMap = $this->createNodes($map, $data['nodes']);
+                $this->createLinks($map, $data['links'], $nodeIdMap);
+
+                return $map;
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to import map: " . $e->getMessage());
+            throw new \RuntimeException("Failed to import map: " . $e->getMessage(), 0, $e);
+        }
     }
 }
