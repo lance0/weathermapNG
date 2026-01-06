@@ -71,7 +71,7 @@ class DeviceDataService
         return $this->formatTrafficData(0, 0, 'none');
     }
 
-    private function fetchDevice(int $deviceId)
+    private function fetchDevice(int $deviceId): mixed
     {
         if (class_exists('\\App\\Models\\Device')) {
             return \App\Models\Device::find($deviceId);

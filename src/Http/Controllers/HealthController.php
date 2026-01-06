@@ -24,7 +24,7 @@ class HealthController
      * Basic health check endpoint (v2)
      * GET /plugin/WeathermapNG/health
      */
-    public function check()
+    public function check(): \Illuminate\Http\JsonResponse
     {
         $health = [
             'status' => 'healthy',
@@ -58,7 +58,7 @@ class HealthController
         };
     }
 
-    public function stats()
+    public function stats(): \Illuminate\Http\JsonResponse
     {
         $stats = [
             'maps' => Map::count(),
@@ -72,7 +72,7 @@ class HealthController
         return response()->json($stats);
     }
 
-    private function getDatabaseSize()
+    private function getDatabaseSize(): string
     {
         try {
             $tables = ['wmng_maps', 'wmng_nodes', 'wmng_links'];
@@ -97,7 +97,7 @@ class HealthController
         }
     }
 
-    private function getCacheInfo()
+    private function getCacheInfo(): array
     {
         try {
             $cache = app('cache');
@@ -128,7 +128,7 @@ class HealthController
      * Readiness probe for container orchestration
      * GET /plugin/WeathermapNG/ready
      */
-    public function ready()
+    public function ready(): \Illuminate\Http\JsonResponse
     {
         try {
             // Check database connectivity
@@ -159,7 +159,7 @@ class HealthController
      * Liveness probe for container orchestration
      * GET /plugin/WeathermapNG/live
      */
-    public function live()
+    public function live(): \Illuminate\Http\JsonResponse
     {
         return response()->json([
             'alive' => true,
@@ -172,7 +172,7 @@ class HealthController
      * Prometheus metrics endpoint
      * GET /plugin/WeathermapNG/metrics
      */
-    public function metrics()
+    public function metrics(): \Illuminate\Http\Response
     {
         $metrics = [];
 
@@ -217,7 +217,7 @@ class HealthController
      * Detailed health check
      * GET /plugin/WeathermapNG/health/detailed
      */
-    public function detailed()
+    public function detailed(): \Illuminate\Http\JsonResponse
     {
         $startTime = microtime(true);
         $checks = [];

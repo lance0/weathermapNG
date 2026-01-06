@@ -47,7 +47,7 @@ class MapLinkController
         try {
             $link = $this->linkService->createLink($map, $data);
             return response()->json(['success' => true, 'link' => $link]);
-        } catch (\InvalidArgumentException|\RuntimeException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }

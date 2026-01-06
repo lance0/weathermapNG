@@ -51,7 +51,7 @@ class AutoDiscoveryService
         return array_map(fn($device) => (array) $device, $devices);
     }
 
-    private function buildDeviceQuery(array $osFilters)
+    private function buildDeviceQuery(array $osFilters): object
     {
         $baseQuery = class_exists('\\App\\Models\\Device')
             ? \App\Models\Device::where('disabled', 0)->where('ignore', 0)->select('device_id', 'hostname', 'os')

@@ -103,7 +103,7 @@ class Logger
         $this->logger->pushHandler($handler);
     }
 
-    private function createHandler()
+    private function createHandler(): object
     {
         $output = $this->config['output'];
 
@@ -209,7 +209,7 @@ class Logger
     }
 
     // Helper for timing operations
-    public function timeOperation(callable $operation, string $name, array $context = [])
+    public function timeOperation(callable $operation, string $name, array $context = []): mixed
     {
         $start = microtime(true);
 

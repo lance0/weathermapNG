@@ -39,7 +39,7 @@ class MapController
         return view('WeathermapNG::editor', compact('map', 'devices'));
     }
 
-    public function create(Request $request)
+    public function create(Request $request): mixed
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:wmng_maps,name',
@@ -67,7 +67,7 @@ class MapController
         return response()->json(['success' => true, 'map' => $map]);
     }
 
-    public function destroy(Map $map)
+    public function destroy(Map $map): mixed
     {
         $this->mapService->deleteMap($map);
 
@@ -116,7 +116,7 @@ class MapController
         ]);
     }
 
-    private function getDevicesForEditor()
+    private function getDevicesForEditor(): \Illuminate\Support\Collection
     {
         try {
             if (class_exists('\App\Models\Device')) {
@@ -140,7 +140,7 @@ class MapController
         }
     }
 
-    private function handleCreateResponse(Request $request, Map $map)
+    private function handleCreateResponse(Request $request, Map $map): mixed
     {
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
@@ -155,7 +155,7 @@ class MapController
             ->with('success', 'Map created successfully!');
     }
 
-    private function handleDeleteResponse()
+    private function handleDeleteResponse(): mixed
     {
         if (request()->ajax() || request()->wantsJson()) {
             return response()->json([
