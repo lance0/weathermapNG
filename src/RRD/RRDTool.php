@@ -3,6 +3,9 @@
 // lib/RRD/RRDTool.php
 namespace LibreNMS\Plugins\WeathermapNG\RRD;
 
+use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+
 class RRDTool
 {
     private $rrdtoolPath;
@@ -11,13 +14,12 @@ class RRDTool
     {
         $this->rrdtoolPath = config('weathermapng.rrdtool_path', '/usr/bin/rrdtool');
 
-        // Try common rrdtool locations if not found
         if (!file_exists($this->rrdtoolPath)) {
             $commonPaths = [
                 '/usr/bin/rrdtool',
                 '/usr/local/bin/rrdtool',
                 '/opt/rrdtool/bin/rrdtool',
-                'rrdtool' // hope it's in PATH
+                'rrdtool'
             ];
 
             foreach ($commonPaths as $path) {
@@ -31,8 +33,10 @@ class RRDTool
 
     private function commandExists($command)
     {
-        $returnVal = shell_exec("which $command 2>/dev/null");
-        return !empty($returnVal);
+        $process = new Process(['which', $command]);
+        $process->run();
+
+        return $process->isSuccessful();
     }
 
     public function fetch($rrdPath, $metric, $period = '1h')
@@ -44,20 +48,25 @@ class RRDTool
         $start = strtotime("-{$period}");
         $end = time();
 
-        $command = sprintf(
-            '%s fetch %s AVERAGE -s %d -e %d 2>/dev/null',
-            escapeshellcmd($this->rrdtoolPath),
-            escapeshellarg($rrdPath),
-            $start,
-            $end
-        );
+        $command = [
+            $this->rrdtoolPath,
+            'fetch',
+            $rrdPath,
+            'AVERAGE',
+            '-s',
+            (string)$start,
+            '-e',
+            (string)$end,
+        ];
 
-        $output = shell_exec($command);
+        $process = new Process($command);
+        $process->run();
 
-        if ($output === null || $output === false) {
+        if (!$process->isSuccessful()) {
             return [];
         }
 
+        $output = $process->getOutput();
         return $this->parseRRDOutput($output, $metric);
     }
 
@@ -75,12 +84,10 @@ class RRDTool
                 continue;
             }
 
-            // Skip error messages
             if (stripos($line, 'error') !== false || stripos($line, 'rrdtool') === 0) {
                 continue;
             }
 
-            // Parse header to find metric index
             if (!$headerParsed && strpos($line, ':') === false) {
                 $headers = preg_split('/\s+/', $line);
                 $metricIndex = $this->getMetricIndex($metric, $headers);
@@ -88,7 +95,6 @@ class RRDTool
                 continue;
             }
 
-            // Parse data lines
             if (strpos($line, ':') !== false) {
                 $parts = explode(':', $line, 2);
                 if (count($parts) !== 2) {
@@ -106,7 +112,6 @@ class RRDTool
                 $valueArray = preg_split('/\s+/', $values);
                 $value = isset($valueArray[$metricIndex]) ? trim($valueArray[$metricIndex]) : null;
 
-                // Handle various "no data" representations
                 if (
                     $value !== null &&
                     $value !== 'nan' &&
@@ -146,18 +151,17 @@ class RRDTool
             }
         }
 
-        return 0; // Default to first column
+        return 0;
     }
 
     public function getLastValue($rrdPath, $metric)
     {
-        $data = $this->fetch($rrdPath, $metric, '5m'); // Last 5 minutes
+        $data = $this->fetch($rrdPath, $metric, '5m');
 
         if (empty($data)) {
             return null;
         }
 
-        // Return the most recent value
         $lastEntry = end($data);
         return $lastEntry['value'];
     }
@@ -174,7 +178,7 @@ class RRDTool
         $count = 0;
 
         foreach ($data as $entry) {
-            if ($entry['value'] > 0) { // Only count positive values
+            if ($entry['value'] > 0) {
                 $sum += $entry['value'];
                 $count++;
             }

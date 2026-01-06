@@ -4,27 +4,19 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
-use LibreNMS\Plugins\WeathermapNG\Services\NodeService;
-use LibreNMS\Plugins\WeathermapNG\Services\LinkService;
 use LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService;
 use Illuminate\Http\Request;
 
 class MapController
 {
     private $mapService;
-    private $nodeService;
-    private $linkService;
     private $autoDiscoveryService;
 
     public function __construct(
         MapService $mapService,
-        NodeService $nodeService,
-        LinkService $linkService,
         AutoDiscoveryService $autoDiscoveryService
     ) {
         $this->mapService = $mapService;
-        $this->nodeService = $nodeService;
-        $this->linkService = $linkService;
         $this->autoDiscoveryService = $autoDiscoveryService;
     }
 
@@ -82,91 +74,6 @@ class MapController
         return $this->handleDeleteResponse();
     }
 
-    public function storeNodes(Request $request, Map $map)
-    {
-        $validated = $request->validate([
-            'nodes' => 'required|array',
-            'nodes.*.label' => 'required|string|max:255',
-            'nodes.*.x' => 'required|numeric',
-            'nodes.*.y' => 'required|numeric',
-            'nodes.*.device_id' => 'nullable|integer',
-        ]);
-
-        $this->nodeService->storeNodes($map, $validated['nodes']);
-
-        return response()->json(['success' => true]);
-    }
-
-    public function storeLinks(Request $request, Map $map)
-    {
-        $validated = $request->validate([
-            'links' => 'required|array',
-            'links.*.src_node_id' => 'required|integer|exists:wmng_nodes,id',
-            'links.*.dst_node_id' => 'required|integer|exists:wmng_nodes,id',
-            'links.*.port_id_a' => 'nullable|integer',
-            'links.*.port_id_b' => 'nullable|integer',
-            'links.*.bandwidth_bps' => 'nullable|integer',
-        ]);
-
-        $this->linkService->storeLinks($map, $validated['links']);
-
-        return response()->json(['success' => true]);
-    }
-
-    public function createNode(Request $request, Map $map)
-    {
-        $data = $request->validate([
-            'label' => 'required|string|max:255',
-            'x' => 'required|numeric',
-            'y' => 'required|numeric',
-            'device_id' => 'nullable|integer',
-            'meta' => 'array',
-        ]);
-
-        $node = $this->nodeService->createNode($map, $data);
-
-        return response()->json(['success' => true, 'node' => $node]);
-    }
-
-    public function deleteNode(Map $map, \LibreNMS\Plugins\WeathermapNG\Models\Node $node)
-    {
-        try {
-            $this->nodeService->deleteNode($map, $node);
-            return response()->json(['success' => true]);
-        } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
-        }
-    }
-
-    public function createLink(Request $request, Map $map)
-    {
-        $data = $request->validate([
-            'src_node_id' => 'required|integer|exists:wmng_nodes,id',
-            'dst_node_id' => 'required|integer|exists:wmng_nodes,id',
-            'port_id_a' => 'nullable|integer',
-            'port_id_b' => 'nullable|integer',
-            'bandwidth_bps' => 'nullable|integer',
-            'style' => 'array',
-        ]);
-
-        try {
-            $link = $this->linkService->createLink($map, $data);
-            return response()->json(['success' => true, 'link' => $link]);
-        } catch (\InvalidArgumentException|\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
-        }
-    }
-
-    public function deleteLink(Map $map, \LibreNMS\Plugins\WeathermapNG\Models\Link $link)
-    {
-        try {
-            $this->linkService->deleteLink($map, $link);
-            return response()->json(['success' => true]);
-        } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
-        }
-    }
-
     public function save(Request $request, Map $map)
     {
         $validatedData = $this->validateSaveRequest($request);
@@ -179,43 +86,6 @@ class MapController
                 'success' => false,
                 'message' => 'Failed to save map: ' . $e->getMessage()
             ], 500);
-        }
-    }
-
-    public function updateNode(Request $request, Map $map, \LibreNMS\Plugins\WeathermapNG\Models\Node $node)
-    {
-        $data = $request->validate([
-            'label' => 'sometimes|string|max:255',
-            'x' => 'sometimes|numeric',
-            'y' => 'sometimes|numeric',
-            'device_id' => 'sometimes|nullable|integer',
-            'meta' => 'sometimes|array',
-        ]);
-
-        try {
-            $node = $this->nodeService->updateNode($map, $node, $data);
-            return response()->json(['success' => true, 'node' => $node]);
-        } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
-        }
-    }
-
-    public function updateLink(Request $request, Map $map, \LibreNMS\Plugins\WeathermapNG\Models\Link $link)
-    {
-        $data = $request->validate([
-            'src_node_id' => 'sometimes|integer',
-            'dst_node_id' => 'sometimes|integer',
-            'port_id_a' => 'sometimes|nullable|integer',
-            'port_id_b' => 'sometimes|nullable|integer',
-            'bandwidth_bps' => 'sometimes|nullable|integer',
-            'style' => 'sometimes|array',
-        ]);
-
-        try {
-            $link = $this->linkService->updateLink($map, $link, $data);
-            return response()->json(['success' => true, 'link' => $link]);
-        } catch (\RuntimeException $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 

@@ -26,11 +26,11 @@ class GridLayout
         $row = intdiv($this->currentIndex, $this->columns);
         $col = $this->currentIndex % $this->columns;
 
-        $x = $this->startX + ($col * $this->step);
-        $y = $this->startY + ($row * $this->step);
+        $positionX = $this->startX + ($col * $this->step);
+        $positionY = $this->startY + ($row * $this->step);
 
         $this->currentIndex++;
 
-        return ['x' => $x, 'y' => $y];
+        return ['x' => $positionX, 'y' => $positionY];
     }
 }

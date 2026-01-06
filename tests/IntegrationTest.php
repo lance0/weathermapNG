@@ -2,22 +2,12 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Tests;
 
-use LibreNMS\Plugins\WeathermapNG\Models\Map;
-use LibreNMS\Plugins\WeathermapNG\Models\Node;
-use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use PHPUnit\Framework\TestCase;
 
 class IntegrationTest extends TestCase
 {
-    public function test_core_classes_exist()
-    {
-        $this->assertTrue(class_exists(Map::class));
-        $this->assertTrue(class_exists(Node::class));
-        $this->assertTrue(class_exists(Link::class));
-    }
-
     public function test_controllers_exist()
     {
         $this->assertTrue(class_exists(MapController::class));
@@ -30,6 +20,12 @@ class IntegrationTest extends TestCase
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\AlertService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\SseStreamService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\MapService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\NodeService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\LinkService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\RrdDataService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\SnmpDataService'));
     }
 
     public function test_render_controller_with_dependencies()
