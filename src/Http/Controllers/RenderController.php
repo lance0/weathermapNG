@@ -3,21 +3,15 @@
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
-use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
-use LibreNMS\Plugins\WeathermapNG\Services\AlertService;
-use LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder;
-use LibreNMS\Plugins\WeathermapNG\Services\SseStreamService;
-use Illuminate\Http\Request;
+use LibreNMS\Plugins\WeathermapNG\Services\NodeDataService;
 
 class RenderController
 {
-    private $mapDataBuilder;
-    private $sseStreamService;
+    private $nodeDataService;
 
-    public function __construct(MapDataBuilder $mapDataBuilder, SseStreamService $sseStreamService)
+    public function __construct(NodeDataService $nodeDataService)
     {
-        $this->mapDataBuilder = $mapDataBuilder;
-        $this->sseStreamService = $sseStreamService;
+        $this->nodeDataService = $nodeDataService;
     }
 
     public function json(Map $map)
@@ -27,7 +21,13 @@ class RenderController
 
     public function live(Map $map)
     {
-        $data = $this->mapDataBuilder->buildLiveData($map);
+        $data = [
+            'ts' => time(),
+            'links' => $this->nodeDataService->buildLinkData($map),
+            'nodes' => $this->nodeDataService->buildNodeData($map),
+            'alerts' => $this->nodeDataService->buildAlertData($map),
+        ];
+
         return response()->json($data);
     }
 
@@ -82,7 +82,7 @@ class RenderController
         $interval = max(1, (int) $request->get('interval', 5));
         $maxSeconds = (int) $request->get('max', 60);
 
-        return $this->sseStreamService->stream($map, $interval, $maxSeconds);
+        return $this->nodeDataService->stream($map, $interval, $maxSeconds);
     }
 
     private function createMapFromImport(array $validated, array $data): Map
@@ -120,17 +120,17 @@ class RenderController
     private function importLinks(Map $map, array $links, array $nodeIdMap): void
     {
         foreach ($links as $linkData) {
-            $srcId = $this->resolveNodeId($linkData, $nodeIdMap, 'src');
-            $dstId = $this->resolveNodeId($linkData, $nodeIdMap, 'dst');
+            $sourceId = $this->resolveNodeId($linkData, $nodeIdMap, 'src');
+            $targetId = $this->resolveNodeId($linkData, $nodeIdMap, 'dst');
 
-            if (!$srcId || !$dstId) {
+            if (!$sourceId || !$targetId) {
                 continue;
             }
 
             \LibreNMS\Plugins\WeathermapNG\Models\Link::create([
                 'map_id' => $map->id,
-                'src_node_id' => $srcId,
-                'dst_node_id' => $dstId,
+                'src_node_id' => $sourceId,
+                'dst_node_id' => $targetId,
                 'port_id_a' => $linkData['port_id_a'] ?? null,
                 'port_id_b' => $linkData['port_id_b'] ?? null,
                 'bandwidth_bps' => $linkData['bandwidth_bps'] ?? null,
