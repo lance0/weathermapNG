@@ -88,22 +88,56 @@ class LinkService
 
     private function validatePortDevicePairing(array $data, ?Node $srcNode, ?Node $dstNode): void
     {
+        $this->validateSourcePortDevice($data, $srcNode);
+        $this->validateDestinationPortDevice($data, $dstNode);
+    }
+
+    private function validateSourcePortDevice(array $data, ?Node $srcNode): void
+    {
+        $portId = $data['port_id_a'] ?? null;
+
+        if (!$portId) {
+            return;
+        }
+
+        $this->validatePortBelongsToDevice($portId, $srcNode);
+    }
+
+    private function validateDestinationPortDevice(array $data, ?Node $dstNode): void
+    {
+        $portId = $data['port_id_b'] ?? null;
+
+        if (!$portId) {
+            return;
+        }
+
+        $this->validatePortBelongsToDevice($portId, $dstNode);
+    }
+
+    private function validatePortBelongsToDevice(int $portId, ?Node $node): void
+    {
+        if (!$node || !$node->device_id) {
+            return;
+        }
+
+        $port = $this->fetchPort($portId);
+
+        if (!$port || $port->device_id != $node->device_id) {
+            throw new \InvalidArgumentException('Port does not belong to device');
+        }
+    }
+
+    private function fetchPort(int $portId): ?object
+    {
         try {
-            if (($data['port_id_a'] ?? null) && class_exists('\\App\\Models\\Port')) {
-                $sourcePort = \App\Models\Port::find($data['port_id_a']);
-                if (!$sourcePort || ($srcNode->device_id && $sourcePort->device_id != $srcNode->device_id)) {
-                    throw new \InvalidArgumentException('Source port does not belong to source device');
-                }
+            $portClass = '\\App\\Models\\Port';
+            if (class_exists($portClass)) {
+                return $portClass::find($portId);
             }
 
-            if (($data['port_id_b'] ?? null) && class_exists('\\App\\Models\\Port')) {
-                $destinationPort = \App\Models\Port::find($data['port_id_b']);
-                if (!$destinationPort || ($dstNode->device_id && $destinationPort->device_id != $dstNode->device_id)) {
-                    throw new \InvalidArgumentException('Destination port does not belong to destination device');
-                }
-            }
+            return null;
         } catch (\Exception $e) {
-            // If we cannot validate via models, skip strict check
+            return null;
         }
     }
 

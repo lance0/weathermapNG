@@ -26,6 +26,9 @@ class IntegrationTest extends TestCase
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\RrdDataService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\SnmpDataService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\NodeDataService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\DeviceDataService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\LinkDataService'));
     }
 
     public function test_render_controller_with_dependencies()
