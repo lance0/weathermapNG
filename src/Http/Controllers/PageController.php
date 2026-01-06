@@ -5,6 +5,8 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Redirect;
+use Exception;
 
 class PageController extends Controller
 {
@@ -13,6 +15,11 @@ class PageController extends Controller
      */
     public function index(): View
     {
+        // Check if database tables exist, redirect to installer if not
+        if (!$this->isInstalled()) {
+            return redirect()->route('weathermapng.install');
+        }
+
         // Get all maps with counts
         $maps = DB::table('wmng_maps')
             ->select('wmng_maps.*')
@@ -72,5 +79,18 @@ class PageController extends Controller
             'title' => 'WeathermapNG Settings',
             'settings' => config('weathermapng'),
         ]);
+    }
+
+    /**
+     * Check if plugin is installed (database tables exist)
+     */
+    private function isInstalled(): bool
+    {
+        try {
+            $tables = DB::select("SHOW TABLES LIKE 'wmng_%'");
+            return count($tables) >= 3;
+        } catch (Exception $e) {
+            return false;
+        }
     }
 }

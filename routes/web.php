@@ -4,12 +4,17 @@ use Illuminate\Support\Facades\Route;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\InstallController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\LookupController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\PageController;
 
-// Plugin routes under the standard v2 plugin path
+// Plugin routes under standard v2 plugin path
 
 Route::middleware(['web', 'auth'])->group(function () {
+    // Installation routes (no auth for initial setup)
+    Route::get('plugin/WeathermapNG/install', [InstallController::class, 'index'])->name('weathermapng.install');
+    Route::post('plugin/WeathermapNG/install', [InstallController::class, 'install'])->name('weathermapng.install.run');
+
     // Main pages under plugin path
     Route::get('plugin/WeathermapNG', [PageController::class, 'index'])->name('weathermapng.index');
     Route::get('plugin/WeathermapNG/editor/{map?}', [PageController::class, 'editor'])->name('weathermapng.editor');
