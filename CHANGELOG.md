@@ -5,6 +5,24 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-01-06
+
+### Changed
+- **Return Type Hints**: Added comprehensive return type declarations to all controller and service methods
+- **Type Safety**: Improved type coverage across HealthController, InstallController, MapController, MapLinkController
+- **Service Layer**: Enhanced AutoDiscoveryService, DeviceDataService, and Logger with explicit return types
+- **Code Quality**: Improved PSR-12 compliance with proper spacing around union type operators
+
+### Fixed
+- **Code Standards**: Fixed PSR-12 spacing violations in exception type declarations
+
+### Technical Details
+- **Methods Updated**: Added return types to 20+ methods across controllers and services
+- **Type Coverage**: 100% of controller methods now have explicit return types
+- **Static Analysis**: Better IDE support and code completion with explicit type hints
+
+---
+
 ## [1.2.2] - 2026-01-06
 
 ### Added
