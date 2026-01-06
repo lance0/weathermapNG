@@ -5,6 +5,35 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.4] - 2026-01-06
+
+### Added
+- **Web Installer Routes**: Added install routes (GET/POST) to enable web-based installation
+- **Installation Detection**: Added automatic check in PageController to redirect to installer if tables missing
+- **Enhanced CLI Installer**: Comprehensive error checking and validation in quick-install.sh
+- **PHP Version Check**: Added PHP 8.0+ requirement verification
+- **Database Verification**: Added table count verification post-installation
+- **Permission Validation**: Enhanced permission checks with better error messages
+
+### Changed
+- **Return Type Hints**: Added comprehensive return type declarations to all controller and service methods
+- **Type Safety**: Improved type coverage across HealthController, InstallController, MapController, MapLinkController
+- **Service Layer**: Enhanced AutoDiscoveryService, DeviceDataService, and Logger with explicit return types
+- **Code Quality**: Improved PSR-12 compliance with proper spacing around union type operators
+
+### Fixed
+- **Code Standards**: Fixed PSR-12 spacing violations in exception type declarations
+- **Missing Installer Routes**: Web installer was built but inaccessible due to missing route definitions
+
+### Technical Details
+- **Methods Updated**: Added return types to 20+ methods across controllers and services
+- **Type Coverage**: 100% of controller methods now have explicit return types
+- **Static Analysis**: Better IDE support and code completion with explicit type hints
+- **Installation UX**: Dual installation paths (CLI + Web) with automatic detection
+- **Best Practices**: Following LibreNMS plugin-interfaces recommendations for plugin enablement checking
+
+---
+
 ## [1.2.3] - 2026-01-06
 
 ### Changed

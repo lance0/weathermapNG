@@ -58,7 +58,7 @@
     "extra": {
         "librenms": {
             "plugin-name": "WeathermapNG",
-    "version": "1.2.3",
+    "version": "1.2.4",
             "description": "Modern interactive network weathermap for LibreNMS",
             "author": "LibreNMS Community",
             "email": "info@librenms.org",
