@@ -1,0 +1,138 @@
+/**
+ * WeathermapNG Accessibility Improvements
+ * Enhanced ARIA labels and focus states
+ */
+
+/* Enhanced Focus States for Form Controls */
+.form-control:focus,
+.form-select:focus,
+.custom-control-input:focus ~ .custom-control-label,
+.custom-file-input:focus ~ .custom-file-label {
+    border-color: var(--weathermap-primary, #007bff);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: 0;
+}
+
+.form-control:focus,
+.form-select:focus {
+    outline: 2px solid var(--weathermap-primary, #007bff);
+    outline-offset: 2px;
+}
+
+/* Button Focus States */
+.btn:focus,
+.btn:not(:disabled):not(.disabled):focus,
+.btn:not(:disabled):not(.disabled).focus {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: 2px solid var(--weathermap-primary, #007bff);
+    outline-offset: 2px;
+}
+
+/* Card Focus for Accessibility */
+.card:focus-within {
+    border-color: var(--weathermap-primary, #007bff);
+}
+
+/* Skip Link for Keyboard Navigation */
+.sr-only-focusable:focus:not(:focus-visible) {
+    display: block !important;
+}
+
+/* Visually Hidden but Accessible */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* High Contrast Focus for Better Visibility */
+.focus-visible {
+    outline: 3px solid var(--weathermap-primary, #007bff) !important;
+    outline-offset: 2px;
+}
+
+/* Accessible Color Contrast Indicators */
+.status-indicator {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-indicator::before {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+}
+
+/* Loading State - Accessible */
+.wmng-loading[aria-busy="true"] {
+    position: relative;
+    pointer-events: none;
+}
+
+.wmng-loading[aria-busy="true"]::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-left: -0.75rem;
+    margin-top: -0.75rem;
+    border: 0.25em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border 0.75s linear infinite;
+}
+
+/* Screen Reader Only Announcements */
+.wmng-announcer {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    .wmng-toast {
+        animation: none;
+    }
+
+    .wmng-toast-timer {
+        animation: none;
+    }
+
+    .spinner-border-custom {
+        animation: none;
+    }
+
+    .spinner-pulse-custom {
+        animation: none;
+    }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .form-control:focus,
+    .form-select:focus,
+    .btn:focus {
+        outline: 3px solid var(--weathermap-primary, #007bff);
+        outline-offset: 3px;
+    }
+}

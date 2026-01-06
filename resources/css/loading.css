@@ -1,0 +1,100 @@
+/* WeathermapNG Loading Spinners (Bootstrap 4 compatible) */
+
+/* Spinner Container (Overlay for blocking operations) */
+.spinner-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(4px);
+}
+
+.spinner-overlay.active {
+    display: flex;
+}
+
+/* Main Spinner */
+.spinner-border-custom {
+    width: 3rem;
+    height: 3rem;
+    border: 0.25em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border 0.75s linear infinite;
+}
+
+@keyframes spinner-border {
+    100% { transform: rotate(360deg); }
+}
+
+/* Small Spinner */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.2em;
+}
+
+/* Inline Spinner for buttons */
+.btn .spinner-border-custom {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.2em;
+    display: inline-block;
+    vertical-align: text-bottom;
+}
+
+/* Pulse Spinner */
+.spinner-pulse-custom {
+    display: inline-block;
+    width: 3rem;
+    height: 3rem;
+    vertical-align: text-bottom;
+    background-color: currentColor;
+    border-radius: 50%;
+    opacity: 0;
+    animation: spinner-pulse 0.75s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes spinner-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 0; }
+}
+
+/* Inline loading indicator */
+.spinner-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.spinner-inline .spinner-border-sm {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-width: 0.15em;
+}
+
+/* Button loading state */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.65;
+}
+
+.btn-loading::before {
+    content: "";
+    position: absolute;
+    width: 1rem;
+    height: 1rem;
+    top: 50%;
+    left: 50%;
+    margin-left: -0.5rem;
+    margin-top: -0.5rem;
+}
