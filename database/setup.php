@@ -76,7 +76,15 @@ try {
         }
 
         if ($tablesExist === 3) {
-            echo "\n✅ All tables already exist. No action needed.\n";
+            // Check for missing columns in existing tables
+            if (!Schema::hasColumn('wmng_maps', 'title')) {
+                Schema::table('wmng_maps', function (Blueprint $t) {
+                    $t->string('title')->nullable()->after('name');
+                });
+                echo "✓ Added 'title' column to 'wmng_maps'\n";
+            }
+
+            echo "\n✅ All tables already exist and are up to date.\n";
             exit(0);
         }
 
@@ -87,6 +95,7 @@ try {
             Schema::create('wmng_maps', function (Blueprint $t) {
                 $t->id();
                 $t->string('name')->unique();
+                $t->string('title')->nullable();
                 $t->text('description')->nullable();
                 $t->integer('width')->default(800);
                 $t->integer('height')->default(600);
@@ -153,7 +162,14 @@ try {
         $existingTables = $result->fetchAll(PDO::FETCH_COLUMN);
 
         if (count($existingTables) >= 3) {
-            echo "✅ All tables already exist (Direct SQL method).\n";
+            // Check for missing columns
+            $columns = $pdo->query("SHOW COLUMNS FROM `wmng_maps` LIKE 'title'")->fetchAll();
+            if (empty($columns)) {
+                $pdo->exec("ALTER TABLE `wmng_maps` ADD COLUMN `title` varchar(255) DEFAULT NULL AFTER `name` ");
+                echo "✓ Added 'title' column to 'wmng_maps' (Direct SQL)\n";
+            }
+
+            echo "✅ All tables already exist and are up to date (Direct SQL method).\n";
             exit(0);
         }
 
@@ -164,6 +180,7 @@ try {
         CREATE TABLE IF NOT EXISTS `wmng_maps` (
           `id` bigint unsigned NOT NULL AUTO_INCREMENT,
           `name` varchar(255) NOT NULL,
+          `title` varchar(255) DEFAULT NULL,
           `description` text,
           `width` int NOT NULL DEFAULT 800,
           `height` int NOT NULL DEFAULT 600,
