@@ -69,5 +69,6 @@ class LinkUtilizationTest extends TestCase
 
         $this->assertTrue(method_exists($service, 'linkUtilBits'));
         $this->assertTrue(method_exists($service, 'getPortData'));
+        $this->assertTrue(method_exists($service, 'deviceAggregateBits'));
     }
 }

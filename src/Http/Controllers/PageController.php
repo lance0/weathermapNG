@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 class PageController extends Controller
 {
     /**
-     * Display the main plugin page
+     * Display main plugin page
      */
     public function index()
     {
@@ -28,28 +28,28 @@ class PageController extends Controller
     }
 
     /**
-     * Display the editor page
+     * Display editor page
      */
-    public function editor($id = null)
+    public function editor($mapId = null)
     {
         $map = null;
-        if ($id) {
-            $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($id);
+        if ($mapId) {
+            $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($mapId);
         }
 
         return view('WeathermapNG::editor', [
             'title' => $map ? 'Edit Map: ' . $map->name : 'Create New Map',
             'map' => $map,
-            'mapId' => $id,
+            'mapId' => $mapId,
         ]);
     }
 
     /**
-     * Display the view page
+     * Display view page
      */
-    public function view($id)
+    public function view($mapId)
     {
-        $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($id);
+        $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($mapId);
 
         if (!$map) {
             abort(404, 'Map not found');
@@ -58,12 +58,12 @@ class PageController extends Controller
         return view('WeathermapNG::view', [
             'title' => 'View Map: ' . $map->name,
             'map' => $map,
-            'mapId' => $id,
+            'mapId' => $mapId,
         ]);
     }
 
     /**
-     * Display the settings page
+     * Display settings page
      */
     public function settings()
     {

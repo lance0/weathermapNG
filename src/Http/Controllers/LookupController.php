@@ -18,10 +18,10 @@ class LookupController
         return response()->json($lookup->getAllDevices());
     }
 
-    public function ports(int $id, DevicePortLookup $lookup): JsonResponse
+    public function ports(int $deviceId, DevicePortLookup $lookup): JsonResponse
     {
         $query = trim((string) request()->query('q', ''));
-        $ports = $lookup->portsForDevice($id);
+        $ports = $lookup->portsForDevice($deviceId);
         if ($query !== '') {
             $lowercaseQuery = strtolower($query);
             $ports = array_values(array_filter($ports, function ($port) use ($lowercaseQuery) {
@@ -31,7 +31,7 @@ class LookupController
             }));
         }
         return response()->json([
-            'device_id' => $id,
+            'device_id' => $deviceId,
             'ports' => $ports,
         ]);
     }

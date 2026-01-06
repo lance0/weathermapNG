@@ -17,22 +17,12 @@ class MapControllerTest extends TestCase
             \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
         );
 
-        $nodeService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\NodeService::class
-        );
-
-        $linkService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\LinkService::class
-        );
-
         $autoDiscoveryService = $this->createMock(
             \LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService::class
         );
 
         $this->controller = new MapController(
             $mapService,
-            $nodeService,
-            $linkService,
             $autoDiscoveryService
         );
     }
@@ -48,8 +38,6 @@ class MapControllerTest extends TestCase
         $this->assertTrue(method_exists($this->controller, 'create'));
         $this->assertTrue(method_exists($this->controller, 'update'));
         $this->assertTrue(method_exists($this->controller, 'destroy'));
-        $this->assertTrue(method_exists($this->controller, 'createNode'));
-        $this->assertTrue(method_exists($this->controller, 'createLink'));
         $this->assertTrue(method_exists($this->controller, 'save'));
         $this->assertTrue(method_exists($this->controller, 'autoDiscover'));
     }
@@ -60,22 +48,12 @@ class MapControllerTest extends TestCase
             \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
         );
 
-        $nodeService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\NodeService::class
-        );
-
-        $linkService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\LinkService::class
-        );
-
         $autoDiscoveryService = $this->createMock(
             \LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService::class
         );
 
         $controller = new MapController(
             $mapService,
-            $nodeService,
-            $linkService,
             $autoDiscoveryService
         );
 
