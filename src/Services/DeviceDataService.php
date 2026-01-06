@@ -3,15 +3,17 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
-use LibreNMS\Plugins\WeathermapNG\Models\PortUtilService;
+use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
 
 class DeviceDataService
 {
     private $portUtil;
+    private $deviceMetrics;
 
-    public function __construct(PortUtilService $portUtil)
+    public function __construct(PortUtilService $portUtil, DeviceMetricsService $deviceMetrics)
     {
         $this->portUtil = $portUtil;
+        $this->deviceMetrics = $deviceMetrics;
     }
 
     public function getNodeStatus(Node $node): string
@@ -22,6 +24,15 @@ class DeviceDataService
 
         $device = $this->fetchDevice($node->device_id);
         return $this->parseDeviceStatus($device);
+    }
+
+    public function getNodeMetrics(Node $node): array
+    {
+        if (!$node->device_id) {
+            return ['cpu' => null, 'mem' => null];
+        }
+
+        return $this->deviceMetrics->getDeviceMetrics((int) $node->device_id);
     }
 
     public function getDeviceTraffic(int $deviceId): array

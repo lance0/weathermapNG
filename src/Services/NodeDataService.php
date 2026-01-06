@@ -4,6 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
+use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
 
 class NodeDataService
 {
@@ -19,117 +20,26 @@ class NodeDataService
     public function buildNodeData(Map $map): array
     {
         $nodeData = [];
-        $portsByNode = $this->buildPortsByNode($map);
-        $linkData = $this->buildLinkData($map);
-
         foreach ($map->nodes as $node) {
-            $nodeData[$node->id] = $this->buildNodeMetrics($node, $portsByNode, $linkData);
+            $nodeData[$node->id] = $this->buildNodeWithMetrics($node);
         }
-
         return $nodeData;
     }
 
-    private function buildNodeMetrics(Node $node, array $portsByNode, array $linkData): array
+    private function buildNodeWithMetrics(Node $node): array
     {
-        $portIds = $portsByNode[$node->id] ?? [];
-        $trafficData = $this->aggregateNodeTraffic($node, $portIds, $linkData);
         $status = $this->deviceDataService->getNodeStatus($node);
+        $metrics = $this->deviceDataService->getNodeMetrics($node);
+        $trafficData = $this->aggregateNodeTraffic($node);
 
-        return array_merge(
-            [
-                'device_id' => $node->device_id,
-                'status' => $status,
-            ],
-            $trafficData
-        );
-    }
-
-    private function buildPortsByNode(Map $map): array
-    {
-        $portsByNode = [];
-        foreach ($map->links as $link) {
-            $this->addPortToNode($portsByNode, $link->src_node_id, $link->port_id_a);
-            $this->addPortToNode($portsByNode, $link->dst_node_id, $link->port_id_b);
-        }
-        return $portsByNode;
-    }
-
-    private function addPortToNode(array &$portsByNode, ?int $nodeId, ?int $portId): void
-    {
-        if ($nodeId && $portId) {
-            $portsByNode[$nodeId] = $portsByNode[$nodeId] ?? [];
-            $portsByNode[$nodeId][] = (int) $portId;
-        }
-    }
-
-    private function aggregateNodeTraffic(Node $node, array $portIds, array $linkData): array
-    {
-        $traffic = $this->sumPortTraffic($portIds);
-
-        if ($traffic['sum'] === 0) {
-            $traffic = $this->sumLinkTraffic($node, $linkData);
-        }
-
-        if ($traffic['sum'] === 0 && $node->device_id) {
-            $traffic = $this->deviceDataService->getDeviceTraffic($node->device_id);
-        }
-
-        if ($traffic['sum'] === 0 && !$node->device_id && $node->label) {
-            $traffic = $this->deviceDataService->guessDeviceTraffic($node->label);
-        }
-
-        return $traffic;
-    }
-
-    private function sumPortTraffic(array $portIds): array
-    {
-        $inSum = 0;
-        $outSum = 0;
-
-        foreach (array_unique($portIds) as $portId) {
-            try {
-                $portData = $this->portUtil->getPortData((int) $portId);
-                $inSum += (int) ($portData['in'] ?? 0);
-                $outSum += (int) ($portData['out'] ?? 0);
-            } catch (\Throwable $e) {
-            }
-        }
-
-        return $this->formatTrafficData($inSum, $outSum, 'ports');
-    }
-
-    private function sumLinkTraffic(Node $node, array $linkData): array
-    {
-        $inSum = 0;
-        $outSum = 0;
-
-        foreach ($linkData as $linkId => $linkInfo) {
-            if ($this->isLinkConnectedToNode($node, $linkId)) {
-                $inSum += (int) ($linkInfo['in_bps'] ?? 0);
-                $outSum += (int) ($linkInfo['out_bps'] ?? 0);
-            }
-        }
-
-        return $this->formatTrafficData($inSum, $outSum, 'links');
-    }
-
-    private function isLinkConnectedToNode(Node $node, int $linkId): bool
-    {
-        $link = collect($node->map->links)->first(fn($lnk) => $lnk->id == $linkId);
-        return $link && ($link->src_node_id == $node->id || $link->dst_node_id == $node->id);
-    }
-
-    private function formatTrafficData(int $inSum, int $outSum, string $source): array
-    {
         return [
-            'in_bps' => $inSum,
-            'out_bps' => $outSum,
-            'sum_bps' => $inSum + $outSum,
-            'source' => ($inSum + $outSum) > 0 ? $source : 'none',
+            'status' => $status,
+            'metrics' => $metrics,
+            'traffic' => $trafficData,
         ];
     }
 
-    private function buildLinkData(Map $map): array
+    public function buildLinkData(Map $map): array
     {
         $linkData = [];
         foreach ($map->links as $link) {
@@ -140,5 +50,139 @@ class NodeDataService
             ]);
         }
         return $linkData;
+    }
+
+    public function buildAlertData(Map $map): array
+    {
+        $deviceIds = [];
+        foreach ($map->nodes as $node) {
+            if ($node->device_id) {
+                $deviceIds[] = (int) $node->device_id;
+            }
+        }
+
+        $deviceIds = array_values(array_unique($deviceIds));
+
+        return [
+            'nodes' => [],
+            'links' => [],
+        ];
+    }
+
+    public function stream(Map $map, int $interval, int $maxSeconds): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return response()->stream(
+            function () use ($map, $interval, $maxSeconds) {
+                $this->configureOutputBuffering();
+                $this->streamLoop($map, $interval, $maxSeconds);
+            },
+            200,
+            $this->getResponseHeaders()
+        );
+    }
+
+    private function configureOutputBuffering(): void
+    {
+        if (function_exists('apache_setenv')) {
+            @apache_setenv('no-gzip', '1');
+        }
+
+        @ini_set('zlib.output_compression', 0);
+        @ini_set('implicit_flush', 1);
+
+        while (ob_get_level() > 0) {
+            @ob_end_flush();
+        }
+
+        @ob_implicit_flush(1);
+    }
+
+    private function getResponseHeaders(): array
+    {
+        return [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache, no-transform',
+            'X-Accel-Buffering' => 'no',
+            'Connection' => 'keep-alive',
+        ];
+    }
+
+    private function streamLoop(Map $map, int $interval, int $maxSeconds): void
+    {
+        $start = time();
+
+        while (true) {
+            $payload = $this->buildSsePayload($map);
+            $this->emitSseEvent($payload);
+
+            if ($this->shouldStopStreaming($start, $maxSeconds)) {
+                break;
+            }
+
+            sleep($interval);
+        }
+    }
+
+    private function buildSsePayload(Map $map): array
+    {
+        return [
+            'ts' => time(),
+            'links' => $this->buildLinkData($map),
+            'nodes' => $this->buildNodeData($map),
+            'alerts' => $this->buildAlertData($map),
+        ];
+    }
+
+    private function emitSseEvent(array $payload): void
+    {
+        echo 'data: ' . json_encode($payload) . "\n\n";
+        @ob_flush();
+        @flush();
+    }
+
+    private function shouldStopStreaming(int $startTime, int $maxSeconds): bool
+    {
+        return connection_aborted() || (time() - $startTime) >= $maxSeconds;
+    }
+
+    private function aggregateNodeTraffic(Node $node): array
+    {
+        $traffic = $this->sumPortTraffic($node);
+
+        if ($traffic['sum_bps'] === 0 && $node->device_id) {
+            $traffic = $this->deviceDataService->getDeviceTraffic((int) $node->device_id);
+        }
+
+        if ($traffic['sum_bps'] === 0 && !$node->device_id && $node->label) {
+            $traffic = $this->deviceDataService->guessDeviceTraffic($node->label);
+        }
+
+        return $traffic;
+    }
+
+    private function sumPortTraffic(Node $node): array
+    {
+        $inSum = 0;
+        $outSum = 0;
+
+        foreach ($node->map->links as $link) {
+            if ($link->src_node_id == $node->id && $link->port_id_a) {
+                $portData = $this->portUtil->getPortData((int) $link->port_id_a);
+                $inSum += (int) ($portData['in'] ?? 0);
+                $outSum += (int) ($portData['out'] ?? 0);
+            }
+            if ($link->dst_node_id == $node->id && $link->port_id_b) {
+                $portData = $this->portUtil->getPortData((int) $link->port_id_b);
+                $inSum += (int) ($portData['out'] ?? 0);
+                $outSum += (int) ($portData['in'] ?? 0);
+            }
+        }
+
+        return [
+            'in_bps' => $inSum,
+            'out_bps' => $outSum,
+            'sum_bps' => $inSum + $outSum,
+            'source' => ($inSum + $outSum) > 0 ? 'ports' : 'none',
+        ];
     }
 }

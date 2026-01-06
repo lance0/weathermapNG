@@ -13,15 +13,11 @@ class RenderControllerTest extends TestCase
     {
         parent::setUp();
 
-        $mapDataBuilder = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder::class
+        $nodeDataService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\NodeDataService::class
         );
 
-        $sseStreamService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\SseStreamService::class
-        );
-
-        $this->controller = new RenderController($mapDataBuilder, $sseStreamService);
+        $this->controller = new RenderController($nodeDataService);
     }
 
     public function test_controller_can_be_instantiated()
@@ -41,15 +37,11 @@ class RenderControllerTest extends TestCase
 
     public function test_services_are_injected()
     {
-        $mapDataBuilder = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder::class
+        $nodeDataService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\NodeDataService::class
         );
 
-        $sseStreamService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\SseStreamService::class
-        );
-
-        $controller = new RenderController($mapDataBuilder, $sseStreamService);
+        $controller = new RenderController($nodeDataService);
 
         $this->assertInstanceOf(RenderController::class, $controller);
     }
