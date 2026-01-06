@@ -8,7 +8,7 @@ use LibreNMS\Plugins\WeathermapNG\WeathermapNG;
 
 class InstallController extends Controller
 {
-    public function index()
+    public function index(): \Illuminate\View\View
     {
         $requirements = $this->checkRequirements();
         $steps = [
@@ -22,7 +22,7 @@ class InstallController extends Controller
         return view('WeathermapNG::install.index', compact('requirements', 'steps'));
     }
 
-    public function install()
+    public function install(): \Illuminate\Http\JsonResponse
     {
         try {
             $plugin = new WeathermapNG();
@@ -45,7 +45,7 @@ class InstallController extends Controller
         }
     }
 
-    private function checkRequirements()
+    private function checkRequirements(): array
     {
         return [
             'php' => [
@@ -75,7 +75,7 @@ class InstallController extends Controller
         ];
     }
 
-    private function checkRequirementsMet($requirements)
+    private function checkRequirementsMet($requirements): bool
     {
         foreach ($requirements as $req) {
             if (!$req['status']) {
@@ -85,7 +85,7 @@ class InstallController extends Controller
         return true;
     }
 
-    private function checkDatabaseReady()
+    private function checkDatabaseReady(): bool
     {
         try {
             $tables = DB::select("SHOW TABLES LIKE 'wmng_%'");
@@ -95,7 +95,7 @@ class InstallController extends Controller
         }
     }
 
-    private function checkPermissions()
+    private function checkPermissions(): bool
     {
         $paths = [
             __DIR__ . '/../../../output',
@@ -110,14 +110,14 @@ class InstallController extends Controller
         return true;
     }
 
-    private function checkPluginEnabled()
+    private function checkPluginEnabled(): bool
     {
         // Check if plugin is registered and enabled in LibreNMS
         // This would need to be implemented based on LibreNMS's plugin system
         return true; // Placeholder
     }
 
-    private function testDatabaseConnection()
+    private function testDatabaseConnection(): bool
     {
         try {
             DB::connection()->getPdo();
