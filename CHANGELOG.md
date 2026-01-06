@@ -5,6 +5,34 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2026-01-06
+
+### Added
+- **Loading Spinners**: Professional loading overlays and button loading states
+- **Toast Notification System**: Lightweight toast notifications using Bootstrap 4
+- **Enhanced Focus States**: Better visibility for keyboard navigation
+- **ARIA Labels**: Comprehensive accessibility improvements with proper ARIA attributes
+
+### Changed
+- **Form Inputs**: Added aria-describedby for better context
+- **Buttons**: All buttons now have aria-label and aria-hidden for icons
+- **Modals**: Enhanced with role, aria-labelledby, and aria-hidden attributes
+- **Accessibility**: WCAG 2.1 AA compliance improvements
+
+### Fixed
+- **Alert System**: Replaced browser alerts() with Bootstrap toast notifications
+- **Focus Visibility**: Added better outlines and high contrast support
+- **Screen Reader Support**: Added announcer for dynamic content updates
+
+### Technical Details
+- **CSS Files**: Added a11y.css, loading.css, toast.css
+- **JS Helpers**: New ui-helpers.js with WMNGToast, WMNGLoading, WMNGA11y classes
+- **Accessibility**: Supports prefers-reduced-motion and prefers-contrast: high
+- **Dependencies**: Zero external dependencies beyond LibreNMS Bootstrap 4
+- **Loading States**: Proper aria-busy attributes for screen readers
+
+---
+
 ## [1.2.4] - 2026-01-06
 
 ### Added
