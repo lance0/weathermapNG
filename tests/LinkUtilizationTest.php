@@ -7,25 +7,49 @@ class LinkUtilizationTest extends TestCase
 {
     public function test_link_utilization_calculation()
     {
-        $service = new PortUtilService();
+        $api = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\RRD\LibreNMSAPI::class
+        );
 
-        // Mock the service to return test data
-        // Since the service uses caching and RRD, we'll test the calculation logic directly
+        $rrdService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\RrdDataService::class
+        );
+
+        $snmpService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\SnmpDataService::class
+        );
+
+        $service = new PortUtilService($api, $rrdService, $snmpService);
+
         $link = [
             'port_id_a' => 1,
             'port_id_b' => 2,
             'bandwidth_bps' => 1000,
         ];
 
-        // Test with mock port data - we'd need to mock the getPortData method
-        // For now, test that the service exists and has the method
-        $this->assertTrue(method_exists($service, 'linkUtilBits'));
-        $this->assertTrue(method_exists($service, 'getPortData'));
+        $result = $service->linkUtilBits($link);
+
+        $this->assertArrayHasKey('in_bps', $result);
+        $this->assertArrayHasKey('out_bps', $result);
+        $this->assertArrayHasKey('pct', $result);
+        $this->assertArrayHasKey('err', $result);
     }
 
     public function test_link_utilization_with_no_ports()
     {
-        $service = new PortUtilService();
+        $api = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\RRD\LibreNMSAPI::class
+        );
+
+        $rrdService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\RrdDataService::class
+        );
+
+        $snmpService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\SnmpDataService::class
+        );
+
+        $service = new PortUtilService($api, $rrdService, $snmpService);
 
         $link = [
             'bandwidth_bps' => 1000,
@@ -38,5 +62,12 @@ class LinkUtilizationTest extends TestCase
         $this->assertNull($result['pct']);
         $this->assertEquals('No ports configured', $result['err']);
     }
-}
 
+    public function test_service_has_required_methods()
+    {
+        $service = $this->createMock(PortUtilService::class);
+
+        $this->assertTrue(method_exists($service, 'linkUtilBits'));
+        $this->assertTrue(method_exists($service, 'getPortData'));
+    }
+}

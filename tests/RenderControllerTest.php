@@ -12,17 +12,24 @@ class RenderControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->controller = new RenderController();
+
+        $mapDataBuilder = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder::class
+        );
+
+        $sseStreamService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\SseStreamService::class
+        );
+
+        $this->controller = new RenderController($mapDataBuilder, $sseStreamService);
     }
 
-    /** @test */
-    public function controller_can_be_instantiated()
+    public function test_controller_can_be_instantiated()
     {
         $this->assertInstanceOf(RenderController::class, $this->controller);
     }
 
-    /** @test */
-    public function controller_has_required_methods()
+    public function test_controller_has_required_methods()
     {
         $this->assertTrue(method_exists($this->controller, 'json'));
         $this->assertTrue(method_exists($this->controller, 'live'));
@@ -32,7 +39,18 @@ class RenderControllerTest extends TestCase
         $this->assertTrue(method_exists($this->controller, 'sse'));
     }
 
-    // Note: Full integration tests for controllers require Laravel framework
-    // These basic tests verify the controller structure and methods exist
-    // Comprehensive testing would require Laravel test environment with database
+    public function test_services_are_injected()
+    {
+        $mapDataBuilder = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder::class
+        );
+
+        $sseStreamService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\SseStreamService::class
+        );
+
+        $controller = new RenderController($mapDataBuilder, $sseStreamService);
+
+        $this->assertInstanceOf(RenderController::class, $controller);
+    }
 }
