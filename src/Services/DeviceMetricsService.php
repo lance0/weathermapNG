@@ -2,17 +2,21 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
 class DeviceMetricsService
 {
     public function getCpuUsage(int $deviceId): ?float
     {
         try {
-            $cpu = \DB::table('processors')
+            $cpu = DB::table('processors')
                 ->where('device_id', $deviceId)
                 ->avg('processor_usage');
 
             return $cpu !== null ? round((float) $cpu, 2) : null;
         } catch (\Exception $e) {
+            Log::debug("Failed to fetch CPU for device {$deviceId}: " . $e->getMessage());
             return null;
         }
     }
@@ -20,12 +24,13 @@ class DeviceMetricsService
     public function getMemoryUsage(int $deviceId): ?float
     {
         try {
-            $mem = \DB::table('mempools')
+            $mem = DB::table('mempools')
                 ->where('device_id', $deviceId)
                 ->avg('mempool_perc');
 
             return $mem !== null ? round((float) $mem, 2) : null;
         } catch (\Exception $e) {
+            Log::debug("Failed to fetch memory for device {$deviceId}: " . $e->getMessage());
             return null;
         }
     }

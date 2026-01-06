@@ -3,6 +3,7 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SnmpDataService
 {
@@ -20,6 +21,7 @@ class SnmpDataService
         }
 
         if (!function_exists('snmp2_get')) {
+            Log::warning("SNMP fallback enabled but snmp2_get() function is missing");
             return null;
         }
 
@@ -80,25 +82,41 @@ class SnmpDataService
     private function fetchSnmpTraffic(string $host, string $community, int $ifIndex): ?array
     {
         try {
-            $timeout = $this->snmpConfig['timeout'] ?? 1;
-            $retries = $this->snmpConfig['retries'] ?? 1;
+            $timeout = (int) ($this->snmpConfig['timeout'] ?? 1) * 1000000;
+            $retries = (int) ($this->snmpConfig['retries'] ?? 1);
 
-            $inOid = ".1.3.6.1.2.1.2.2.1.10.{$ifIndex}.1";
-            $outOid = ".1.3.6.1.2.1.2.2.1.10.{$ifIndex}.2";
+            $inOid = ".1.3.6.1.2.1.2.2.1.10.{$ifIndex}";
+            $outOid = ".1.3.6.1.2.1.2.2.1.16.{$ifIndex}";
 
-            $inOctets = snmp2_get($host, $community, $inOid, $timeout, $retries);
-            $outOctets = snmp2_get($host, $community, $outOid, $timeout, $retries);
+            $inOctets = @snmp2_get($host, $community, $inOid, $timeout, $retries);
+            $outOctets = @snmp2_get($host, $community, $outOid, $timeout, $retries);
 
             if ($inOctets === false || $outOctets === false) {
                 return null;
             }
 
+            // Simple 32-bit counter octets to bits conversion
             return [
-                'in' => (int) $inOctets * 8,
-                'out' => (int) $outOctets * 8,
+                'in' => (int) $this->cleanSnmpValue($inOctets) * 8,
+                'out' => (int) $this->cleanSnmpValue($outOctets) * 8,
             ];
         } catch (\Exception $e) {
+            Log::debug("SNMP fetch failed for {$host}: " . $e->getMessage());
             return null;
         }
+    }
+
+    private function cleanSnmpValue($value): int
+    {
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        // Handle string formatted values like "Counter32: 12345"
+        if (preg_match('/(\d+)/', (string) $value, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 0;
     }
 }

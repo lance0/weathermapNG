@@ -3,8 +3,8 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use LibreNMS\Plugins\WeathermapNG\RRD\RRDTool;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class RrdDataService
 {
@@ -35,10 +35,11 @@ class RrdDataService
         try {
             $query = class_exists('\\App\\Models\\Port')
                 ? \App\Models\Port::select('device_id', 'ifIndex', 'port_id')->where('port_id', $portId)->first()
-                : \DB::table('ports')->select('device_id', 'ifIndex', 'port_id')->where('port_id', $portId)->first();
+                : DB::table('ports')->select('device_id', 'ifIndex', 'port_id')->where('port_id', $portId)->first();
 
             return $query ? (array) $query : null;
         } catch (\Exception $e) {
+            Log::debug("Failed to get port info for port {$portId}: " . $e->getMessage());
             return null;
         }
     }
@@ -52,7 +53,11 @@ class RrdDataService
             return null;
         }
 
-        $hostname = $device->hostname ?? $device['sysName'] ?? '';
+        $hostname = $device['hostname'] ?? $device['sysName'] ?? '';
+        if (!$hostname) {
+            return null;
+        }
+
         $ifIndex = $port['ifIndex'];
 
         // Try different RRD path patterns
@@ -77,11 +82,12 @@ class RrdDataService
             $device = class_exists('\\App\\Models\\Device')
                 ? \App\Models\Device::select('hostname', 'sysName', 'rrd_path')
                     ->where('device_id', $deviceId)->first()
-                : \DB::table('devices')->select('hostname', 'sysName', 'rrd_path')
+                : DB::table('devices')->select('hostname', 'sysName', 'rrd_path')
                     ->where('device_id', $deviceId)->first();
 
             return $device ? (array) $device : null;
         } catch (\Exception $e) {
+            Log::debug("Failed to get device info for device {$deviceId}: " . $e->getMessage());
             return null;
         }
     }
@@ -92,15 +98,12 @@ class RrdDataService
             $inBps = $this->rrdTool->getLastValue($rrdPath, 'traffic_in');
             $outBps = $this->rrdTool->getLastValue($rrdPath, 'traffic_out');
 
-            if ($inBps === null || $outBps === null) {
-                return ['in' => 0, 'out' => 0];
-            }
-
             return [
-                'in' => (int) $inBps,
-                'out' => (int) $outBps,
+                'in' => (int) ($inBps ?? 0),
+                'out' => (int) ($outBps ?? 0),
             ];
         } catch (\Exception $e) {
+            Log::error("Failed to fetch traffic from RRD {$rrdPath}: " . $e->getMessage());
             return ['in' => 0, 'out' => 0];
         }
     }

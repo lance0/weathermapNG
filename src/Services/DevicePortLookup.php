@@ -3,6 +3,7 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class DevicePortLookup
 {
@@ -208,7 +209,7 @@ class DevicePortLookup
     }
 
     /**
-     * Clear all caches (useful for testing or forced refresh)
+     * Clear all caches
      */
     public function clearCaches(): void
     {
@@ -221,8 +222,6 @@ class DevicePortLookup
         ];
 
         foreach ($cacheKeys as $pattern) {
-            // Note: This is a simplified cache clearing
-            // In production, you might want to use a more sophisticated approach
             Cache::forget($pattern);
         }
     }

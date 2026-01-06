@@ -41,10 +41,10 @@ class LinkDataService
         $portAlerts = $this->alertService->portAlerts($portIds);
         $alertInfo = $this->calculateLinkAlertInfo($link, $portAlerts);
 
-        return array_merge($this->getLinkBaseData($link), $alertInfo);
+        return array_merge($this->getLinkBaseData(), $alertInfo);
     }
 
-    private function getLinkBaseData(Link $link): array
+    private function getLinkBaseData(): array
     {
         return [
             'in_bps' => 0,

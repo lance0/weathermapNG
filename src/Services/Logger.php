@@ -198,7 +198,7 @@ class Logger
 
         array_walk_recursive($context, function (&$value, $key) use ($sensitiveKeys) {
             foreach ($sensitiveKeys as $sensitive) {
-                if (stripos($key, $sensitive) !== false) {
+                if (is_string($key) && stripos($key, $sensitive) !== false) {
                     $value = '***REDACTED***';
                     break;
                 }

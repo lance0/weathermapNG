@@ -5,6 +5,8 @@ namespace LibreNMS\Plugins\WeathermapNG\Services;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class LinkService
 {
@@ -47,18 +49,25 @@ class LinkService
 
     public function storeLinks(Map $map, array $linksData): void
     {
-        $map->links()->delete();
+        try {
+            DB::transaction(function () use ($map, $linksData) {
+                $map->links()->delete();
 
-        foreach ($linksData as $linkData) {
-            Link::create([
-                'map_id' => $map->id,
-                'src_node_id' => $linkData['src_node_id'],
-                'dst_node_id' => $linkData['dst_node_id'],
-                'port_id_a' => $linkData['port_id_a'] ?? null,
-                'port_id_b' => $linkData['port_id_b'] ?? null,
-                'bandwidth_bps' => $linkData['bandwidth_bps'] ?? null,
-                'style' => $linkData['style'] ?? [],
-            ]);
+                foreach ($linksData as $linkData) {
+                    Link::create([
+                        'map_id' => $map->id,
+                        'src_node_id' => $linkData['src_node_id'],
+                        'dst_node_id' => $linkData['dst_node_id'],
+                        'port_id_a' => $linkData['port_id_a'] ?? null,
+                        'port_id_b' => $linkData['port_id_b'] ?? null,
+                        'bandwidth_bps' => $linkData['bandwidth_bps'] ?? null,
+                        'style' => $linkData['style'] ?? [],
+                    ]);
+                }
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to store links for map {$map->id}: " . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -122,8 +131,12 @@ class LinkService
 
         $port = $this->fetchPort($portId);
 
-        if (!$port || $port->device_id != $node->device_id) {
-            throw new \InvalidArgumentException('Port does not belong to device');
+        if (!$port) {
+            throw new \InvalidArgumentException("Port {$portId} not found");
+        }
+
+        if ($port->device_id != $node->device_id) {
+            throw new \InvalidArgumentException("Port {$portId} does not belong to device {$node->device_id}");
         }
     }
 
@@ -135,7 +148,7 @@ class LinkService
                 return $portClass::find($portId);
             }
 
-            return null;
+            return DB::table('ports')->where('port_id', $portId)->first();
         } catch (\Exception $e) {
             return null;
         }
@@ -144,7 +157,7 @@ class LinkService
     private function validateLinkOwnership(Map $map, Link $link): void
     {
         if ($link->map_id !== $map->id) {
-            throw new \RuntimeException('Link does not belong to map');
+            throw new \RuntimeException("Link {$link->id} does not belong to map {$map->id}");
         }
     }
 }

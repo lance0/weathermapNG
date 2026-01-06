@@ -20,18 +20,18 @@ class MapController
         $this->autoDiscoveryService = $autoDiscoveryService;
     }
 
-    public function index()
+    public function index(): \Illuminate\View\View
     {
         $maps = Map::withCount(['nodes', 'links'])->get();
         return view('WeathermapNG::index', compact('maps'));
     }
 
-    public function show(Map $map)
+    public function show(Map $map): \Illuminate\Http\RedirectResponse
     {
         return redirect()->route('weathermapng.embed', $map);
     }
 
-    public function editor(Map $map)
+    public function editor(Map $map): \Illuminate\View\View
     {
         $map->load(['nodes', 'links']);
         $devices = $this->getDevicesForEditor();
@@ -53,7 +53,7 @@ class MapController
         return $this->handleCreateResponse($request, $map);
     }
 
-    public function update(Request $request, Map $map)
+    public function update(Request $request, Map $map): \Illuminate\Http\JsonResponse
     {
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
@@ -74,7 +74,7 @@ class MapController
         return $this->handleDeleteResponse();
     }
 
-    public function save(Request $request, Map $map)
+    public function save(Request $request, Map $map): \Illuminate\Http\JsonResponse
     {
         $validatedData = $this->validateSaveRequest($request);
 
@@ -89,7 +89,7 @@ class MapController
         }
     }
 
-    public function autoDiscover(Request $request, Map $map)
+    public function autoDiscover(Request $request, Map $map): \Illuminate\Http\JsonResponse
     {
         $params = $this->autoDiscoveryService->validateDiscoveryParams($request->all());
 

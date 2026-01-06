@@ -6,6 +6,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class AutoDiscoveryService
 {
@@ -18,21 +19,26 @@ class AutoDiscoveryService
 
     public function discoverAndSeedMap(Map $map, array $params): array
     {
-        $devices = $this->discoverDevices($params);
-        $existingNodes = $this->getExistingNodeMapping($map);
-        $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
+        try {
+            $devices = $this->discoverDevices($params);
+            $existingNodes = $this->getExistingNodeMapping($map);
+            $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
 
-        $connectivityData = $this->buildConnectivityGraph($nodeMapping);
-        $this->createDiscoveredLinks($map, $connectivityData['links'], $nodeMapping);
-        $this->applyLayoutAlgorithm($map, $nodeMapping, $connectivityData['links']);
+            $connectivityData = $this->buildConnectivityGraph($nodeMapping);
+            $this->createDiscoveredLinks($map, $connectivityData['links'], $nodeMapping);
+            $this->applyLayoutAlgorithm();
 
-        return $nodeMapping;
+            return $nodeMapping;
+        } catch (\Exception $e) {
+            Log::error("Auto-discovery failed for map {$map->id}: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function validateDiscoveryParams(array $params): array
     {
         return [
-            'minDegree' => max(0, (int) $params['min_degree'] ?? 0),
+            'minDegree' => max(0, (int) ($params['min_degree'] ?? 0)),
             'osFilter' => array_filter(array_map('trim', explode(',', trim((string) ($params['os'] ?? ''))))),
         ];
     }
@@ -106,6 +112,10 @@ class AutoDiscoveryService
         $degrees = [];
         $deviceIds = array_column($devices, 'device_id');
 
+        if (empty($deviceIds)) {
+            return $degrees;
+        }
+
         $portsQuery = class_exists('\\App\\Models\\Port')
             ? \App\Models\Port::whereIn('device_id', $deviceIds)
                 ->where('ifOperStatus', 'up')
@@ -127,6 +137,10 @@ class AutoDiscoveryService
     private function buildConnectivityGraph(array $nodeMapping): array
     {
         $deviceIds = array_keys($nodeMapping);
+        if (empty($deviceIds)) {
+            return ['portsByDevice' => [], 'links' => []];
+        }
+
         $ports = $this->getActivePorts($deviceIds);
         $portsByDevice = $this->groupPortsByDevice($ports);
 
@@ -237,6 +251,10 @@ class AutoDiscoveryService
     {
         $ports = ['port_a' => null, 'port_b' => null];
 
+        if (empty($portData)) {
+            return $ports;
+        }
+
         foreach ($portData as $portInfo) {
             $portId = $this->findPortId($portInfo['device_id'], $portInfo['port_id']);
 
@@ -266,7 +284,7 @@ class AutoDiscoveryService
         }
     }
 
-    private function applyLayoutAlgorithm(Map $map, array $nodeMapping, array $links): void
+    private function applyLayoutAlgorithm(): void
     {
         // Layout positions are already applied during node creation
         // This method is a placeholder for future advanced layout algorithms

@@ -65,13 +65,13 @@ class PortUtilService
         });
     }
 
-    public function deviceAggregateBits(int $deviceId, int $topN = 24): array
+    public function deviceAggregateBits(int $deviceId): array
     {
-        $cacheKey = "weathermapng.device.{$deviceId}.top{$topN}";
+        $cacheKey = "weathermapng.device.{$deviceId}.aggregate";
         $cacheTtl = config('weathermapng.cache_ttl', 300);
 
-        return Cache::remember($cacheKey, $cacheTtl, function () use ($deviceId, $topN) {
-            return $this->fetchDeviceAggregate($deviceId, $topN);
+        return Cache::remember($cacheKey, $cacheTtl, function () use ($deviceId) {
+            return $this->fetchDeviceAggregate($deviceId);
         });
     }
 
@@ -127,7 +127,7 @@ class PortUtilService
         return (int) ($latest['value'] ?? 0);
     }
 
-    private function fetchDeviceAggregate(int $deviceId, int $topN): array
+    private function fetchDeviceAggregate(int $deviceId): array
     {
         try {
             $inData = $this->api->getDeviceData($deviceId, 'traffic_in', '5m');

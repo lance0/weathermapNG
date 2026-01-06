@@ -3,7 +3,8 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
-use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DeviceDataService
 {
@@ -22,8 +23,13 @@ class DeviceDataService
             return 'unknown';
         }
 
-        $device = $this->fetchDevice($node->device_id);
-        return $this->parseDeviceStatus($device);
+        try {
+            $device = $this->fetchDevice((int) $node->device_id);
+            return $this->parseDeviceStatus($device);
+        } catch (\Exception $e) {
+            Log::debug("Failed to get status for device {$node->device_id}: " . $e->getMessage());
+            return 'unknown';
+        }
     }
 
     public function getNodeMetrics(Node $node): array
@@ -37,30 +43,29 @@ class DeviceDataService
 
     public function getDeviceTraffic(int $deviceId): array
     {
-        $agg = $this->portUtil->deviceAggregateBits($deviceId, 24);
-        $inSum = (int) ($agg['in'] ?? 0);
-        $outSum = (int) ($agg['out'] ?? 0);
-
-        return $this->formatTrafficData($inSum, $outSum, 'device');
+        try {
+            $agg = $this->portUtil->deviceAggregateBits($deviceId);
+            return $this->formatTrafficData((int) ($agg['in'] ?? 0), (int) ($agg['out'] ?? 0), 'device');
+        } catch (\Exception $e) {
+            Log::error("Failed to get traffic for device {$deviceId}: " . $e->getMessage());
+            return $this->formatTrafficData(0, 0, 'none');
+        }
     }
 
     public function guessDeviceTraffic(string $label): array
     {
         try {
-            $row = \DB::table('devices')
+            $row = DB::table('devices')
                 ->select('device_id')
                 ->where('hostname', $label)
                 ->orWhere('sysName', $label)
                 ->first();
 
             if ($row && isset($row->device_id)) {
-                $agg = $this->portUtil->deviceAggregateBits((int) $row->device_id, 24);
-                $inSum = (int) ($agg['in'] ?? 0);
-                $outSum = (int) ($agg['out'] ?? 0);
-
-                return $this->formatTrafficData($inSum, $outSum, 'device_guess');
+                return $this->getDeviceTraffic((int) $row->device_id);
             }
         } catch (\Throwable $e) {
+            Log::debug("Failed to guess traffic for label '{$label}': " . $e->getMessage());
         }
 
         return $this->formatTrafficData(0, 0, 'none');
@@ -72,7 +77,7 @@ class DeviceDataService
             return \App\Models\Device::find($deviceId);
         }
 
-        return \DB::table('devices')->where('device_id', $deviceId)->first();
+        return DB::table('devices')->where('device_id', $deviceId)->first();
     }
 
     private function parseDeviceStatus($device): string
@@ -83,11 +88,6 @@ class DeviceDataService
 
         $status = is_object($device) ? ($device->status ?? null) : ($device['status'] ?? null);
 
-        return $this->convertStatusToString($status);
-    }
-
-    private function convertStatusToString($status): string
-    {
         if (is_numeric($status)) {
             return (int) $status === 1 ? 'up' : 'down';
         }

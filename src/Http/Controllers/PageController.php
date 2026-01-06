@@ -3,17 +3,18 @@
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class PageController extends Controller
 {
     /**
      * Display main plugin page
      */
-    public function index()
+    public function index(): View
     {
         // Get all maps with counts
-        $maps = \Illuminate\Support\Facades\DB::table('wmng_maps')
+        $maps = DB::table('wmng_maps')
             ->select('wmng_maps.*')
             ->selectRaw('(SELECT COUNT(*) FROM wmng_nodes WHERE map_id = wmng_maps.id) as nodes_count')
             ->selectRaw('(SELECT COUNT(*) FROM wmng_links WHERE map_id = wmng_maps.id) as links_count')
@@ -30,11 +31,11 @@ class PageController extends Controller
     /**
      * Display editor page
      */
-    public function editor($mapId = null)
+    public function editor($mapId = null): View
     {
         $map = null;
         if ($mapId) {
-            $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($mapId);
+            $map = DB::table('wmng_maps')->find($mapId);
         }
 
         return view('WeathermapNG::editor', [
@@ -47,9 +48,9 @@ class PageController extends Controller
     /**
      * Display view page
      */
-    public function view($mapId)
+    public function view($mapId): View
     {
-        $map = \Illuminate\Support\Facades\DB::table('wmng_maps')->find($mapId);
+        $map = DB::table('wmng_maps')->find($mapId);
 
         if (!$map) {
             abort(404, 'Map not found');
@@ -65,7 +66,7 @@ class PageController extends Controller
     /**
      * Display settings page
      */
-    public function settings()
+    public function settings(): View
     {
         return view('WeathermapNG::settings', [
             'title' => 'WeathermapNG Settings',

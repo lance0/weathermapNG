@@ -4,6 +4,10 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeDataService;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RenderController
 {
@@ -14,12 +18,12 @@ class RenderController
         $this->nodeDataService = $nodeDataService;
     }
 
-    public function json(Map $map)
+    public function json(Map $map): JsonResponse
     {
         return response()->json($map->toJsonModel());
     }
 
-    public function live(Map $map)
+    public function live(Map $map): JsonResponse
     {
         $data = [
             'ts' => time(),
@@ -31,14 +35,14 @@ class RenderController
         return response()->json($data);
     }
 
-    public function embed(Map $map)
+    public function embed(Map $map): View
     {
         $mapData = $map->toJsonModel();
         $mapId = $map->id;
         return view('WeathermapNG::embed', compact('mapData', 'mapId'));
     }
 
-    public function export(Map $map, Request $request)
+    public function export(Map $map, Request $request): JsonResponse
     {
         $format = $request->get('format', 'json');
 
@@ -50,7 +54,7 @@ class RenderController
         return response()->json(['error' => 'Unsupported format'], 400);
     }
 
-    public function import(Request $request)
+    public function import(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'file' => 'required|file|mimes:json|max:10240',
@@ -59,6 +63,10 @@ class RenderController
         ]);
 
         $file = $request->file('file');
+        if (!$file) {
+            return response()->json(['error' => 'No file uploaded'], 400);
+        }
+
         $content = file_get_contents($file->getRealPath());
         $data = json_decode($content, true);
 
@@ -77,7 +85,7 @@ class RenderController
         ]);
     }
 
-    public function sse(Map $map, Request $request)
+    public function sse(Map $map, Request $request): StreamedResponse
     {
         $interval = max(1, (int) $request->get('interval', 5));
         $maxSeconds = (int) $request->get('max', 60);
@@ -145,6 +153,6 @@ class RenderController
         $altKey = $type === 'src' ? 'src_node_id' : 'dst_node_id';
 
         $oldId = $linkData[$type] ?? $linkData[$key] ?? $linkData[$altKey] ?? null;
-        return $nodeIdMap[$oldId] ?? $oldId;
+        return $nodeIdMap[$oldId] ?? (is_numeric($oldId) ? (int)$oldId : null);
     }
 }
