@@ -5,6 +5,108 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-01-07
+
+### Added
+- **Map Versioning System**: Complete version control for network maps
+- **Version History**: Save, restore, compare, and export map versions
+- **Auto-Save**: Configurable automatic version saving (5, 10, 30 min intervals)
+- **Version Diff**: Visual comparison between versions (nodes/links added/removed/modified)
+- **Version Export**: Export all versions for backup (JSON format)
+
+### Changed
+- **Routes**: Added 10 versioning routes to web.php
+- **Service Provider**: Created WeathermapNGServiceProvider for dependency injection
+- **Policies**: Registered MapPolicy and NodePolicy with Laravel Gate
+- **Auto-save**: Timer-based automatic versioning
+- **Retention**: Configurable version retention (oldest 20, newest 20, all)
+
+### Technical Details
+- **Database Schema**:
+  - wmng_map_versions table (map_id, name, description, config_snapshot, created_by, created_at)
+  - Cascade delete on map deletion
+  - Indexed on map_id and created_at
+
+- **Model**: MapVersion with relationships to Map and User
+- - Casts: config_snapshot (array), created_at (datetime)
+  - Scopes: latestForMap, versions, byVersionNumber
+  - Accessors: created_at_human, map, creator
+
+- **Service**: MapVersionService
+  - createVersion(): Create new version with snapshot
+  - restoreVersion(): Restore map from version
+  - getVersions(): Get paginated version list
+  - compareVersions(): Compare two versions
+  - deleteVersionsOlderThan(): Cleanup old versions
+  - captureSnapshot(): Serialize map, nodes, links state
+
+- **API Endpoints** (10 new routes):
+  - GET /maps/{id}/versions - List all versions
+  - POST /maps/{id}/versions - Create manual version
+  - GET /versions/{id} - Get version details
+  - POST /versions/{id}/restore - Restore from version
+  - GET /versions/{id}/compare/{compareId} - Compare versions
+  - DELETE /versions/{id} - Delete version
+  - GET /versions/export - Export all versions
+  - GET /versions/settings - Get settings
+  - PUT /versions/settings - Update settings
+  - POST /versions/auto-save - Auto-save current state
+
+- **FormRequest**: SaveMapVersionRequest
+  - name (required, max 100 chars)
+  - description (optional, max 1000 chars)
+  - auto_save (optional, boolean)
+
+- **Service Provider**: WeathermapNGServiceProvider
+  - Registers MapVersionService as singleton
+  - Registers MapPolicy with Gate facade
+  - Registers NodePolicy with Gate facade
+
+### Features
+- **Named Versions**: Create descriptive names for each version
+- **Version Descriptions**: Add optional notes to versions
+- **Diff View**: Visual side-by-side comparison
+- **Rollback**: One-click restore to any version
+- **Auto-Save**: Configurable timer-based saving
+- **Version Management**: 20 versions max by default
+- **Export**: Export all versions with metadata
+- **Cleanup**: Auto-delete old versions (configurable)
+
+### Configuration
+- **Auto-Save Settings**:
+  - enabled: true
+  - interval: 5 minutes
+  - max_versions: 20
+  - retention_policy: oldest_20
+
+- **Version Storage**:
+  - format: JSON
+  - location: database (LONGTEXT)
+  - compression: none (future: gzip)
+
+- **UI Integration**:
+  - Version dropdown in editor
+  - Save version button
+  - History modal/table view
+  - Compare modal
+  - Restore confirmation dialog
+
+### Security
+- **Authorization**: Version access via MapPolicy
+- **Audit Trail**: Created by user tracking
+- **Ownership**: Users can only restore their own versions
+- **CSRF**: Protected via web middleware
+
+### Benefits
+- **Zero Data Loss**: Users can always rollback
+- **Safe Experimentation**: Test changes without risk
+- **Audit Trail**: Full history of all modifications
+- **Team Collaboration**: Version history for teams
+- **Backup**: Automatic versioning = automatic backups
+- **Disaster Recovery**: Restore from any saved version
+
+---
+
 ## [1.4.0] - 2026-01-07
 
 ### Added
