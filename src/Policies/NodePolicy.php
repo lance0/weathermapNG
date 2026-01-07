@@ -2,21 +2,18 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Policies;
 
-use Illuminate\Auth\Access\HandlesAuthorization;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 
 class NodePolicy
 {
-    use HandlesAuthorization;
-
     public function view($user, Node $node): bool
     {
-        return true; // Authenticated users can view nodes
+        return true;
     }
 
     public function create($user): bool
     {
-        return true; // Authenticated users can create nodes
+        return true;
     }
 
     public function update($user, Node $node): bool
@@ -26,7 +23,7 @@ class NodePolicy
         }
 
         $map = $node->map;
-        return $map->user_id === ($user->id ?? null);
+        return $map->user_id === $user->id ?? null;
     }
 
     public function delete($user, Node $node): bool
@@ -36,6 +33,37 @@ class NodePolicy
         }
 
         $map = $node->map;
-        return $map->user_id === ($user->id ?? null);
+        return $map->user_id === $user->id ?? null;
+    }
+}
+
+
+    public function create($user): bool
+    {
+        return true;
+    }
+
+    public function update($user, Node $node): Response
+    {
+        if ($user->isAdmin ?? false) {
+            return Response::allow();
+        }
+
+        $map = $node->map;
+        return $map->user_id === $user->id
+            ? Response::allow()
+            : Response::deny('You do not own this node');
+    }
+
+    public function delete($user, Node $node): Response
+    {
+        if ($user->isAdmin ?? false) {
+            return Response::allow();
+        }
+
+        $map = $node->map;
+        return $map->user_id === $user->id
+            ? Response::allow()
+            : Response::deny('You do not own this node');
     }
 }
