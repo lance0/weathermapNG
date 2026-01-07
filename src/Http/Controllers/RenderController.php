@@ -46,7 +46,9 @@ class RenderController
             'nodes' => $this->nodeDataService->buildNodeData($map),
         ];
 
-        return view('WeathermapNG::embed', compact('mapData', 'mapId', 'liveData'));
+        $demoMode = config('weathermapng.demo_mode', false);
+
+        return view('WeathermapNG::embed', compact('mapData', 'mapId', 'liveData', 'demoMode'));
     }
 
     public function export(Map $map, Request $request): JsonResponse

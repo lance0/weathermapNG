@@ -11,7 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Demo Mode**: Simulated traffic data for testing without real LibreNMS devices
   - Enable with `WEATHERMAPNG_DEMO_MODE=true` environment variable
   - Links without port associations get randomized 10-85% utilization
-  - Flow animations and heatmaps work with simulated data
+  - Flow animations work with simulated data
+- **Demo Mode Indicator**: Yellow "DEMO MODE" badge in nav bar when demo mode is active
+- **Device-Type Node Icons**: Different shapes for network device types
+  - Router/Core: Diamond shape
+  - Switch: Rounded horizontal rectangle
+  - Server/DB/App: Tall rectangle with rack lines
+  - Firewall: Shield shape
+  - Default: Circle
+- **Embed Navigation Bar**: Persistent top nav bar on embed view
+  - "All Maps" link to return to map index
+  - Map title display
+  - "Edit Map" link to open editor
+- **Enhanced Link Tooltip**: Improved hover info on links
+  - Color-coded In/Out indicators (green ▼ / blue ▲)
+  - Bandwidth capacity display when available
+  - Bold utilization percentage
 - **Demo Data Seeder**: `database/seed-demo.php` creates sample network topology
   - 8 nodes (Core Router, Switches, Servers, Firewall)
   - 8 links with 1Gbps/10Gbps bandwidth configurations
@@ -34,15 +49,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Route Wiring**: Node/link routes now map to dedicated controllers for clearer separation
 - **Index UX**: Added breadcrumbs, search/sort controls, and improved map cards for LibreNMS consistency
 - **Documentation**: Updated CONTRIBUTING.md with Docker dev setup instructions
+- **Status Bar**: Now shows relative time since last data update (e.g., "Just now", "15s ago", "2m ago")
 
 ### Fixed
 - **Map Rendering**: Fixed `toJsonModel()` returning Eloquent Collections instead of arrays
 - **Link Coordinates**: Fixed `drawLink()` not reading node x/y coordinates correctly
-- **Heatmap Performance**: Cached heatmap rendering, removed expensive blur filter
-  - Was creating new canvas + applying CSS blur every frame (60fps)
-  - Now only regenerates when data changes
+- **Demo Mode Traffic**: Fixed percentage calculation that was treating pre-calculated percentages as BPS
 - **Map Version Export**: Corrected JSON response formatting
 - **Controller Base Class**: Controllers now properly reference the application base controller
+- **Controls Position**: Fixed controls being hidden under nav bar (adjusted top offset)
+
+### Removed
+- **Heatmap Overlay**: Removed heatmap feature due to pan/zoom sync issues
+  - Was not following minimap navigation correctly
+  - Performance concerns with blur filters on every frame
 
 ## [1.5.1] - 2026-01-07
 
