@@ -6,6 +6,7 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 
 - **Real-time Visualization**: Live traffic data with animated flow indicators
 - **Interactive Editor**: Professional map editor with device integration
+- **LibreNMS-native UI**: Editor and map views styled to match the LibreNMS interface
 - **Multiple Data Sources**: RRD files → LibreNMS API → SNMP fallback
 - **Server-Sent Events**: Real-time updates without polling
 - **Import/Export**: JSON format for backup and sharing maps
