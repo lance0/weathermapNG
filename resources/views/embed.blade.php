@@ -191,6 +191,8 @@
         // Heatmap overlay
         let heatmapEnabled = false;
         let heatmapIntensity = 1.0; // 0.5 to 2.0
+        let heatmapDirty = true; // Only redraw when data changes
+        let heatmapCache = null; // Cached heatmap canvas
 
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
@@ -416,10 +418,10 @@
 
             if (!sourceNode || !targetNode) return;
 
-            const x1 = sourceNode.position?.x || 0;
-            const y1 = sourceNode.position?.y || 0;
-            const x2 = targetNode.position?.x || 0;
-            const y2 = targetNode.position?.y || 0;
+            const x1 = (sourceNode.position?.x ?? sourceNode.x) || 0;
+            const y1 = (sourceNode.position?.y ?? sourceNode.y) || 0;
+            const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
+            const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
 
             // Draw link line
             ctx.beginPath();
@@ -716,6 +718,7 @@
             document.getElementById('heatmap-intensity').addEventListener('input', (e) => {
                 heatmapIntensity = parseFloat(e.target.value);
                 document.getElementById('heatmap-intensity-value').textContent = heatmapIntensity.toFixed(1);
+                heatmapDirty = true;
             });
             
             // start animation loop
@@ -812,6 +815,7 @@
                     });
                 }
             }
+            heatmapDirty = true; // Invalidate heatmap cache on data update
             renderMap();
         }
 
@@ -923,6 +927,7 @@
                 const heat = document.getElementById('heat-canvas');
                 heat.width = canvas.width;
                 heat.height = canvas.height;
+                heatmapDirty = true;
                 renderMap();
             }
         });
@@ -1082,93 +1087,82 @@
 
         function drawHeatOverlay() {
             if (!heatCtx) return;
-            heatCtx.clearRect(0, 0, heatCanvas.width, heatCanvas.height);
-            
-            // Create temporary canvas for gradient processing
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = heatCanvas.width;
-            tempCanvas.height = heatCanvas.height;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            // Draw heat points for links
+
+            // Only regenerate if data changed
+            if (!heatmapDirty && heatmapCache) {
+                heatCtx.clearRect(0, 0, heatCanvas.width, heatCanvas.height);
+                heatCtx.drawImage(heatmapCache, 0, 0);
+                return;
+            }
+
+            // Create/reuse cache canvas
+            if (!heatmapCache) {
+                heatmapCache = document.createElement('canvas');
+            }
+            heatmapCache.width = heatCanvas.width;
+            heatmapCache.height = heatCanvas.height;
+            const cacheCtx = heatmapCache.getContext('2d');
+            cacheCtx.clearRect(0, 0, heatmapCache.width, heatmapCache.height);
+
+            // Simple colored circles (no expensive gradients or blur)
+            cacheCtx.globalCompositeOperation = 'lighter';
+
+            // Draw heat for links
             linkGeoms.forEach(g => {
                 if (g.pct == null || g.pct === 0) return;
-                
-                // Calculate intensity based on utilization
+
                 const intensity = (g.pct / 100) * heatmapIntensity;
-                const radius = 40 + (intensity * 30);
-                
-                // Draw heat points along the link
-                const steps = Math.max(3, Math.floor(Math.sqrt((g.x2-g.x1)**2 + (g.y2-g.y1)**2) / 50));
-                for (let i = 0; i <= steps; i++) {
-                    const t = i / steps;
-                    const x = g.x1 + (g.x2 - g.x1) * t;
-                    const y = g.y1 + (g.y2 - g.y1) * t;
-                    
-                    const gradient = tempCtx.createRadialGradient(x, y, 0, x, y, radius);
-                    
-                    // Color based on utilization level
-                    if (g.pct < 30) {
-                        gradient.addColorStop(0, `rgba(0, 255, 0, ${intensity * 0.5})`);
-                        gradient.addColorStop(0.5, `rgba(0, 255, 0, ${intensity * 0.2})`);
-                        gradient.addColorStop(1, 'rgba(0, 255, 0, 0)');
-                    } else if (g.pct < 60) {
-                        gradient.addColorStop(0, `rgba(255, 255, 0, ${intensity * 0.6})`);
-                        gradient.addColorStop(0.5, `rgba(255, 255, 0, ${intensity * 0.3})`);
-                        gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
-                    } else if (g.pct < 80) {
-                        gradient.addColorStop(0, `rgba(255, 165, 0, ${intensity * 0.7})`);
-                        gradient.addColorStop(0.5, `rgba(255, 165, 0, ${intensity * 0.35})`);
-                        gradient.addColorStop(1, 'rgba(255, 165, 0, 0)');
-                    } else {
-                        gradient.addColorStop(0, `rgba(255, 0, 0, ${intensity * 0.8})`);
-                        gradient.addColorStop(0.5, `rgba(255, 0, 0, ${intensity * 0.4})`);
-                        gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
-                    }
-                    
-                    tempCtx.fillStyle = gradient;
-                    tempCtx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-                }
+                const alpha = Math.min(0.4, intensity * 0.5);
+
+                // Color based on utilization
+                let color;
+                if (g.pct < 30) color = `rgba(0, 200, 0, ${alpha})`;
+                else if (g.pct < 60) color = `rgba(200, 200, 0, ${alpha})`;
+                else if (g.pct < 80) color = `rgba(255, 140, 0, ${alpha})`;
+                else color = `rgba(220, 50, 50, ${alpha})`;
+
+                // Draw a thick line instead of multiple circles
+                cacheCtx.strokeStyle = color;
+                cacheCtx.lineWidth = 30 + (intensity * 20);
+                cacheCtx.lineCap = 'round';
+                cacheCtx.beginPath();
+                cacheCtx.moveTo(g.x1, g.y1);
+                cacheCtx.lineTo(g.x2, g.y2);
+                cacheCtx.stroke();
             });
-            
-            // Draw heat for problematic nodes
+
+            // Draw heat for problematic nodes (simple circles)
             (mapData.nodes || []).forEach(n => {
                 const x = (n.position?.x ?? n.x) || 0;
                 const y = (n.position?.y ?? n.y) || 0;
                 const status = n.status || 'unknown';
                 const cpu = n.metrics?.cpu || 0;
                 const mem = n.metrics?.mem || 0;
-                
-                let drawHeat = false;
-                let color, intensity;
-                
+
+                let color, radius;
                 if (status === 'down') {
-                    drawHeat = true;
-                    color = [220, 53, 69]; // red
-                    intensity = 0.8 * heatmapIntensity;
+                    color = `rgba(220, 53, 69, ${0.5 * heatmapIntensity})`;
+                    radius = 40;
                 } else if (cpu > 80 || mem > 80) {
-                    drawHeat = true;
-                    color = [255, 193, 7]; // yellow
-                    intensity = (Math.max(cpu, mem) / 100) * 0.6 * heatmapIntensity;
+                    const intensity = (Math.max(cpu, mem) / 100) * heatmapIntensity;
+                    color = `rgba(255, 193, 7, ${intensity * 0.4})`;
+                    radius = 30;
+                } else {
+                    return;
                 }
-                
-                if (drawHeat) {
-                    const radius = 50 * (1 + intensity);
-                    const gradient = tempCtx.createRadialGradient(x, y, 0, x, y, radius);
-                    gradient.addColorStop(0, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${intensity})`);
-                    gradient.addColorStop(0.5, `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${intensity * 0.5})`);
-                    gradient.addColorStop(1, `rgba(${color[0]}, ${color[1]}, ${color[2]}, 0)`);
-                    
-                    tempCtx.fillStyle = gradient;
-                    tempCtx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-                }
+
+                cacheCtx.fillStyle = color;
+                cacheCtx.beginPath();
+                cacheCtx.arc(x, y, radius, 0, Math.PI * 2);
+                cacheCtx.fill();
             });
-            
-            // Apply blur for smooth heatmap effect
-            heatCtx.filter = 'blur(15px)';
-            heatCtx.globalCompositeOperation = 'source-over';
-            heatCtx.drawImage(tempCanvas, 0, 0);
-            heatCtx.filter = 'none';
+
+            cacheCtx.globalCompositeOperation = 'source-over';
+            heatmapDirty = false;
+
+            // Draw cached result
+            heatCtx.clearRect(0, 0, heatCanvas.width, heatCanvas.height);
+            heatCtx.drawImage(heatmapCache, 0, 0);
         }
     </script>
 </body>

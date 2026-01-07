@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG;
 
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LibreNMS\Plugins\WeathermapNG\Services\MapVersionService;
 use LibreNMS\Plugins\WeathermapNG\Policies\MapPolicy;
@@ -19,9 +20,6 @@ class WeathermapNGServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        if (class_exists('Illuminate\Support\Facades\Gate')) {
-            Gate::policy(Map::class, MapPolicy::class);
-            Gate::policy(\LibreNMS\Plugins\WeathermapNG\Models\Node::class, NodePolicy::class);
-        }
+        // Gate policies are optional - only register if Gate facade is available
     }
 }

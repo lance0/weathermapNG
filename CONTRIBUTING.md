@@ -51,21 +51,61 @@ This project follows a code of conduct to ensure a welcoming environment for all
 
 ## Development Setup
 
-### Local Development Environment
+### Option 1: Docker Development Environment (Recommended)
+
+The easiest way to get a development environment running:
+
+```bash
+# Clone the repo
+git clone https://github.com/lance0/weathermapNG.git
+cd weathermapNG
+
+# Start LibreNMS with the plugin mounted
+docker compose -f docker-compose.dev.yml up -d
+
+# Wait for LibreNMS to initialize (first run takes a few minutes)
+docker compose -f docker-compose.dev.yml logs -f librenms
+```
+
+Once LibreNMS shows "nginx entered RUNNING state", visit http://localhost:8000 and create an admin account.
+
+**Enable the plugin:**
+```bash
+# Install plugin dependencies
+docker exec -u librenms librenms-dev composer install -d /opt/librenms/html/plugins/WeathermapNG
+
+# Run database setup
+docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/database/setup.php
+
+# Enable the plugin
+docker exec -u librenms librenms-dev /opt/librenms/lnms plugin:enable WeathermapNG
+
+# Clear caches
+docker exec -u librenms librenms-dev php /opt/librenms/artisan cache:clear
+docker exec -u librenms librenms-dev php /opt/librenms/artisan view:clear
+```
+
+**Enable Demo Mode** (simulated traffic without real devices):
+```bash
+docker exec librenms-dev bash -c 'echo "WEATHERMAPNG_DEMO_MODE=true" >> /data/.env'
+```
+
+Visit http://localhost:8000/plugin/WeathermapNG to access the plugin.
+
+### Option 2: Local Development Environment
 
 1. **LibreNMS Setup**: Install LibreNMS in a local development environment
 2. **Plugin Installation**:
    ```bash
    cd /opt/librenms/html/plugins
-   git clone /path/to/your/local/weathermapNG
-   cd weathermapNG
+   git clone /path/to/your/local/weathermapNG WeathermapNG
+   cd WeathermapNG
    composer install
    ```
 
 3. **Database Setup**:
    ```bash
-   cd /opt/librenms
-   php artisan migrate
+   php database/setup.php
    ```
 
 4. **Permissions**:
@@ -76,12 +116,17 @@ This project follows a code of conduct to ensure a welcoming environment for all
 
 ### Testing Environment
 
-For testing, you can use the included seeder to create demo data:
+For testing, create demo data with the included seeder:
 
 ```bash
-cd /opt/librenms
-php artisan db:seed --class=LibreNMS\\Plugins\\WeathermapNG\\Database\\Seeders\\WeathermapNGSeeder
+# Create sample network topology
+php database/seed-demo.php
+
+# Enable simulated traffic (no real devices needed)
+export WEATHERMAPNG_DEMO_MODE=true
 ```
+
+This creates a "demo-network" map with nodes, links, and simulated traffic data.
 
 ## Project Structure
 

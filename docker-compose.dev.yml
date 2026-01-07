@@ -1,0 +1,83 @@
+# WeathermapNG Development Environment
+# Usage: docker compose -f docker-compose.dev.yml up -d
+#
+# First run takes a few minutes for LibreNMS to initialize.
+# Watch logs: docker compose -f docker-compose.dev.yml logs -f librenms
+# When you see "nginx entered RUNNING state", visit http://localhost:8000
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: librenms-db
+    command:
+      - "mysqld"
+      - "--innodb-file-per-table=1"
+      - "--lower-case-table-names=0"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: librenms
+      MYSQL_USER: librenms
+      MYSQL_PASSWORD: librenms
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: librenms-redis
+    restart: unless-stopped
+
+  librenms:
+    image: librenms/librenms:latest
+    container_name: librenms-dev
+    hostname: librenms
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - librenms_data:/data
+      # Mount plugin for live development
+      - ./:/opt/librenms/html/plugins/WeathermapNG:rw
+    environment:
+      TZ: "UTC"
+      PUID: "1000"
+      PGID: "1000"
+      DB_HOST: db
+      DB_NAME: librenms
+      DB_USER: librenms
+      DB_PASSWORD: librenms
+      DB_TIMEOUT: 60
+      REDIS_HOST: redis
+      # Demo mode - enable simulated traffic data
+      WEATHERMAPNG_DEMO_MODE: "true"
+    restart: unless-stopped
+
+  dispatcher:
+    image: librenms/librenms:latest
+    container_name: librenms-dispatcher
+    hostname: librenms-dispatcher
+    depends_on:
+      - librenms
+    volumes:
+      - librenms_data:/data
+      - ./:/opt/librenms/html/plugins/WeathermapNG:rw
+    environment:
+      TZ: "UTC"
+      PUID: "1000"
+      PGID: "1000"
+      DB_HOST: db
+      DB_NAME: librenms
+      DB_USER: librenms
+      DB_PASSWORD: librenms
+      REDIS_HOST: redis
+      DISPATCHER_NODE_ID: dispatcher1
+      SIDECAR_DISPATCHER: 1
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  librenms_data:

@@ -1,5 +1,6 @@
 <?php
 return [
+    'demo_mode' => env('WEATHERMAPNG_DEMO_MODE', false), // Enable simulated traffic data
     'default_width' => 800,
     'default_height' => 600,
     'poll_interval' => 300,         // seconds for CLI poller default

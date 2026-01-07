@@ -45,7 +45,7 @@ class Map extends Model
             'height' => $this->height,
             'background' => $this->background,
             'options' => $this->options ?? new \stdClass(),
-            'nodes' => $this->nodes()->get(['id', 'label', 'x', 'y', 'device_id', 'meta']),
+            'nodes' => $this->nodes()->get(['id', 'label', 'x', 'y', 'device_id', 'meta'])->toArray(),
             'links' => $this->links()->get([
                 'id',
                 'src_node_id as src',
@@ -54,7 +54,7 @@ class Map extends Model
                 'port_id_b',
                 'bandwidth_bps',
                 'style'
-            ]),
+            ])->toArray(),
         ];
     }
 }
