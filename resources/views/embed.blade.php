@@ -91,6 +91,9 @@
                 <span style="font-weight:500;">{{ $mapData['title'] ?? $mapData['name'] ?? 'Map' }}</span>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
+                @if($demoMode ?? false)
+                <span style="background:#ffc107; color:#000; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600;">DEMO MODE</span>
+                @endif
                 <a href="{{ url('plugin/WeathermapNG/editor/' . $mapId) }}" style="color:#ffc107; text-decoration:none; display:flex; align-items:center; gap:6px;">
                     <i class="fas fa-edit"></i> Edit Map
                 </a>
@@ -167,6 +170,7 @@
         let sseMax = parseInt(param('max', 60), 10) || 60;
         let currentTransport = 'init';
         let eventSourceRef = null;
+        let lastDataUpdate = null;
         let mapData = {};
         try {
             mapData = {!! json_encode($mapData ?? []) !!};
@@ -179,6 +183,7 @@
                         l.live = initialLive.links[id];
                     }
                 });
+                lastDataUpdate = Date.now();
             }
         } catch (e) {
             console.error('Failed to parse map data:', e);
@@ -243,6 +248,10 @@
 
         function renderMap() {
             if (!mapData || !mapData.nodes) return;
+
+            // Clear geometry arrays for hover/click detection
+            nodeGeoms.length = 0;
+            linkGeoms.length = 0;
 
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -366,25 +375,95 @@
         function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
         const nodeGeoms = [];
+        const linkGeoms = [];
+        function getNodeType(node) {
+            const label = (node.label || '').toLowerCase();
+            if (label.includes('router') || label.includes('core')) return 'router';
+            if (label.includes('switch')) return 'switch';
+            if (label.includes('server') || label.includes('db') || label.includes('app') || label.includes('web') || label.includes('file')) return 'server';
+            if (label.includes('firewall') || label.includes('fw')) return 'firewall';
+            return 'default';
+        }
+
         function drawNode(node) {
             const x = (node.position?.x ?? node.x) || 0;
             const y = (node.position?.y ?? node.y) || 0;
-            const radius = 8;
+            const nodeType = getNodeType(node);
+            const color = getNodeColor(node);
+            const radius = 10; // Base radius for hit testing and badges
 
-            // Node body
-            ctx.beginPath();
-            ctx.arc(x, y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = getNodeColor(node);
-            ctx.fill();
+            ctx.fillStyle = color;
             ctx.strokeStyle = '#000';
-            ctx.lineWidth = 1;
-            ctx.stroke();
+            ctx.lineWidth = 1.5;
+
+            // Draw shape based on device type
+            if (nodeType === 'router') {
+                // Diamond
+                ctx.beginPath();
+                ctx.moveTo(x, y - 10);
+                ctx.lineTo(x + 10, y);
+                ctx.lineTo(x, y + 10);
+                ctx.lineTo(x - 10, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            } else if (nodeType === 'switch') {
+                // Rounded rectangle (horizontal)
+                const w = 18, h = 10, r = 3;
+                ctx.beginPath();
+                ctx.moveTo(x - w/2 + r, y - h/2);
+                ctx.lineTo(x + w/2 - r, y - h/2);
+                ctx.quadraticCurveTo(x + w/2, y - h/2, x + w/2, y - h/2 + r);
+                ctx.lineTo(x + w/2, y + h/2 - r);
+                ctx.quadraticCurveTo(x + w/2, y + h/2, x + w/2 - r, y + h/2);
+                ctx.lineTo(x - w/2 + r, y + h/2);
+                ctx.quadraticCurveTo(x - w/2, y + h/2, x - w/2, y + h/2 - r);
+                ctx.lineTo(x - w/2, y - h/2 + r);
+                ctx.quadraticCurveTo(x - w/2, y - h/2, x - w/2 + r, y - h/2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            } else if (nodeType === 'server') {
+                // Tall rectangle (server rack style)
+                ctx.beginPath();
+                ctx.rect(x - 7, y - 12, 14, 24);
+                ctx.fill();
+                ctx.stroke();
+                // Rack lines
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y - 6); ctx.lineTo(x + 5, y - 6);
+                ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y);
+                ctx.moveTo(x - 5, y + 6); ctx.lineTo(x + 5, y + 6);
+                ctx.stroke();
+                ctx.strokeStyle = '#000';
+            } else if (nodeType === 'firewall') {
+                // Shield shape
+                ctx.beginPath();
+                ctx.moveTo(x, y - 12);
+                ctx.lineTo(x + 10, y - 6);
+                ctx.lineTo(x + 10, y + 4);
+                ctx.quadraticCurveTo(x + 10, y + 12, x, y + 14);
+                ctx.quadraticCurveTo(x - 10, y + 12, x - 10, y + 4);
+                ctx.lineTo(x - 10, y - 6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            } else {
+                // Default: circle
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
 
             // Node label
             ctx.fillStyle = '#000';
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(node.label || node.id, x, y - radius - 5);
+            const labelY = (nodeType === 'server') ? y - 18 : y - 16;
+            ctx.fillText(node.label || node.id, x, labelY);
 
             // Status indicator
             if (node.current_value !== null && node.current_value !== undefined) {
@@ -765,6 +844,7 @@
         }
 
         function applyLiveUpdate(live) {
+            lastDataUpdate = Date.now();
             // Attach link live data by id
             if (live && live.links && Array.isArray(mapData.links)) {
                 mapData.links.forEach(l => {
@@ -828,7 +908,19 @@
             const statusBar = document.getElementById('status-bar');
             const lastUpdated = document.getElementById('last-updated');
 
-            lastUpdated.textContent = new Date().toLocaleTimeString();
+            if (lastDataUpdate) {
+                const seconds = Math.floor((Date.now() - lastDataUpdate) / 1000);
+                if (seconds < 5) {
+                    lastUpdated.textContent = 'Just now';
+                } else if (seconds < 60) {
+                    lastUpdated.textContent = `${seconds}s ago`;
+                } else {
+                    const mins = Math.floor(seconds / 60);
+                    lastUpdated.textContent = `${mins}m ago`;
+                }
+            } else {
+                lastUpdated.textContent = 'Waiting...';
+            }
             statusBar.style.display = 'block';
         }
 
@@ -886,8 +978,8 @@
                 .then(data => {
                     if (!data.error) {
                         mapData = data;
+                        lastDataUpdate = Date.now();
                         renderMap();
-                        lastUpdate = Date.now();
                     }
                 })
                 .catch(error => {
@@ -916,11 +1008,11 @@
         });
 
         // Hover tooltip for link bandwidth
-        const linkGeoms = [];
         function storeLinkGeom(link, x1, y1, x2, y2, pct) {
             const inBps = link.live?.in_bps ?? 0;
             const outBps = link.live?.out_bps ?? 0;
-            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps, link});
+            const bandwidth = link.bandwidth_bps || link.bandwidth || null;
+            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps,bandwidth, link});
         }
 
         function distToSegment(px, py, x1, y1, x2, y2) {
@@ -1000,7 +1092,11 @@
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.pageX + 10) + 'px';
                 tooltip.style.top = (e.pageY + 10) + 'px';
-                tooltip.innerHTML = `Util: ${best.pct ?? 0}%<br>In: ${humanBits(best.inBps)}<br>Out: ${humanBits(best.outBps)}`;
+                const pctVal = best.pct !== null ? Math.round(best.pct) + '%' : 'N/A';
+                const bwLine = best.bandwidth ? `<br><span style="opacity:0.75;">Capacity: ${humanBits(best.bandwidth)}</span>` : '';
+                tooltip.innerHTML = `<b>Utilization: ${pctVal}</b><br>` +
+                    `<span style="color:#40ff40;">▼</span> In: ${humanBits(best.inBps)}<br>` +
+                    `<span style="color:#40a0ff;">▲</span> Out: ${humanBits(best.outBps)}` + bwLine;
             } else {
                 tooltip.style.display = 'none';
             }
