@@ -1,89 +1,83 @@
 # Simplified WeathermapNG Docker Compose
-# Quick start: docker compose up -d
+# Quick start: docker compose -f docker-compose.simple.yml up -d
 
 services:
+  db:
+    image: mariadb:10
+    container_name: librenms-db
+    command:
+      - "mysqld"
+      - "--innodb-file-per-table=1"
+      - "--lower-case-table-names=0"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    environment:
+      - TZ=UTC
+      - MARIADB_RANDOM_ROOT_PASSWORD=yes
+      - MYSQL_DATABASE=librenms
+      - MYSQL_USER=librenms
+      - MYSQL_PASSWORD=librenms
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: librenms-redis
+    restart: unless-stopped
+
   librenms:
     image: librenms/librenms:latest
     container_name: librenms-weathermap
-    env_file: .env
-    environment:
-      - INSTALL_WEATHERMAP=true
-    volumes:
-      - ./:/opt/librenms/html/plugins/WeathermapNG:cached
-      - librenms_data:/data
+    hostname: librenms
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     ports:
-      - "${WEB_PORT:-8000}:80"
+      - "8000:8000"
     depends_on:
       - db
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/login"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    command: >
-      bash -c "
-        # Wait for database
-        while ! mysqladmin ping -h db --silent; do
-          echo 'Waiting for database...'
-          sleep 5
-        done
-        
-        # Install WeathermapNG on first run
-        if [ ! -f /data/.weathermap_installed ]; then
-          echo 'Installing WeathermapNG...'
-          cd /opt/librenms/html/plugins/WeathermapNG
-          composer install --no-dev --no-interaction 2>/dev/null || true
-          touch /data/.weathermap_installed
-        fi
-        
-        # Start LibreNMS
-        /opt/librenms/librenms.sh
-      "
-
-  db:
-    image: mariadb:10.5
-    container_name: librenms-db
-    env_file: .env
-    environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${DB_DATABASE}
-      - MYSQL_USER=${DB_USERNAME}
-      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - redis
     volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Combined poller for LibreNMS and WeathermapNG
-  poller:
-    image: librenms/librenms:latest
-    container_name: librenms-poller
-    env_file: .env
-    volumes:
-      - ./:/opt/librenms/html/plugins/WeathermapNG:cached
       - librenms_data:/data
+      - ./:/opt/librenms/html/plugins/WeathermapNG
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
+      - DB_HOST=db
+      - DB_NAME=librenms
+      - DB_USER=librenms
+      - DB_PASSWORD=librenms
+      - DB_TIMEOUT=60
+      - REDIS_HOST=redis
+    restart: unless-stopped
+
+  dispatcher:
+    image: librenms/librenms:latest
+    container_name: librenms-dispatcher
+    hostname: librenms-dispatcher
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
     depends_on:
       - librenms
-    command: >
-      bash -c "
-        echo 'Starting combined poller service...'
-        while true; do
-          # Run LibreNMS discovery and poller
-          /opt/librenms/discovery.php -h all 2>/dev/null || true
-          /opt/librenms/poller.php -h all 2>/dev/null || true
-          
-          # Run WeathermapNG poller
-          if [ -f /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php ]; then
-            php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php 2>/dev/null || true
-          fi
-          
-          # Wait 5 minutes
-          sleep 300
-        done
-      "
+      - redis
+    volumes:
+      - librenms_data:/data
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
+      - DB_HOST=db
+      - DB_NAME=librenms
+      - DB_USER=librenms
+      - DB_PASSWORD=librenms
+      - DB_TIMEOUT=60
+      - REDIS_HOST=redis
+      - DISPATCHER_NODE_ID=dispatcher1
+      - SIDECAR_DISPATCHER=1
+    restart: unless-stopped
 
 volumes:
   db_data:

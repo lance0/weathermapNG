@@ -42,14 +42,42 @@ class NodeDataService
     public function buildLinkData(Map $map): array
     {
         $linkData = [];
+        $demoMode = config('weathermapng.demo_mode', false);
+
         foreach ($map->links as $link) {
-            $linkData[$link->id] = $this->portUtil->linkUtilBits([
-                'port_id_a' => $link->port_id_a,
-                'port_id_b' => $link->port_id_b,
-                'bandwidth_bps' => $link->bandwidth_bps,
-            ]);
+            // If demo mode or no real ports, generate simulated data
+            if ($demoMode || (!$link->port_id_a && !$link->port_id_b)) {
+                $linkData[$link->id] = $this->generateDemoLinkData($link);
+            } else {
+                $linkData[$link->id] = $this->portUtil->linkUtilBits([
+                    'port_id_a' => $link->port_id_a,
+                    'port_id_b' => $link->port_id_b,
+                    'bandwidth_bps' => $link->bandwidth_bps,
+                ]);
+            }
         }
         return $linkData;
+    }
+
+    private function generateDemoLinkData($link): array
+    {
+        $bandwidth = $link->bandwidth_bps ?: 1000000000; // Default 1Gbps
+
+        // Generate realistic-looking traffic (10-85% utilization with some variance)
+        $baseUtil = rand(10, 85);
+        $variance = rand(-5, 5);
+        $utilization = max(0, min(100, $baseUtil + $variance));
+
+        $inBps = (int) ($bandwidth * ($utilization / 100) * (rand(40, 60) / 100));
+        $outBps = (int) ($bandwidth * ($utilization / 100) * (rand(40, 60) / 100));
+
+        return [
+            'in_bps' => $inBps,
+            'out_bps' => $outBps,
+            'pct' => $utilization,
+            'bandwidth' => $bandwidth,
+            'source' => 'demo',
+        ];
     }
 
     public function buildAlertData(): array

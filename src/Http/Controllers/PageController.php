@@ -53,9 +53,9 @@ class PageController extends Controller
     }
 
     /**
-     * Display view page
+     * Display view page - redirects to embed for live visualization
      */
-    public function view($mapId): View
+    public function view($mapId)
     {
         $map = DB::table('wmng_maps')->find($mapId);
 
@@ -63,11 +63,7 @@ class PageController extends Controller
             abort(404, 'Map not found');
         }
 
-        return view('WeathermapNG::view', [
-            'title' => 'View Map: ' . $map->name,
-            'map' => $map,
-            'mapId' => $mapId,
-        ]);
+        return redirect()->route('weathermapng.embed', ['map' => $mapId]);
     }
 
     /**

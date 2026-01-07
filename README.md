@@ -79,6 +79,18 @@ chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 - **Live Preview**: See traffic updates in real-time
 - **Export**: Save maps as JSON for backup/sharing
 
+### Demo Mode (Testing Without Devices)
+
+Want to test the plugin without real LibreNMS devices?
+
+```bash
+# Enable demo mode (generates simulated traffic)
+echo "WEATHERMAPNG_DEMO_MODE=true" >> /opt/librenms/.env
+
+# Create sample network topology
+php /opt/librenms/html/plugins/WeathermapNG/database/seed-demo.php
+```
+
 ## 🔧 Troubleshooting
 
 ### Plugin Not Showing

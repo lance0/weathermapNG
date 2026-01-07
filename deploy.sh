@@ -1,8 +1,8 @@
 #!/bin/bash
-# WeathermapNG Deployment Script
-# Simple deployment for LibreNMS v2 plugin
+# WeathermapNG Deployment/Update Script
+# Use this to update an existing installation
 
-set -e  # Exit on error
+set -e
 
 # Colors
 GREEN='\033[0;32m'
@@ -12,43 +12,72 @@ NC='\033[0m'
 echo -e "${GREEN}WeathermapNG Deployment${NC}"
 echo "========================"
 
+# Detect environment
+PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIBRENMS_PATH="${LIBRENMS_PATH:-/opt/librenms}"
+
 # Check if we're in the right directory
-if [ ! -f "composer.json" ]; then
+if [ ! -f "$PLUGIN_DIR/composer.json" ]; then
     echo "Error: Not in WeathermapNG directory"
     exit 1
 fi
 
-# 1. Pull latest changes
+# Find LibreNMS
+if [ ! -d "$LIBRENMS_PATH" ]; then
+    for path in /opt/librenms /usr/local/librenms /data; do
+        if [ -f "$path/artisan" ]; then
+            LIBRENMS_PATH="$path"
+            break
+        fi
+    done
+fi
+
+echo "LibreNMS: $LIBRENMS_PATH"
+echo "Plugin: $PLUGIN_DIR"
+echo ""
+
+# 1. Pull latest changes (if git repo)
 echo -e "${GREEN}[1/5]${NC} Pulling latest changes..."
-git pull || echo "Not a git repo, skipping..."
+cd "$PLUGIN_DIR"
+if [ -d ".git" ]; then
+    git pull || echo -e "${YELLOW}Not a git repo or pull failed, skipping...${NC}"
+else
+    echo "  Not a git repo, skipping..."
+fi
 
 # 2. Install dependencies
 echo -e "${GREEN}[2/5]${NC} Installing dependencies..."
 composer install --no-dev --optimize-autoloader
 
-# 3. Clear LibreNMS caches
-echo -e "${GREEN}[3/5]${NC} Clearing caches..."
-cd /opt/librenms
-php artisan cache:clear
-php artisan route:clear
-php artisan view:clear
-php artisan config:clear
+# 3. Run database setup (handles migrations and updates)
+echo -e "${GREEN}[3/5]${NC} Updating database..."
+php database/setup.php
 
-# 4. Set permissions
-echo -e "${GREEN}[4/5]${NC} Setting permissions..."
-cd /opt/librenms/html/plugins/WeathermapNG
-chown -R librenms:librenms .
-chmod -R 755 .
+# 4. Clear caches
+echo -e "${GREEN}[4/5]${NC} Clearing caches..."
+if [ -f "$LIBRENMS_PATH/artisan" ]; then
+    cd "$LIBRENMS_PATH"
+    php artisan cache:clear 2>/dev/null || true
+    php artisan route:clear 2>/dev/null || true
+    php artisan view:clear 2>/dev/null || true
+    php artisan config:clear 2>/dev/null || true
+else
+    echo -e "${YELLOW}  Artisan not found, skipping cache clear${NC}"
+fi
 
-# 5. Run migrations if needed
-echo -e "${GREEN}[5/5]${NC} Checking database..."
-cd /opt/librenms
-php artisan migrate --path=html/plugins/WeathermapNG/database/migrations --force 2>/dev/null || echo "Migrations already run"
+# 5. Set permissions (if not in Docker)
+echo -e "${GREEN}[5/5]${NC} Setting permissions..."
+if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    echo "  Skipped in Docker"
+else
+    cd "$PLUGIN_DIR"
+    chown -R librenms:librenms . 2>/dev/null || echo -e "${YELLOW}  Could not set ownership (try with sudo)${NC}"
+fi
 
-echo -e "${GREEN}✓ Deployment complete!${NC}"
+echo ""
+echo -e "${GREEN}Deployment complete!${NC}"
 echo ""
 echo "Visit: https://your-server/plugin/WeathermapNG"
 echo ""
-echo "If you see errors, run:"
-echo "  cd /opt/librenms"
-echo "  php artisan view:clear"
+echo "If you see errors, try:"
+echo "  cd $LIBRENMS_PATH && php artisan view:clear"

@@ -7,15 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Demo Mode**: Simulated traffic data for testing without real LibreNMS devices
+  - Enable with `WEATHERMAPNG_DEMO_MODE=true` environment variable
+  - Links without port associations get randomized 10-85% utilization
+  - Flow animations and heatmaps work with simulated data
+- **Demo Data Seeder**: `database/seed-demo.php` creates sample network topology
+  - 8 nodes (Core Router, Switches, Servers, Firewall)
+  - 8 links with 1Gbps/10Gbps bandwidth configurations
+- **Docker Development Environment**: `docker-compose.dev.yml` for easy local development
+  - One-command setup with LibreNMS, MariaDB, and Redis
+  - Plugin auto-mounted for live development
+  - Demo mode enabled by default
+- **Docker Installation Docs**: Added Docker section to INSTALL.md
+
 ### Changed
+- **Install Scripts**: Improved `quick-install.sh` and `deploy.sh`
+  - Auto-detect Docker vs native environment
+  - Dynamic path detection (no more hardcoded `/opt/librenms`)
+  - Automatic `lnms plugin:enable` step
+  - Better error handling and user feedback
 - **LibreNMS UI Alignment**: Modern editor and map view styling now match LibreNMS colors, borders, and typography
 - **Legend Styling**: Utilization legend uses shared status indicator styles and palette
 - **Editor UX**: Added an empty state prompt for new maps and replaced emoji node icons with Font Awesome glyphs
 - **Editor Cleanup**: Consolidated editor scripts, added device loading, and improved save/versioning request flow
 - **Route Wiring**: Node/link routes now map to dedicated controllers for clearer separation
 - **Index UX**: Added breadcrumbs, search/sort controls, and improved map cards for LibreNMS consistency
+- **Documentation**: Updated CONTRIBUTING.md with Docker dev setup instructions
 
 ### Fixed
+- **Map Rendering**: Fixed `toJsonModel()` returning Eloquent Collections instead of arrays
+- **Link Coordinates**: Fixed `drawLink()` not reading node x/y coordinates correctly
+- **Heatmap Performance**: Cached heatmap rendering, removed expensive blur filter
+  - Was creating new canvas + applying CSS blur every frame (60fps)
+  - Now only regenerates when data changes
 - **Map Version Export**: Corrected JSON response formatting
 - **Controller Base Class**: Controllers now properly reference the application base controller
 
@@ -631,11 +656,5 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ---
 
 ## Future Plans
-- [ ] Advanced map styling and theming
-- [ ] Historical data visualization
-- [ ] Alert integration with LibreNMS
-- [ ] Multi-user collaboration features
-- [ ] Advanced network topology algorithms
-- [ ] Performance optimizations for large networks
-- [ ] Mobile app companion
-- [ ] Integration with external monitoring systems
+
+See [ROADMAP.md](ROADMAP.md) for detailed feature plans and priorities.
