@@ -35,35 +35,9 @@ class NodePolicy
         $map = $node->map;
         return $map->user_id === $user->id ?? null;
     }
-}
 
-
-    public function create($user): bool
+    public function manage($user, Node $node): bool
     {
-        return true;
-    }
-
-    public function update($user, Node $node): Response
-    {
-        if ($user->isAdmin ?? false) {
-            return Response::allow();
-        }
-
-        $map = $node->map;
-        return $map->user_id === $user->id
-            ? Response::allow()
-            : Response::deny('You do not own this node');
-    }
-
-    public function delete($user, Node $node): Response
-    {
-        if ($user->isAdmin ?? false) {
-            return Response::allow();
-        }
-
-        $map = $node->map;
-        return $map->user_id === $user->id
-            ? Response::allow()
-            : Response::deny('You do not own this node');
+        return $this->update($user, $node);
     }
 }
