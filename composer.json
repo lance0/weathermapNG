@@ -2,7 +2,7 @@
     "name": "librenms/weathermapng",
     "description": "Next-generation Weathermap plugin for LibreNMS",
     "type": "librenms-plugin",
-    "version": "1.2.2",
+    "version": "1.2.6",
     "license": "Unlicense",
     "authors": [
         { "name": "LibreNMS Community", "email": "info@librenms.org" }
