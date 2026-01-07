@@ -38,6 +38,33 @@
     overflow: hidden;
 }
 
+.editor-canvas-container {
+    overflow: auto;
+    max-height: 600px;
+}
+
+#map-canvas.editor-map-canvas {
+    border: 1px solid var(--weathermap-border);
+    display: block;
+    margin: 0 auto;
+}
+
+.editor-link-tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 10;
+}
+
+.editor-version-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
 #map-canvas {
     cursor: crosshair;
     border-radius: 0.375rem;

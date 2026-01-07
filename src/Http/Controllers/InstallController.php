@@ -2,9 +2,11 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use LibreNMS\Plugins\WeathermapNG\WeathermapNG;
+use Exception;
 
 class InstallController extends Controller
 {

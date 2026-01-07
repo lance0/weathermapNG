@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapLinkController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapNodeController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapVersionController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapTemplateController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
@@ -31,16 +33,16 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::post('plugin/WeathermapNG/map', [MapController::class, 'create'])->name('weathermapng.map.create');
     Route::put('plugin/WeathermapNG/map/{map}', [MapController::class, 'update'])->name('weathermapng.map.update');
     Route::delete('plugin/WeathermapNG/map/{map}', [MapController::class, 'destroy'])->name('weathermapng.map.destroy');
-    Route::post('plugin/WeathermapNG/map/{map}/nodes', [MapController::class, 'storeNodes'])->name('weathermapng.nodes.store');
-    Route::post('plugin/WeathermapNG/map/{map}/links', [MapController::class, 'storeLinks'])->name('weathermapng.links.store');
+    Route::post('plugin/WeathermapNG/map/{map}/nodes', [MapNodeController::class, 'store'])->name('weathermapng.nodes.store');
+    Route::post('plugin/WeathermapNG/map/{map}/links', [MapLinkController::class, 'store'])->name('weathermapng.links.store');
     Route::post('plugin/WeathermapNG/api/maps/{map}/save', [MapController::class, 'save'])->name('weathermapng.map.save');
     Route::post('plugin/WeathermapNG/map/{map}/autodiscover', [MapController::class, 'autoDiscover'])->name('weathermapng.map.autodiscover');
-    Route::patch('plugin/WeathermapNG/map/{map}/node/{node}', [MapController::class, 'updateNode'])->name('weathermapng.node.update');
-    Route::patch('plugin/WeathermapNG/map/{map}/link/{link}', [MapController::class, 'updateLink'])->name('weathermapng.link.update');
-    Route::post('plugin/WeathermapNG/map/{map}/node', [MapController::class, 'createNode'])->name('weathermapng.node.create');
-    Route::delete('plugin/WeathermapNG/map/{map}/node/{node}', [MapController::class, 'deleteNode'])->name('weathermapng.node.delete');
-    Route::post('plugin/WeathermapNG/map/{map}/link', [MapController::class, 'createLink'])->name('weathermapng.link.create');
-    Route::delete('plugin/WeathermapNG/map/{map}/link/{link}', [MapController::class, 'deleteLink'])->name('weathermapng.link.delete');
+    Route::patch('plugin/WeathermapNG/map/{map}/node/{node}', [MapNodeController::class, 'update'])->name('weathermapng.node.update');
+    Route::patch('plugin/WeathermapNG/map/{map}/link/{link}', [MapLinkController::class, 'update'])->name('weathermapng.link.update');
+    Route::post('plugin/WeathermapNG/map/{map}/node', [MapNodeController::class, 'create'])->name('weathermapng.node.create');
+    Route::delete('plugin/WeathermapNG/map/{map}/node/{node}', [MapNodeController::class, 'delete'])->name('weathermapng.node.delete');
+    Route::post('plugin/WeathermapNG/map/{map}/link', [MapLinkController::class, 'create'])->name('weathermapng.link.create');
+    Route::delete('plugin/WeathermapNG/map/{map}/link/{link}', [MapLinkController::class, 'delete'])->name('weathermapng.link.delete');
 
     Route::get('plugin/WeathermapNG/templates', [MapTemplateController::class, 'index'])->name('weathermapng.templates.index');
     Route::get('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'show'])->name('weathermapng.templates.show');

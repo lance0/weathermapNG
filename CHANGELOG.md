@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LibreNMS UI Alignment**: Modern editor and map view styling now match LibreNMS colors, borders, and typography
 - **Legend Styling**: Utilization legend uses shared status indicator styles and palette
 - **Editor UX**: Added an empty state prompt for new maps and replaced emoji node icons with Font Awesome glyphs
+- **Editor Cleanup**: Consolidated editor scripts, added device loading, and improved save/versioning request flow
+- **Route Wiring**: Node/link routes now map to dedicated controllers for clearer separation
+
+### Fixed
+- **Map Version Export**: Corrected JSON response formatting
+- **Controller Base Class**: Controllers now properly reference the application base controller
 
 ## [1.5.1] - 2026-01-07
 

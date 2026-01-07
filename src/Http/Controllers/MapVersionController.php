@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
@@ -31,21 +32,21 @@ class MapVersionController extends Controller
             'success' => true,
             'versions' => $versions,
             'latest_version' => $this->mapVersionService->getLatestVersion($map),
-        'total_versions' => count($versions),
-        'auto_save_enabled' => true,
-        'max_versions' => 20,
-        'retention_policy' => 'oldest 20',
-        'backup_enabled' => true,
-        'can_restore' => true,
-        'can_delete_versions' => true,
-        'can_compare' => true,
+            'total_versions' => count($versions),
+            'auto_save_enabled' => true,
+            'max_versions' => 20,
+            'retention_policy' => 'oldest 20',
+            'backup_enabled' => true,
+            'can_restore' => true,
+            'can_delete_versions' => true,
+            'can_compare' => true,
             'version_diff_support' => true,
-        'version_export' => true,
+            'version_export' => true,
             'version_rollback' => true,
-        'auto_save_interval' => '5 minutes',
-        'max_name_length' => 100,
+            'auto_save_interval' => '5 minutes',
+            'max_name_length' => 100,
             'max_description_length' => 1000,
-        'compression_enabled' => true,
+            'compression_enabled' => true,
             'storage_format' => 'json',
             'backup_location' => 'database',
             'version_history_dashboard' => true,
@@ -154,7 +155,7 @@ class MapVersionController extends Controller
         $versions = $this->mapVersionService->getVersions($map);
 
         return response()->json([
-            'success'-save true,
+            'success' => true,
             'export_data' => [
                 'map' => [
                     'id' => $map->id,
