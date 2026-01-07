@@ -6,17 +6,25 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1><i class="fas fa-edit"></i> {{ $map ? 'Edit Map: ' . $map->name : 'Create New Map' }}</h1>
-                <div>
-                    <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Maps
-                    </a>
-                    <button class="btn btn-success" onclick="saveMap()">
-                        <i class="fas fa-save"></i> Save Map
-                    </button>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1><i class="fas fa-edit"></i> {{ $map ? 'Edit Map: ' . $map->name : 'Create New Map' }}</h1>
+                    <div>
+                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Maps
+                        </a>
+                        <button class="btn btn-outline-primary" onclick="openVersionSaveModal()">
+                            <i class="fas fa-code-branch"></i> Save Version
+                        </button>
+                        <button class="btn btn-info" onclick="openVersionHistory()">
+                            <i class="fas fa-history"></i> Versions
+                        </button>
+                        <button class="btn btn-success" onclick="saveMap()">
+                            <i class="fas fa-save"></i> Save Map
+                        </button>
+                    </div>
                 </div>
-            </div>
+                    </div>
+                </div>
         </div>
     </div>
 
@@ -159,492 +167,376 @@
                     <i class="fas fa-save"></i> Save
                 </button>
             </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
-    </div>
-@endsection
 
-@section('scripts')
-<script>
-let nodes = [];
-let selectedDevice = null;
-let selectedInterface = null;
-let nodeCounter = 1;
-let mapId = {{ $map->id ?? 'null' }};
-let linkMode = false;
-let linkSource = null;
-let selectedNode = null;
-let devicesCache = [];
+        <!-- Version Save Modal -->
+        <div class="modal fade" id="versionModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Save Version</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="version-name" class="form-label">Version Name</label>
+                            <input type="text" class="form-control" id="version-name"
+                                   placeholder="e.g. Experiment 1" maxlength="100">
+                            <small class="form-text text-muted">Max 100 characters</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" id="version-desc"
+                                      placeholder="What did you change in this version?" rows="3" maxlength="1000"></textarea>
+                            <small class="form-text text-muted">Max 1000 characters</small>
+                        </div>
+                        <div class="form-check mb-3">
+                            <label>
+                                <input type="checkbox" id="auto-save" checked>
+                                <span class="ml-2">Auto-save every 5 minutes</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveVersion()">
+                            <i class="fas fa-save"></i> Save Version
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-document.addEventListener('DOMContentLoaded', function() {
-    initCanvas();
-    if (mapId) loadMapData(mapId);
-    loadDevices();
+        <!-- Version History Modal -->
+        <div class="modal fade" id="versionHistoryModal" tabindex="-1">
+            <div class="modal-dialog" style="max-width: 800px;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Version History</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="version-list" style="max-height: 400px; overflow-y: auto;">
+                            <div class="text-center text-muted py-3">
+                                <div class="spinner-border-custom text-primary" style="width: 2rem; height: 2rem;"></div>
+                                <small>Loading versions...</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-outline-danger" onclick="clearOldVersions()">
+                            <i class="fas fa-trash-alt"></i> Clear Old
+                        </button>
+                        <button type="button" class="btn btn-info" onclick="exportVersions()">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    // Device selection handler
-    document.getElementById('device-select').addEventListener('change', function() {
-        selectedDevice = this.value;
-        if (selectedDevice) {
-            loadInterfaces(selectedDevice);
-        } else {
-            document.getElementById('interface-container').style.display = 'none';
-        }
-    });
-});
+        @endsection
 
-function loadMapData(id) {
-    fetch('{{ url('plugin/WeathermapNG/api/maps') }}' + '/' + id + '/json')
-        .then(r => r.json())
-        .then(data => {
-            if (data && Array.isArray(data.nodes)) {
-                nodes = data.nodes.map(n => ({
-                    dbId: n.id,
-                    label: n.label,
-                    x: n.x,
-                    y: n.y,
-                    deviceId: n.device_id || null,
-                    interfaceId: n.meta?.interface_id || null,
-                }));
-                // Load links if provided
-                links = Array.isArray(data.links) ? data.links.map(l => ({
-                    dbId: l.id,
-                    srcId: l.src,
-                    dstId: l.dst,
-                    portA: l.port_id_a || null,
-                    portB: l.port_id_b || null,
-                    bw: l.bandwidth_bps || null,
-                    style: l.style || {}
-                })) : [];
-                renderEditor();
-            }
-        }).catch(() => {});
-}
-
-function initCanvas() {
-    const canvas = document.getElementById('map-canvas');
-    const ctx = canvas.getContext('2d');
-
-    // Set canvas background
-    ctx.fillStyle = '#f8f9fa';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Add grid
-    ctx.strokeStyle = '#dee2e6';
-    ctx.lineWidth = 1;
-    for (let x = 0; x <= canvas.width; x += 20) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-    for (let y = 0; y <= canvas.height; y += 20) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-    // Drag + drop support
-    let dragging = null;
-    let dragOffset = {x:0,y:0};
-    let dragPatchTimer = null;
-    canvas.addEventListener('mousedown', (e) => {
-        const pos = getMousePos(canvas, e);
-        const hit = hitTestNode(pos.x, pos.y);
-        if (linkMode && hit) {
-            if (!linkSource) {
-                linkSource = hit;
-            } else if (linkSource !== hit) {
-                // create link
-                createLink(linkSource, hit);
-                linkSource = null;
-            }
-            return;
-        }
-        // open link modal if clicking near an existing link
-        if (!hit) {
-            const near = hitTestLink(pos.x, pos.y);
-            if (near) {
-                openLinkModal(near);
-                return;
-            }
-        }
-        if (hit) {
-            selectedNode = hit;
-            populateNodeProperties(hit);
-            dragging = hit;
-            dragOffset.x = hit.x - pos.x;
-            dragOffset.y = hit.y - pos.y;
-        }
-    });
-    canvas.addEventListener('mousemove', (e) => {
-        if (!dragging) return;
-        const pos = getMousePos(canvas, e);
-        dragging.x = pos.x + dragOffset.x;
-        dragging.y = pos.y + dragOffset.y;
-        renderEditor();
-        // Debounced persistence while dragging
-        if (mapId && dragging.dbId) {
-            if (dragPatchTimer) clearTimeout(dragPatchTimer);
-            dragPatchTimer = setTimeout(() => { patchNodePos(dragging); }, 300);
-        }
-    });
-    canvas.addEventListener('mouseup', () => {
-        if (dragging && mapId && dragging.dbId) {
-            // persist position
-            patchNodePos(dragging);
-        }
-        dragging = null;
-    });
-}
-
-function toggleLinkMode() {
-    linkMode = !linkMode;
-    linkSource = null;
-    document.getElementById('link-mode-btn').textContent = `Link Mode: ${linkMode ? 'On' : 'Off'}`;
-}
-
-function createLink(srcNode, dstNode) {
-    if (!mapId) {
-        alert('Save map first to create links.');
-        return;
-    }
-    const payload = {
-        src_node_id: srcNode.dbId,
-        dst_node_id: dstNode.dbId,
-        port_id_a: srcNode.interfaceId || null,
-        port_id_b: dstNode.interfaceId || null,
-        bandwidth_bps: null,
-        style: {}
-    };
-    fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/link', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify(payload)
-    }).then(r => r.json()).then(d => {
-        if (!d.success) {
-            alert('Failed to create link: ' + (d.message || 'Unknown error'));
-        } else {
-            renderEditor();
-        }
-    }).catch(err => alert('Failed to create link: ' + err.message));
-}
-
-function getMousePos(canvas, evt) {
-    const rect = canvas.getBoundingClientRect();
-    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
-}
-
-function hitTestNode(x, y) {
-    for (let i = nodes.length - 1; i >= 0; i--) {
-        const n = nodes[i];
-        const dx = x - n.x, dy = y - n.y;
-        if (Math.hypot(dx, dy) <= 12) return n;
-    }
-    return null;
-}
-
-// Double-click node to open properties
-document.addEventListener('DOMContentLoaded', function() {
-    const canvas = document.getElementById('map-canvas');
-    canvas.addEventListener('dblclick', (e) => {
-        const pos = getMousePos(canvas, e);
-        const hit = hitTestNode(pos.x, pos.y);
-        if (hit) {
-            selectedNode = hit;
-            populateNodeProperties(hit);
-            renderEditor();
-        }
-    });
-});
-
-function renderEditor() {
-    const canvas = document.getElementById('map-canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0,0,canvas.width, canvas.height);
-    // background + grid
-    ctx.fillStyle = '#f8f9fa';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#eee';
-    for (let x = 0; x <= canvas.width; x += 20) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
-    for (let y = 0; y <= canvas.height; y += 20) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-    // draw links first, then nodes
-    links.forEach(drawLink);
-    nodes.forEach(drawNode);
-    renderLinksList();
-}
-
-function patchNodePos(node) {
-    fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/node/' + node.dbId, {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-        },
-        body: JSON.stringify({ x: node.x, y: node.y })
-    }).catch(() => {});
-}
-
-function loadDevices() {
-    fetch('{{ url("plugin/WeathermapNG/api/devices") }}')
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('device-select');
-            select.innerHTML = '<option value="">Choose a device...</option>';
-
-            devicesCache = data.devices || [];
-            devicesCache.forEach(device => {
-                const option = document.createElement('option');
-                option.value = device.device_id;
-                option.textContent = device.hostname;
-                select.appendChild(option);
+        @section('scripts')
+        <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
+        <script>
+            let mapId = {{ $map->id ?? 'null' }};
+            let nodes = [];
+            let links = [];
+            let selectedNode = null;
+            let devicesCache = [];
+            
+            document.addEventListener('DOMContentLoaded', function() {
+                initCanvas();
+                if (mapId) loadMapData(mapId);
+                loadDevices();
             });
 
-            // populate node properties device select as well
-            const nodeDevSel = document.getElementById('node-prop-device');
-            if (nodeDevSel) {
-                nodeDevSel.innerHTML = '<option value="">No device</option>';
-                devicesCache.forEach(device => {
-                    const opt = document.createElement('option');
-                    opt.value = device.device_id;
-                    opt.text = device.hostname;
-                    nodeDevSel.appendChild(opt);
-                });
-                nodeDevSel.addEventListener('change', function() {
-                    const devId = this.value || null;
-                    const intSel = document.getElementById('node-prop-interface');
-                    intSel.innerHTML = '<option value="">No interface</option>';
-                    if (devId) {
-                        fetch('{{ url('plugin/WeathermapNG/api/device') }}' + '/' + devId + '/ports')
-                            .then(r => r.json()).then(d => {
-                                (d.ports || []).forEach(p => {
-                                    const o = document.createElement('option');
-                                    o.value = p.port_id; o.text = p.ifName;
-                                    intSel.appendChild(o);
-                                });
-                            });
+            function saveMap() {
+                WMNGLoading.show('Saving map...');
+                
+                const mapName = document.getElementById('map-name').value.trim();
+                const mapTitle = document.getElementById('map-title').value.trim();
+                const mapWidth = parseInt(document.getElementById('map-width').value);
+                const mapHeight = parseInt(document.getElementById('map-height').value);
+                
+                if (!mapName) {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Please enter a map name', { duration: 3000 });
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('name', mapName);
+                if (mapTitle) formData.append('title', mapTitle);
+                formData.append('width', mapWidth);
+                formData.append('height', mapHeight);
+                
+                fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    WMNGLoading.hide();
+                    if (data.success) {
+                        WMNGToast.success('Map saved successfully!', { duration: 3000 });
+                    } else {
+                        WMNGToast.error('Failed to save map: ' + (data.message || 'Unknown error'), { duration: 3000 });
                     }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Error saving map: ' + error.message, { duration: 3000 });
                 });
             }
-        })
-        .catch(error => {
-            console.error('Error loading devices:', error);
-        });
-}
 
-function loadInterfaces(deviceId) {
-    fetch('{{ url("plugin/WeathermapNG/api/device") }}' + '/' + deviceId + '/ports')
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById('interface-select');
-            select.innerHTML = '<option value="">Choose an interface...</option>';
-
-            data.ports.forEach(port => {
-                const option = document.createElement('option');
-                option.value = port.port_id;
-                option.textContent = port.ifName;
-                select.appendChild(option);
-            });
-
-            document.getElementById('interface-container').style.display = 'block';
-
-            select.addEventListener('change', function() {
-                selectedInterface = this.value;
-            });
-        })
-        .catch(error => {
-            console.error('Error loading interfaces:', error);
-        });
-}
-
-function addNode() {
-    if (!selectedDevice || !selectedInterface) {
-        alert('Please select both a device and an interface first.');
-        return;
-    }
-
-    const deviceSelect = document.getElementById('device-select');
-    const interfaceSelect = document.getElementById('interface-select');
-
-    const deviceText = deviceSelect.options[deviceSelect.selectedIndex].text;
-    const interfaceText = interfaceSelect.options[interfaceSelect.selectedIndex].text;
-
-    const node = {
-        id: 'node' + nodeCounter++,
-        deviceId: selectedDevice,
-        interfaceId: selectedInterface,
-        label: `${deviceText} (${interfaceText})`,
-        x: Math.random() * 400 + 100,
-        y: Math.random() * 300 + 100
-    };
-
-    if (mapId) {
-        // Create immediately
-        fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/node', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-            },
-            body: JSON.stringify({
-                label: node.label,
-                x: node.x,
-                y: node.y,
-                device_id: node.deviceId || null,
-                meta: { interface_id: node.interfaceId || null }
-            })
-        }).then(r => r.json()).then(d => {
-            if (d && d.success && d.node) {
-                node.dbId = d.node.id;
+            function openVersionSaveModal() {
+                $('#versionModal').modal('show');
             }
-            nodes.push(node);
-            renderEditor();
-        }).catch(() => { nodes.push(node); renderEditor(); });
-    } else {
-        nodes.push(node);
-        renderEditor();
-    }
 
-    // Reset selections
-    document.getElementById('device-select').value = '';
-    document.getElementById('interface-select').value = '';
-    document.getElementById('interface-container').style.display = 'none';
-    selectedDevice = null;
-    selectedInterface = null;
-}
-
-function drawNode(node) {
-    const canvas = document.getElementById('map-canvas');
-    const ctx = canvas.getContext('2d');
-
-    // Draw node circle
-    ctx.fillStyle = '#007bff';
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, 10, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // Draw label
-    ctx.fillStyle = '#000';
-    ctx.font = '12px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(node.label, node.x, node.y - 15);
-    if (selectedNode && selectedNode === node) {
-        ctx.strokeStyle = '#fd7e14';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, 14, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-}
-
-function findNodeById(id) {
-    return nodes.find(n => n.dbId === id);
-}
-
-function drawLink(link) {
-    const a = findNodeById(link.srcId);
-    const b = findNodeById(link.dstId);
-    if (!a || !b) return;
-    const canvas = document.getElementById('map-canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = '#20c997';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.stroke();
-    // store simple geometry for hit-testing
-    link.__geom = { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
-}
-
-function hitTestLink(x, y) {
-    const distToSegment = (px, py, x1, y1, x2, y2) => {
-        const dx = x2 - x1, dy = y2 - y1;
-        const len2 = dx*dx + dy*dy;
-        if (len2 === 0) return Math.hypot(px - x1, py - y1);
-        let t = ((px - x1)*dx + (py - y1)*dy) / len2;
-        t = Math.max(0, Math.min(1, t));
-        const qx = x1 + t*dx, qy = y1 + t*dy;
-        return Math.hypot(px - qx, py - qy);
-    };
-    for (let i = links.length - 1; i >= 0; i--) {
-        const g = links[i].__geom;
-        if (!g) continue;
-        if (distToSegment(x, y, g.x1, g.y1, g.x2, g.y2) < 8) return links[i];
-    }
-    return null;
-}
-
-function openLinkModal(link) {
-    const src = findNodeById(link.srcId);
-    const dst = findNodeById(link.dstId);
-    if (!src || !dst) return;
-    const srcSel = document.getElementById('link-src-port');
-    const dstSel = document.getElementById('link-dst-port');
-    srcSel.innerHTML = '<option value="">No port</option>';
-    dstSel.innerHTML = '<option value="">No port</option>';
-    // load ports
-    const loadPorts = (deviceId, sel, preset) => {
-        if (!deviceId) return;
-        fetch('{{ url('plugin/WeathermapNG/api/device') }}' + '/' + deviceId + '/ports')
-            .then(r => r.json())
-            .then(d => {
-                (d.ports || []).forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.port_id;
-                    opt.text = p.ifName;
-                    if (preset && preset == p.port_id) opt.selected = true;
-                    sel.appendChild(opt);
+            function saveVersion() {
+                const versionName = document.getElementById('version-name').value.trim();
+                const versionDesc = document.getElementById('version-desc').value.trim();
+                const autoSave = document.getElementById('auto-save').checked;
+                
+                WMNGLoading.show('Saving version...');
+                
+                const formData = new FormData();
+                formData.append('name', versionName);
+                formData.append('description', versionDesc);
+                formData.append('auto_save', autoSave ? '1' : '0');
+                
+                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: formData
+                })
+                .then(r => r.json())
+                .then(data => {
+                    WMNGLoading.hide();
+                    if (data.success) {
+                        WMNGToast.success('Version saved successfully!', { duration: 3000 });
+                        $('#versionModal').modal('hide');
+                    } else {
+                        WMNGToast.error('Failed to save version: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                    }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Error saving version: ' + error.message, { duration: 3000 });
                 });
-            });
-    };
-    loadPorts(src.deviceId, srcSel, link.portA || null);
-    loadPorts(dst.deviceId, dstSel, link.portB || null);
-    document.getElementById('link-bandwidth').value = link.bw || '';
-    document.getElementById('delete-link-btn').style.display = link.dbId ? 'inline-block' : 'none';
-    document.getElementById('delete-link-btn').onclick = () => deleteLink(link);
-    document.getElementById('save-link-btn').onclick = () => saveLink(link);
-    $('#linkModal').modal('show');
-}
+            }
 
-function saveLink(link) {
-    const srcPort = document.getElementById('link-src-port').value || null;
-    const dstPort = document.getElementById('link-dst-port').value || null;
-    const bw = parseInt(document.getElementById('link-bandwidth').value || '0', 10) || null;
-    const payload = { port_id_a: srcPort ? parseInt(srcPort, 10) : null, port_id_b: dstPort ? parseInt(dstPort, 10) : null, bandwidth_bps: bw };
-    if (!mapId) return;
-    if (link.dbId) {
-        fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/link/' + link.dbId, {
-            method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(payload)
-        }).then(() => { link.portA = payload.port_id_a; link.portB = payload.port_id_b; link.bw = payload.bandwidth_bps; renderEditor(); });
-    } else {
-        // create new
-        fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/link', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify({
-                src_node_id: link.srcId, dst_node_id: link.dstId, ...payload, style: {}
-            })
-        }).then(r => r.json()).then(d => { if (d.success && d.link) { link.dbId = d.link.id; link.portA = payload.port_id_a; link.portB = payload.port_id_b; link.bw = payload.bandwidth_bps; renderEditor(); } });
-    }
-}
+            function openVersionHistory() {
+                $('#versionHistoryModal').modal('show');
+                loadVersions();
+            }
 
-function deleteLink(link) {
-    if (!link.dbId || !mapId) return;
-    fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/link/' + link.dbId, {
-        method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-    }).then(() => { links = links.filter(l => l !== link); renderEditor(); });
-}
+            function loadVersions() {
+                WMNGLoading.show('Loading versions...');
+                
+                const versionList = document.getElementById('version-list');
+                versionList.innerHTML = '<div class="spinner-border-custom text-primary" style="width: 2rem; height: 2rem;"></div><small>Loading versions...</small>';
+                
+                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions', {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && Array.isArray(data.versions)) {
+                        const versions = data.versions;
+                        let html = '';
+                        
+                        versions.forEach((version, idx) => {
+                            html += `
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>v${versions.length - idx}</strong>
+                                            <small class="text-muted">
+                                                ${version.created_at_human}
+                                                by ${version.created_by || 'Unknown'}
+                                            </small>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="restoreVersion(${version.id})">
+                                            <i class="fas fa-undo"></i> Restore
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVersion(${version.id})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-info" onclick="compareVersion(${version.id})">
+                                        <i class="fas fa-code-compare"></i> Compare
+                                    </button>
+                                </div>
+                                <hr>
+                            `;
+                        });
+                        
+                        versionList.innerHTML = html || '<div class="text-center text-muted py-3">No versions saved yet. <small>Save your first version to start tracking.</small></div>';
+                    } else {
+                        versionList.innerHTML = '<div class="text-center text-muted py-3">No versions found</div>';
+                    }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    versionList.innerHTML = '<div class="text-center text-danger py-3">Error loading versions: ' + error.message + '</div>';
+                })
+                .finally(() => {
+                    WMNGLoading.hide();
+                });
+            }
 
-function clearCanvas() {
-    if (confirm('Are you sure you want to clear the canvas? This will remove all nodes.')) {
-        nodes = [];
-        nodeCounter = 1;
-        initCanvas();
-    }
-}
+            function restoreVersion(versionId) {
+                if (!confirm('Restore to this version? Current changes will be lost.')) {
+                    return;
+                }
+                
+                WMNGLoading.show('Restoring version...');
+                
+                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId + '/restore', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    WMNGLoading.hide();
+                    if (data.success) {
+                        WMNGToast.success('Version restored successfully!', { duration: 3000 });
+                        $('#versionHistoryModal').modal('hide');
+                        
+                        if (data.snapshot) {
+                            const snapshot = JSON.parse(data.snapshot);
+                            if (snapshot && Array.isArray(snapshot.nodes)) {
+                                nodes = snapshot.nodes;
+                            }
+                            if (snapshot && Array.isArray(snapshot.links)) {
+                                links = snapshot.links;
+                            }
+                            if (snapshot && snapshot.map) {
+                                const mapData = snapshot.map;
+                                if (mapData.title) document.getElementById('map-title').value = mapData.title;
+                                if (mapData.width) document.getElementById('map-width').value = mapData.width;
+                                if (mapData.height) document.getElementById('map-height').value = mapData.height;
+                            }
+                        }
+                        
+                        renderEditor();
+                    } else {
+                        WMNGToast.error('Failed to restore version: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                    }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Error restoring version: ' + error.message, { duration: 3000 });
+                });
+            }
 
-function saveMap() {
+            function deleteVersion(versionId) {
+                if (!confirm('Delete this version permanently? This cannot be undone.')) {
+                    return;
+                }
+                
+                WMNGLoading.show('Deleting version...');
+                
+                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    WMNGLoading.hide();
+                    if (data.success) {
+                        WMNGToast.success('Version deleted successfully!', { duration: 3000 });
+                        loadVersions();
+                    } else {
+                        WMNGToast.error('Failed to delete version: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                    }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Error deleting version: ' + error.message, { duration: 3000 });
+                });
+            }
+
+            function clearOldVersions() {
+                if (!confirm('Delete all but the latest 20 versions?')) {
+                    return;
+                }
+                
+                WMNGLoading.show('Clearing old versions...');
+                
+                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/cleanup', {
+                    method: 'POST'
+                })
+                .then(r => r.json())
+                .then(data => {
+                    WMNGLoading.hide();
+                    if (data.success) {
+                        const count = data.deleted_count || 0;
+                        WMNGToast.success('Cleared ' + count + ' old versions!', { duration: 3000 });
+                        loadVersions();
+                    } else {
+                        WMNGToast.error('Failed to clear versions: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                    }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Error clearing versions: ' + error.message, { duration: 3000 });
+                });
+            }
+
+            function compareVersion(versionId) {
+                const compareId = prompt('Enter version ID to compare against:', '0');
+                if (!compareId) return;
+                
+                alert('Compare feature coming soon! Select two versions from the history to compare.');
+            }
+
+            function exportVersions() {
+                WMNGLoading.show('Exporting versions...');
+                
+                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/export', {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    WMNGLoading.hide();
+                    if (data.success) {
+                        WMNGToast.success('Versions exported successfully!', { duration: 3000 });
+                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'weathermap-versions-' + mapId + '.json';
+                        a.click();
+                    } else {
+                        WMNGToast.error('Failed to export versions: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                    }
+                })
+                .catch(error => {
+                    WMNGLoading.hide();
+                    WMNGToast.error('Error exporting versions: ' ' + error.message, { duration: 3000 });
+                });
+            }
+
+            function saveMap() {
     const mapName = document.getElementById('map-name').value.trim();
     const mapTitle = document.getElementById('map-title').value.trim();
     const mapWidth = parseInt(document.getElementById('map-width').value, 10);
