@@ -60,6 +60,10 @@ class PortUtilService
         $cacheKey = "weathermapng.port.{$portId}";
         $cacheTtl = config('weathermapng.cache_ttl', 300);
 
+        if (!class_exists(Cache::class)) {
+            return $this->fetchPortData($portId);
+        }
+
         return Cache::remember($cacheKey, $cacheTtl, function () use ($portId) {
             return $this->fetchPortData($portId);
         });
@@ -69,6 +73,10 @@ class PortUtilService
     {
         $cacheKey = "weathermapng.device.{$deviceId}.aggregate";
         $cacheTtl = config('weathermapng.cache_ttl', 300);
+
+        if (!class_exists(Cache::class)) {
+            return $this->fetchDeviceAggregate($deviceId);
+        }
 
         return Cache::remember($cacheKey, $cacheTtl, function () use ($deviceId) {
             return $this->fetchDeviceAggregate($deviceId);
@@ -117,7 +125,7 @@ class PortUtilService
         }
     }
 
-    private function extractLatestValue(array $data): int
+    private function extractLatestValue(?array $data): int
     {
         if (empty($data)) {
             return 0;

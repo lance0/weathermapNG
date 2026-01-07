@@ -37,8 +37,17 @@ class WMNGToast {
     }
 
     show(message, type = 'info', options = {}) {
-        const settings = { ...this.options, ...options };
-        const toast = this.createToast(message, type, settings);
+        // show(message, options) is supported via type detection
+        let resolvedType = type;
+        let resolvedOptions = options;
+
+        if (type && typeof type === 'object') {
+            resolvedOptions = type;
+            resolvedType = resolvedOptions.type || 'info';
+        }
+
+        const settings = { ...this.options, ...resolvedOptions };
+        const toast = this.createToast(message, resolvedType, settings);
 
         this.container.appendChild(toast);
 
@@ -107,7 +116,9 @@ class WMNGToast {
         }
     }
 
+    // success(message)
     success(message, options) { return this.show(message, 'success', options); }
+    // error(message)
     error(message, options) { return this.show(message, 'error', options); }
     warning(message, options) { return this.show(message, 'warning', options); }
     info(message, options) { return this.show(message, 'info', options); }

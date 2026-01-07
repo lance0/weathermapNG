@@ -67,7 +67,8 @@ class E2EInstallationWorkflowTest extends TestCase
     {
         $controllerPath = __DIR__ . '/../src/Http/Controllers/InstallController.php';
         $this->assertFileExists($controllerPath);
-        $this->assertFileContains('class InstallController', $controllerPath);
+        $content = file_get_contents($controllerPath);
+        $this->assertStringContainsString('class InstallController', $content);
     }
 
     public function test_web_installer_has_index_method(): void
