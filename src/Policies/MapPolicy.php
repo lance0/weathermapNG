@@ -6,6 +6,11 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 
 class MapPolicy
 {
+    public function viewAny($user): bool
+    {
+        return true;
+    }
+
     public function view($user, Map $map): bool
     {
         return true;
@@ -37,5 +42,20 @@ class MapPolicy
     public function manage($user, Map $map): bool
     {
         return $this->update($user, $map);
+    }
+
+    public function export($user, Map $map): bool
+    {
+        return $this->view($user, $map);
+    }
+
+    public function import($user): bool
+    {
+        return $this->create($user);
+    }
+
+    public function embed($user, Map $map): bool
+    {
+        return $this->view($user, $map);
     }
 }
