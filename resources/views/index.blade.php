@@ -1,6 +1,7 @@
 @extends('layouts.librenmsv1')
 
 @push('styles')
+<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/weathermapng.css') }}">
 <link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/loading.css') }}">
 <link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/toast.css') }}">
 <link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/a11y.css') }}">
@@ -12,13 +13,45 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1><i class="fas fa-network-wired" aria-hidden="true"></i> WeathermapNG</h1>
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap">
                 <div>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-1">
+                            <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
+                            <li class="breadcrumb-item"><a href="{{ url('plugin/WeathermapNG') }}">Plugins</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">WeathermapNG</li>
+                        </ol>
+                    </nav>
+                    <h1 class="mb-1"><i class="fas fa-network-wired" aria-hidden="true"></i> WeathermapNG</h1>
+                    <p class="text-muted mb-0">Topology maps with live device and link utilization.</p>
+                </div>
+                <div class="mt-2 mt-md-0">
                     <button class="btn btn-primary" data-toggle="modal" data-target="#createMapModal"
                             aria-label="Create new map">
                         <i class="fas fa-plus" aria-hidden="true"></i> Create New Map
                     </button>
+                </div>
+            </div>
+            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-4">
+                <div class="text-muted small mb-2 mb-md-0">
+                    <span id="map-count">{{ count($maps) }}</span> maps
+                    <span class="mx-1">•</span>
+                    <span id="map-filter-count">Showing {{ count($maps) }} of {{ count($maps) }}</span>
+                </div>
+                <div class="d-flex flex-column flex-md-row">
+                    <div class="input-group input-group-sm mb-2 mb-md-0 mr-md-2">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        </div>
+                        <input type="text" class="form-control" id="map-search" placeholder="Search maps" aria-label="Search maps">
+                    </div>
+                    <select class="form-control form-control-sm" id="map-filter" aria-label="Sort maps">
+                        <option value="name-asc">Name (A-Z)</option>
+                        <option value="name-desc">Name (Z-A)</option>
+                        <option value="nodes-desc">Most nodes</option>
+                        <option value="links-desc">Most links</option>
+                        <option value="size-desc">Largest canvas</option>
+                    </select>
                 </div>
             </div>
 
@@ -39,26 +72,36 @@
             <div id="maps-container" class="row">
                 @forelse($maps as $map)
                     <div class="col-lg-4 col-md-6 mb-4">
-                        <div class="card h-100 shadow-sm">
+                        <div class="card map-card h-100 shadow-sm"
+                             data-name="{{ strtolower($map->name) }}"
+                             data-title="{{ strtolower($map->title ?? $map->name) }}"
+                             data-nodes="{{ $map->nodes_count ?? $map->nodes()->count() }}"
+                             data-links="{{ $map->links_count ?? $map->links()->count() }}"
+                             data-size="{{ ($map->width ?? 0) * ($map->height ?? 0) }}">
                             <div class="card-header bg-light">
-                                <h5 class="card-title mb-0">
-                                    <i class="fas fa-map"></i> {{ $map->title ?? $map->name }}
-                                </h5>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-map"></i> {{ $map->title ?? $map->name }}
+                                    </h5>
+                                    <span class="badge badge-light map-stat">
+                                        <i class="fas fa-vector-square"></i> {{ $map->width }} x {{ $map->height }}
+                                    </span>
+                                </div>
                             </div>
                             <div class="card-body d-flex flex-column">
-                                <ul class="list-unstyled mb-4 small text-muted">
-                                    <li><i class="fas fa-id-badge"></i> Name: {{ $map->name }}</li>
-                                    <li><i class="fas fa-vector-square"></i> Size: {{ $map->width }} x {{ $map->height }}</li>
-                                    <li><i class="fas fa-project-diagram"></i> Nodes: {{ $map->nodes_count ?? $map->nodes()->count() }}, Links: {{ $map->links_count ?? $map->links()->count() }}</li>
-                                </ul>
+                                <div class="d-flex flex-wrap gap-2 text-muted small mb-4">
+                                    <span class="map-stat"><i class="fas fa-id-badge"></i> {{ $map->name }}</span>
+                                    <span class="map-stat"><i class="fas fa-project-diagram"></i> {{ $map->nodes_count ?? $map->nodes()->count() }} nodes</span>
+                                    <span class="map-stat"><i class="fas fa-link"></i> {{ $map->links_count ?? $map->links()->count() }} links</span>
+                                </div>
                                 <div class="mt-auto">
-                                    <div class="btn-group w-100" role="group" aria-label="Map actions">
+                                    <div class="btn-group btn-group-sm w-100 map-card-actions" role="group" aria-label="Map actions">
                                         <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
                                            class="btn btn-outline-primary btn-sm" target="_blank"
                                            aria-label="View map {{ $map->name }}">
                                             <i class="fas fa-external-link-alt" aria-hidden="true"></i> View
                                         </a>
-                                        <a href="{{ url('plugins/weathermapng/maps/' . $map->id . '/editor') }}"
+                                        <a href="{{ url('plugin/WeathermapNG/editor/' . $map->id) }}"
                                            class="btn btn-outline-secondary btn-sm"
                                            aria-label="Edit map {{ $map->name }}">
                                             <i class="fas fa-edit" aria-hidden="true"></i> Edit
@@ -68,7 +111,7 @@
                                            aria-label="Export map {{ $map->name }}">
                                             <i class="fas fa-download" aria-hidden="true"></i> Export
                                         </a>
-                                        <form method="POST" action="{{ url('plugins/weathermapng/maps/' . $map->id) }}" onsubmit="return confirm('Delete this map?');">
+                                        <form method="POST" action="{{ url('plugin/WeathermapNG/map/' . $map->id) }}" class="d-inline" onsubmit="return confirm('Delete this map?');">
                                             @csrf
                                             @method('DELETE')
                                             <button class="btn btn-outline-danger btn-sm"
@@ -83,10 +126,10 @@
                     </div>
                 @empty
                     <div class="col-12">
-                        <div class="text-center py-5">
-                            <i class="fas fa-map fa-4x text-muted mb-3"></i>
-                            <h3 class="text-muted">No Maps Found</h3>
-                            <p class="text-muted">Create your first network map to get started.</p>
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="fas fa-map"></i></div>
+                            <h3>No maps yet</h3>
+                            <p>Create your first network map to start visualizing devices and links.</p>
                             <button class="btn btn-primary" data-toggle="modal" data-target="#createMapModal"
                                     aria-label="Create first map">
                                 <i class="fas fa-plus" aria-hidden="true"></i> Create Your First Map
@@ -94,6 +137,11 @@
                         </div>
                     </div>
                 @endforelse
+            </div>
+            <div id="map-filter-empty" class="empty-state mt-3" style="display: none;">
+                <div class="empty-state-icon"><i class="fas fa-filter"></i></div>
+                <h3>No matching maps</h3>
+                <p>Try a different search term or sorting option.</p>
             </div>
         </div>
     </div>
@@ -250,13 +298,9 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch('{{ url('plugin/WeathermapNG/health/stats') }}')
             .then(r => r.json())
             .then(d => {
-                // no fixed DOM ids here; left as example: update title with map count
-                const h1 = document.querySelector('h1');
-                if (h1 && d && typeof d.maps !== 'undefined') {
-                    if (!h1.dataset.original) {
-                        h1.dataset.original = h1.textContent;
-                    }
-                    h1.textContent = (h1.dataset.original) + ' (' + d.maps + ' maps)';
+                const mapCount = document.getElementById('map-count');
+                if (mapCount && d && typeof d.maps !== 'undefined') {
+                    mapCount.textContent = d.maps;
                 }
             }).catch(() => {});
     };
@@ -275,7 +319,7 @@ function showEmbedCode(mapId) {
     document.getElementById('embedCode').value = htmlCode;
     document.getElementById('iframeCode').value = iframeCode;
 
-    new bootstrap.Modal(document.getElementById('embedModal')).show();
+    $('#embedModal').modal('show');
 }
 
 function copyEmbedCode() {
@@ -309,5 +353,84 @@ function deleteMap(mapId) {
     // Handled via form submit for proper CSRF and method spoofing
     // Added aria-label in HTML
 }
+
+function updateMapFilterCount(visible, total) {
+    const count = document.getElementById('map-filter-count');
+    if (count) {
+        count.textContent = `Showing ${visible} of ${total}`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('map-search');
+    const filterSelect = document.getElementById('map-filter');
+    const container = document.getElementById('maps-container');
+    if (!searchInput || !filterSelect || !container) return;
+
+    const cards = Array.from(container.querySelectorAll('.map-card'))
+        .map(card => card.closest('.col-lg-4'));
+
+    const total = cards.length;
+
+    function sortCards(mode) {
+        const sorted = [...cards].sort((a, b) => {
+            const cardA = a.querySelector('.map-card');
+            const cardB = b.querySelector('.map-card');
+            if (!cardA || !cardB) return 0;
+
+            const nameA = cardA.dataset.title || cardA.dataset.name || '';
+            const nameB = cardB.dataset.title || cardB.dataset.name || '';
+            const nodesA = parseInt(cardA.dataset.nodes || '0', 10);
+            const nodesB = parseInt(cardB.dataset.nodes || '0', 10);
+            const linksA = parseInt(cardA.dataset.links || '0', 10);
+            const linksB = parseInt(cardB.dataset.links || '0', 10);
+            const sizeA = parseInt(cardA.dataset.size || '0', 10);
+            const sizeB = parseInt(cardB.dataset.size || '0', 10);
+
+            switch (mode) {
+                case 'name-desc':
+                    return nameB.localeCompare(nameA);
+                case 'nodes-desc':
+                    return nodesB - nodesA;
+                case 'links-desc':
+                    return linksB - linksA;
+                case 'size-desc':
+                    return sizeB - sizeA;
+                case 'name-asc':
+                default:
+                    return nameA.localeCompare(nameB);
+            }
+        });
+
+        sorted.forEach(card => container.appendChild(card));
+    }
+
+    function applyFilter() {
+        const query = searchInput.value.trim().toLowerCase();
+        let visible = 0;
+
+        cards.forEach(card => {
+            const mapCard = card.querySelector('.map-card');
+            const text = `${mapCard.dataset.name} ${mapCard.dataset.title}`;
+            const isMatch = text.includes(query);
+            card.style.display = isMatch ? '' : 'none';
+            if (isMatch) visible += 1;
+        });
+
+        updateMapFilterCount(visible, total);
+        const emptyState = document.getElementById('map-filter-empty');
+        if (emptyState) {
+            emptyState.style.display = total > 0 && visible === 0 ? '' : 'none';
+        }
+    }
+
+    searchInput.addEventListener('input', applyFilter);
+    filterSelect.addEventListener('change', function() {
+        sortCards(this.value);
+    });
+
+    sortCards(filterSelect.value);
+    applyFilter();
+});
 </script>
 @endsection

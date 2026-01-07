@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editor UX**: Added an empty state prompt for new maps and replaced emoji node icons with Font Awesome glyphs
 - **Editor Cleanup**: Consolidated editor scripts, added device loading, and improved save/versioning request flow
 - **Route Wiring**: Node/link routes now map to dedicated controllers for clearer separation
+- **Index UX**: Added breadcrumbs, search/sort controls, and improved map cards for LibreNMS consistency
 
 ### Fixed
 - **Map Version Export**: Corrected JSON response formatting
