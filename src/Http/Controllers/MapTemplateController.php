@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use LibreNMS\Plugins\WeathermapNG\Models\MapTemplate;
