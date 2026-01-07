@@ -4,27 +4,27 @@
  */
 
 :root {
-    /* Modern gradient colors */
-    --primary-color: #667eea;
-    --secondary-color: #764ba2;
-    --success-color: #48bb78;
-    --warning-color: #f6ad55;
-    --danger-color: #fc8181;
-    --info-color: #4299e1;
-    --dark: #2d3748;
-    --light: #f7fafc;
+    /* LibreNMS-aligned palette (Bootstrap 4 friendly) */
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    --dark: #212529;
+    --light: #f8f9fa;
     --border-radius: 0.5rem;
-    --transition: all 0.3s ease;
+    --transition: all 0.2s ease;
     
     /* Legacy compatibility */
-    --weathermap-primary: #667eea;
-    --weathermap-secondary: #764ba2;
-    --weathermap-success: #48bb78;
-    --weathermap-warning: #f6ad55;
-    --weathermap-danger: #fc8181;
-    --weathermap-info: #4299e1;
-    --weathermap-light: #f7fafc;
-    --weathermap-dark: #2d3748;
+    --weathermap-primary: #0d6efd;
+    --weathermap-secondary: #6c757d;
+    --weathermap-success: #28a745;
+    --weathermap-warning: #ffc107;
+    --weathermap-danger: #dc3545;
+    --weathermap-info: #17a2b8;
+    --weathermap-light: #f8f9fa;
+    --weathermap-dark: #212529;
     --weathermap-border: #e2e8f0;
 }
 
@@ -461,19 +461,36 @@ body {
     font-weight: 500;
 }
 
-/* Editor Toolbar - Professional styling */
+/* Editor Toolbar - LibreNMS aligned */
 .editor-toolbar {
     background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
     color: #495057;
     padding: 0.75rem 1rem;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.tool-button {
+.editor-toolbar h2 {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-toolbar {
     background: white;
     border: 1px solid #ced4da;
     color: #495057;
@@ -484,20 +501,31 @@ body {
     font-size: 0.875rem;
 }
 
-.tool-button:hover {
+.btn-toolbar:hover {
     background: #e9ecef;
     border-color: #adb5bd;
 }
 
-.tool-button.active {
-    background: #007bff;
-    border-color: #007bff;
-    color: white;
+.btn-toolbar-primary {
+    background: #e9f2ff;
+    border-color: #b6d4fe;
+    color: #0d6efd;
 }
 
-.tool-button:focus {
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+.btn-toolbar-primary:hover {
+    background: #dbe9ff;
+    border-color: #9ec5fe;
+}
+
+.btn-toolbar-danger {
+    background: #f8d7da;
+    border-color: #f1aeb5;
+    color: #b02a37;
+}
+
+.btn-toolbar-danger:hover {
+    background: #f5c2c7;
+    border-color: #eaa2ab;
 }
 
 /* Canvas Area - Clean and professional */
@@ -581,15 +609,15 @@ body {
     width: 200px;
     height: 150px;
     background: white;
-    border: 2px solid var(--primary-color);
+    border: 1px solid #dee2e6;
     border-radius: var(--border-radius);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     z-index: 1000;
 }
 
 /* Context Menu - Clean dropdown */
 .context-menu {
-    position: absolute;
+    position: fixed;
     background: white;
     border: 1px solid #dee2e6;
     border-radius: 0.25rem;
@@ -620,32 +648,212 @@ body {
     color: #212529;
 }
 
-/* Zoom Controls - Subtle and functional */
+/* Modern Editor Layout (LibreNMS aligned) */
+.weathermap-editor {
+    margin: 0;
+    padding: 0;
+    background: #f0f2f5;
+}
+
+.editor-container {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    padding-top: 56px;
+    padding-bottom: 40px;
+}
+
+.toolbar-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.editor-sidebar {
+    width: 320px;
+    background: white;
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+}
+
+.sidebar-section {
+    padding: 1.25rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.sidebar-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+}
+
+.editor-canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    position: relative;
+    overflow: auto;
+    background: #f8f9fa;
+}
+
+.canvas-wrapper {
+    position: relative;
+    background: white;
+    border-radius: 0.5rem;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+}
+
+#mapCanvas {
+    display: block;
+    cursor: crosshair;
+}
+
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.tool-btn {
+    padding: 0.65rem;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    text-align: center;
+    color: #495057;
+}
+
+.tool-btn:hover {
+    border-color: #adb5bd;
+    background: #f8f9fa;
+}
+
+.tool-btn.active {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.tool-btn i {
+    display: block;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.tool-btn span {
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.property-group {
+    margin-bottom: 1rem;
+}
+
+.property-group label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    color: #495057;
+}
+
+.property-group input,
+.property-group select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
+}
+
+.grid-overlay {
+    position: absolute;
+    inset: 0;
+    background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0, 0, 0, 0.05) 19px, rgba(0, 0, 0, 0.05) 20px),
+        repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0, 0, 0, 0.05) 19px, rgba(0, 0, 0, 0.05) 20px);
+    pointer-events: none;
+    display: none;
+}
+
+.grid-overlay.active {
+    display: block;
+}
+
+.editor-empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 320px;
+    text-align: center;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.08);
+}
+
+.editor-empty-state .empty-state-icon {
+    font-size: 2.5rem;
+}
+
+.status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #2f3743;
+    color: white;
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8125rem;
+    z-index: 999;
+}
+
+.status-info {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .zoom-controls {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
+    top: 20px;
+    right: 20px;
     background: white;
     border: 1px solid #dee2e6;
-    border-radius: 0.25rem;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
 .zoom-btn {
-    padding: 0.5rem;
+    padding: 0.75rem;
     border: none;
-    background: transparent;
+    background: white;
     cursor: pointer;
-    transition: background-color 0.15s ease-in-out;
+    transition: background 0.2s;
+    display: block;
     width: 40px;
     height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     color: #6c757d;
 }
 
@@ -654,8 +862,48 @@ body {
     color: #495057;
 }
 
-.zoom-btn:not(:last-child) {
-    border-bottom: 1px solid #dee2e6;
+.zoom-btn + .zoom-btn {
+    border-top: 1px solid #dee2e6;
+}
+
+.map-canvas {
+    border: 1px solid #dee2e6;
+    background: #ffffff;
+    border-radius: 0.25rem;
+}
+
+.map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.map-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.status-traffic-low {
+    background: #28a745;
+}
+
+.status-traffic-mid {
+    background: #ffc107;
+}
+
+.status-traffic-high {
+    background: #fd7e14;
+}
+
+.status-traffic-critical {
+    background: #dc3545;
+}
+
+.status-traffic-none {
+    background: #6c757d;
 }
 
 /* Animation Classes */

@@ -35,14 +35,14 @@ $links = dbFetchRows("SELECT l.*,
                 <div class="panel-heading">
                     <h3 class="panel-title">
                         <i class="fas fa-map"></i> <?php echo htmlspecialchars($map['name']); ?>
-                        <div class="pull-right">
-                            <a href="/plugin/v1/WeathermapNG" class="btn btn-default btn-sm">
+                        <div class="pull-right btn-group btn-group-sm" role="group" aria-label="Map actions">
+                            <a href="/plugin/v1/WeathermapNG" class="btn btn-default">
                                 <i class="fas fa-arrow-left"></i> Back
                             </a>
-                            <a href="/plugin/v1/WeathermapNG/editor/<?php echo $mapId; ?>" class="btn btn-warning btn-sm">
+                            <a href="/plugin/v1/WeathermapNG/editor/<?php echo $mapId; ?>" class="btn btn-warning">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
-                            <button class="btn btn-info btn-sm" onclick="refreshMap()">
+                            <button class="btn btn-info" onclick="refreshMap()">
                                 <i class="fas fa-sync"></i> Refresh
                             </button>
                         </div>
@@ -50,10 +50,10 @@ $links = dbFetchRows("SELECT l.*,
                 </div>
                 <div class="panel-body">
                     <div style="text-align: center;">
-                        <canvas id="mapCanvas" 
+                        <canvas id="mapCanvas"
+                                class="map-canvas"
                                 width="<?php echo $map['width']; ?>" 
-                                height="<?php echo $map['height']; ?>"
-                                style="border: 1px solid #333; background: white;">
+                                height="<?php echo $map['height']; ?>">
                         </canvas>
                     </div>
                     
@@ -61,11 +61,13 @@ $links = dbFetchRows("SELECT l.*,
                         <div class="col-md-12">
                             <div class="well well-sm">
                                 <strong>Legend:</strong>
-                                <span style="display: inline-block; width: 20px; height: 10px; background: #00ff00; margin: 0 5px;"></span> 0-30% utilization
-                                <span style="display: inline-block; width: 20px; height: 10px; background: #ffff00; margin: 0 5px;"></span> 30-70% utilization
-                                <span style="display: inline-block; width: 20px; height: 10px; background: #ff9900; margin: 0 5px;"></span> 70-90% utilization
-                                <span style="display: inline-block; width: 20px; height: 10px; background: #ff0000; margin: 0 5px;"></span> 90%+ utilization
-                                <span style="display: inline-block; width: 20px; height: 10px; background: #999999; margin: 0 5px;"></span> No data
+                                <div class="map-legend">
+                                    <span><span class="status-indicator status-traffic-low"></span> 0-30% utilization</span>
+                                    <span><span class="status-indicator status-traffic-mid"></span> 30-70% utilization</span>
+                                    <span><span class="status-indicator status-traffic-high"></span> 70-90% utilization</span>
+                                    <span><span class="status-indicator status-traffic-critical"></span> 90%+ utilization</span>
+                                    <span><span class="status-indicator status-traffic-none"></span> No data</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -92,15 +94,15 @@ function getLinkColor(link) {
         link.out_rate_b || 0
     );
     
-    if (maxRate == 0) return '#999999'; // No data
+    if (maxRate == 0) return '#6c757d'; // No data
     
     // Assuming 1Gbps links for now (can be made dynamic)
     var utilization = (maxRate * 8) / 1000000000 * 100; // Convert to percentage
     
-    if (utilization > 90) return '#ff0000';
-    if (utilization > 70) return '#ff9900';
-    if (utilization > 30) return '#ffff00';
-    return '#00ff00';
+    if (utilization > 90) return '#dc3545';
+    if (utilization > 70) return '#fd7e14';
+    if (utilization > 30) return '#ffc107';
+    return '#28a745';
 }
 
 // Draw the map
@@ -123,8 +125,8 @@ function drawMap() {
             if (link.in_rate_a || link.out_rate_a) {
                 var midX = (srcNode.x + dstNode.x) / 2;
                 var midY = (srcNode.y + dstNode.y) / 2;
-                ctx.fillStyle = '#000';
-                ctx.font = '10px Arial';
+                ctx.fillStyle = '#212529';
+                ctx.font = '10px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
                 ctx.textAlign = 'center';
                 var rate = Math.max(link.in_rate_a || 0, link.out_rate_a || 0);
                 var rateStr = rate > 1000000 ? (rate/1000000).toFixed(1) + ' Mbps' : (rate/1000).toFixed(1) + ' Kbps';
@@ -137,11 +139,11 @@ function drawMap() {
     nodes.forEach(function(node) {
         // Node color based on device status
         if (node.status == 1) {
-            ctx.fillStyle = '#00cc00'; // Up
+            ctx.fillStyle = '#28a745'; // Up
         } else if (node.status === 0) {
-            ctx.fillStyle = '#ff0000'; // Down
+            ctx.fillStyle = '#dc3545'; // Down
         } else {
-            ctx.fillStyle = '#0066cc'; // No device assigned
+            ctx.fillStyle = '#6c757d'; // No device assigned
         }
         
         ctx.beginPath();
@@ -154,16 +156,16 @@ function drawMap() {
         ctx.stroke();
         
         // Draw label
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 12px Arial';
+        ctx.fillStyle = '#212529';
+        ctx.font = '600 12px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
         ctx.textAlign = 'center';
         var label = node.hostname || node.label;
         ctx.fillText(label, node.x, node.y - 18);
     });
     
     // Draw timestamp
-    ctx.fillStyle = '#666';
-    ctx.font = '10px Arial';
+    ctx.fillStyle = '#6c757d';
+    ctx.font = '10px "Segoe UI", "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'right';
     var now = new Date();
     ctx.fillText('Last updated: ' + now.toLocaleString(), canvas.width - 10, canvas.height - 10);

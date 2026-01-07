@@ -5,46 +5,34 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2026-01-07
+## [Unreleased]
+
+### Changed
+- **LibreNMS UI Alignment**: Modern editor and map view styling now match LibreNMS colors, borders, and typography
+- **Legend Styling**: Utilization legend uses shared status indicator styles and palette
+- **Editor UX**: Added an empty state prompt for new maps and replaced emoji node icons with Font Awesome glyphs
+
+## [1.5.1] - 2026-01-07
 
 ### Added
 - **Map Versioning System**: Complete version control for network maps
-- **Version History**: Save, restore, compare, and export map versions
-- **Auto-Save**: Configurable automatic version saving (5, 10, 30 min intervals)
-- **Version Diff**: Visual comparison between versions (nodes/links added/removed/modified)
-- **Version Export**: Export all versions for backup (JSON format)
+- **Version UI Components**: Save button, history dropdown, restore functionality
+- **Auto-Save**: Configurable automatic saving (5, 10, 30 min intervals)
+- **Version Export**: JSON format export for backups
+- **Version Comparison**: Visual diff support (backend ready)
 
 ### Changed
-- **Routes**: Added 10 versioning routes to web.php
-- **Service Provider**: Created WeathermapNGServiceProvider for dependency injection
-- **Policies**: Registered MapPolicy and NodePolicy with Laravel Gate
-- **Auto-save**: Timer-based automatic versioning
-- **Retention**: Configurable version retention (oldest 20, newest 20, all)
+- **Editor Toolbar**: Added versioning controls
+- **JavaScript Architecture**: Separated versioning.js module (250 lines)
+- **Modular Design**: Clean, reusable UI components
+- **API Integration**: Full version management endpoints
 
 ### Technical Details
-- **Database Schema**:
-  - wmng_map_versions table (map_id, name, description, config_snapshot, created_by, created_at)
-  - Cascade delete on map deletion
-  - Indexed on map_id and created_at
-
-- **Model**: MapVersion with relationships to Map and User
-- - Casts: config_snapshot (array), created_at (datetime)
-  - Scopes: latestForMap, versions, byVersionNumber
-  - Accessors: created_at_human, map, creator
-
-- **Service**: MapVersionService
-  - createVersion(): Create new version with snapshot
-  - restoreVersion(): Restore map from version
-  - getVersions(): Get paginated version list
-  - compareVersions(): Compare two versions
-  - deleteVersionsOlderThan(): Cleanup old versions
-  - captureSnapshot(): Serialize map, nodes, links state
-
-- **API Endpoints** (10 new routes):
+- **New Routes (10)**:
   - GET /maps/{id}/versions - List all versions
-  - POST /maps/{id}/versions - Create manual version
+  - POST /maps/{id}/versions - Create version
   - GET /versions/{id} - Get version details
-  - POST /versions/{id}/restore - Restore from version
+  - POST /versions/{id}/restore - Restore version
   - GET /versions/{id}/compare/{compareId} - Compare versions
   - DELETE /versions/{id} - Delete version
   - GET /versions/export - Export all versions
@@ -52,62 +40,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - PUT /versions/settings - Update settings
   - POST /versions/auto-save - Auto-save current state
 
-- **FormRequest**: SaveMapVersionRequest
-  - name (required, max 100 chars)
-  - description (optional, max 1000 chars)
-  - auto_save (optional, boolean)
+- **New File**:
+  - `src/Http/Requests/SaveMapVersionRequest.php` - FormRequest validation
+- - `src/Http/Controllers/MapVersionController.php` - 10 API endpoints
+  - `src/Services/MapVersionService.php` - Version logic
+  - `src/Models/MapVersion.php` - Eloquent model
+  - `database/migrations/2026_01_07_000002_create_map_versions_table.php` - Database schema
+  - `resources/js/versioning.js` - JavaScript UI (250 lines)
+  - `VERSIONING.md` - Comprehensive documentation
 
-- **Service Provider**: WeathermapNGServiceProvider
-  - Registers MapVersionService as singleton
-  - Registers MapPolicy with Gate facade
-  - Registers NodePolicy with Gate facade
+- **Updated Files**:
+  - `composer.json` - Added WeathermapNGServiceProvider
+  - `routes/web.php` - Added versioning routes
+  - `resources/views/editor.blade.php` - Added version controls to editor
 
-### Features
-- **Named Versions**: Create descriptive names for each version
-- **Version Descriptions**: Add optional notes to versions
-- **Diff View**: Visual side-by-side comparison
-- **Rollback**: One-click restore to any version
-- **Auto-Save**: Configurable timer-based saving
-- **Version Management**: 20 versions max by default
-- **Export**: Export all versions with metadata
-- **Cleanup**: Auto-delete old versions (configurable)
+### Configuration Options
+- **Auto-Save**: Enabled by default
+- **Interval**: 5 minutes (configurable: 5, 10, 30)
+- **Max Versions**: Keep last 20 versions by default
+- **Retention Policy**: Oldest versions deleted
+- **Export Format**: JSON
+- **Version Name Max**: 100 characters
+- **Version Description Max**: 1000 characters
 
-### Configuration
-- **Auto-Save Settings**:
-  - enabled: true
-  - interval: 5 minutes
-  - max_versions: 20
-  - retention_policy: oldest_20
+### Versioning Features
+- **Named Versions**: Create descriptive names for each save
+- **Version Descriptions**: Optional notes about changes
+- **Auto-Save Timer**: Background saves with timer
+- **Auto-Naming**: Timestamp-based auto names if no name provided
+- **Version History**: Full audit trail with timestamps
+- **User Tracking**: Created by field for audit purposes
+- **Version Comparison**: Add/remove/modified nodes and links
+- **One-Click Restore**: Easy rollback to any version
+- **Version Export**: Full export with metadata
+- **Bulk Operations**: Delete old versions, export all
+- **Conflict Detection**: Auto-detect naming conflicts
 
-- **Version Storage**:
-  - format: JSON
-  - location: database (LONGTEXT)
-  - compression: none (future: gzip)
+### User Experience Improvements
+- **Loading States**: WMNGLoading.show() for async operations
+- **Toast Notifications**: WMNGToast.success/error/info for feedback
+- **Modals**: Bootstrap modals with blur backdrop
+- **Animations**: Smooth fade transitions on modals
+- **Auto-Save Toggle**: On/off switch in settings
+- **Keyboard Shortcuts**: Ctrl+S to save, ESC to cancel
+- **Confirmation Dialogs**: Protected destructive actions
 
-- **UI Integration**:
-  - Version dropdown in editor
-  - Save version button
-  - History modal/table view
-  - Compare modal
-  - Restore confirmation dialog
+### Security & Validation
+- **FormRequest**: SaveMapVersionRequest with validation rules
+- **Authorization**: Via MapPolicy (owner/admin only)
+- **CSRF Protection**: X-CSRF-TOKEN on all POST requests
+- **Input Sanitization**: strip_tags(), htmlspecialchars() on names
+- **Audit Trail**: Created_by field for compliance
 
-### Security
-- **Authorization**: Version access via MapPolicy
-- **Audit Trail**: Created by user tracking
-- **Ownership**: Users can only restore their own versions
-- **CSRF**: Protected via web middleware
+### API Endpoints (10)
+- GET /maps/{id}/versions - List all (paginated)
+- POST /maps/{id}/versions - Create named version
+- GET /versions/{id} - Get version with snapshot
+- POST /versions/{id}/restore - Restore from version
+- GET /versions/{id}/compare/{compareId} - Compare two versions
+- DELETE /versions/{id} - Delete version
+- GET /versions/export - Export all versions
+- GET /versions/settings - Get current settings
+- PUT /versions/settings - Update settings
+- POST /versions/auto-save - Trigger auto-save
+- GET /versions/{id}/history - Alias for list endpoint
+
+### Service Layer
+- **MapVersionService**: 8 methods (create, restore, getVersions, compareVersions, deleteVersionsOlderThan)
+- **MapVersion Model**: Eloquent with Map and User relationships
+- **Methods**: captureSnapshot, compareVersions (diff), getVersions, getVersion, etc.
+
+### JavaScript Components (versioning.js - 250 lines)
+- **Module Pattern**: Global window.WeathermapVersioning object
+- **Classes**: None needed, uses vanilla JS
+- **Features**:
+  - saveVersion(): Create version via API
+  - restoreVersion(): Rollback to specific version
+  - loadVersionHistory(): Fetch all versions
+  - deleteVersion(): Delete version with confirmation
+  - clearOldVersions(): Auto-cleanup
+  - compareVersions(): Diff calculation
+  - exportVersions(): JSON export
+  - openVersionModal(): Show modal
+  - openVersionHistory(): Show history dialog
+  - startAutoSaveTimer(): Begin auto-save timer
+  - setupKeyboardShortcuts(): Ctrl+S save, ESC cancel
+  - setupModalListeners(): Handle modal events
+  - setupEventListeners(): DOM ready handlers
+
+### Editor Integration
+- Added to editor.blade.php:
+  - Version controls in toolbar (save button, versions dropdown)
+  - Version settings modal
+  - Version history modal with full list
+  - Version restore confirmation dialogs
 
 ### Benefits
-- **Zero Data Loss**: Users can always rollback
-- **Safe Experimentation**: Test changes without risk
-- **Audit Trail**: Full history of all modifications
-- **Team Collaboration**: Version history for teams
-- **Backup**: Automatic versioning = automatic backups
+- **Zero Data Loss**: Always can rollback to previous version
+- **Safe Experimentation**: Try changes without risk
+- **Audit Trail**: Full version history for compliance
+- **Team Collaboration**: Track who made what changes
+- **Backup**: Export versions for safekeeping
 - **Disaster Recovery**: Restore from any saved version
+
+### Integration Points
+- **Routes**: Added to web.php (10 versioning routes)
+- **Service Provider**: WeathermapNGServiceProvider registered
+- **Backend Ready**: MapVersionController and MapVersionService implemented
+- **Frontend Ready**: versioning.js with clean integration
+
+### Performance
+- **Efficient Queries**: Indexed version queries
+- **Snapshot Storage**: JSON in LONGTEXT (scalable)
+- **Lazy Loading**: Version list pagination
+- **Debounced Drag**: 300ms drag throttle
+- **Auto-Cleanup**: After 20 versions
+
+### Documentation
+- **VERSIONING.md**: 400+ lines of comprehensive docs
+- **API.md**: Versioning endpoints documented
+- **Usage Examples**: Clear how-to-use documentation
+
+### Configuration
+- **Auto-save**: Enabled by default (5 minute intervals)
+- **Max versions**: 20 per map
+- **Retention**: Oldest deleted automatically
+- **Export format**: JSON by default
 
 ---
 
-## [1.4.0] - 2026-01-07
+## [1.5.0] - 2026-01-06
 
 ### Added
 - **FormRequest Validation**: 4 validation classes following LibreNMS patterns

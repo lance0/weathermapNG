@@ -29,307 +29,13 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     
     <!-- Include WeathermapNG CSS -->
     <link href="/plugins/WeathermapNG/css/weathermapng.css" rel="stylesheet">
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f0f2f5;
-        }
-        
-        .editor-container {
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        
-        /* Toolbar */
-        .editor-toolbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-        }
-        
-        .toolbar-title {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-        
-        .toolbar-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .btn-toolbar {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-            padding: 0.5rem 1rem;
-            border-radius: 0.25rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn-toolbar:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateY(-1px);
-        }
-        
-        /* Sidebar */
-        .editor-sidebar {
-            width: 320px;
-            background: white;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.05);
-            overflow-y: auto;
-            margin-top: 60px;
-        }
-        
-        .sidebar-section {
-            padding: 1.5rem;
-            border-bottom: 1px solid #e1e4e8;
-        }
-        
-        .sidebar-section h3 {
-            margin: 0 0 1rem 0;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #6c757d;
-        }
-        
-        /* Canvas Area */
-        .editor-canvas-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            margin-top: 60px;
-            position: relative;
-            overflow: auto;
-        }
-        
-        .canvas-wrapper {
-            position: relative;
-            background: white;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        #mapCanvas {
-            display: block;
-            cursor: crosshair;
-        }
-        
-        /* Tool Buttons */
-        .tool-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.5rem;
-        }
-        
-        .tool-btn {
-            padding: 0.75rem;
-            border: 2px solid #e1e4e8;
-            background: white;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-        }
-        
-        .tool-btn:hover {
-            border-color: #667eea;
-            background: #f8f9ff;
-            transform: translateY(-2px);
-        }
-        
-        .tool-btn.active {
-            background: #667eea;
-            color: white;
-            border-color: #667eea;
-        }
-        
-        .tool-btn i {
-            display: block;
-            font-size: 1.5rem;
-            margin-bottom: 0.25rem;
-        }
-        
-        .tool-btn span {
-            font-size: 0.75rem;
-        }
-        
-        /* Properties Panel */
-        .properties-panel {
-            background: #f8f9fa;
-            border-radius: 0.5rem;
-            padding: 1rem;
-            margin-top: 1rem;
-        }
-        
-        .property-group {
-            margin-bottom: 1rem;
-        }
-        
-        .property-group label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 0.25rem;
-            color: #495057;
-        }
-        
-        .property-group input,
-        .property-group select {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ced4da;
-            border-radius: 0.25rem;
-            font-size: 0.875rem;
-        }
-        
-        /* Grid Overlay */
-        .grid-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-image: 
-                repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(0,0,0,0.05) 19px, rgba(0,0,0,0.05) 20px),
-                repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(0,0,0,0.05) 19px, rgba(0,0,0,0.05) 20px);
-            pointer-events: none;
-            display: none;
-        }
-        
-        .grid-overlay.active {
-            display: block;
-        }
-        
-        /* Context Menu */
-        .context-menu {
-            position: fixed;
-            background: white;
-            border: 1px solid #e1e4e8;
-            border-radius: 0.5rem;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-            padding: 0.5rem 0;
-            display: none;
-            z-index: 2000;
-            min-width: 160px;
-        }
-        
-        .context-menu-item {
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        
-        .context-menu-item:hover {
-            background: #f8f9fa;
-        }
-        
-        .context-menu-item i {
-            width: 20px;
-            margin-right: 0.5rem;
-            color: #6c757d;
-        }
-        
-        /* Status Bar */
-        .status-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #2d3748;
-            color: white;
-            padding: 0.5rem 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.875rem;
-            z-index: 999;
-        }
-        
-        .status-info {
-            display: flex;
-            gap: 2rem;
-        }
-        
-        .status-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        /* Mini Map */
-        .minimap {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            width: 200px;
-            height: 150px;
-            background: white;
-            border: 2px solid #e1e4e8;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .minimap canvas {
-            width: 100%;
-            height: 100%;
-        }
-        
-        /* Zoom Controls */
-        .zoom-controls {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: white;
-            border-radius: 0.5rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .zoom-btn {
-            padding: 0.75rem;
-            border: none;
-            background: white;
-            cursor: pointer;
-            transition: background 0.2s;
-            display: block;
-            width: 40px;
-            height: 40px;
-        }
-        
-        .zoom-btn:hover {
-            background: #f8f9fa;
-        }
-        
-        .zoom-btn + .zoom-btn {
-            border-top: 1px solid #e1e4e8;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body>
+<body class="weathermap-editor">
     <!-- Toolbar -->
     <div class="editor-toolbar">
         <div class="toolbar-title">
-            <h2 style="margin: 0;">
+            <h2>
                 <i class="fas fa-edit"></i> 
                 <?php echo htmlspecialchars($map['name']); ?>
             </h2>
@@ -347,10 +53,10 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
             <button class="btn-toolbar" onclick="redo()">
                 <i class="fas fa-redo"></i> Redo
             </button>
-            <button class="btn-toolbar" onclick="clearAll()">
+            <button class="btn-toolbar btn-toolbar-danger" onclick="clearAll()">
                 <i class="fas fa-trash"></i> Clear
             </button>
-            <button class="btn-toolbar" onclick="saveMap()" style="background: rgba(40,167,69,0.2); border-color: rgba(40,167,69,0.3);">
+            <button class="btn-toolbar btn-toolbar-primary" onclick="saveMap()">
                 <i class="fas fa-save"></i> Save
             </button>
             <button class="btn-toolbar" onclick="exitEditor()">
@@ -451,6 +157,13 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         <div class="editor-canvas-container">
             <div class="canvas-wrapper">
                 <div class="grid-overlay" id="gridOverlay"></div>
+                <div id="emptyState" class="empty-state editor-empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                    <h3>Start your map</h3>
+                    <p>Add nodes and links to build a LibreNMS-aligned topology view.</p>
+                </div>
                 <canvas id="mapCanvas" 
                         width="<?php echo $map['width']; ?>" 
                         height="<?php echo $map['height']; ?>">
@@ -549,12 +262,14 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     let historyIndex = -1;
     
     // Node types with icons
+    const iconFontFamily = '"Font Awesome 6 Free"';
+    const labelFontFamily = '"Segoe UI", "Helvetica Neue", Arial, sans-serif';
     const nodeTypes = {
-        router: { icon: '🔧', color: '#4a90e2', size: 30 },
-        switch: { icon: '🔌', color: '#50c878', size: 28 },
-        firewall: { icon: '🛡️', color: '#ff6b6b', size: 30 },
-        server: { icon: '💾', color: '#9b59b6', size: 28 },
-        default: { icon: '📍', color: '#95a5a6', size: 25 }
+        router: { icon: '\uf4d7', color: '#4a90e2', size: 30 },
+        switch: { icon: '\uf6ff', color: '#50c878', size: 28 },
+        firewall: { icon: '\uf3ed', color: '#ff6b6b', size: 30 },
+        server: { icon: '\uf233', color: '#9b59b6', size: 28 },
+        default: { icon: '\uf111', color: '#95a5a6', size: 25 }
     };
 
     // Initialize
@@ -666,6 +381,7 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         }
         
         ctx.restore();
+        updateEmptyState();
     }
 
     function drawNode(node) {
@@ -692,15 +408,17 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         ctx.stroke();
         
         // Draw icon
-        ctx.font = '20px Arial';
+        const iconSize = Math.max(12, Math.round(type.size * 0.85));
+        ctx.font = `900 ${iconSize}px ${iconFontFamily}`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(type.icon, node.x, node.y);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(type.icon, node.x, node.y + 1);
         
         // Draw label
         if (node.label) {
             ctx.fillStyle = '#2d3748';
-            ctx.font = 'bold 12px Arial';
+            ctx.font = `600 12px ${labelFontFamily}`;
             ctx.fillText(node.label, node.x, node.y + type.size + 15);
         }
         
@@ -1570,6 +1288,15 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
 
     function updateStatus(message) {
         document.getElementById('statusMessage').textContent = message || 'Ready';
+    }
+
+    function updateEmptyState() {
+        const emptyState = document.getElementById('emptyState');
+        if (!emptyState) {
+            return;
+        }
+        const isEmpty = nodes.length === 0 && links.length === 0;
+        emptyState.style.display = isEmpty ? 'flex' : 'none';
     }
 
     function updateNodeCount() {
