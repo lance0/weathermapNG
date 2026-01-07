@@ -3,23 +3,20 @@
 use Illuminate\Support\Facades\Route;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapTemplateController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\InstallController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\LookupController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\PageController;
 
-// Plugin routes under standard v2 plugin path
-
 Route::middleware(['web', 'auth'])->group(function () {
-    // Installation routes (no auth for initial setup)
     Route::get('plugin/WeathermapNG/install', [InstallController::class, 'index'])->name('weathermapng.install');
     Route::post('plugin/WeathermapNG/install', [InstallController::class, 'install'])->name('weathermapng.install.run');
 
-    // Main pages under plugin path
     Route::get('plugin/WeathermapNG', [PageController::class, 'index'])->name('weathermapng.index');
     Route::get('plugin/WeathermapNG/editor/{map?}', [PageController::class, 'editor'])->name('weathermapng.editor');
     Route::get('plugin/WeathermapNG/view/{map}', [PageController::class, 'view'])->name('weathermapng.view');
-    // Embed view and JSON endpoints
+
     Route::get('plugin/WeathermapNG/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed');
     Route::get('plugin/WeathermapNG/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json');
     Route::get('plugin/WeathermapNG/api/maps/{map}/live', [RenderController::class, 'live'])->name('weathermapng.live');
@@ -27,11 +24,9 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::post('plugin/WeathermapNG/api/import', [RenderController::class, 'import'])->name('weathermapng.import');
     Route::get('plugin/WeathermapNG/api/maps/{map}/sse', [RenderController::class, 'sse'])->name('weathermapng.sse');
 
-    // Device and port lookup endpoints for editor
     Route::get('plugin/WeathermapNG/api/devices', [LookupController::class, 'devices'])->name('weathermapng.devices');
     Route::get('plugin/WeathermapNG/api/device/{id}/ports', [LookupController::class, 'ports'])->name('weathermapng.device.ports');
 
-    // Optional CRUD endpoints (guard as needed)
     Route::post('plugin/WeathermapNG/map', [MapController::class, 'create'])->name('weathermapng.map.create');
     Route::put('plugin/WeathermapNG/map/{map}', [MapController::class, 'update'])->name('weathermapng.map.update');
     Route::delete('plugin/WeathermapNG/map/{map}', [MapController::class, 'destroy'])->name('weathermapng.map.destroy');
@@ -45,9 +40,15 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::delete('plugin/WeathermapNG/map/{map}/node/{node}', [MapController::class, 'deleteNode'])->name('weathermapng.node.delete');
     Route::post('plugin/WeathermapNG/map/{map}/link', [MapController::class, 'createLink'])->name('weathermapng.link.create');
     Route::delete('plugin/WeathermapNG/map/{map}/link/{link}', [MapController::class, 'deleteLink'])->name('weathermapng.link.delete');
+
+    Route::get('plugin/WeathermapNG/templates', [MapTemplateController::class, 'index'])->name('weathermapng.templates.index');
+    Route::get('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'show'])->name('weathermapng.templates.show');
+    Route::post('plugin/WeathermapNG/templates', [MapTemplateController::class, 'store'])->name('weathermapng.templates.store');
+    Route::put('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'update'])->name('weathermapng.templates.update');
+    Route::delete('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'destroy'])->name('weathermapng.templates.destroy');
+    Route::post('plugin/WeathermapNG/templates/{id}/create-map', [MapTemplateController::class, 'createFromTemplate'])->name('weathermapng.templates.create-map');
 });
 
-// Health and probe endpoints (no auth for k8s/monitoring)
 Route::prefix('plugin/WeathermapNG')->group(function () {
     Route::get('/health', [HealthController::class, 'check'])->name('weathermapng.health');
     Route::get('/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
