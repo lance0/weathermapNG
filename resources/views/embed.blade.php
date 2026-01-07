@@ -82,21 +82,33 @@
 </head>
 <body>
     <div id="map-container">
+        <div id="nav-bar" style="position:absolute; top:0; left:0; right:0; background:rgba(52,58,64,0.95); color:#fff; padding:8px 16px; display:flex; justify-content:space-between; align-items:center; z-index:1001; font-size:13px;">
+            <div style="display:flex; align-items:center; gap:16px;">
+                <a href="{{ url('plugin/WeathermapNG') }}" style="color:#fff; text-decoration:none; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-arrow-left"></i> All Maps
+                </a>
+                <span style="color:#adb5bd;">|</span>
+                <span style="font-weight:500;">{{ $mapData['title'] ?? $mapData['name'] ?? 'Map' }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <a href="{{ url('plugin/WeathermapNG/editor/' . $mapId) }}" style="color:#ffc107; text-decoration:none; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-edit"></i> Edit Map
+                </a>
+            </div>
+        </div>
         <div id="loading" class="loading">
             <i class="fas fa-spinner fa-spin"></i>
             <div>Loading map...</div>
         </div>
         <canvas id="map-canvas"></canvas>
-        <canvas id="heat-canvas" style="position:absolute; top:0; left:0; pointer-events:none;"></canvas>
-        <canvas id="minimap" width="160" height="120" style="position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.85); border:1px solid #ddd; border-radius:4px;"></canvas>
+        <canvas id="minimap" width="160" height="120" style="position:absolute; top:55px; right:10px; background:rgba(255,255,255,0.85); border:1px solid #ddd; border-radius:4px;"></canvas>
         <div id="status-bar" class="status-bar" style="display: none;">
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
         <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
-        <div id="controls" style="position:absolute; top:10px; left:10px; z-index:1000; display:flex; gap:8px; align-items:center;">
+        <div id="controls" style="position:absolute; top:55px; left:10px; z-index:1000; display:flex; gap:8px; align-items:center;">
             <button id="toggle-transport" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Live: loading…</button>
             <button id="toggle-flow" style="background:#007bff; color:#fff; border:1px solid #007bff; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Toggle flow animation">🌊 Flow</button>
-            <button id="toggle-heatmap" style="background:#6c757d; color:#fff; border:1px solid #6c757d; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Toggle heatmap overlay">🔥 Heat</button>
             <div style="position:relative;">
                 <button id="viz-settings" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Visualization settings">⚙️</button>
                 <div id="viz-menu" style="position:absolute; top:100%; left:0; background:#fff; border:1px solid #ccc; border-radius:4px; padding:10px; min-width:250px; display:none; margin-top:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
@@ -105,14 +117,9 @@
                         <label style="font-size:11px; display:block;">Particle Density: <span id="density-value">1.0</span></label>
                         <input type="range" id="particle-density" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
                     </div>
-                    <div style="margin-bottom:12px;">
+                    <div style="margin-bottom:8px;">
                         <label style="font-size:11px; display:block;">Particle Speed: <span id="speed-value">1.0</span></label>
                         <input type="range" id="particle-speed" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
-                    </div>
-                    <div style="font-size:12px; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">Heatmap Overlay</div>
-                    <div>
-                        <label style="font-size:11px; display:block;">Intensity: <span id="heatmap-intensity-value">1.0</span></label>
-                        <input type="range" id="heatmap-intensity" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
                     </div>
                 </div>
             </div>
@@ -127,7 +134,7 @@
             </label>
             <button id="export-png" title="Export PNG" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Export PNG</button>
         </div>
-        <div id="legend" style="position:absolute; bottom:10px; right:10px; background:rgba(255,255,255,0.9); border:1px solid #ddd; border-radius:4px; font-size:12px; padding:6px 8px; z-index:1000;">
+        <div id="legend" style="position:absolute; bottom:10px; left:10px; background:rgba(255,255,255,0.9); border:1px solid #ddd; border-radius:4px; font-size:12px; padding:6px 8px; z-index:1000;">
             <div style="font-weight:600; margin-bottom:4px;">Legend</div>
             <div id="legend-rows"></div>
         </div>
@@ -163,11 +170,21 @@
         let mapData = {};
         try {
             mapData = {!! json_encode($mapData ?? []) !!};
+            // Apply initial live data if provided
+            const initialLive = {!! json_encode($liveData ?? []) !!};
+            if (initialLive && initialLive.links && Array.isArray(mapData.links)) {
+                mapData.links.forEach(l => {
+                    const id = l.id ?? l.link_id ?? null;
+                    if (id && initialLive.links[id]) {
+                        l.live = initialLive.links[id];
+                    }
+                });
+            }
         } catch (e) {
             console.error('Failed to parse map data:', e);
             mapData = { error: 'Invalid map data' };
         }
-        let canvas, ctx, heatCanvas, heatCtx, minimap;
+        let canvas, ctx, minimap;
         let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
         let animationId;
         let lastUpdate = Date.now();
@@ -188,12 +205,6 @@
         let particleDensity = 1.0; // 0.5 to 2.0
         let particleSpeed = 1.0; // 0.5 to 2.0
         
-        // Heatmap overlay
-        let heatmapEnabled = false;
-        let heatmapIntensity = 1.0; // 0.5 to 2.0
-        let heatmapDirty = true; // Only redraw when data changes
-        let heatmapCache = null; // Cached heatmap canvas
-
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
             if (mapData && !mapData.error) {
@@ -218,10 +229,6 @@
             const container = document.getElementById('map-container');
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
-            heatCanvas = document.getElementById('heat-canvas');
-            heatCanvas.width = canvas.width;
-            heatCanvas.height = canvas.height;
-            heatCtx = heatCanvas.getContext('2d');
             minimap = document.getElementById('minimap');
 
             // Hide loading
@@ -287,9 +294,6 @@
             // Update status and overlays
             updateStatus();
             drawMinimap();
-            if (heatmapEnabled) {
-                drawHeatOverlay();
-            }
         }
 
         function initNavControls() {
@@ -618,20 +622,24 @@
                 const b = (typeof live.out_bps === 'number') ? live.out_bps : 0;
                 return (a + b) || null;
             }
-            // percent
-            if (typeof live.pct === 'number') return live.pct;
-            const bps = (typeof live.in_bps === 'number') ? live.in_bps : ((live.in_bps || 0) + (live.out_bps || 0));
-            return getLinkPct(link, bps);
+            // percent - return the max of in/out bps for calculation
+            const inBps = (typeof live.in_bps === 'number') ? live.in_bps : 0;
+            const outBps = (typeof live.out_bps === 'number') ? live.out_bps : 0;
+            return Math.max(inBps, outBps) || null;
         }
 
         function getLinkPct(link, metricBps) {
+            // If we have a pre-calculated pct from live data, use it
+            const live = link.live || {};
+            if (typeof live.pct === 'number') return live.pct;
+
+            // Otherwise calculate from bps and bandwidth
             if (typeof metricBps === 'number') {
                 const bw = link.bandwidth_bps || link.bandwidth || null;
                 if (bw) return Math.max(0, Math.min(100, (metricBps / bw) * 100));
                 return null;
             }
-            if (metricBps === null || typeof metricBps === 'undefined') return null;
-            return metricBps; // already percent
+            return null;
         }
 
         function getLinkColor(pct) {
@@ -678,20 +686,7 @@
                     particles = []; // Clear particles when disabled
                 }
             });
-            
-            // Heatmap toggle
-            document.getElementById('toggle-heatmap').addEventListener('click', () => {
-                heatmapEnabled = !heatmapEnabled;
-                const btn = document.getElementById('toggle-heatmap');
-                if (heatmapEnabled) {
-                    btn.style.background = '#dc3545';
-                    btn.style.borderColor = '#dc3545';
-                } else {
-                    btn.style.background = '#6c757d';
-                    btn.style.borderColor = '#6c757d';
-                }
-            });
-            
+
             // Visualization settings menu toggle
             document.getElementById('viz-settings').addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -714,13 +709,7 @@
                 particleSpeed = parseFloat(e.target.value);
                 document.getElementById('speed-value').textContent = particleSpeed.toFixed(1);
             });
-            
-            document.getElementById('heatmap-intensity').addEventListener('input', (e) => {
-                heatmapIntensity = parseFloat(e.target.value);
-                document.getElementById('heatmap-intensity-value').textContent = heatmapIntensity.toFixed(1);
-                heatmapDirty = true;
-            });
-            
+
             // start animation loop
             function tick() {
                 animTick += 1;
@@ -815,7 +804,6 @@
                     });
                 }
             }
-            heatmapDirty = true; // Invalidate heatmap cache on data update
             renderMap();
         }
 
@@ -875,7 +863,6 @@
                 out.width = canvas.width; out.height = canvas.height;
                 const octx = out.getContext('2d');
                 octx.drawImage(canvas, 0, 0);
-                octx.drawImage(heatCanvas, 0, 0);
                 const a = document.createElement('a');
                 a.href = out.toDataURL('image/png');
                 a.download = `weathermap-${mapId}.png`;
@@ -924,10 +911,6 @@
                 const container = document.getElementById('map-container');
                 canvas.width = container.clientWidth;
                 canvas.height = container.clientHeight;
-                const heat = document.getElementById('heat-canvas');
-                heat.width = canvas.width;
-                heat.height = canvas.height;
-                heatmapDirty = true;
                 renderMap();
             }
         });
@@ -1083,86 +1066,6 @@
                 ctxm.fillRect(x-2, y-2, 4, 4);
             });
             ctxm.strokeStyle = '#ccc'; ctxm.strokeRect(0,0,w,h);
-        }
-
-        function drawHeatOverlay() {
-            if (!heatCtx) return;
-
-            // Only regenerate if data changed
-            if (!heatmapDirty && heatmapCache) {
-                heatCtx.clearRect(0, 0, heatCanvas.width, heatCanvas.height);
-                heatCtx.drawImage(heatmapCache, 0, 0);
-                return;
-            }
-
-            // Create/reuse cache canvas
-            if (!heatmapCache) {
-                heatmapCache = document.createElement('canvas');
-            }
-            heatmapCache.width = heatCanvas.width;
-            heatmapCache.height = heatCanvas.height;
-            const cacheCtx = heatmapCache.getContext('2d');
-            cacheCtx.clearRect(0, 0, heatmapCache.width, heatmapCache.height);
-
-            // Simple colored circles (no expensive gradients or blur)
-            cacheCtx.globalCompositeOperation = 'lighter';
-
-            // Draw heat for links
-            linkGeoms.forEach(g => {
-                if (g.pct == null || g.pct === 0) return;
-
-                const intensity = (g.pct / 100) * heatmapIntensity;
-                const alpha = Math.min(0.4, intensity * 0.5);
-
-                // Color based on utilization
-                let color;
-                if (g.pct < 30) color = `rgba(0, 200, 0, ${alpha})`;
-                else if (g.pct < 60) color = `rgba(200, 200, 0, ${alpha})`;
-                else if (g.pct < 80) color = `rgba(255, 140, 0, ${alpha})`;
-                else color = `rgba(220, 50, 50, ${alpha})`;
-
-                // Draw a thick line instead of multiple circles
-                cacheCtx.strokeStyle = color;
-                cacheCtx.lineWidth = 30 + (intensity * 20);
-                cacheCtx.lineCap = 'round';
-                cacheCtx.beginPath();
-                cacheCtx.moveTo(g.x1, g.y1);
-                cacheCtx.lineTo(g.x2, g.y2);
-                cacheCtx.stroke();
-            });
-
-            // Draw heat for problematic nodes (simple circles)
-            (mapData.nodes || []).forEach(n => {
-                const x = (n.position?.x ?? n.x) || 0;
-                const y = (n.position?.y ?? n.y) || 0;
-                const status = n.status || 'unknown';
-                const cpu = n.metrics?.cpu || 0;
-                const mem = n.metrics?.mem || 0;
-
-                let color, radius;
-                if (status === 'down') {
-                    color = `rgba(220, 53, 69, ${0.5 * heatmapIntensity})`;
-                    radius = 40;
-                } else if (cpu > 80 || mem > 80) {
-                    const intensity = (Math.max(cpu, mem) / 100) * heatmapIntensity;
-                    color = `rgba(255, 193, 7, ${intensity * 0.4})`;
-                    radius = 30;
-                } else {
-                    return;
-                }
-
-                cacheCtx.fillStyle = color;
-                cacheCtx.beginPath();
-                cacheCtx.arc(x, y, radius, 0, Math.PI * 2);
-                cacheCtx.fill();
-            });
-
-            cacheCtx.globalCompositeOperation = 'source-over';
-            heatmapDirty = false;
-
-            // Draw cached result
-            heatCtx.clearRect(0, 0, heatCanvas.width, heatCanvas.height);
-            heatCtx.drawImage(heatmapCache, 0, 0);
         }
     </script>
 </body>

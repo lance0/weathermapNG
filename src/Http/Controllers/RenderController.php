@@ -39,7 +39,14 @@ class RenderController
     {
         $mapData = $map->toJsonModel();
         $mapId = $map->id;
-        return view('WeathermapNG::embed', compact('mapData', 'mapId'));
+
+        // Include initial live data so page renders with traffic immediately
+        $liveData = [
+            'links' => $this->nodeDataService->buildLinkData($map),
+            'nodes' => $this->nodeDataService->buildNodeData($map),
+        ];
+
+        return view('WeathermapNG::embed', compact('mapData', 'mapId', 'liveData'));
     }
 
     public function export(Map $map, Request $request): JsonResponse
