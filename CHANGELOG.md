@@ -5,6 +5,66 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-07
+
+### Added
+- **FormRequest Validation**: 4 validation classes following LibreNMS patterns
+- **Authorization Policies**: MapPolicy and NodePolicy for ownership control
+- **Input Sanitization**: Automatic XSS prevention on all user inputs
+- **Security Layer**: Comprehensive validation and authorization system
+
+### Security Improvements (Critical)
+- **XSS Prevention**: Addresses CVE-2024-50355, CVE-2024-32479, CVE-2024-51092
+- **Input Validation**: Proper type checking and regex patterns
+- **Sanitization**: strip_tags() and htmlspecialchars() on all user data
+- **Authorization**: Map ownership checks (only creator/admin can modify)
+- **Output Escaping**: Proper encoding for API responses
+
+### Changed
+- **MapController**: Updated to use FormRequest classes
+- **Validation Strategy**: From inline to FormRequest pattern
+- **Error Messages**: Clear, user-friendly validation errors
+
+### Fixed
+- **Security Vulnerabilities**: Multiple XSS attack vectors addressed
+- **Unauthorized Access**: Added authorization policies
+- **Input Injection**: Proper sanitization prevents malicious input
+
+### Technical Details
+- **FormRequest Classes**:
+  - CreateMapRequest: Validates map name (alphanumeric, hyphens, underscores)
+  - UpdateMapRequest: Validates dimensions and hex colors
+  - CreateNodeRequest: Validates coordinates and devices
+  - CreateLinkRequest: Validates ports and bandwidth
+
+- **Policies**:
+  - MapPolicy: view, create, update, delete, manage
+  - NodePolicy: view, create, update, delete
+  - Admin checks: Admins can modify any map
+  - Ownership checks: Users can only modify their own maps
+
+- **Validation Rules**:
+  - Regex patterns for allowed characters
+  - Min/max constraints (dimensions: 100-4096px)
+  - Exists checks (devices, ports, nodes)
+  - Type validation (integer, string)
+  - Unique constraints (map names)
+
+- **Sanitization Methods**:
+  - strip_tags() on all string inputs
+  - htmlspecialchars() on labels and titles
+  - trim() on all whitespace
+  - HTML entity encoding (ENT_QUOTES, UTF-8)
+
+### Alignment with LibreNMS
+- Uses Laravel FormRequest (LibreNMS standard)
+- Follows LibreNMS plugin-interfaces patterns
+- PSR-2 coding style maintained
+- Security best practices from LibreNMS advisories
+- Matches LibreNMS core validation approach
+
+---
+
 ## [1.3.0] - 2026-01-07
 
 ### Added
