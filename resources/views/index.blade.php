@@ -344,49 +344,17 @@
 .category-advanced { background-color: #007bff; }
 .category-custom { background-color: #6c757d; }
 
-/* ===== Custom Form Sections ===== */
-.custom-form-section {
-    background: var(--idx-stat-bg);
-    border: 1px solid var(--idx-card-border);
-    border-radius: 8px;
-    overflow: hidden;
-}
-.custom-form-section-header {
-    background: var(--idx-card-bg);
-    border-bottom: 1px solid var(--idx-card-border);
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: var(--idx-text);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.custom-form-section-header i {
-    color: #667eea;
-    font-size: 0.9rem;
-}
-.custom-form-section-body {
-    padding: 1rem;
-}
-.custom-form-section .form-group label {
-    font-weight: 500;
-    font-size: 0.9rem;
-    color: var(--idx-text);
-    margin-bottom: 0.35rem;
-}
-.custom-form-section .form-text {
-    color: var(--idx-text-muted);
-    font-size: 0.8rem;
-}
-.custom-form-section .form-control {
+/* ===== Custom Tab Form ===== */
+#customPane .form-control {
     background: var(--idx-input-bg);
     border-color: var(--idx-input-border);
     color: var(--idx-text);
 }
-.custom-form-section .input-group-text {
-    background: var(--idx-card-bg);
-    border-color: var(--idx-input-border);
+#customPane label {
+    color: var(--idx-text);
+    font-weight: 500;
+}
+#customPane .form-text {
     color: var(--idx-text-muted);
 }
 
@@ -617,73 +585,31 @@
                     <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" id="createMapForm" novalidate>
                         @csrf
                         <div class="modal-body">
-                            <!-- Map Details Section -->
-                            <div class="custom-form-section">
-                                <div class="custom-form-section-header">
-                                    <i class="fas fa-info-circle"></i> Map Details
+                            <div class="form-group">
+                                <label for="map-name">Map Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="map-name" name="name" required maxlength="255"
+                                       placeholder="e.g., datacenter-core" aria-required="true">
+                                <small class="form-text text-muted">Unique identifier used in URLs</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="map-title">Display Title</label>
+                                <input type="text" class="form-control" id="map-title" name="title" maxlength="255"
+                                       placeholder="e.g., Datacenter Core Network">
+                                <small class="form-text text-muted">Human-readable title shown in the UI</small>
+                            </div>
+                            <div class="form-row">
+                                <div class="col-6">
+                                    <label for="map-width">Width (px)</label>
+                                    <input type="number" class="form-control" id="map-width" name="width"
+                                           value="800" min="100" max="4096">
                                 </div>
-                                <div class="custom-form-section-body">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group mb-md-0">
-                                                <label for="map-name">Map Name <span class="text-danger">*</span></label>
-                                                <input type="text" class="form-control" id="map-name" name="name" required maxlength="255"
-                                                       placeholder="e.g., datacenter-core" aria-required="true">
-                                                <small class="form-text">Unique ID for URLs</small>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group mb-0">
-                                                <label for="map-title">Display Title</label>
-                                                <input type="text" class="form-control" id="map-title" name="title" maxlength="255"
-                                                       placeholder="e.g., Datacenter Core Network">
-                                                <small class="form-text">Human-readable title</small>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="col-6">
+                                    <label for="map-height">Height (px)</label>
+                                    <input type="number" class="form-control" id="map-height" name="height"
+                                           value="600" min="100" max="4096">
                                 </div>
                             </div>
-
-                            <!-- Canvas Size Section -->
-                            <div class="custom-form-section mt-3">
-                                <div class="custom-form-section-header">
-                                    <i class="fas fa-expand-arrows-alt"></i> Canvas Size
-                                </div>
-                                <div class="custom-form-section-body">
-                                    <div class="row justify-content-center">
-                                        <div class="col-5 col-md-4">
-                                            <div class="form-group mb-0 text-center">
-                                                <label for="map-width">Width</label>
-                                                <div class="input-group">
-                                                    <input type="number" class="form-control text-center" id="map-width" name="width"
-                                                           value="800" min="100" max="4096">
-                                                    <div class="input-group-append">
-                                                        <span class="input-group-text">px</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-auto d-flex align-items-center pt-4">
-                                            <i class="fas fa-times text-muted"></i>
-                                        </div>
-                                        <div class="col-5 col-md-4">
-                                            <div class="form-group mb-0 text-center">
-                                                <label for="map-height">Height</label>
-                                                <div class="input-group">
-                                                    <input type="number" class="form-control text-center" id="map-height" name="height"
-                                                           value="600" min="100" max="4096">
-                                                    <div class="input-group-append">
-                                                        <span class="input-group-text">px</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-center mt-2">
-                                        <small class="text-muted">Dimensions in pixels (100-4096)</small>
-                                    </div>
-                                </div>
-                            </div>
+                            <small class="form-text text-muted">Canvas dimensions in pixels (100-4096)</small>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
