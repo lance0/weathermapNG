@@ -130,11 +130,6 @@
     border-color: var(--idx-input-border);
     color: var(--idx-text);
 }
-.wmng-filters .input-group-text {
-    background: var(--idx-input-bg);
-    border-color: var(--idx-input-border);
-    color: var(--idx-text-muted);
-}
 
 /* ===== Map Cards ===== */
 .map-card {
@@ -414,12 +409,7 @@
                 </div>
             </div>
             <div class="wmng-filters">
-                <div class="input-group" style="width: 280px;">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                    </div>
-                    <input type="text" class="form-control" id="map-search" placeholder="Search maps..." aria-label="Search maps">
-                </div>
+                <input type="text" class="form-control" id="map-search" placeholder="Search maps..." aria-label="Search maps" style="width: 280px;">
                 <select class="form-control" id="map-filter" style="width: 180px;" aria-label="Sort maps">
                     <option value="name-asc">Name (A-Z)</option>
                     <option value="name-desc">Name (Z-A)</option>
