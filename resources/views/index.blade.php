@@ -566,7 +566,7 @@
 
             <div class="tab-content">
                 <!-- Templates Tab -->
-                <div class="tab-pane fade show active" id="templatesPane" role="tabpanel">
+                <div class="tab-pane active" id="templatesPane" role="tabpanel">
                     <div class="modal-body">
                         <div id="templatesLoading" class="text-center py-3">
                             <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
@@ -581,7 +581,7 @@
                 </div>
 
                 <!-- Custom Tab -->
-                <div class="tab-pane fade" id="customPane" role="tabpanel">
+                <div class="tab-pane" id="customPane" role="tabpanel">
                     <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" id="createMapForm" novalidate>
                         @csrf
                         <div class="modal-body">
