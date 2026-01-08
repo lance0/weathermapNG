@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Redirect;
+use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use Exception;
 
 class PageController extends Controller
@@ -20,19 +21,10 @@ class PageController extends Controller
             return redirect()->route('weathermapng.install');
         }
 
-        // Get all maps with counts
-        $maps = DB::table('wmng_maps')
-            ->select('wmng_maps.*')
-            ->selectRaw('(SELECT COUNT(*) FROM wmng_nodes WHERE map_id = wmng_maps.id) as nodes_count')
-            ->selectRaw('(SELECT COUNT(*) FROM wmng_links WHERE map_id = wmng_maps.id) as links_count')
-            ->orderBy('name')
-            ->get();
+        // Get all maps with counts using Eloquent for proper model features
+        $maps = Map::withCount(['nodes', 'links'])->orderBy('name')->get();
 
-        return view('WeathermapNG::page', [
-            'title' => 'Network Weather Maps',
-            'maps' => $maps,
-            'can_create' => true,
-        ]);
+        return view('WeathermapNG::index', compact('maps'));
     }
 
     /**

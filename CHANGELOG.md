@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Main Index Page Redesign**: Complete visual overhaul of the plugin index page
+  - **Dark/Light Mode Support**: CSS variables and theme detection matching LibreNMS
+  - **Enhanced Card Design**: Gradient headers, stats badges, hover effects with lift/shadow
+  - **Improved Header**: Better spacing, import button, total stats display
+  - **Better Empty State**: Helpful guidance with icon and quick-start prompt
+  - **Search & Sort**: Filter maps by name with sort options
+- **Map Editor Overhaul**: Comprehensive editor improvements
+  - **GIMP/Photoshop-style Layout**: Vertical toolbox on left, canvas in center, properties panel on right
+  - **Dark Mode Support**: Full light/dark theme support using CSS variables
+  - **Left Toolbox**: Icon-only tool buttons for add, link, snap, copy, delete, undo/redo, zoom
+  - **Status Bar**: Live node/link counts and zoom level in top bar
+  - **Unsaved Indicator**: Yellow badge shows when changes need saving
+  - **Preview Button**: Open map in embed view directly from editor
+  - **Nodes List Panel**: List of all nodes with quick select/delete
+  - **Links List Panel**: List showing all connections
+  - **Duplicate Node**: Copy selected node with offset positioning
+  - **Link Mode Feedback**: Visual feedback showing link start node (orange highlight, pulsing button)
+  - **Zoom & Pan**: Mouse wheel zoom, middle-click pan, zoom controls (+/-/reset)
+  - **Editor Minimap**: Overview in bottom-right with click-to-navigate
+  - **Keyboard Shortcuts**: Ctrl+S save, Ctrl+Z/Y undo/redo, Delete node, Arrow nudge, Esc deselect
+  - **Undo/Redo System**: Full undo/redo with 50-state history
+  - **Grid Snapping**: Toggle snap-to-grid with visual grid overlay
+  - **Link Modal**: Edit/delete links with port selection and bandwidth
+  - **Node Property Panel**: Edit selected node properties in sidebar
+  - **Smart Node Placement**: Spiral placement to avoid overlapping new nodes
+  - **Boundary Checking**: Nodes constrained to canvas bounds during drag
+  - **Canvas Resize Validation**: Warns when nodes would be outside new bounds
+  - **Auto-Save**: 5-minute auto-save when toggle enabled
+  - **JSON Export**: Download current map as JSON file from toolbar
 - **Demo Mode**: Simulated traffic data for testing without real LibreNMS devices
   - Enable with `WEATHERMAPNG_DEMO_MODE=true` environment variable
   - Links without port associations get randomized 10-85% utilization
@@ -52,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Status Bar**: Now shows relative time since last data update (e.g., "Just now", "15s ago", "2m ago")
 
 ### Fixed
+- **Modal Accessibility**: Removed static `aria-hidden="true"` from modals to fix focus warning
+- **Create Map Modal**: Fixed canvas size inputs not centered using inline flexbox
 - **Map Rendering**: Fixed `toJsonModel()` returning Eloquent Collections instead of arrays
 - **Link Coordinates**: Fixed `drawLink()` not reading node x/y coordinates correctly
 - **Demo Mode Traffic**: Fixed percentage calculation that was treating pre-calculated percentages as BPS
