@@ -91,7 +91,7 @@ class InstallController extends Controller
     {
         try {
             $tables = DB::select("SHOW TABLES LIKE 'wmng_%'");
-            return count($tables) === 0;
+            return count($tables) >= 5;
         } catch (Exception $e) {
             return false;
         }
