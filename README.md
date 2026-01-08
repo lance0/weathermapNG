@@ -177,4 +177,4 @@ Pull requests welcome. Please follow PSR-12 coding standards and include tests.
 
 ## License
 
-Unlicense - Public Domain
+MIT License - see [LICENSE](LICENSE)
