@@ -187,7 +187,7 @@
     flex-direction: column;
 }
 .map-card-title {
-    font-size: 1.25rem;
+    font-size: 1.4rem;
     font-weight: 600;
     color: var(--idx-text);
     margin: 0 0 0.35rem;
@@ -196,8 +196,8 @@
     text-overflow: ellipsis;
 }
 .map-card-name {
-    font-size: 0.9rem;
-    color: var(--idx-text-light);
+    font-size: 1.1rem;
+    color: var(--idx-text-muted);
     margin-bottom: 1rem;
     font-family: monospace;
 }
@@ -213,18 +213,18 @@
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: var(--idx-text-muted);
     background: var(--idx-stat-bg);
-    padding: 0.4rem 0.75rem;
+    padding: 0.5rem 0.85rem;
     border-radius: 6px;
 }
-.map-stat-badge i { font-size: 0.85rem; opacity: 0.7; }
+.map-stat-badge i { font-size: 0.9rem; opacity: 0.7; }
 
 /* Meta/Updated */
 .map-card-meta {
-    font-size: 0.9rem;
-    color: var(--idx-text-light);
+    font-size: 1rem;
+    color: var(--idx-text-muted);
     margin-top: auto;
     padding-top: 0.75rem;
     border-top: 1px solid var(--idx-stat-border);
