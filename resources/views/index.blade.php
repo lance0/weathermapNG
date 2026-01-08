@@ -123,13 +123,12 @@
     display: flex;
     gap: 0.75rem;
     flex-wrap: wrap;
+    align-items: center;
 }
 .wmng-filters .form-control {
     background: var(--idx-input-bg);
     border-color: var(--idx-input-border);
     color: var(--idx-text);
-    font-size: 1rem;
-    padding: 0.5rem 0.75rem;
 }
 .wmng-filters .input-group-text {
     background: var(--idx-input-bg);
