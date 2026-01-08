@@ -538,7 +538,7 @@
 
 <!-- Create Map Modal -->
 <div class="modal fade" id="createMapModal" tabindex="-1" role="dialog" aria-labelledby="createMapModalTitle">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg" id="createMapDialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createMapModalTitle">
@@ -1018,6 +1018,16 @@ function escapeHtml(text) {
 $('#createMapModal').on('shown.bs.modal', function() {
     if (!templatesLoaded) {
         loadTemplates();
+    }
+});
+
+// Toggle modal size based on active tab
+$('#createMapTabs a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
+    const dialog = document.getElementById('createMapDialog');
+    if (e.target.id === 'templates-tab') {
+        dialog.classList.add('modal-lg');
+    } else {
+        dialog.classList.remove('modal-lg');
     }
 });
 </script>
