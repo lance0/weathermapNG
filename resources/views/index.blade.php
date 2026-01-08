@@ -902,7 +902,8 @@ function loadTemplates() {
         return response.json();
     })
     .then(data => {
-        templatesData = Array.isArray(data) ? data : (data.data || []);
+        // API returns { success: true, templates: [...] }
+        templatesData = Array.isArray(data) ? data : (data.templates || data.data || []);
         renderTemplates(templatesData);
         templatesLoaded = true;
         loading.style.display = 'none';
