@@ -23,7 +23,9 @@ jobs:
 
       - name: Check PHP syntax
         run: |
-          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; | grep -v "No syntax errors"
+          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -v "No syntax errors" || true
+          # Fail if any actual errors found
+          ! find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -q "Parse error"
 
       - name: Validate composer.json
         run: composer validate --no-check-publish
