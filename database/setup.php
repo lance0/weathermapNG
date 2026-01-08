@@ -74,8 +74,12 @@ try {
             echo "✓ Table 'wmng_links' already exists\n";
             $tablesExist++;
         }
+        if (Schema::hasTable('wmng_map_versions')) {
+            echo "✓ Table 'wmng_map_versions' already exists\n";
+            $tablesExist++;
+        }
 
-        if ($tablesExist === 3) {
+        if ($tablesExist === 4) {
             // Check for missing columns in existing tables
             if (!Schema::hasColumn('wmng_maps', 'title')) {
                 Schema::table('wmng_maps', function (Blueprint $t) {
@@ -85,6 +89,26 @@ try {
             }
 
             echo "\n✅ All tables already exist and are up to date.\n";
+            exit(0);
+        }
+
+        // Check if versions table is missing (upgrade from older install)
+        if ($tablesExist === 3 && !Schema::hasTable('wmng_map_versions')) {
+            echo "🔄 Adding missing wmng_map_versions table...\n";
+            Schema::create('wmng_map_versions', function (Blueprint $t) {
+                $t->id();
+                $t->unsignedBigInteger('map_id');
+                $t->foreign('map_id')->references('id')->on('wmng_maps')->onDelete('cascade');
+                $t->string('name')->nullable();
+                $t->text('description')->nullable();
+                $t->longText('config_snapshot')->nullable();
+                $t->string('created_by')->nullable();
+                $t->timestamp('created_at')->useCurrent();
+                $t->index(['map_id']);
+                $t->index(['created_at']);
+            });
+            echo "✓ Created table 'wmng_map_versions'\n";
+            echo "\n✅ Database upgraded successfully!\n";
             exit(0);
         }
 
@@ -136,6 +160,23 @@ try {
             echo "✓ Created table 'wmng_links'\n";
         }
 
+        // Create map versions table (for versioning system)
+        if (!Schema::hasTable('wmng_map_versions')) {
+            Schema::create('wmng_map_versions', function (Blueprint $t) {
+                $t->id();
+                $t->unsignedBigInteger('map_id');
+                $t->foreign('map_id')->references('id')->on('wmng_maps')->onDelete('cascade');
+                $t->string('name')->nullable();
+                $t->text('description')->nullable();
+                $t->longText('config_snapshot')->nullable();
+                $t->string('created_by')->nullable();
+                $t->timestamp('created_at')->useCurrent();
+                $t->index(['map_id']);
+                $t->index(['created_at']);
+            });
+            echo "✓ Created table 'wmng_map_versions'\n";
+        }
+
         echo "\n✅ Database setup completed successfully (Laravel Schema method)!\n";
         exit(0);
     } else {
@@ -161,7 +202,7 @@ try {
         $result = $pdo->query("SHOW TABLES LIKE 'wmng_%'");
         $existingTables = $result->fetchAll(PDO::FETCH_COLUMN);
 
-        if (count($existingTables) >= 3) {
+        if (count($existingTables) >= 4) {
             // Check for missing columns
             $columns = $pdo->query("SHOW COLUMNS FROM `wmng_maps` LIKE 'title'")->fetchAll();
             if (empty($columns)) {
@@ -170,6 +211,29 @@ try {
             }
 
             echo "✅ All tables already exist and are up to date (Direct SQL method).\n";
+            exit(0);
+        }
+
+        // Check if versions table is missing (upgrade from older install)
+        if (count($existingTables) >= 3 && !in_array('wmng_map_versions', $existingTables)) {
+            echo "🔄 Adding missing wmng_map_versions table...\n";
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `wmng_map_versions` (
+                  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+                  `map_id` bigint unsigned NOT NULL,
+                  `name` varchar(255) DEFAULT NULL,
+                  `description` text,
+                  `config_snapshot` longtext,
+                  `created_by` varchar(255) DEFAULT NULL,
+                  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY (`id`),
+                  KEY `wmng_map_versions_map_id_index` (`map_id`),
+                  KEY `wmng_map_versions_created_at_index` (`created_at`),
+                  CONSTRAINT `wmng_map_versions_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            ");
+            echo "✓ Created table 'wmng_map_versions'\n";
+            echo "✅ Database upgraded successfully (Direct SQL method).\n";
             exit(0);
         }
 
@@ -224,6 +288,20 @@ try {
           CONSTRAINT `wmng_links_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE,
           CONSTRAINT `wmng_links_src_node_id_foreign` FOREIGN KEY (`src_node_id`) REFERENCES `wmng_nodes` (`id`),
           CONSTRAINT `wmng_links_dst_node_id_foreign` FOREIGN KEY (`dst_node_id`) REFERENCES `wmng_nodes` (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+        CREATE TABLE IF NOT EXISTS `wmng_map_versions` (
+          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+          `map_id` bigint unsigned NOT NULL,
+          `name` varchar(255) DEFAULT NULL,
+          `description` text,
+          `config_snapshot` longtext,
+          `created_by` varchar(255) DEFAULT NULL,
+          `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`),
+          KEY `wmng_map_versions_map_id_index` (`map_id`),
+          KEY `wmng_map_versions_created_at_index` (`created_at`),
+          CONSTRAINT `wmng_map_versions_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ";
 
