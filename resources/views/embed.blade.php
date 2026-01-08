@@ -167,9 +167,12 @@
         if (scale !== 'bytes') scale = 'bits';
         let intervalSec = parseInt(param('interval', WMNG_CONFIG.client_refresh), 10) || WMNG_CONFIG.client_refresh;
         let sseEnabled = param('sse', WMNG_CONFIG.enable_sse ? '1' : '0') !== '0' && !!window.EventSource;
-        let sseMax = parseInt(param('max', 60), 10) || 60;
+        let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
         let currentTransport = 'init';
         let eventSourceRef = null;
+        let sseReconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 2000; // 2 seconds
         let lastDataUpdate = null;
         let mapData = {};
         try {
@@ -817,6 +820,7 @@
                 updateTransportButton();
                 es.onmessage = (e) => {
                     try {
+                        sseReconnectAttempts = 0; // Reset on successful message
                         const live = JSON.parse(e.data);
                         applyLiveUpdate(live);
                     } catch {}
@@ -824,10 +828,19 @@
                 es.onerror = () => {
                     es.close();
                     eventSourceRef = null;
-                    // fall back to polling
-                    currentTransport = 'poll';
-                    sseEnabled = false;
-                    startAutoUpdate();
+                    // Try to reconnect if SSE was enabled
+                    if (sseEnabled && sseReconnectAttempts < maxReconnectAttempts) {
+                        sseReconnectAttempts++;
+                        setTimeout(() => {
+                            if (sseEnabled) startSSE();
+                        }, reconnectDelay);
+                    } else {
+                        // Fall back to polling after max attempts
+                        currentTransport = 'poll';
+                        sseEnabled = false;
+                        sseReconnectAttempts = 0;
+                        startAutoUpdate();
+                    }
                 };
             } catch (e) {
                 currentTransport = 'poll';
