@@ -64,6 +64,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Was not following minimap navigation correctly
   - Performance concerns with blur filters on every frame
 
+## [1.6.0] - 2026-01-08
+
+### Changed
+- **Data Fetching Simplified**: Now uses RRD files as the single source of truth
+  - Removed unreliable API fallback (wrong auth headers, wrong endpoints)
+  - Removed SNMP polling (counter-to-rate bug, complex state management)
+- **RRD Path Resolution**: Now matches LibreNMS naming convention (`port-{ifName}.rrd`)
+  - Properly sanitizes interface names (replaces `/`, `:`, spaces with `-`)
+  - Falls back to port_id and ifIndex patterns for legacy installations
+- **Utilization Calculation**: Fixed for full-duplex links
+  - Now uses `max(in, out)` instead of `(in + out)` for percentage
+  - Prevents showing 200% when both directions are saturated
+- **Service Architecture**: Proper dependency injection via ServiceProvider
+  - Registered all core services (MapVersionService, MapCacheService, DevicePortLookup, RrdDataService, PortUtilService)
+  - Clean constructor injection for testability
+- **Settings Authorization**: Now requires admin privileges
+  - Checks hasGlobalAdmin(), isAdmin(), or level >= 10
+
+### Fixed
+- **Cache Key Collision**: Port metadata and traffic data now use separate cache keys
+  - DevicePortLookup: `weathermapng.port.meta.{id}`
+  - PortUtilService: `weathermapng.port.traffic.{id}`
+- **Cache Invalidation**: Removed non-functional wildcard patterns from clearCaches()
+- **Version Sync**: Unified version to 1.6.0 across composer.json and WeathermapNG.php
+
+### Removed
+- **LibreNMSAPI Service**: Deleted `src/RRD/LibreNMSAPI.php`
+  - Had wrong authentication (Bearer instead of X-Auth-Token)
+  - Used wrong API endpoints that don't return rate data
+  - Silently returned mock data on failure, masking real issues
+- **SNMP Polling**: Deleted `src/Services/SnmpDataService.php`
+  - Had counter-to-rate calculation bug (returned raw counters × 8)
+  - Required complex state tracking for delta calculation
+- **Auto-Discovery**: Disabled `discoverAndSeedMap()` method
+  - ifIndex-based neighbor matching doesn't work reliably
+  - Future: Will use LibreNMS LLDP/CDP data from links table
+- **Config Options**: Removed `enable_local_rrd`, `enable_api_fallback`, `snmp.*`, `api_token`
+
 ## [1.5.1] - 2026-01-07
 
 ### Added

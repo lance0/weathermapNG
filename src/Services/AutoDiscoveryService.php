@@ -17,22 +17,16 @@ class AutoDiscoveryService
         $this->gridLayout = new GridLayout(100, 100, 120, 8);
     }
 
+    /**
+     * Auto-discovery is currently disabled.
+     *
+     * The ifIndex-based neighbor matching doesn't work reliably.
+     * Future versions will use LibreNMS LLDP/CDP data from the links table.
+     */
     public function discoverAndSeedMap(Map $map, array $params): array
     {
-        try {
-            $devices = $this->discoverDevices($params);
-            $existingNodes = $this->getExistingNodeMapping($map);
-            $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
-
-            $connectivityData = $this->buildConnectivityGraph($nodeMapping);
-            $this->createDiscoveredLinks($map, $connectivityData['links'], $nodeMapping);
-            $this->applyLayoutAlgorithm();
-
-            return $nodeMapping;
-        } catch (\Exception $e) {
-            Log::error("Auto-discovery failed for map {$map->id}: " . $e->getMessage());
-            throw $e;
-        }
+        Log::warning("WeathermapNG: Auto-discovery is disabled. Use manual node/link creation instead.");
+        return [];
     }
 
     public function validateDiscoveryParams(array $params): array

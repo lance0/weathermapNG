@@ -38,7 +38,7 @@ class WeathermapNG
 
     public function getVersion()
     {
-        return '1.2.2';
+        return '1.6.0';
     }
 
     public function getInfo()
@@ -98,19 +98,9 @@ class WeathermapNG
             'scale' => 'bits',
             'rrd_base' => '/opt/librenms/rrd',
             'rrdcached' => ['socket' => null],
-            'enable_local_rrd' => true,
-            'enable_api_fallback' => true,
             'cache_ttl' => 300,
             'enable_sse' => true,
             'client_refresh' => 60,
-            'snmp' => [
-                'enabled' => false,
-                'version' => '2c',
-                'community' => null,
-                'timeout' => 1,
-                'retries' => 1,
-            ],
-            'api_token' => null,
             'colors' => [
                 'node_up' => '#28a745',
                 'node_down' => '#dc3545',

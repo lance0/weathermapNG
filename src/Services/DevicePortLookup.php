@@ -115,7 +115,8 @@ class DevicePortLookup
      */
     public function getPort(int $portId): ?array
     {
-        $cacheKey = "weathermapng.port.{$portId}";
+        // Use distinct cache key to avoid collision with PortUtilService traffic data
+        $cacheKey = "weathermapng.port.meta.{$portId}";
         $cacheTtl = config('weathermapng.cache_ttl', 300);
 
         return Cache::remember($cacheKey, $cacheTtl, function () use ($portId) {
@@ -210,19 +211,14 @@ class DevicePortLookup
 
     /**
      * Clear all caches
+     *
+     * Note: Cache::forget() does not support wildcards. We only clear the
+     * global all_devices cache here. Per-entity caches (device, port) will
+     * expire naturally via TTL (5 minutes default).
      */
     public function clearCaches(): void
     {
-        $cacheKeys = [
-            'weathermapng.all_devices',
-            'weathermapng.device_search.*',
-            'weathermapng.device.*',
-            'weathermapng.device_ports.*',
-            'weathermapng.port.*',
-        ];
-
-        foreach ($cacheKeys as $pattern) {
-            Cache::forget($pattern);
-        }
+        // Only clear the global cache - per-entity caches expire via TTL
+        Cache::forget('weathermapng.all_devices');
     }
 }
