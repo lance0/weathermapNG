@@ -1160,8 +1160,24 @@
         });
 
         function drawMinimap() {
-            if (!minimap || !Array.isArray(mapData.nodes)) return;
-            const mw = mapData.width || 800, mh = mapData.height || 600;
+            if (!minimap || !Array.isArray(mapData.nodes) || mapData.nodes.length === 0) return;
+
+            // Calculate actual bounds from node positions
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            mapData.nodes.forEach(n => {
+                const nx = (n.position?.x ?? n.x) || 0;
+                const ny = (n.position?.y ?? n.y) || 0;
+                minX = Math.min(minX, nx);
+                minY = Math.min(minY, ny);
+                maxX = Math.max(maxX, nx);
+                maxY = Math.max(maxY, ny);
+            });
+
+            // Use larger of map dimensions or node extent (with padding)
+            const padding = 50;
+            const mw = Math.max(mapData.width || 800, maxX + padding);
+            const mh = Math.max(mapData.height || 600, maxY + padding);
+
             const w = minimap.width, h = minimap.height;
             const s = Math.min(w/mw, h/mh);
             // Center the map in minimap
