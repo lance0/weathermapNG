@@ -46,6 +46,11 @@ docker exec -u librenms <container_name> php /opt/librenms/artisan view:clear
 
 **Important**: Always run commands as the `librenms` user (`-u librenms`), not root.
 
+**View Docker Logs**:
+```bash
+docker compose logs librenms
+```
+
 ## Manual Installation
 
 If you prefer manual control or the automated script doesn't work:
@@ -166,7 +171,7 @@ Demo mode generates simulated traffic data for links without real port associati
 WEATHERMAPNG_DEMO_MODE=true
 
 # Or for Docker
-docker exec <container> bash -c 'echo "WEATHERMAPNG_DEMO_MODE=true" >> /data/.env'
+docker exec -u librenms <container> bash -c 'echo "WEATHERMAPNG_DEMO_MODE=true" >> /opt/librenms/.env'
 ```
 
 **Option 2: Config Override**
@@ -182,7 +187,7 @@ return [
 
 In demo mode:
 - Links without port_id_a/port_id_b get randomized traffic (10-85% utilization)
-- Flow animations and heatmaps work with simulated data
+- Flow animations work with simulated data
 - Node status remains "unknown" unless connected to real devices
 
 ### Create Demo Map

@@ -7,7 +7,7 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 - **Real-time Visualization**: Live traffic data with animated flow indicators
 - **Interactive Editor**: Professional map editor with device integration
 - **LibreNMS-native UI**: Editor and map views styled to match the LibreNMS interface
-- **Multiple Data Sources**: RRD files → LibreNMS API → SNMP fallback
+- **RRD-based Traffic Data**: Real-time bandwidth from LibreNMS RRD files
 - **Server-Sent Events**: Real-time updates without polling
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
@@ -151,15 +151,8 @@ WeathermapNG follows a modular service-oriented architecture to ensure high perf
 - **NodeService**: Dedicated service for Node creation, updates, and validation.
 - **LinkService**: Manages Link life-cycle and port-to-device pairing validation.
 - **SseStreamService**: Manages real-time data streaming via Server-Sent Events.
-- **AutoDiscoveryService**: Implements topology discovery algorithms and graph building.
-- **PortUtilService**: Provides a unified interface for RRD, API, and SNMP data sources.
-
-### Data Sources
-
-The plugin uses a multi-tier fallback strategy for traffic data:
-1. **Local RRD**: Fast, direct file access if available on the same host.
-2. **LibreNMS API**: Fallback to the internal API for distributed setups.
-3. **SNMP**: Direct on-demand polling for critical real-time updates (optional).
+- **AutoDiscoveryService**: Topology discovery (currently disabled, use manual node/link creation).
+- **PortUtilService**: Provides RRD-based traffic data for links.
 
 ## 🛠️ Development
 
