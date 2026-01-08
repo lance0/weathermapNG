@@ -294,6 +294,56 @@
 /* ===== Modal Title Icon ===== */
 .modal-title i { color: #667eea; margin-right: 0.5rem; }
 
+/* ===== Template Cards ===== */
+.template-card {
+    background: var(--idx-card-bg);
+    border: 1px solid var(--idx-card-border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+.template-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px var(--idx-card-shadow-hover);
+    transform: translateY(-2px);
+}
+.template-card-icon {
+    font-size: 2rem;
+    color: #667eea;
+    margin-bottom: 0.75rem;
+}
+.template-card-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--idx-text);
+    margin-bottom: 0.5rem;
+}
+.template-card-desc {
+    font-size: 0.9rem;
+    color: var(--idx-text-muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.4;
+}
+.template-card-meta {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+.template-card-meta .badge {
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.3em 0.6em;
+}
+.template-card-btn {
+    width: 100%;
+}
+.category-basic { background-color: #28a745; }
+.category-advanced { background-color: #007bff; }
+.category-custom { background-color: #6c757d; }
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .wmng-header-top { flex-direction: column; align-items: stretch; }
@@ -474,9 +524,8 @@
 
 <!-- Create Map Modal -->
 <div class="modal fade" id="createMapModal" tabindex="-1" role="dialog" aria-labelledby="createMapModalTitle">
-    <div class="modal-dialog modal-dialog-centered">
-        <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" class="modal-content" id="createMapForm" novalidate>
-            @csrf
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createMapModalTitle">
                     <i class="fas fa-plus-circle" aria-hidden="true"></i>
@@ -486,53 +535,91 @@
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="map-name">Map Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="map-name" name="name" required maxlength="255"
-                           placeholder="e.g., datacenter-core" aria-required="true">
-                    <small class="form-text">Unique identifier used in URLs (no spaces)</small>
-                </div>
-                <div class="form-group">
-                    <label for="map-title">Display Title</label>
-                    <input type="text" class="form-control" id="map-title" name="title" maxlength="255"
-                           placeholder="e.g., Datacenter Core Network">
-                    <small class="form-text">Human-readable title shown in the interface</small>
-                </div>
-                <div class="form-group">
-                    <label style="display: block; text-align: center;">Canvas Size</label>
-                    <div style="display: flex; justify-content: center; margin-top: 0.5rem; gap: 1rem;">
-                        <div style="width: 150px;">
-                            <label class="small text-muted mb-1" style="display: block; text-align: center;">Width</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="map-width" name="width"
-                                       value="800" min="100" max="4096">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">px</span>
-                                </div>
-                            </div>
+
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs px-3 pt-2" id="createMapTabs" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" id="templates-tab" data-toggle="tab" href="#templatesPane" role="tab">
+                        <i class="fas fa-th-large mr-1"></i>From Template
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="custom-tab" data-toggle="tab" href="#customPane" role="tab">
+                        <i class="fas fa-edit mr-1"></i>Custom
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- Templates Tab -->
+                <div class="tab-pane fade show active" id="templatesPane" role="tabpanel">
+                    <div class="modal-body">
+                        <div id="templatesLoading" class="text-center py-4">
+                            <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                            <p class="mt-2 text-muted">Loading templates...</p>
                         </div>
-                        <div style="width: 150px;">
-                            <label class="small text-muted mb-1" style="display: block; text-align: center;">Height</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="map-height" name="height"
-                                       value="600" min="100" max="4096">
-                                <div class="input-group-append">
-                                    <span class="input-group-text">px</span>
-                                </div>
-                            </div>
+                        <div id="templatesGrid" class="row" style="display: none;"></div>
+                        <div id="templatesError" class="alert alert-warning" style="display: none;">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <span>Failed to load templates. <a href="#" onclick="loadTemplates(); return false;">Retry</a></span>
                         </div>
                     </div>
-                    <small class="form-text" style="display: block; text-align: center;">Canvas dimensions in pixels (100-4096)</small>
+                </div>
+
+                <!-- Custom Tab -->
+                <div class="tab-pane fade" id="customPane" role="tabpanel">
+                    <form method="POST" action="{{ url('plugin/WeathermapNG/map') }}" id="createMapForm" novalidate>
+                        @csrf
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="map-name">Map Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="map-name" name="name" required maxlength="255"
+                                       placeholder="e.g., datacenter-core" aria-required="true">
+                                <small class="form-text">Unique identifier used in URLs (no spaces)</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="map-title">Display Title</label>
+                                <input type="text" class="form-control" id="map-title" name="title" maxlength="255"
+                                       placeholder="e.g., Datacenter Core Network">
+                                <small class="form-text">Human-readable title shown in the interface</small>
+                            </div>
+                            <div class="form-group">
+                                <label style="display: block; text-align: center;">Canvas Size</label>
+                                <div style="display: flex; justify-content: center; margin-top: 0.5rem; gap: 1rem;">
+                                    <div style="width: 150px;">
+                                        <label class="small text-muted mb-1" style="display: block; text-align: center;">Width</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="map-width" name="width"
+                                                   value="800" min="100" max="4096">
+                                            <div class="input-group-append">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style="width: 150px;">
+                                        <label class="small text-muted mb-1" style="display: block; text-align: center;">Height</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="map-height" name="height"
+                                                   value="600" min="100" max="4096">
+                                            <div class="input-group-append">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <small class="form-text" style="display: block; text-align: center;">Canvas dimensions in pixels (100-4096)</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary" id="createMapSubmitBtn">
+                                <i class="fas fa-plus mr-1" aria-hidden="true"></i>Create Map
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="createMapSubmitBtn">
-                    <i class="fas fa-plus mr-1" aria-hidden="true"></i>Create Map
-                </button>
-            </div>
-        </form>
+        </div>
     </div>
 </div>
 
@@ -789,6 +876,147 @@ document.addEventListener('DOMContentLoaded', function() {
 
     sortCards(filterSelect.value);
     applyFilter();
+});
+
+// ===== Templates Gallery =====
+let templatesLoaded = false;
+let templatesData = [];
+
+function loadTemplates() {
+    const loading = document.getElementById('templatesLoading');
+    const grid = document.getElementById('templatesGrid');
+    const error = document.getElementById('templatesError');
+
+    loading.style.display = '';
+    grid.style.display = 'none';
+    error.style.display = 'none';
+
+    fetch('{{ url("plugin/WeathermapNG/templates") }}', {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Failed to load templates');
+        return response.json();
+    })
+    .then(data => {
+        templatesData = Array.isArray(data) ? data : (data.data || []);
+        renderTemplates(templatesData);
+        templatesLoaded = true;
+        loading.style.display = 'none';
+        grid.style.display = 'flex';
+    })
+    .catch(err => {
+        console.error('Templates load error:', err);
+        loading.style.display = 'none';
+        error.style.display = '';
+    });
+}
+
+function renderTemplates(templates) {
+    const grid = document.getElementById('templatesGrid');
+    grid.innerHTML = '';
+
+    if (templates.length === 0) {
+        grid.innerHTML = '<div class="col-12 text-center py-4 text-muted">No templates available.</div>';
+        return;
+    }
+
+    templates.forEach(template => {
+        const categoryClass = 'category-' + (template.category || 'custom');
+        const nodeCount = template.config?.default_nodes?.length || 0;
+        const linkCount = template.config?.default_links?.length || 0;
+
+        const card = document.createElement('div');
+        card.className = 'col-md-6 col-lg-4';
+        card.innerHTML = `
+            <div class="template-card" onclick="selectTemplate(${template.id})">
+                <div class="template-card-icon">
+                    <i class="${template.icon || 'fas fa-map'}"></i>
+                </div>
+                <div class="template-card-title">${escapeHtml(template.title || template.name)}</div>
+                <div class="template-card-desc">${escapeHtml(template.description || '')}</div>
+                <div class="template-card-meta">
+                    <span class="badge badge-secondary">${template.width}x${template.height}</span>
+                    <span class="badge ${categoryClass}">${template.category || 'custom'}</span>
+                    ${nodeCount > 0 ? `<span class="badge badge-light">${nodeCount} nodes</span>` : ''}
+                    ${linkCount > 0 ? `<span class="badge badge-light">${linkCount} links</span>` : ''}
+                </div>
+                <button type="button" class="btn btn-primary btn-sm template-card-btn" onclick="event.stopPropagation(); selectTemplate(${template.id})">
+                    <i class="fas fa-plus mr-1"></i>Use Template
+                </button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function selectTemplate(templateId) {
+    const template = templatesData.find(t => t.id === templateId);
+    if (!template) return;
+
+    const mapName = prompt(`Create map from "${template.title}".\n\nEnter a unique map name (no spaces):`, '');
+    if (!mapName || !mapName.trim()) return;
+
+    const cleanName = mapName.trim().toLowerCase().replace(/[^a-z0-9\-_]/g, '-');
+
+    createMapFromTemplate(templateId, cleanName);
+}
+
+function createMapFromTemplate(templateId, mapName) {
+    const grid = document.getElementById('templatesGrid');
+    grid.style.opacity = '0.5';
+    grid.style.pointerEvents = 'none';
+
+    fetch(`{{ url("plugin/WeathermapNG/templates") }}/${templateId}/create-map`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ name: mapName })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.message || data.error || 'Failed to create map');
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        WMNGToast.success('Map created from template!');
+        $('#createMapModal').modal('hide');
+        // Redirect to editor
+        const mapId = data.id || data.map_id || data.data?.id;
+        if (mapId) {
+            window.location.href = '{{ url("plugin/WeathermapNG/editor") }}/' + mapId;
+        } else {
+            location.reload();
+        }
+    })
+    .catch(err => {
+        WMNGToast.error('Error: ' + err.message);
+        grid.style.opacity = '1';
+        grid.style.pointerEvents = '';
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load templates when modal opens
+$('#createMapModal').on('shown.bs.modal', function() {
+    if (!templatesLoaded) {
+        loadTemplates();
+    }
 });
 </script>
 @endsection

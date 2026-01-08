@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Templates Gallery**: Create Map modal now shows 5 built-in map templates
+  - Tabbed interface: "From Template" and "Custom" tabs
+  - Template cards with icon, description, dimensions, and category badges
+  - One-click map creation from any template
+  - Templates table added to database setup with auto-seeding
 - **Main Index Page Redesign**: Complete visual overhaul of the plugin index page
   - **Dark/Light Mode Support**: CSS variables and theme detection matching LibreNMS
   - **Enhanced Card Design**: Gradient headers, stats badges, hover effects with lift/shadow
