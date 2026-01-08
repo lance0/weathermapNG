@@ -1164,16 +1164,40 @@
             const mw = mapData.width || 800, mh = mapData.height || 600;
             const w = minimap.width, h = minimap.height;
             const s = Math.min(w/mw, h/mh);
+            // Center the map in minimap
+            const offsetX = (w - mw * s) / 2;
+            const offsetY = (h - mh * s) / 2;
             const ctxm = minimap.getContext('2d');
             ctxm.clearRect(0,0,w,h);
             ctxm.fillStyle = '#fafafa'; ctxm.fillRect(0,0,w,h);
-            // draw nodes
+
+            // Draw map boundary
+            ctxm.strokeStyle = '#ddd';
+            ctxm.strokeRect(offsetX, offsetY, mw * s, mh * s);
+
+            // Draw nodes
             mapData.nodes.forEach(n => {
-                const x = ((n.position?.x ?? n.x)||0) * s;
-                const y = ((n.position?.y ?? n.y)||0) * s;
+                const x = offsetX + ((n.position?.x ?? n.x)||0) * s;
+                const y = offsetY + ((n.position?.y ?? n.y)||0) * s;
                 ctxm.fillStyle = getNodeColor(n);
-                ctxm.fillRect(x-2, y-2, 4, 4);
+                ctxm.beginPath();
+                ctxm.arc(x, y, 3, 0, Math.PI * 2);
+                ctxm.fill();
             });
+
+            // Draw viewport rectangle (what's currently visible)
+            if (viewScale > 0 && canvas) {
+                const vpLeft = (-viewOffsetX / viewScale) * s + offsetX;
+                const vpTop = (-viewOffsetY / viewScale) * s + offsetY;
+                const vpWidth = (canvas.width / viewScale) * s;
+                const vpHeight = (canvas.height / viewScale) * s;
+                ctxm.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+                ctxm.lineWidth = 2;
+                ctxm.strokeRect(vpLeft, vpTop, vpWidth, vpHeight);
+                ctxm.lineWidth = 1;
+            }
+
+            // Border
             ctxm.strokeStyle = '#ccc'; ctxm.strokeRect(0,0,w,h);
         }
     </script>
