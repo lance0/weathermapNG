@@ -538,7 +538,7 @@
 
 <!-- Create Map Modal -->
 <div class="modal fade" id="createMapModal" tabindex="-1" role="dialog" aria-labelledby="createMapModalTitle">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createMapModalTitle">
@@ -568,9 +568,9 @@
                 <!-- Templates Tab -->
                 <div class="tab-pane fade show active" id="templatesPane" role="tabpanel">
                     <div class="modal-body">
-                        <div id="templatesLoading" class="text-center py-4">
+                        <div id="templatesLoading" class="text-center py-3">
                             <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
-                            <p class="mt-2 text-muted">Loading templates...</p>
+                            <p class="mt-2 mb-0 text-muted">Loading templates...</p>
                         </div>
                         <div id="templatesGrid" class="row" style="display: none;"></div>
                         <div id="templatesError" class="alert alert-warning" style="display: none;">
