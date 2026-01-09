@@ -18,7 +18,7 @@ This guide provides step-by-step instructions for deploying WeathermapNG in vari
 ### System Requirements
 
 - **LibreNMS**: Latest stable version recommended
-- **PHP**: 8.0 or higher
+- **PHP**: 8.2 or higher
 - **Database**: MySQL 5.7+ or PostgreSQL 9.5+
 - **Web Server**: Apache or Nginx with PHP support
 - **Extensions**:
@@ -251,73 +251,6 @@ docker-compose exec librenms /opt/librenms/html/plugins/WeathermapNG/bin/map-pol
 
 # View logs
 docker-compose logs librenms
-```
-
-## High Availability
-
-### Load Balancer Configuration
-
-```nginx
-# /etc/nginx/sites-available/librenms-lb
-upstream librenms_backend {
-    server librenms1.example.com:80;
-    server librenms2.example.com:80;
-    server librenms3.example.com:80;
-}
-
-server {
-    listen 80;
-    server_name librenms.example.com;
-
-    location / {
-        proxy_pass http://librenms_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Sticky sessions for plugin state
-    sticky learn create=$upstream_cookie_session
-                  lookup=$cookie_session
-                  zone=sticky:1m;
-}
-```
-
-### Database Replication
-
-```sql
--- Master configuration
-[mysqld]
-server-id = 1
-log-bin = mysql-bin
-binlog-do-db = librenms
-
--- Slave configuration
-[mysqld]
-server-id = 2
-relay-log = mysql-relay-bin
-read-only = 1
-
--- Setup replication
-CHANGE MASTER TO
-  MASTER_HOST='master.example.com',
-  MASTER_USER='replication',
-  MASTER_PASSWORD='password',
-  MASTER_LOG_FILE='mysql-bin.000001',
-  MASTER_LOG_POS=0;
-
-START SLAVE;
-```
-
-### Shared Storage
-
-```bash
-# NFS mount for shared RRD files
-mount -t nfs master:/opt/librenms/rrd /opt/librenms/rrd
-
-# Add to /etc/fstab
-master:/opt/librenms/rrd /opt/librenms/rrd nfs defaults 0 0
 ```
 
 ## Monitoring & Maintenance

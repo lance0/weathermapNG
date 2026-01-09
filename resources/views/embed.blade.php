@@ -167,9 +167,12 @@
         if (scale !== 'bytes') scale = 'bits';
         let intervalSec = parseInt(param('interval', WMNG_CONFIG.client_refresh), 10) || WMNG_CONFIG.client_refresh;
         let sseEnabled = param('sse', WMNG_CONFIG.enable_sse ? '1' : '0') !== '0' && !!window.EventSource;
-        let sseMax = parseInt(param('max', 60), 10) || 60;
+        let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
         let currentTransport = 'init';
         let eventSourceRef = null;
+        let sseReconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 2000; // 2 seconds
         let lastDataUpdate = null;
         let mapData = {};
         try {
@@ -817,6 +820,7 @@
                 updateTransportButton();
                 es.onmessage = (e) => {
                     try {
+                        sseReconnectAttempts = 0; // Reset on successful message
                         const live = JSON.parse(e.data);
                         applyLiveUpdate(live);
                     } catch {}
@@ -824,10 +828,19 @@
                 es.onerror = () => {
                     es.close();
                     eventSourceRef = null;
-                    // fall back to polling
-                    currentTransport = 'poll';
-                    sseEnabled = false;
-                    startAutoUpdate();
+                    // Try to reconnect if SSE was enabled
+                    if (sseEnabled && sseReconnectAttempts < maxReconnectAttempts) {
+                        sseReconnectAttempts++;
+                        setTimeout(() => {
+                            if (sseEnabled) startSSE();
+                        }, reconnectDelay);
+                    } else {
+                        // Fall back to polling after max attempts
+                        currentTransport = 'poll';
+                        sseEnabled = false;
+                        sseReconnectAttempts = 0;
+                        startAutoUpdate();
+                    }
                 };
             } catch (e) {
                 currentTransport = 'poll';
@@ -1147,20 +1160,60 @@
         });
 
         function drawMinimap() {
-            if (!minimap || !Array.isArray(mapData.nodes)) return;
-            const mw = mapData.width || 800, mh = mapData.height || 600;
+            if (!minimap || !Array.isArray(mapData.nodes) || mapData.nodes.length === 0) return;
+
+            // Calculate actual bounds from node positions
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            mapData.nodes.forEach(n => {
+                const nx = (n.position?.x ?? n.x) || 0;
+                const ny = (n.position?.y ?? n.y) || 0;
+                minX = Math.min(minX, nx);
+                minY = Math.min(minY, ny);
+                maxX = Math.max(maxX, nx);
+                maxY = Math.max(maxY, ny);
+            });
+
+            // Use larger of map dimensions or node extent (with padding)
+            const padding = 50;
+            const mw = Math.max(mapData.width || 800, maxX + padding);
+            const mh = Math.max(mapData.height || 600, maxY + padding);
+
             const w = minimap.width, h = minimap.height;
             const s = Math.min(w/mw, h/mh);
+            // Center the map in minimap
+            const offsetX = (w - mw * s) / 2;
+            const offsetY = (h - mh * s) / 2;
             const ctxm = minimap.getContext('2d');
             ctxm.clearRect(0,0,w,h);
             ctxm.fillStyle = '#fafafa'; ctxm.fillRect(0,0,w,h);
-            // draw nodes
+
+            // Draw map boundary
+            ctxm.strokeStyle = '#ddd';
+            ctxm.strokeRect(offsetX, offsetY, mw * s, mh * s);
+
+            // Draw nodes
             mapData.nodes.forEach(n => {
-                const x = ((n.position?.x ?? n.x)||0) * s;
-                const y = ((n.position?.y ?? n.y)||0) * s;
+                const x = offsetX + ((n.position?.x ?? n.x)||0) * s;
+                const y = offsetY + ((n.position?.y ?? n.y)||0) * s;
                 ctxm.fillStyle = getNodeColor(n);
-                ctxm.fillRect(x-2, y-2, 4, 4);
+                ctxm.beginPath();
+                ctxm.arc(x, y, 3, 0, Math.PI * 2);
+                ctxm.fill();
             });
+
+            // Draw viewport rectangle (what's currently visible)
+            if (viewScale > 0 && canvas) {
+                const vpLeft = (-viewOffsetX / viewScale) * s + offsetX;
+                const vpTop = (-viewOffsetY / viewScale) * s + offsetY;
+                const vpWidth = (canvas.width / viewScale) * s;
+                const vpHeight = (canvas.height / viewScale) * s;
+                ctxm.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+                ctxm.lineWidth = 2;
+                ctxm.strokeRect(vpLeft, vpTop, vpWidth, vpHeight);
+                ctxm.lineWidth = 1;
+            }
+
+            // Border
             ctxm.strokeStyle = '#ccc'; ctxm.strokeRect(0,0,w,h);
         }
     </script>

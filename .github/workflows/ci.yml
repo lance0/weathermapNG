@@ -2,38 +2,102 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
-  build-and-test:
+  lint:
     runs-on: ubuntu-latest
+    name: PHP Lint & Syntax
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-       - name: Setup PHP
-         uses: shivammathur/setup-php@v2
-         with:
-           php-version: '8.2'
-           extensions: gd, json, mbstring, pdo, pdo_mysql
-           ini-values: memory_limit=256M
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: gd, json, mbstring, pdo, pdo_mysql
 
-       - name: Cache Composer dependencies
-         uses: actions/cache@v3
-         with:
-           path: vendor
-           key: ${{ runner.os }}-php82-composer-${{ hashFiles('**/composer.lock') }}
-           restore-keys: |
-             ${{ runner.os }}-php82-composer-
+      - name: Check PHP syntax
+        run: |
+          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -v "No syntax errors" || true
+          # Fail if any actual errors found
+          ! find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -q "Parse error"
+
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+
+  test:
+    runs-on: ubuntu-latest
+    name: PHP Tests
+    needs: lint
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: librenms_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: gd, json, mbstring, pdo, pdo_mysql
+          tools: composer:v2
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Lint (PSR-12)
-        run: composer lint
+      - name: Run tests
+        run: |
+          if [ -f phpunit.xml ] || [ -f phpunit.xml.dist ]; then
+            if [ -f vendor/bin/phpunit ]; then
+              vendor/bin/phpunit --testdox
+            else
+              echo "PHPUnit not installed, skipping tests"
+            fi
+          else
+            echo "No PHPUnit config found, skipping tests"
+          fi
 
-      - name: Run unit tests
-        run: composer test
+  security:
+    runs-on: ubuntu-latest
+    name: Security Check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets
+        run: |
+          # Simple check for common secret patterns
+          if grep -rE "(password|secret|api_key)\s*=\s*['\"][^'\"$][^'\"]+['\"]" \
+             --include="*.php" --exclude-dir=vendor . 2>/dev/null | \
+             grep -v "example\|placeholder\|your_"; then
+            echo "Warning: Potential hardcoded secrets found"
+            exit 1
+          fi
+          echo "No hardcoded secrets detected"

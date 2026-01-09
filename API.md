@@ -539,6 +539,8 @@ curl -X DELETE \
 
 ### Auto-Discover Topology
 
+> **Note**: Auto-discovery is currently disabled in v1.6.0. Use manual node/link creation instead. This feature will be re-implemented using LLDP/CDP data in a future release.
+
 ```http
 POST /plugin/WeathermapNG/map/{id}/autodiscover
 Content-Type: application/json
@@ -708,7 +710,7 @@ GET /plugin/WeathermapNG/health
 {
     "status": "healthy",
     "timestamp": "2025-01-30T10:00:00Z",
-    "version": "1.2.5",
+    "version": "1.6.0",
     "checks": {
         "database": {"status": "healthy"},
         "rrd": {"status": "healthy"},
@@ -1022,88 +1024,6 @@ All endpoints return JSON with the following structure:
 
 ---
 
-## Real-World Use Cases
-
-### Creating a New Network Map
-
-```bash
-# 1. Create a new map
-RESPONSE=$(curl -s -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "name": "production_network",
-         "title": "Production Network Map",
-         "width": 1200,
-         "height": 800
-     }' \
-     https://librenms/plugin/WeathermapNG/map)
-
-# Extract map ID
-MAP_ID=$(echo $RESPONSE | jq -r '.map.id')
-
-# 2. Get available devices
-curl -s -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/devices > devices.json
-
-# 3. Add nodes from devices
-for device in $(jq -r '.[].id' devices.json); do
-    curl -s -X POST \
-         -H "Content-Type: application/json" \
-         -H "X-Auth-Token: YOUR_TOKEN" \
-         -d "{\"map_id\": $MAP_ID, \"device_id\": $device, \"label\": \"Device-$device\", \"x\": 100, \"y\": 100}" \
-         https://librenms/plugin/WeathermapNG/map/$MAP_ID/node
-done
-
-# 4. Create links between nodes
-curl -s -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d "{\"map_id\": $MAP_ID, \"src_node_id\": 1, \"dst_node_id\": 2}" \
-     https://librenms/plugin/WeathermapNG/map/$MAP_ID/link
-```
-
----
-
-### Monitoring Live Traffic
-
-```bash
-# Continuously monitor a specific map
-MAP_ID=1
-
-while true; do
-    # Get live data
-    curl -s -H "X-Auth-Token: YOUR_TOKEN" \
-         https://librenms/plugin/WeathermapNG/api/maps/$MAP_ID/live | jq
-
-    echo "--- Monitoring $(date '+%Y-%m-%d %H:%M:%S') ---"
-
-    sleep 10
-done
-```
-
----
-
-### Backup All Maps
-
-```bash
-# Export all maps to a directory
-mkdir -p weathermap-backup
-
-curl -s -H "X-Auth-Token: YOUR_TOKEN" \
-    https://librenms/plugin/WeathermapNG > maps.json
-
-for map_id in $(jq -r '.[].id' maps.json); do
-    curl -s -H "X-Auth-Token: YOUR_TOKEN" \
-         https://librenms/plugin/WeathermapNG/api/maps/$map_id/export \
-         > "weathermap-backup/map-$map_id.json"
-done
-
-echo "Backup completed!"
-```
-
----
-
 ## Rate Limiting
 
 API requests are rate-limited. Recommended limits:
@@ -1148,6 +1068,6 @@ GET /plugin/WeathermapNG/api/devices?page=1&per_page=50
 
 ## Version Information
 
-Current API version: **1.2.5**
+Current API version: **1.6.0**
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.

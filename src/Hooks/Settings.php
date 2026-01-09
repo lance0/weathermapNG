@@ -9,7 +9,19 @@ class Settings implements SettingsHook
 {
     public function authorize(User $user): bool
     {
-        return true;
+        // Only admins can access plugin settings
+        // Check various admin methods that may exist in LibreNMS User model
+        if (method_exists($user, 'hasGlobalAdmin') && $user->hasGlobalAdmin()) {
+            return true;
+        }
+        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return true;
+        }
+        // Fallback: check level attribute (10 = admin in LibreNMS)
+        if (isset($user->level) && $user->level >= 10) {
+            return true;
+        }
+        return false;
     }
 
     /**

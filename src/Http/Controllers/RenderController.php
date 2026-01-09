@@ -97,7 +97,7 @@ class RenderController
     public function sse(Map $map, Request $request): StreamedResponse
     {
         $interval = max(1, (int) $request->get('interval', 5));
-        $maxSeconds = (int) $request->get('max', 60);
+        $maxSeconds = (int) $request->get('max', 300);  // 5 minutes default
 
         return $this->nodeDataService->stream($map, $interval, $maxSeconds);
     }

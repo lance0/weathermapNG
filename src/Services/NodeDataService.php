@@ -167,6 +167,13 @@ class NodeDataService
 
     private function aggregateNodeTraffic(Node $node): array
     {
+        $demoMode = config('weathermapng.demo_mode', false);
+
+        // In demo mode, generate simulated node traffic
+        if ($demoMode) {
+            return $this->generateDemoNodeTraffic($node);
+        }
+
         $traffic = $this->sumPortTraffic($node);
 
         if ($traffic['sum_bps'] === 0 && $node->device_id) {
@@ -178,6 +185,41 @@ class NodeDataService
         }
 
         return $traffic;
+    }
+
+    private function generateDemoNodeTraffic(Node $node): array
+    {
+        // Generate realistic traffic based on node type (inferred from label)
+        $label = strtolower($node->label ?? '');
+
+        // Core/router nodes have higher traffic
+        if (str_contains($label, 'core') || str_contains($label, 'router')) {
+            $baseIn = rand(500000000, 2000000000);  // 500Mbps - 2Gbps
+            $baseOut = rand(400000000, 1800000000);
+        // Switches have medium traffic
+        } elseif (str_contains($label, 'switch') || str_contains($label, 'sw')) {
+            $baseIn = rand(100000000, 800000000);   // 100Mbps - 800Mbps
+            $baseOut = rand(80000000, 700000000);
+        // Servers have moderate traffic
+        } elseif (str_contains($label, 'server') || str_contains($label, 'srv') || str_contains($label, 'db')) {
+            $baseIn = rand(50000000, 400000000);    // 50Mbps - 400Mbps
+            $baseOut = rand(40000000, 350000000);
+        // Firewalls aggregate traffic
+        } elseif (str_contains($label, 'firewall') || str_contains($label, 'fw')) {
+            $baseIn = rand(200000000, 1000000000);  // 200Mbps - 1Gbps
+            $baseOut = rand(180000000, 900000000);
+        // Default for other nodes
+        } else {
+            $baseIn = rand(10000000, 200000000);    // 10Mbps - 200Mbps
+            $baseOut = rand(8000000, 180000000);
+        }
+
+        return [
+            'in_bps' => $baseIn,
+            'out_bps' => $baseOut,
+            'sum_bps' => $baseIn + $baseOut,
+            'source' => 'demo',
+        ];
     }
 
     private function sumPortTraffic(Node $node): array

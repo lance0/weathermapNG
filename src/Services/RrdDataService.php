@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class RrdDataService
 {
-    private $rrdTool;
+    private RRDTool $rrdTool;
 
     public function __construct(RRDTool $rrdTool)
     {
@@ -34,8 +34,10 @@ class RrdDataService
     {
         try {
             $query = class_exists('\\App\\Models\\Port')
-                ? \App\Models\Port::select('device_id', 'ifIndex', 'port_id')->where('port_id', $portId)->first()
-                : DB::table('ports')->select('device_id', 'ifIndex', 'port_id')->where('port_id', $portId)->first();
+                ? \App\Models\Port::select('device_id', 'ifIndex', 'ifName', 'port_id')
+                    ->where('port_id', $portId)->first()
+                : DB::table('ports')->select('device_id', 'ifIndex', 'ifName', 'port_id')
+                    ->where('port_id', $portId)->first();
 
             return $query ? (array) $query : null;
         } catch (\Exception $e) {
@@ -58,13 +60,19 @@ class RrdDataService
             return null;
         }
 
-        $ifIndex = $port['ifIndex'];
+        $ifIndex = $port['ifIndex'] ?? '';
+        $ifName = $port['ifName'] ?? '';
 
-        // Try different RRD path patterns
+        // Sanitize ifName for filesystem (LibreNMS replaces / : and spaces with -)
+        $sanitizedIfName = preg_replace('/[\/\s:]+/', '-', $ifName);
+
+        // Try different RRD path patterns in order of likelihood
+        // LibreNMS standard is: port-{ifName_sanitized}.rrd
         $patterns = [
-            "{$config}/{$hostname}/port-id{$port['port_id']}.rrd",
-            "{$config}/{$hostname}/port-{$ifIndex}.rrd",
-            "{$config}/{$hostname}/port_{$ifIndex}.rrd",
+            "{$config}/{$hostname}/port-{$sanitizedIfName}.rrd",  // LibreNMS standard
+            "{$config}/{$hostname}/port-id{$port['port_id']}.rrd", // Fallback by port_id
+            "{$config}/{$hostname}/port-{$ifIndex}.rrd",           // Legacy by ifIndex
+            "{$config}/{$hostname}/port_{$ifIndex}.rrd",           // Alt legacy format
         ];
 
         foreach ($patterns as $pattern) {
@@ -73,6 +81,7 @@ class RrdDataService
             }
         }
 
+        Log::debug("WeathermapNG: No RRD file found for port {$port['port_id']} ({$ifName}), tried: " . implode(', ', $patterns));
         return null;
     }
 

@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Templates Gallery**: Create Map modal now shows 5 built-in map templates
+  - Tabbed interface: "From Template" and "Custom" tabs
+  - Template cards with icon, description, dimensions, and category badges
+  - One-click map creation from any template
+  - Templates table added to database setup with auto-seeding
+- **Main Index Page Redesign**: Complete visual overhaul of the plugin index page
+  - **Dark/Light Mode Support**: CSS variables and theme detection matching LibreNMS
+  - **Enhanced Card Design**: Gradient headers, stats badges, hover effects with lift/shadow
+  - **Improved Header**: Better spacing, import button, total stats display
+  - **Better Empty State**: Helpful guidance with icon and quick-start prompt
+  - **Search & Sort**: Filter maps by name with sort options
+- **Map Editor Overhaul**: Comprehensive editor improvements
+  - **GIMP/Photoshop-style Layout**: Vertical toolbox on left, canvas in center, properties panel on right
+  - **Dark Mode Support**: Full light/dark theme support using CSS variables
+  - **Left Toolbox**: Icon-only tool buttons for add, link, snap, copy, delete, undo/redo, zoom
+  - **Status Bar**: Live node/link counts and zoom level in top bar
+  - **Unsaved Indicator**: Yellow badge shows when changes need saving
+  - **Preview Button**: Open map in embed view directly from editor
+  - **Nodes List Panel**: List of all nodes with quick select/delete
+  - **Links List Panel**: List showing all connections
+  - **Duplicate Node**: Copy selected node with offset positioning
+  - **Link Mode Feedback**: Visual feedback showing link start node (orange highlight, pulsing button)
+  - **Zoom & Pan**: Mouse wheel zoom, middle-click pan, zoom controls (+/-/reset)
+  - **Editor Minimap**: Overview in bottom-right with click-to-navigate
+  - **Keyboard Shortcuts**: Ctrl+S save, Ctrl+Z/Y undo/redo, Delete node, Arrow nudge, Esc deselect
+  - **Undo/Redo System**: Full undo/redo with 50-state history
+  - **Grid Snapping**: Toggle snap-to-grid with visual grid overlay
+  - **Link Modal**: Edit/delete links with port selection and bandwidth
+  - **Node Property Panel**: Edit selected node properties in sidebar
+  - **Smart Node Placement**: Spiral placement to avoid overlapping new nodes
+  - **Boundary Checking**: Nodes constrained to canvas bounds during drag
+  - **Canvas Resize Validation**: Warns when nodes would be outside new bounds
+  - **Auto-Save**: 5-minute auto-save when toggle enabled
+  - **JSON Export**: Download current map as JSON file from toolbar
 - **Demo Mode**: Simulated traffic data for testing without real LibreNMS devices
   - Enable with `WEATHERMAPNG_DEMO_MODE=true` environment variable
   - Links without port associations get randomized 10-85% utilization
@@ -52,6 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Status Bar**: Now shows relative time since last data update (e.g., "Just now", "15s ago", "2m ago")
 
 ### Fixed
+- **Demo Mode Node Traffic**: Nodes now show simulated traffic (in/out/sum) in demo mode tooltips
+- **Versioning Table Missing**: Added `wmng_map_versions` table to `database/setup.php` for fresh installs and upgrades
+- **Modal Accessibility**: Removed static `aria-hidden="true"` from modals to fix focus warning
+- **Create Map Modal**: Fixed canvas size inputs not centered using inline flexbox
 - **Map Rendering**: Fixed `toJsonModel()` returning Eloquent Collections instead of arrays
 - **Link Coordinates**: Fixed `drawLink()` not reading node x/y coordinates correctly
 - **Demo Mode Traffic**: Fixed percentage calculation that was treating pre-calculated percentages as BPS
@@ -63,6 +101,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Heatmap Overlay**: Removed heatmap feature due to pan/zoom sync issues
   - Was not following minimap navigation correctly
   - Performance concerns with blur filters on every frame
+
+## [1.6.0] - 2026-01-08
+
+### Changed
+- **Data Fetching Simplified**: Now uses RRD files as the single source of truth
+  - Removed unreliable API fallback (wrong auth headers, wrong endpoints)
+  - Removed SNMP polling (counter-to-rate bug, complex state management)
+- **RRD Path Resolution**: Now matches LibreNMS naming convention (`port-{ifName}.rrd`)
+  - Properly sanitizes interface names (replaces `/`, `:`, spaces with `-`)
+  - Falls back to port_id and ifIndex patterns for legacy installations
+- **Utilization Calculation**: Fixed for full-duplex links
+  - Now uses `max(in, out)` instead of `(in + out)` for percentage
+  - Prevents showing 200% when both directions are saturated
+- **Service Architecture**: Proper dependency injection via ServiceProvider
+  - Registered all core services (MapVersionService, MapCacheService, DevicePortLookup, RrdDataService, PortUtilService)
+  - Clean constructor injection for testability
+- **Settings Authorization**: Now requires admin privileges
+  - Checks hasGlobalAdmin(), isAdmin(), or level >= 10
+
+### Fixed
+- **Cache Key Collision**: Port metadata and traffic data now use separate cache keys
+  - DevicePortLookup: `weathermapng.port.meta.{id}`
+  - PortUtilService: `weathermapng.port.traffic.{id}`
+- **Cache Invalidation**: Removed non-functional wildcard patterns from clearCaches()
+- **Version Sync**: Unified version to 1.6.0 across composer.json and WeathermapNG.php
+
+### Removed
+- **LibreNMSAPI Service**: Deleted `src/RRD/LibreNMSAPI.php`
+  - Had wrong authentication (Bearer instead of X-Auth-Token)
+  - Used wrong API endpoints that don't return rate data
+  - Silently returned mock data on failure, masking real issues
+- **SNMP Polling**: Deleted `src/Services/SnmpDataService.php`
+  - Had counter-to-rate calculation bug (returned raw counters × 8)
+  - Required complex state tracking for delta calculation
+- **Auto-Discovery**: Disabled `discoverAndSeedMap()` method
+  - ifIndex-based neighbor matching doesn't work reliably
+  - Future: Will use LibreNMS LLDP/CDP data from links table
+- **Config Options**: Removed `enable_local_rrd`, `enable_api_fallback`, `snmp.*`, `api_token`
 
 ## [1.5.1] - 2026-01-07
 

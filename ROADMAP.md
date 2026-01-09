@@ -2,33 +2,34 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.5.x (Stable)
+## Current Status: v1.6.0 (Stable)
 
 The plugin is production-ready with core features complete:
 - Interactive map editor with drag-and-drop
-- Real-time traffic visualization (RRD, API, SNMP fallback)
-- Flow animations and heatmap overlays
+- Real-time traffic visualization (RRD-based)
+- Flow animations with particle effects
 - Map versioning and history
 - Server-Sent Events for live updates
-- Embeddable views for dashboards
+- Embeddable views with navigation bar
 - Demo mode for testing
+- Device-type node icons (router, switch, server, firewall)
 
 ---
 
 ## Short Term (Next Release)
 
-### v1.6.0 - Polish & UX
+### v1.7.0 - Auto-Discovery & Templates
+
+- [ ] **LLDP/CDP Auto-Discovery**: Real neighbor detection
+  - Query LibreNMS `links` table for actual topology
+  - Create accurate node/link mapping from LLDP/CDP data
+  - Replace broken ifIndex-based matching
 
 - [ ] **Map Templates Gallery**: Pre-built templates for common topologies
   - Data center layout
   - WAN/MPLS network
   - Campus network
   - Simple branch office
-
-- [ ] **Improved Node Icons**: Device-type specific icons
-  - Router, switch, firewall, server icons
-  - Custom icon upload support
-  - Icon library integration (Font Awesome)
 
 - [ ] **Keyboard Shortcuts**: Power user features
   - Ctrl+S save
@@ -122,13 +123,24 @@ The plugin is production-ready with core features complete:
 
 ## Completed Features
 
+### v1.6.0
+- [x] Simplified data fetching (RRD-only, removed buggy API/SNMP)
+- [x] Fixed RRD path resolution to match LibreNMS naming
+- [x] Fixed utilization calculation for full-duplex links
+- [x] Device-type node icons (router, switch, server, firewall)
+- [x] Enhanced link tooltips with bandwidth capacity
+- [x] Embed navigation bar with map title and edit link
+- [x] Proper service registration in ServiceProvider
+- [x] Admin-only settings authorization
+- [x] Fixed cache key collisions
+
 ### v1.5.x
 - [x] Map versioning with history and restore
 - [x] Auto-save functionality
 - [x] Demo mode for testing without devices
 - [x] Docker development environment
 - [x] Improved install scripts
-- [x] Heatmap performance optimization
+- [x] Removed heatmap (pan/zoom sync issues)
 
 ### v1.4.x - v1.5.0
 - [x] Security hardening (XSS prevention, input validation)

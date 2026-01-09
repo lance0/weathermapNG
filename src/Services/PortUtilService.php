@@ -3,22 +3,15 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use Illuminate\Support\Facades\Cache;
-use LibreNMS\Plugins\WeathermapNG\RRD\LibreNMSAPI;
+use Illuminate\Support\Facades\Log;
 
 class PortUtilService
 {
-    private $api;
-    private $rrdService;
-    private $snmpService;
+    private RrdDataService $rrdService;
 
-    public function __construct(
-        LibreNMSAPI $api,
-        RrdDataService $rrdService,
-        SnmpDataService $snmpService
-    ) {
-        $this->api = $api;
+    public function __construct(RrdDataService $rrdService)
+    {
         $this->rrdService = $rrdService;
-        $this->snmpService = $snmpService;
     }
 
     public function linkUtilBits(array $link): array
@@ -44,7 +37,8 @@ class PortUtilService
 
         $utilization = null;
         if ($bandwidth && $bandwidth > 0) {
-            $utilization = round(($inBps + $outBps) / $bandwidth * 100, 2);
+            // Use max for full-duplex links (both directions can saturate independently)
+            $utilization = round(max($inBps, $outBps) / $bandwidth * 100, 2);
         }
 
         return [
@@ -57,7 +51,8 @@ class PortUtilService
 
     public function getPortData(int $portId): array
     {
-        $cacheKey = "weathermapng.port.{$portId}";
+        // Use distinct cache key to avoid collision with DevicePortLookup
+        $cacheKey = "weathermapng.port.traffic.{$portId}";
         $cacheTtl = config('weathermapng.cache_ttl', 300);
 
         if (!class_exists(Cache::class)) {
@@ -85,72 +80,22 @@ class PortUtilService
 
     private function fetchPortData(int $portId): array
     {
-        if (config('weathermapng.enable_local_rrd', true)) {
-            $rrdData = $this->rrdService->getPortTraffic($portId);
-            if ($rrdData) {
-                return $rrdData;
-            }
+        // RRD is the single source of truth
+        $rrdData = $this->rrdService->getPortTraffic($portId);
+
+        if ($rrdData !== null) {
+            return $rrdData;
         }
 
-        if (config('weathermapng.enable_api_fallback', true)) {
-            return $this->fetchFromAPI($portId);
-        }
-
-        if (config('weathermapng.snmp.enabled', false)) {
-            $snmpData = $this->snmpService->getPortTraffic($portId);
-            if ($snmpData) {
-                return $snmpData;
-            }
-        }
-
+        Log::warning("WeathermapNG: No RRD data for port {$portId}");
         return ['in' => 0, 'out' => 0];
-    }
-
-    private function fetchFromAPI(int $portId): array
-    {
-        try {
-            $inData = $this->api->getPortMetricByPortId($portId, 'traffic_in', '5m');
-            $inBps = $this->extractLatestValue($inData);
-
-            $outData = $this->api->getPortMetricByPortId($portId, 'traffic_out', '5m');
-            $outBps = $this->extractLatestValue($outData);
-
-            return [
-                'in' => (int) $inBps,
-                'out' => (int) $outBps,
-            ];
-        } catch (\Exception $e) {
-            error_log("PortUtilService API error for port {$portId}: " . $e->getMessage());
-            return ['in' => 0, 'out' => 0];
-        }
-    }
-
-    private function extractLatestValue(?array $data): int
-    {
-        if (empty($data)) {
-            return 0;
-        }
-
-        $latest = end($data);
-        return (int) ($latest['value'] ?? 0);
     }
 
     private function fetchDeviceAggregate(int $deviceId): array
     {
-        try {
-            $inData = $this->api->getDeviceData($deviceId, 'traffic_in', '5m');
-            $inSum = array_sum(array_column($inData, 'value'));
-
-            $outData = $this->api->getDeviceData($deviceId, 'traffic_out', '5m');
-            $outSum = array_sum(array_column($outData, 'value'));
-
-            return [
-                'in' => (int) $inSum,
-                'out' => (int) $outSum,
-            ];
-        } catch (\Exception $e) {
-            error_log("PortUtilService API error for device {$deviceId}: " . $e->getMessage());
-            return ['in' => 0, 'out' => 0];
-        }
+        // Sum traffic from all ports on the device
+        // This is a placeholder - would need to query all device ports
+        Log::debug("WeathermapNG: Device aggregate not implemented for device {$deviceId}");
+        return ['in' => 0, 'out' => 0];
     }
 }

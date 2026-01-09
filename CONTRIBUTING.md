@@ -27,7 +27,7 @@ This project follows a code of conduct to ensure a welcoming environment for all
 
 ### Prerequisites
 
-- PHP 8.0 or higher
+- PHP 8.2 or higher
 - Composer
 - Git
 - LibreNMS installation
@@ -87,7 +87,7 @@ docker exec -u librenms librenms-dev php /opt/librenms/artisan view:clear
 
 **Enable Demo Mode** (simulated traffic without real devices):
 ```bash
-docker exec librenms-dev bash -c 'echo "WEATHERMAPNG_DEMO_MODE=true" >> /data/.env'
+docker exec -u librenms librenms-dev bash -c 'echo "WEATHERMAPNG_DEMO_MODE=true" >> /opt/librenms/.env'
 ```
 
 Visit http://localhost:8000/plugin/WeathermapNG to access the plugin.
@@ -165,9 +165,8 @@ WeathermapNG/
 │   │   └── viewer.js                # Viewer functionality
 │   └── css/                         # Stylesheets
 │       └── weathermapng.css
-├── lib/RRD/                         # Legacy RRD handling
-│   ├── RRDTool.php                  # RRD file operations
-│   └── LibreNMSAPI.php              # API fallback
+├── lib/RRD/                         # RRD handling
+│   └── RRDTool.php                  # RRD file operations
 ├── bin/                             # Executable scripts
 │   └── map-poller.php               # Background poller
 ├── tests/                           # Test files
@@ -179,26 +178,6 @@ WeathermapNG/
 ├── README.md                        # Main documentation
 ├── CONTRIBUTING.md                  # This file
 └── CHANGELOG.md                     # Version history
-```
-WeathermapNG/
-├── WeathermapNG.php          # Main plugin bootstrap
-├── routes.php                # Route definitions
-├── composer.json             # Dependencies
-├── database/
-│   ├── migrations/           # Database schema
-│   └── seeders/              # Demo data
-├── Http/Controllers/         # Web controllers
-├── Models/                   # Eloquent models
-├── Services/                 # Business logic
-├── Policies/                 # Authorization
-├── Resources/
-│   ├── views/                # Blade templates
-│   ├── js/                   # JavaScript assets
-│   └── css/                  # Stylesheets
-├── config/                   # Configuration files
-├── bin/                      # Executable scripts
-├── tests/                    # Test files
-└── lib/                      # Legacy support (to be removed)
 ```
 
 ## Coding Standards
