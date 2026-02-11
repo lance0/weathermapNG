@@ -2,10 +2,12 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.6.0 (Stable)
+## Current Status: v1.6.1 (Stable)
 
 The plugin is production-ready with core features complete:
-- Interactive map editor with drag-and-drop
+- Professional 3-panel map editor (toolbox, canvas, properties sidebar)
+- Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
+- Dark/light theme auto-detection (matches LibreNMS)
 - Real-time traffic visualization (RRD-based)
 - Flow animations with particle effects
 - Map versioning and history
@@ -18,7 +20,7 @@ The plugin is production-ready with core features complete:
 
 ## Short Term (Next Release)
 
-### v1.7.0 - Auto-Discovery & Templates
+### v1.7.0 - Auto-Discovery & Bulk Operations
 
 - [ ] **LLDP/CDP Auto-Discovery**: Real neighbor detection
   - Query LibreNMS `links` table for actual topology
@@ -31,31 +33,18 @@ The plugin is production-ready with core features complete:
   - Campus network
   - Simple branch office
 
-- [x] **Keyboard Shortcuts**: Power user features (DONE)
-  - Ctrl+S save, Ctrl+Z/Y undo/redo
-  - Delete key for selected items
-  - Arrow keys for nudging (Shift for 10px)
-  - +/-/0 for zoom control, Esc to deselect
-
-- [x] **Editor Enhancements** (DONE)
-  - Zoom & pan (mouse wheel + middle-click)
-  - Editor minimap with click navigation
-  - Undo/redo system (50-state history)
-  - Grid snapping toggle
-  - Node boundary checking
-  - Smart node placement (spiral)
-  - Canvas resize validation
-
 - [ ] **Bulk Operations**: Multi-select and bulk edit
   - Select multiple nodes/links
   - Bulk delete
   - Bulk style changes
 
+- [ ] **Version Comparison**: Visual diff between map versions
+
 ---
 
 ## Medium Term
 
-### v1.7.0 - Advanced Visualization
+### v1.8.0 - Advanced Visualization
 
 - [ ] **Historical Playback**: View traffic patterns over time
   - Timeline scrubber
@@ -79,7 +68,7 @@ The plugin is production-ready with core features complete:
   - Tags and filtering
   - Favorites
 
-### v1.8.0 - Collaboration & Export
+### v1.9.0 - Collaboration & Export
 
 - [ ] **Multi-user Editing**: Real-time collaboration
   - Presence indicators
@@ -131,6 +120,21 @@ The plugin is production-ready with core features complete:
 ---
 
 ## Completed Features
+
+### v1.6.1
+- [x] Professional 3-panel editor layout (toolbox, canvas, properties sidebar)
+- [x] Dark/light theme auto-detection matching LibreNMS
+- [x] Zoom & pan (mouse wheel + middle-click panning)
+- [x] Undo/redo system (50-state history)
+- [x] Full keyboard shortcuts (Ctrl+S/Z/Y, Delete, arrow nudge, +/-/0 zoom, Esc)
+- [x] Editor minimap with click-to-navigate
+- [x] Grid snapping toggle with visual overlay
+- [x] Smart spiral node placement
+- [x] Node boundary checking and canvas resize validation
+- [x] Node duplication, inline property editing
+- [x] Link mode with visual feedback (orange highlight, pulsing button)
+- [x] Unsaved changes indicator, auto-save support
+- [x] Fixed link bandwidth utilization calculation accuracy
 
 ### v1.6.0
 - [x] Simplified data fetching (RRD-only, removed buggy API/SNMP)

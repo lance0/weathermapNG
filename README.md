@@ -7,13 +7,18 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 ## Features
 
 - **Real-time Visualization**: Live traffic data with animated flow indicators
-- **Interactive Editor**: Professional map editor with device integration
-- **LibreNMS-native UI**: Editor and map views styled to match LibreNMS
+- **Professional Editor**: 3-panel layout with toolbox, canvas, and properties sidebar
+- **Zoom, Pan & Minimap**: Mouse-wheel zoom, middle-click pan, click-to-navigate minimap
+- **Keyboard Shortcuts**: Ctrl+S save, Ctrl+Z/Y undo/redo, arrow nudge, Delete, +/-/0 zoom
+- **Undo/Redo**: 50-state history with full node and link state tracking
+- **Dark/Light Mode**: Auto-detects LibreNMS theme and matches it
+- **Grid Snapping**: Toggle snap-to-grid for precise node alignment
 - **RRD-based Traffic Data**: Real-time bandwidth from LibreNMS RRD files
 - **Server-Sent Events**: Live updates without polling
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies
+- **Map Versioning**: Save, restore, and export version history
 
 ## Quick Start
 
@@ -68,9 +73,10 @@ chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 
 ### Tips
 
-- Use the device dropdown to populate your map automatically
-- Drag nodes to position them on the canvas
-- See traffic updates in real-time as you work
+- Use the device dropdown in the right sidebar to add nodes
+- Drag nodes to position them; enable grid snapping for alignment
+- Use Ctrl+Z/Y to undo/redo, arrow keys to nudge selected nodes
+- Scroll wheel to zoom, middle-click to pan around large maps
 - Export maps as JSON for backup or sharing
 
 ### Demo Mode

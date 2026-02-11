@@ -5,7 +5,7 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.1] - 2026-02-11
 
 ### Added
 - **Templates Gallery**: Create Map modal now shows 5 built-in map templates
@@ -99,8 +99,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Map Version Export**: Corrected JSON response formatting
 - **Controller Base Class**: Controllers now properly reference the application base controller
 - **Controls Position**: Fixed controls being hidden under nav bar (adjusted top offset)
+- **Editor Race Condition**: Moved post-load logic into fetch callback instead of relying on setTimeout(500)
+- **Dark Mode Node List**: Selected node highlight now uses CSS variable instead of hardcoded bg-light class
 
 ### Removed
+- **Dead Code**: Removed unused exportConfig() function and compareVersion() stub with its UI button
+- **Function Monkey-patching**: Replaced fragile function wrapping (saveState, renderEditor, loadMapData) with direct inline calls
+
 - **Heatmap Overlay**: Removed heatmap feature due to pan/zoom sync issues
   - Was not following minimap navigation correctly
   - Performance concerns with blur filters on every frame
