@@ -67,6 +67,10 @@ librenms-example-plugin-main/
 
 # Local dev symlinks and scratch files
 configs
-*.png
 docker/
 docker-compose.official.yml
+
+# Screenshots (allow repo screenshots, ignore misc)
+*.png
+!wmng.png
+!wmng-editor.png

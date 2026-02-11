@@ -2,7 +2,9 @@
 
 A modern network weathermap plugin for LibreNMS v2 that provides real-time network topology visualization with traffic flow animations.
 
-![WeathermapNG Demo](wmng.png)
+![WeathermapNG Live View](wmng.png)
+
+![WeathermapNG Editor](wmng-editor.png)
 
 ## Features
 
