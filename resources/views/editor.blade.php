@@ -30,6 +30,7 @@
     --editor-text: #212529;
     --editor-text-muted: #6c757d;
     --editor-list-hover: rgba(0,123,255,0.1);
+    --editor-list-selected: rgba(0,123,255,0.15);
     --editor-accent: #0d6efd;
     --editor-accent-orange: #fd7e14;
 }
@@ -56,6 +57,7 @@
     --editor-text: #e9ecef;
     --editor-text-muted: #adb5bd;
     --editor-list-hover: rgba(13,110,253,0.2);
+    --editor-list-selected: rgba(13,110,253,0.25);
 }
 
 /* ===== Editor Layout ===== */
@@ -811,8 +813,9 @@
 
                 ctx.restore();
 
-                // Update minimap
+                // Update minimap and status
                 renderMinimap();
+                updateStatusCounts();
             }
 
             function drawGrid() {
@@ -1085,6 +1088,7 @@
                     undoStack.shift();
                 }
                 redoStack.length = 0; // Clear redo stack on new action
+                markUnsaved();
             }
 
             function undo() {
@@ -1173,6 +1177,9 @@
 
                     renderEditor();
                     renderLinksList();
+                    renderNodesList();
+                    updateStatusCounts();
+                    markSaved();
                 })
                 .catch(error => {
                     console.error('Failed to load map data', error);
@@ -1393,9 +1400,6 @@
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </div>
-                                    <button class="btn btn-sm btn-outline-info" onclick="compareVersion(${version.id})">
-                                        <i class="fas fa-code-compare"></i> Compare
-                                    </button>
                                 </div>
                                 <hr>
                             `;
@@ -1526,13 +1530,6 @@
                 });
             }
 
-            function compareVersion(versionId) {
-                const compareId = prompt('Enter version ID to compare against:', '0');
-                if (!compareId) return;
-                
-                alert('Compare feature coming soon! Select two versions from the history to compare.');
-            }
-
             function exportVersions() {
                 WMNGLoading.show('Exporting versions...');
                 
@@ -1656,37 +1653,6 @@
                     WMNGToast.error('Error saving map: ' + err.message, { duration: 3000 });
                 });
             }
-
-function exportConfig() {
-    const mapTitle = document.getElementById('map-title').value.trim() || 'Network Map';
-    const mapWidth = document.getElementById('map-width').value;
-    const mapHeight = document.getElementById('map-height').value;
-
-    let config = `[global]\n`;
-    config += `width ${mapWidth}\n`;
-    config += `height ${mapHeight}\n`;
-    config += `title "${mapTitle}"\n\n`;
-
-    nodes.forEach(node => {
-        config += `[node:${node.id}]\n`;
-        config += `label "${node.label}"\n`;
-        config += `x ${Math.round(node.x)}\n`;
-        config += `y ${Math.round(node.y)}\n`;
-        config += `device_id ${node.deviceId}\n`;
-        config += `interface_id ${node.interfaceId}\n`;
-        config += `metric traffic_in\n\n`;
-    });
-
-    const blob = new Blob([config], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'weathermap.conf';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
 
 function exportJson() {
     const mapName = document.getElementById('map-name').value.trim() || 'untitled';
@@ -2018,7 +1984,7 @@ function renderNodesList() {
 
     const items = nodes.map((node, idx) => {
         const isSelected = node === selectedNode;
-        return `<div class="d-flex align-items-center justify-content-between py-1 ${isSelected ? 'bg-light' : ''}" style="cursor: pointer;" onclick="selectNodeByIndex(${idx})">
+        return `<div class="d-flex align-items-center justify-content-between py-1" style="cursor: pointer;${isSelected ? ' background: var(--editor-list-selected); border-radius: 3px;' : ''} onclick="selectNodeByIndex(${idx})">
             <small class="${isSelected ? 'font-weight-bold' : ''}">
                 <i class="fas fa-circle ${isSelected ? 'text-primary' : 'text-success'}" style="font-size: 8px;"></i>
                 ${node.label || 'Node ' + (idx + 1)}
@@ -2102,34 +2068,6 @@ function updateToolbarState() {
     if (duplicateBtn) duplicateBtn.disabled = !hasSelection;
     if (deleteBtn) deleteBtn.disabled = !hasSelection;
 }
-
-// Override saveState to mark unsaved
-const originalSaveState = saveState;
-saveState = function() {
-    originalSaveState();
-    markUnsaved();
-};
-
-// Override saveMap to mark saved
-const originalSaveMapSuccess = WMNGToast.success;
-
-// Update renderEditor to also update status
-const originalRenderEditor = renderEditor;
-renderEditor = function() {
-    originalRenderEditor();
-    updateStatusCounts();
-};
-
-// Update render functions to maintain state
-const originalLoadMapData = loadMapData;
-loadMapData = function(id) {
-    originalLoadMapData(id);
-    setTimeout(() => {
-        renderNodesList();
-        updateStatusCounts();
-        markSaved();
-    }, 500);
-};
 
 // Initial state updates
 document.addEventListener('DOMContentLoaded', function() {
