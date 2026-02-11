@@ -5,8 +5,6 @@ namespace LibreNMS\Plugins\WeathermapNG\Tests;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Policies\MapPolicy;
 use PHPUnit\Framework\TestCase;
-use Mockery;
-
 class MapPolicyTest extends TestCase
 {
     protected MapPolicy $policy;
@@ -15,12 +13,6 @@ class MapPolicyTest extends TestCase
     {
         parent::setUp();
         $this->policy = new MapPolicy();
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
     /** @test */

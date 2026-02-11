@@ -7,173 +7,230 @@ use LibreNMS\Plugins\WeathermapNG\Services\AlertService;
 
 class AlertServiceTest extends TestCase
 {
-    private AlertService $alertService;
+    private AlertService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->alertService = new AlertService();
+        $this->service = new AlertService();
     }
 
-    public function test_device_alerts_returns_empty_array_for_empty_input(): void
+    // --- normalizeSeverity tests (private, tested via reflection) ---
+
+    private function normalizeSeverity($input): string
     {
-        $result = $this->alertService->deviceAlerts([]);
-        $this->assertIsArray($result);
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('normalizeSeverity');
+        $method->setAccessible(true);
+        return $method->invoke($this->service, $input);
+    }
+
+    public function test_normalize_null_returns_warning(): void
+    {
+        $this->assertEquals('warning', $this->normalizeSeverity(null));
+    }
+
+    public function test_normalize_numeric_zero_returns_ok(): void
+    {
+        $this->assertEquals('ok', $this->normalizeSeverity(0));
+    }
+
+    public function test_normalize_numeric_one_returns_warning(): void
+    {
+        $this->assertEquals('warning', $this->normalizeSeverity(1));
+    }
+
+    public function test_normalize_numeric_two_returns_critical(): void
+    {
+        $this->assertEquals('critical', $this->normalizeSeverity(2));
+    }
+
+    public function test_normalize_numeric_three_returns_severe(): void
+    {
+        $this->assertEquals('severe', $this->normalizeSeverity(3));
+    }
+
+    public function test_normalize_high_numeric_returns_severe(): void
+    {
+        $this->assertEquals('severe', $this->normalizeSeverity(99));
+    }
+
+    public function test_normalize_string_ok(): void
+    {
+        $this->assertEquals('ok', $this->normalizeSeverity('ok'));
+    }
+
+    public function test_normalize_string_warning(): void
+    {
+        $this->assertEquals('warning', $this->normalizeSeverity('warning'));
+    }
+
+    public function test_normalize_string_critical(): void
+    {
+        $this->assertEquals('critical', $this->normalizeSeverity('critical'));
+    }
+
+    public function test_normalize_string_severe(): void
+    {
+        $this->assertEquals('severe', $this->normalizeSeverity('severe'));
+    }
+
+    public function test_normalize_string_case_insensitive(): void
+    {
+        $this->assertEquals('critical', $this->normalizeSeverity('CRITICAL'));
+        $this->assertEquals('warning', $this->normalizeSeverity('Warning'));
+    }
+
+    public function test_normalize_unknown_string_returns_warning(): void
+    {
+        $this->assertEquals('warning', $this->normalizeSeverity('unknown'));
+        $this->assertEquals('warning', $this->normalizeSeverity('info'));
+        $this->assertEquals('warning', $this->normalizeSeverity('banana'));
+    }
+
+    // --- maxSeverity tests ---
+
+    private function maxSeverity(string $a, string $b): string
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('maxSeverity');
+        $method->setAccessible(true);
+        return $method->invoke($this->service, $a, $b);
+    }
+
+    public function test_max_severity_returns_higher(): void
+    {
+        $this->assertEquals('critical', $this->maxSeverity('warning', 'critical'));
+        $this->assertEquals('critical', $this->maxSeverity('critical', 'warning'));
+    }
+
+    public function test_max_severity_same_returns_same(): void
+    {
+        $this->assertEquals('warning', $this->maxSeverity('warning', 'warning'));
+    }
+
+    public function test_max_severity_severe_beats_all(): void
+    {
+        $this->assertEquals('severe', $this->maxSeverity('ok', 'severe'));
+        $this->assertEquals('severe', $this->maxSeverity('critical', 'severe'));
+    }
+
+    public function test_max_severity_ok_loses_to_all(): void
+    {
+        $this->assertEquals('warning', $this->maxSeverity('ok', 'warning'));
+        $this->assertEquals('critical', $this->maxSeverity('ok', 'critical'));
+        $this->assertEquals('severe', $this->maxSeverity('ok', 'severe'));
+    }
+
+    public function test_max_severity_ordering(): void
+    {
+        $levels = ['ok', 'warning', 'critical', 'severe'];
+        for ($i = 0; $i < count($levels); $i++) {
+            for ($j = $i; $j < count($levels); $j++) {
+                $this->assertEquals(
+                    $levels[$j],
+                    $this->maxSeverity($levels[$i], $levels[$j]),
+                    "{$levels[$j]} should beat {$levels[$i]}"
+                );
+            }
+        }
+    }
+
+    // --- buildAlertsByDevice tests ---
+
+    public function test_device_alerts_returns_empty_for_empty_input(): void
+    {
+        $result = $this->service->deviceAlerts([]);
         $this->assertEmpty($result);
     }
 
-    public function test_device_alerts_structure(): void
+    public function test_port_alerts_returns_empty_for_empty_input(): void
     {
-        if (!class_exists('Illuminate\Support\Facades\DB')) {
-            $this->markTestSkipped('DB facade not available');
-            return;
-        }
-
-        $result = $this->alertService->deviceAlerts([1, 2, 3]);
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey(1, $result);
-        $this->assertArrayHasKey(2, $result);
-        $this->assertArrayHasKey(3, $result);
-    }
-
-    public function test_device_alerts_returns_alert_structure(): void
-    {
-        if (!class_exists('Illuminate\Support\Facades\DB')) {
-            $this->markTestSkipped('DB facade not available');
-            return;
-        }
-
-        $result = $this->alertService->deviceAlerts([1]);
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey(1, $result);
-        $this->assertIsArray($result[1]);
-        $this->assertArrayHasKey('count', $result[1]);
-        $this->assertArrayHasKey('severity', $result[1]);
-        $this->assertIsInt($result[1]['count']);
-        $this->assertIsString($result[1]['severity']);
-    }
-
-    public function test_port_alerts_returns_empty_array_for_empty_input(): void
-    {
-        $result = $this->alertService->portAlerts([]);
-        $this->assertIsArray($result);
+        $result = $this->service->portAlerts([]);
         $this->assertEmpty($result);
     }
 
-    public function test_port_alerts_structure(): void
+    // --- buildAlertsByDevice via reflection ---
+
+    public function test_build_alerts_initializes_all_devices(): void
     {
-        if (!class_exists('Illuminate\Support\Facades\DB')) {
-            $this->markTestSkipped('DB facade not available');
-            return;
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAlertsByDevice');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, [], [1, 2, 3]);
+
+        $this->assertCount(3, $result);
+        foreach ([1, 2, 3] as $id) {
+            $this->assertEquals(0, $result[$id]['count']);
+            $this->assertEquals('warning', $result[$id]['severity']);
         }
-
-        $result = $this->alertService->portAlerts([1, 2, 3]);
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey(1, $result);
-        $this->assertArrayHasKey(2, $result);
-        $this->assertArrayHasKey(3, $result);
     }
 
-    public function test_port_alerts_returns_alert_structure(): void
+    public function test_build_alerts_counts_per_device(): void
     {
-        if (!class_exists('Illuminate\Support\Facades\DB')) {
-            $this->markTestSkipped('DB facade not available');
-            return;
-        }
-
-        $result = $this->alertService->portAlerts([1]);
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey(1, $result);
-        $this->assertIsArray($result[1]);
-        $this->assertArrayHasKey('count', $result[1]);
-        $this->assertArrayHasKey('severity', $result[1]);
-        $this->assertIsInt($result[1]['count']);
-        $this->assertIsString($result[1]['severity']);
-    }
-
-    public function test_severity_normalization_handles_null(): void
-    {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAlertsByDevice');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->alertService, null);
-        $this->assertEquals('warning', $result);
+        $alerts = [
+            ['device_id' => 1, 'severity' => 1],
+            ['device_id' => 1, 'severity' => 2],
+            ['device_id' => 2, 'severity' => 1],
+        ];
+
+        $result = $method->invoke($this->service, $alerts, [1, 2]);
+
+        $this->assertEquals(2, $result[1]['count']);
+        $this->assertEquals('critical', $result[1]['severity']);
+        $this->assertEquals(1, $result[2]['count']);
+        $this->assertEquals('warning', $result[2]['severity']);
     }
 
-    public function test_severity_normalization_handles_numeric_3(): void
+    public function test_build_alerts_ignores_unknown_devices(): void
     {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAlertsByDevice');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->alertService, 3);
-        $this->assertEquals('severe', $result);
+        $alerts = [
+            ['device_id' => 999, 'severity' => 3],
+        ];
+
+        $result = $method->invoke($this->service, $alerts, [1]);
+
+        $this->assertEquals(0, $result[1]['count']);
     }
 
-    public function test_severity_normalization_handles_numeric_2(): void
+    // --- buildAlertsByPort via reflection ---
+
+    public function test_build_port_alerts_initializes_all_ports(): void
     {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAlertsByPort');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->alertService, 2);
-        $this->assertEquals('critical', $result);
+        $result = $method->invoke($this->service, [], [10, 20]);
+
+        $this->assertCount(2, $result);
+        $this->assertEquals(0, $result[10]['count']);
+        $this->assertEquals(0, $result[20]['count']);
     }
 
-    public function test_severity_normalization_handles_numeric_1(): void
+    public function test_build_port_alerts_aggregates_severity(): void
     {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('buildAlertsByPort');
         $method->setAccessible(true);
 
-        $result = $method->invoke($this->alertService, 1);
-        $this->assertEquals('warning', $result);
-    }
+        $alerts = [
+            ['port_id' => 10, 'severity' => 'warning'],
+            ['port_id' => 10, 'severity' => 'critical'],
+        ];
 
-    public function test_severity_normalization_handles_numeric_0(): void
-    {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
-        $method->setAccessible(true);
+        $result = $method->invoke($this->service, $alerts, [10]);
 
-        $result = $method->invoke($this->alertService, 0);
-        $this->assertEquals('ok', $result);
-    }
-
-    public function test_severity_normalization_handles_string_ok(): void
-    {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->alertService, 'OK');
-        $this->assertEquals('ok', $result);
-    }
-
-    public function test_severity_normalization_handles_invalid_string(): void
-    {
-        $method = new \ReflectionMethod($this->alertService, 'normalizeSeverity');
-        $method->setAccessible(true);
-
-        $result = $method->invoke($this->alertService, 'invalid');
-        $this->assertEquals('warning', $result);
-    }
-
-    public function test_max_severity_compares_correctly(): void
-    {
-        $method = new \ReflectionMethod($this->alertService, 'maxSeverity');
-        $method->setAccessible(true);
-
-        $this->assertEquals('severe', $method->invoke($this->alertService, 'severe', 'critical'));
-        $this->assertEquals('critical', $method->invoke($this->alertService, 'critical', 'warning'));
-        $this->assertEquals('warning', $method->invoke($this->alertService, 'warning', 'ok'));
-    }
-
-    public function test_max_severity_returns_first_if_equal(): void
-    {
-        $method = new \ReflectionMethod($this->alertService, 'maxSeverity');
-        $method->setAccessible(true);
-
-        $this->assertEquals('warning', $method->invoke($this->alertService, 'warning', 'warning'));
-        $this->assertEquals('ok', $method->invoke($this->alertService, 'ok', 'ok'));
+        $this->assertEquals(2, $result[10]['count']);
+        $this->assertEquals('critical', $result[10]['severity']);
     }
 }

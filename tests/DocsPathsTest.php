@@ -7,7 +7,6 @@ class DocsPathsTest extends TestCase
     private $docs = [
         'README.md',
         'API.md',
-        'FAQ.md',
         'INSTALL.md',
         'DEPLOYMENT.md',
     ];

@@ -1,1 +1,5 @@
-{"name":"librenms/weathermapng","description":"Next-generation Weathermap plugin for LibreNMS","type":"librenms-plugin","version":"1.6.1","license":"MIT","authors":[{"name":"LibreNMS Community","email":"info@librenms.org"}],"require":{"php":">=8.2","ext-gd":"*","ext-json":"*","librenms/plugin-interfaces":"^1.0","symfony/process":"^7.0"},"autoload":{"psr-4":{"LibreNMS\\Plugins\\WeathermapNG\\":"src/"}},"extra":{"laravel":{"providers":["LibreNMS\\Plugins\\WeathermapNG\\WeathermapNGProvider"]}}}
+{"name":"librenms/weathermapng","description":"Next-generation Weathermap plugin for LibreNMS","type":"librenms-plugin","version":"1.6.1","license":"MIT","authors":[{"name":"LibreNMS Community","email":"info@librenms.org"}],"require":{"php":">=8.2","ext-gd":"*","ext-json":"*","librenms/plugin-interfaces":"^1.0","symfony/process":"^7.0"},"autoload":{"psr-4":{"LibreNMS\\Plugins\\WeathermapNG\\":"src/"}},"extra":{"laravel":{"providers":["LibreNMS\\Plugins\\WeathermapNG\\WeathermapNGProvider"]}},
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    }
+}
