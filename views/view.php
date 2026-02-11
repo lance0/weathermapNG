@@ -17,7 +17,7 @@ $nodes = dbFetchRows("SELECT n.*, d.hostname, d.status
                       WHERE n.map_id = ? 
                       ORDER BY n.id", [$mapId]);
 
-// Get links with traffic data
+// Get links with traffic data and bandwidth
 $links = dbFetchRows("SELECT l.*, 
                              p1.ifInOctets_rate as in_rate_a, p1.ifOutOctets_rate as out_rate_a,
                              p2.ifInOctets_rate as in_rate_b, p2.ifOutOctets_rate as out_rate_b
@@ -26,6 +26,14 @@ $links = dbFetchRows("SELECT l.*,
                       LEFT JOIN ports p2 ON l.port_id_b = p2.port_id
                       WHERE l.map_id = ?
                       ORDER BY l.id", [$mapId]);
+
+// Ensure bandwidth_bps is included in the links data
+foreach ($links as &$link) {
+    if (!isset($link['bandwidth_bps'])) {
+        $link['bandwidth_bps'] = null;
+    }
+}
+unset($link);
 ?>
 
 <div class="container-fluid">
@@ -96,8 +104,9 @@ function getLinkColor(link) {
     
     if (maxRate == 0) return '#6c757d'; // No data
     
-    // Assuming 1Gbps links for now (can be made dynamic)
-    var utilization = (maxRate * 8) / 1000000000 * 100; // Convert to percentage
+    // Use configured bandwidth or default to 1Gbps
+    var bandwidth = link.bandwidth_bps || 1000000000;
+    var utilization = (maxRate * 8) / bandwidth * 100; // Convert to percentage
     
     if (utilization > 90) return '#dc3545';
     if (utilization > 70) return '#fd7e14';

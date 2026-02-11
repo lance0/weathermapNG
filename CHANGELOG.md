@@ -86,6 +86,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Status Bar**: Now shows relative time since last data update (e.g., "Just now", "15s ago", "2m ago")
 
 ### Fixed
+- **Link Utilization Calculation**: Map view now uses configured `bandwidth_bps` instead of assuming 1Gbps
+  - Utilization percentages are now accurate for links with different bandwidths (10Gbps, 100Mbps, etc.)
+  - Falls back to 1Gbps only when no bandwidth is configured
 - **Demo Mode Node Traffic**: Nodes now show simulated traffic (in/out/sum) in demo mode tooltips
 - **Versioning Table Missing**: Added `wmng_map_versions` table to `database/setup.php` for fresh installs and upgrades
 - **Modal Accessibility**: Removed static `aria-hidden="true"` from modals to fix focus warning
