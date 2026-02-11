@@ -64,3 +64,9 @@ yarn-error.log*
 
 # Local references and example plugin trees
 librenms-example-plugin-main/
+
+# Local dev symlinks and scratch files
+configs
+*.png
+docker/
+docker-compose.official.yml
