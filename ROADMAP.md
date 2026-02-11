@@ -31,11 +31,20 @@ The plugin is production-ready with core features complete:
   - Campus network
   - Simple branch office
 
-- [ ] **Keyboard Shortcuts**: Power user features
-  - Ctrl+S save
+- [x] **Keyboard Shortcuts**: Power user features (DONE)
+  - Ctrl+S save, Ctrl+Z/Y undo/redo
   - Delete key for selected items
-  - Arrow keys for nudging
-  - Ctrl+Z undo
+  - Arrow keys for nudging (Shift for 10px)
+  - +/-/0 for zoom control, Esc to deselect
+
+- [x] **Editor Enhancements** (DONE)
+  - Zoom & pan (mouse wheel + middle-click)
+  - Editor minimap with click navigation
+  - Undo/redo system (50-state history)
+  - Grid snapping toggle
+  - Node boundary checking
+  - Smart node placement (spiral)
+  - Canvas resize validation
 
 - [ ] **Bulk Operations**: Multi-select and bulk edit
   - Select multiple nodes/links
