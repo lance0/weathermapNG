@@ -23,31 +23,24 @@ jobs:
 
       - name: Check PHP syntax
         run: |
-          find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -v "No syntax errors" || true
-          # Fail if any actual errors found
-          ! find . -name "*.php" -not -path "./vendor/*" -exec php -l {} \; 2>&1 | grep -q "Parse error"
+          ERRORS=0
+          while IFS= read -r file; do
+            if ! php -l "$file" 2>&1 | grep -q "No syntax errors"; then
+              ERRORS=1
+            fi
+          done < <(find . -name "*.php" -not -path "./vendor/*")
+          exit $ERRORS
 
       - name: Validate composer.json
         run: composer validate --no-check-publish
 
   test:
     runs-on: ubuntu-latest
-    name: PHP Tests
+    name: PHPUnit (${{ matrix.php-version }})
     needs: lint
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: librenms_test
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+    strategy:
+      matrix:
+        php-version: ['8.2', '8.3']
 
     steps:
       - name: Checkout code
@@ -56,32 +49,23 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
-          extensions: gd, json, mbstring, pdo, pdo_mysql
+          php-version: ${{ matrix.php-version }}
+          extensions: gd, json, mbstring, pdo
           tools: composer:v2
 
       - name: Cache Composer dependencies
         uses: actions/cache@v4
         with:
           path: vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-php${{ matrix.php-version }}-composer-${{ hashFiles('composer.json') }}
           restore-keys: |
-            ${{ runner.os }}-composer-
+            ${{ runner.os }}-php${{ matrix.php-version }}-composer-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run tests
-        run: |
-          if [ -f phpunit.xml ] || [ -f phpunit.xml.dist ]; then
-            if [ -f vendor/bin/phpunit ]; then
-              vendor/bin/phpunit --testdox
-            else
-              echo "PHPUnit not installed, skipping tests"
-            fi
-          else
-            echo "No PHPUnit config found, skipping tests"
-          fi
+        run: vendor/bin/phpunit --testdox
 
   security:
     runs-on: ubuntu-latest
