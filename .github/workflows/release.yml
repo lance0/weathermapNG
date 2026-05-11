@@ -54,7 +54,7 @@ jobs:
           git archive --format=tar.gz --prefix=WeathermapNG/ -o dist/WeathermapNG-${VERSION}.tar.gz HEAD
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           name: WeathermapNG ${{ steps.version.outputs.VERSION }}
           body: |
