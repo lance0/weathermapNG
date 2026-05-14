@@ -159,7 +159,10 @@
             },
             enable_sse: {!! json_encode(config('weathermapng.enable_sse') ?? true) !!},
             client_refresh: {!! json_encode(config('weathermapng.client_refresh') ?? 60) !!},
-            scale: {!! json_encode(config('weathermapng.scale') ?? 'bits') !!}
+            scale: {!! json_encode(config('weathermapng.scale') ?? 'bits') !!},
+            link_style: '{{ config('weathermapng.link_style', 'straight') }}',
+            show_bandwidth: {!! json_encode(config('weathermapng.show_bandwidth', true)) !!},
+            show_percentages: {!! json_encode(config('weathermapng.show_percentages', true)) !!}
         };
         const urlParams = new URLSearchParams(window.location.search);
         const param = (k, d) => urlParams.has(k) ? urlParams.get(k) : d;
@@ -498,7 +501,7 @@
 
         function buildLinkPath(link, x1, y1, x2, y2) {
             const viaPoints = (link.style && link.style.via_points) || [];
-            const viaStyle = (link.style && link.style.via_style) || 'straight';
+            const viaStyle = (link.style && link.style.via_style) || WMNG_CONFIG.link_style || 'straight';
             const points = [{x: x1, y: y1}];
             for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
             points.push({x: x2, y: y2});
@@ -632,15 +635,20 @@
 
             // Link utilization label
             if (metric !== null && metric !== undefined) {
-                const mid = getPathMidpoint(points);
-                ctx.fillStyle = '#111';
-                ctx.font = '11px Arial';
-                ctx.textAlign = 'center';
-                const label = (currentMetric === 'percent') ? (Math.round(pct) + '%') : humanBits(metric);
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 3;
-                ctx.strokeText(label, mid.x, mid.y - 5);
-                ctx.fillText(label, mid.x, mid.y - 5);
+                const showLabel = (currentMetric === 'percent')
+                    ? WMNG_CONFIG.show_percentages !== false
+                    : WMNG_CONFIG.show_bandwidth !== false;
+                if (showLabel) {
+                    const mid = getPathMidpoint(points);
+                    ctx.fillStyle = '#111';
+                    ctx.font = '11px Arial';
+                    ctx.textAlign = 'center';
+                    const label = (currentMetric === 'percent') ? (Math.round(pct) + '%') : humanBits(metric);
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.strokeText(label, mid.x, mid.y - 5);
+                    ctx.fillText(label, mid.x, mid.y - 5);
+                }
             }
             // Link alert badge (diamond)
             if (link.alerts && link.alerts.count > 0) {

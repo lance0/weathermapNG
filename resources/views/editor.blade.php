@@ -344,6 +344,14 @@
                     <label class="form-label">Bandwidth (bps)</label>
                     <input type="number" id="link-bandwidth" class="form-control" min="0" placeholder="e.g. 1000000000 for 1Gbps">
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Via Style</label>
+                    <select id="link-via-style" class="form-control">
+                        <option value="straight">Straight</option>
+                        <option value="angled">Angled</option>
+                        <option value="curved">Curved</option>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-danger" id="delete-link-btn" style="display:none;">
@@ -496,6 +504,10 @@
             let dragOffset = { x: 0, y: 0 };
             let linkMode = false;
             let linkStart = null;
+
+            const editorConfig = {
+                link_style: '{{ config('weathermapng.link_style', 'straight') }}'
+            };
 
             // Zoom and pan state
             let viewScale = 1;
@@ -787,7 +799,7 @@
                 if (!src || !dst) return;
 
                 const viaPoints = (link.style && link.style.via_points) || [];
-                const viaStyle = (link.style && link.style.via_style) || 'straight';
+                const viaStyle = (link.style && link.style.via_style) || editorConfig.link_style;
                 const points = [{x: src.x, y: src.y}];
                 for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
                 points.push({x: dst.x, y: dst.y});
@@ -1872,11 +1884,13 @@ function openLinkModal(linkIndex) {
     const dstPortSelect = document.getElementById('link-dst-port');
     const bandwidthInput = document.getElementById('link-bandwidth');
     const deleteBtn = document.getElementById('delete-link-btn');
+    const viaStyleSelect = document.getElementById('link-via-style');
 
     // Reset dropdowns
     srcPortSelect.innerHTML = '<option value="">Select port...</option>';
     dstPortSelect.innerHTML = '<option value="">Select port...</option>';
     bandwidthInput.value = link.bw || '';
+    viaStyleSelect.value = (link.style && link.style.via_style) || 'straight';
     deleteBtn.style.display = 'inline-block';
 
     // Load source node ports
@@ -1920,6 +1934,9 @@ function saveLink() {
     link.portA = document.getElementById('link-src-port').value || null;
     link.portB = document.getElementById('link-dst-port').value || null;
     link.bw = parseInt(document.getElementById('link-bandwidth').value, 10) || null;
+    const viaStyle = document.getElementById('link-via-style').value || 'straight';
+    if (!link.style) link.style = {};
+    link.style.via_style = viaStyle;
 
     $('#linkModal').modal('hide');
     currentLinkIndex = null;

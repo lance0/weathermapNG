@@ -17,7 +17,9 @@ class WeathermapNGTest extends TestCase
 
     public function test_version_matches_expected(): void
     {
-        $this->assertEquals('1.6.1', $this->plugin->getVersion());
+        $version = $this->plugin->getVersion();
+        $this->assertNotEmpty($version);
+        $this->assertMatchesRegularExpression('/^\d+\.\d+\.\d+$/', $version);
     }
 
     public function test_get_info_returns_complete_structure(): void

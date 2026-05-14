@@ -2,7 +2,7 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.6.1 (Stable)
+## Current Status: v1.6.2 (Stable)
 
 The plugin is production-ready with core features complete:
 - Professional 3-panel map editor (toolbox, canvas, properties sidebar)
@@ -120,6 +120,13 @@ The plugin is production-ready with core features complete:
 ---
 
 ## Completed Features
+
+### v1.6.2
+- [x] Via points and via style for links (curved/angled/straight path routing)
+- [x] Interactive via point editing in modern editor (add, drag, delete)
+- [x] Flow particles follow waypoint paths
+- [x] Catmull-Rom spline interpolation for curved via style
+- [x] Automated GitHub Actions dependency updates (Dependabot)
 
 ### v1.6.1
 - [x] Professional 3-panel editor layout (toolbox, canvas, properties sidebar)

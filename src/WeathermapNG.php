@@ -38,7 +38,8 @@ class WeathermapNG
 
     public function getVersion()
     {
-        return '1.6.1';
+        $composer = json_decode(file_get_contents(dirname(__DIR__) . '/composer.json'), true);
+        return $composer['version'] ?? '0.0.0';
     }
 
     public function getInfo()
