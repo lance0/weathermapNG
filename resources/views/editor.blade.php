@@ -786,12 +786,44 @@
                 const dst = findNodeById(link.dstId);
                 if (!src || !dst) return;
 
+                const viaPoints = (link.style && link.style.via_points) || [];
+                const viaStyle = (link.style && link.style.via_style) || 'straight';
+                const points = [{x: src.x, y: src.y}];
+                for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
+                points.push({x: dst.x, y: dst.y});
+
                 ctx.beginPath();
-                ctx.moveTo(src.x, src.y);
-                ctx.lineTo(dst.x, dst.y);
+                ctx.moveTo(points[0].x, points[0].y);
+
+                if (points.length === 2) {
+                    ctx.lineTo(points[1].x, points[1].y);
+                } else if (viaStyle === 'curved') {
+                    for (let i = 0; i < points.length - 1; i++) {
+                        const p0 = points[Math.max(0, i - 1)];
+                        const p1 = points[i];
+                        const p2 = points[i + 1];
+                        const p3 = points[Math.min(points.length - 1, i + 2)];
+                        const cp1x = p1.x + (p2.x - p0.x) / 6;
+                        const cp1y = p1.y + (p2.y - p0.y) / 6;
+                        const cp2x = p2.x - (p3.x - p1.x) / 6;
+                        const cp2y = p2.y - (p3.y - p1.y) / 6;
+                        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                    }
+                } else {
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i].x, points[i].y);
+                    }
+                }
+
                 ctx.strokeStyle = '#6c757d';
                 ctx.lineWidth = 2;
                 ctx.stroke();
+
+                // Store segments for hit-testing
+                link._segs = [];
+                for (let i = 1; i < points.length; i++) {
+                    link._segs.push({x1: points[i-1].x, y1: points[i-1].y, x2: points[i].x, y2: points[i].y});
+                }
             }
 
             function renderEditor() {

@@ -260,6 +260,8 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     let snapEnabled = true;
     let history = [];
     let historyIndex = -1;
+    let draggingViaPoint = null; // { linkIndex, pointIndex }
+    let selectedViaPoint = null; // { linkIndex, pointIndex }
     
     // Node types with icons
     const iconFontFamily = '"Font Awesome 6 Free"';
@@ -370,7 +372,7 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         }
         
         // Draw links
-        links.forEach(link => drawLink(link));
+        links.forEach(link => drawLink(link, true));
         
         // Draw nodes
         nodes.forEach(node => drawNode(node));
@@ -431,45 +433,80 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         }
     }
 
-    function drawLink(link) {
+    function drawLink(link, drawViaPoints) {
         const srcNode = nodes.find(n => n.id == link.src_node_id);
         const dstNode = nodes.find(n => n.id == link.dst_node_id);
         
         if (!srcNode || !dstNode) return;
         
-        // Calculate link path
-        const dx = dstNode.x - srcNode.x;
-        const dy = dstNode.y - srcNode.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
+        const viaPoints = (link.style && link.style.via_points) || [];
+        const viaStyle = (link.style && link.style.via_style) || (link.curved ? 'curved' : 'straight');
+        const points = [{x: srcNode.x, y: srcNode.y}];
+        for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
+        points.push({x: dstNode.x, y: dstNode.y});
+
         // Draw link line
         ctx.strokeStyle = link.color || '#718096';
         ctx.lineWidth = link.width || 3;
-        ctx.setLineDash(link.style === 'dashed' ? [5, 5] : []);
+        ctx.setLineDash(link.style_line === 'dashed' ? [5, 5] : []);
         
         ctx.beginPath();
-        ctx.moveTo(srcNode.x, srcNode.y);
-        
-        if (link.curved) {
-            // Draw curved link
+        ctx.moveTo(points[0].x, points[0].y);
+
+        if (points.length === 2 && !link.curved && viaStyle === 'straight') {
+            ctx.lineTo(points[1].x, points[1].y);
+        } else if (viaStyle === 'curved' && points.length > 2) {
+            // Catmull-Rom smooth curve through all waypoints
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[Math.max(0, i - 1)];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = points[Math.min(points.length - 1, i + 2)];
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                const cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                const cp2y = p2.y - (p3.y - p1.y) / 6;
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+            }
+        } else if (link.curved && points.length === 2) {
+            // Legacy curved: single quadratic bezier
+            const dx = dstNode.x - srcNode.x;
+            const dy = dstNode.y - srcNode.y;
             const cx = (srcNode.x + dstNode.x) / 2 + dy * 0.2;
             const cy = (srcNode.y + dstNode.y) / 2 - dx * 0.2;
             ctx.quadraticCurveTo(cx, cy, dstNode.x, dstNode.y);
         } else {
-            // Draw straight link
-            ctx.lineTo(dstNode.x, dstNode.y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
         }
         
         ctx.stroke();
         ctx.setLineDash([]);
         
-        // Draw arrow
+        // Draw via point handles if requested
+        if (drawViaPoints && viaPoints.length > 0) {
+            viaPoints.forEach((vp, idx) => {
+                ctx.fillStyle = '#667eea';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(vp.x, vp.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+
+        // Draw arrow (use last segment direction)
         if (link.directional) {
-            const angle = Math.atan2(dy, dx);
+            const last = points[points.length - 1];
+            const prev = points[points.length - 2];
+            const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
+            const dist = Math.sqrt((last.x - prev.x)**2 + (last.y - prev.y)**2);
             const arrowSize = 10;
             
             ctx.save();
-            ctx.translate(dstNode.x - dx/distance * 30, dstNode.y - dy/distance * 30);
+            ctx.translate(last.x - (last.x - prev.x) / dist * 30, last.y - (last.y - prev.y) / dist * 30);
             ctx.rotate(angle);
             
             ctx.beginPath();
@@ -483,10 +520,11 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
             ctx.restore();
         }
         
-        // Draw bandwidth label
+        // Draw bandwidth label at midpoint
         if (link.bandwidth) {
-            const midX = (srcNode.x + dstNode.x) / 2;
-            const midY = (srcNode.y + dstNode.y) / 2;
+            const midIdx = Math.floor(points.length / 2);
+            const midX = points.length === 2 ? (srcNode.x + dstNode.x) / 2 : points[midIdx].x;
+            const midY = points.length === 2 ? (srcNode.y + dstNode.y) / 2 : points[midIdx].y;
             
             ctx.fillStyle = 'white';
             ctx.fillRect(midX - 30, midY - 10, 60, 20);
@@ -565,6 +603,22 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         const x = (e.clientX - rect.left) / zoom - pan.x;
         const y = (e.clientY - rect.top) / zoom - pan.y;
         
+        // Check if clicking a via point first
+        if (currentTool === 'select') {
+            const vp = getViaPointAt(x, y);
+            if (vp) {
+                draggingViaPoint = vp;
+                selectedViaPoint = vp;
+                isDragging = true;
+                dragStart = { x, y };
+                // Select the parent link
+                selectedElement = { type: 'link', id: links[vp.linkIndex].id };
+                drawMap();
+                showProperties(selectedElement);
+                return;
+            }
+        }
+        
         switch(currentTool) {
             case 'select':
                 selectElement(x, y);
@@ -602,7 +656,18 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         document.getElementById('cursorPos').textContent = `${Math.round(x)}, ${Math.round(y)}`;
         
         if (isDragging) {
-            if (currentTool === 'select' && selectedElement) {
+            if (draggingViaPoint) {
+                // Drag via point
+                const link = links[draggingViaPoint.linkIndex];
+                if (link && link.style && link.style.via_points) {
+                    const vp = link.style.via_points[draggingViaPoint.pointIndex];
+                    if (vp) {
+                        vp.x = snapEnabled ? Math.round(x / 20) * 20 : x;
+                        vp.y = snapEnabled ? Math.round(y / 20) * 20 : y;
+                        drawMap();
+                    }
+                }
+            } else if (currentTool === 'select' && selectedElement) {
                 // Move selected element
                 if (selectedElement.type === 'node') {
                     const node = nodes.find(n => n.id === selectedElement.id);
@@ -623,17 +688,51 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     }
 
     function handleMouseUp(e) {
-        if (isDragging && currentTool === 'select') {
+        if (isDragging && currentTool === 'select' && !draggingViaPoint) {
+            saveHistory();
+        }
+        if (isDragging && draggingViaPoint) {
             saveHistory();
         }
         isDragging = false;
         dragStart = null;
+        draggingViaPoint = null;
     }
 
     function handleDoubleClick(e) {
         const rect = canvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) / zoom - pan.x;
         const y = (e.clientY - rect.top) / zoom - pan.y;
+        
+        // If on a via point, remove it
+        const vp = getViaPointAt(x, y);
+        if (vp) {
+            const link = links[vp.linkIndex];
+            if (link.style && link.style.via_points) {
+                link.style.via_points.splice(vp.pointIndex, 1);
+                if (link.style.via_points.length === 0) delete link.style.via_points;
+                saveHistory();
+                drawMap();
+                if (selectedElement) showProperties(selectedElement);
+            }
+            return;
+        }
+        
+        // If on a link, add a via point at click position
+        const link = getLinkAt(x, y);
+        if (link) {
+            if (!link.style) link.style = {};
+            if (!link.style.via_points) link.style.via_points = [];
+            const newX = snapEnabled ? Math.round(x / 20) * 20 : x;
+            const newY = snapEnabled ? Math.round(y / 20) * 20 : y;
+            link.style.via_points.push({ x: newX, y: newY });
+            selectedElement = { type: 'link', id: link.id };
+            saveHistory();
+            drawMap();
+            showProperties(selectedElement);
+            updateStatus('Added via point — double-click it to remove');
+            return;
+        }
         
         // Find element at position
         const element = getElementAt(x, y);
@@ -666,7 +765,16 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     function handleKeyDown(e) {
         switch(e.key) {
             case 'Delete':
-                if (selectedElement) {
+                if (selectedViaPoint) {
+                    const link = links[selectedViaPoint.linkIndex];
+                    if (link && link.style && link.style.via_points) {
+                        link.style.via_points.splice(selectedViaPoint.pointIndex, 1);
+                        if (link.style.via_points.length === 0) delete link.style.via_points;
+                        selectedViaPoint = null;
+                        saveHistory();
+                        drawMap();
+                    }
+                } else if (selectedElement) {
                     deleteSelectedElement();
                 }
                 break;
@@ -810,15 +918,38 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
 
     function getLinkAt(x, y) {
         // Simplified link detection
-        for (let link of links) {
+        for (let i = links.length - 1; i >= 0; i--) {
+            const link = links[i];
             const srcNode = nodes.find(n => n.id == link.src_node_id);
             const dstNode = nodes.find(n => n.id == link.dst_node_id);
             
             if (srcNode && dstNode) {
-                // Check if point is near line
-                const dist = pointToLineDistance(x, y, srcNode.x, srcNode.y, dstNode.x, dstNode.y);
-                if (dist < 5) {
-                    return link;
+                // Check distance to each segment of the via point path
+                const viaPoints = (link.style && link.style.via_points) || [];
+                const points = [
+                    {x: srcNode.x, y: srcNode.y},
+                    ...viaPoints.map(vp => ({x: vp.x, y: vp.y})),
+                    {x: dstNode.x, y: dstNode.y}
+                ];
+                for (let j = 1; j < points.length; j++) {
+                    const dist = pointToLineDistance(x, y, points[j-1].x, points[j-1].y, points[j].x, points[j].y);
+                    if (dist < 5) return link;
+                }
+            }
+        }
+        return null;
+    }
+
+    function getViaPointAt(x, y) {
+        // Check if clicking near a via point handle
+        for (let i = links.length - 1; i >= 0; i--) {
+            const link = links[i];
+            const viaPoints = (link.style && link.style.via_points) || [];
+            for (let j = 0; j < viaPoints.length; j++) {
+                const dx = x - viaPoints[j].x;
+                const dy = y - viaPoints[j].y;
+                if (Math.sqrt(dx*dx + dy*dy) < 8) {
+                    return { linkIndex: i, pointIndex: j };
                 }
             }
         }
@@ -1036,6 +1167,8 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
         } else if (element.type === 'link') {
             const link = links.find(l => l.id === element.id);
             if (!link) return;
+            const viaStyle = (link.style && link.style.via_style) || 'straight';
+            const viaPoints = (link.style && link.style.via_points) || [];
             
             panel.innerHTML = `
                 <div class="property-group">
@@ -1052,15 +1185,27 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
                 </div>
                 <div class="property-group">
                     <label>Style</label>
-                    <select id="propStyle" onchange="updateLinkProperty('style', this.value)">
-                        <option value="solid" ${link.style === 'solid' ? 'selected' : ''}>Solid</option>
-                        <option value="dashed" ${link.style === 'dashed' ? 'selected' : ''}>Dashed</option>
+                    <select id="propStyle" onchange="updateLinkProperty('style_line', this.value)">
+                        <option value="solid" ${link.style_line === 'solid' ? 'selected' : ''}>Solid</option>
+                        <option value="dashed" ${link.style_line === 'dashed' ? 'selected' : ''}>Dashed</option>
                     </select>
+                </div>
+                <div class="property-group">
+                    <label>Via Style</label>
+                    <select id="propViaStyle" onchange="updateViaStyle(this.value)">
+                        <option value="straight" ${viaStyle === 'straight' ? 'selected' : ''}>Straight</option>
+                        <option value="angled" ${viaStyle === 'angled' ? 'selected' : ''}>Angled</option>
+                        <option value="curved" ${viaStyle === 'curved' ? 'selected' : ''}>Curved</option>
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label>Via Points: ${viaPoints.length}</label>
+                    <small class="text-muted">Double-click link to add; double-click point to remove</small>
                 </div>
                 <div class="property-group">
                     <label>
                         <input type="checkbox" ${link.curved ? 'checked' : ''} onchange="updateLinkProperty('curved', this.checked)">
-                        Curved
+                        Curved (legacy)
                     </label>
                 </div>
                 <div class="property-group">
@@ -1097,9 +1242,23 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
                 link[prop] = parseInt(value);
             } else if (prop === 'curved' || prop === 'directional') {
                 link[prop] = value;
+            } else if (prop === 'style_line') {
+                if (!link.style) link.style = {};
+                link.style.line = value;
             } else {
                 link[prop] = value;
             }
+            saveHistory();
+            drawMap();
+        }
+    }
+
+    function updateViaStyle(value) {
+        if (!selectedElement || selectedElement.type !== 'link') return;
+        const link = links.find(l => l.id === selectedElement.id);
+        if (link) {
+            if (!link.style) link.style = {};
+            link.style.via_style = value;
             saveHistory();
             drawMap();
         }
@@ -1247,8 +1406,15 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
                 const x2 = offsetX + (dstNode.x - minX) * scale;
                 const y2 = offsetY + (dstNode.y - minY) * scale;
 
+                const viaPoints = (link.style && link.style.via_points) || [];
                 miniCtx.beginPath();
                 miniCtx.moveTo(x1, y1);
+                for (const vp of viaPoints) {
+                    miniCtx.lineTo(
+                        offsetX + (vp.x - minX) * scale,
+                        offsetY + (vp.y - minY) * scale
+                    );
+                }
                 miniCtx.lineTo(x2, y2);
                 miniCtx.stroke();
             }

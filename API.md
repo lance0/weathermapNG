@@ -535,6 +535,31 @@ curl -X DELETE \
 
 ---
 
+### Link Style & Via Points
+
+Links support waypoint routing via the `style` JSON column. No database migration is required.
+
+#### Link `style` object
+
+```json
+{
+    "via_points": [
+        {"x": 200, "y": 150},
+        {"x": 400, "y": 100}
+    ],
+    "via_style": "curved"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `via_points` | `array` of `{x, y}` | Ordered list of intermediate waypoints the link passes through. Empty or missing = straight line from src to dst. |
+| `via_style` | `string` | `"straight"` (default), `"angled"` (sharp corners at waypoints), or `"curved"` (smooth Catmull-Rom spline through waypoints). |
+
+These fields are included automatically in all link API responses (GET, POST, PATCH, save, import) and are persisted through the existing `style` JSON column.
+
+---
+
 ## Discovery
 
 ### Auto-Discover Topology

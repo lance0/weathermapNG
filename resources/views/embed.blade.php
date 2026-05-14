@@ -496,6 +496,102 @@
             nodeGeoms.push({ x, y, r: radius, node });
         }
 
+        function buildLinkPath(link, x1, y1, x2, y2) {
+            const viaPoints = (link.style && link.style.via_points) || [];
+            const viaStyle = (link.style && link.style.via_style) || 'straight';
+            const points = [{x: x1, y: y1}];
+            for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
+            points.push({x: x2, y: y2});
+            return { points, viaStyle };
+        }
+
+        function traceLinkPath(ctx, points, viaStyle) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            if (points.length === 2) {
+                ctx.lineTo(points[1].x, points[1].y);
+                return;
+            }
+            if (viaStyle === 'curved') {
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p0 = points[Math.max(0, i - 1)];
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    const p3 = points[Math.min(points.length - 1, i + 2)];
+                    const cp1x = p1.x + (p2.x - p0.x) / 6;
+                    const cp1y = p1.y + (p2.y - p0.y) / 6;
+                    const cp2x = p2.x - (p3.x - p1.x) / 6;
+                    const cp2y = p2.y - (p3.y - p1.y) / 6;
+                    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+                }
+            } else {
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+            }
+        }
+
+        function getPathMidpoint(points) {
+            if (points.length === 2) return points[1];
+            let totalLen = 0;
+            const segs = [];
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i-1].x;
+                const dy = points[i].y - points[i-1].y;
+                const len = Math.sqrt(dx*dx + dy*dy);
+                segs.push(len);
+                totalLen += len;
+            }
+            let half = totalLen / 2, accum = 0;
+            for (let i = 0; i < segs.length; i++) {
+                if (accum + segs[i] >= half) {
+                    const t = (half - accum) / Math.max(segs[i], 0.001);
+                    return {
+                        x: points[i].x + (points[i+1].x - points[i].x) * t,
+                        y: points[i].y + (points[i+1].y - points[i].y) * t
+                    };
+                }
+                accum += segs[i];
+            }
+            return points[Math.floor(points.length / 2)];
+        }
+
+        function getPointOnPath(points, progress) {
+            let totalLen = 0;
+            const segs = [];
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i-1].x;
+                const dy = points[i].y - points[i-1].y;
+                const len = Math.sqrt(dx*dx + dy*dy);
+                segs.push(len);
+                totalLen += len;
+            }
+            if (totalLen === 0) return points[0];
+            const target = progress * totalLen;
+            let accum = 0;
+            for (let i = 0; i < segs.length; i++) {
+                if (accum + segs[i] >= target) {
+                    const t = (target - accum) / Math.max(segs[i], 0.001);
+                    return {
+                        x: points[i].x + (points[i+1].x - points[i].x) * t,
+                        y: points[i].y + (points[i+1].y - points[i].y) * t
+                    };
+                }
+                accum += segs[i];
+            }
+            return points[points.length - 1];
+        }
+
+        function pathLength(points) {
+            let len = 0;
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i-1].x;
+                const dy = points[i].y - points[i-1].y;
+                len += Math.sqrt(dx*dx + dy*dy);
+            }
+            return len;
+        }
+
         function drawLink(link) {
             const srcId = link.source ?? link.src ?? link.source_id;
             const dstId = link.target ?? link.dst ?? link.destination_id;
@@ -509,10 +605,10 @@
             const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
             const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
 
+            const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+
             // Draw link line
-            ctx.beginPath();
-            ctx.moveTo(x1, y1);
-            ctx.lineTo(x2, y2);
+            traceLinkPath(ctx, points, viaStyle);
             const metric = getLinkMetric(link);
             const pct = getLinkPct(link, metric);
             ctx.strokeStyle = getLinkColor(pct);
@@ -531,29 +627,27 @@
             
             // Draw flow particles if enabled
             if (flowAnimationEnabled) {
-                drawFlowParticles(link, x1, y1, x2, y2, pct);
+                drawFlowParticles(link, x1, y1, x2, y2, pct, points);
             }
 
             // Link utilization label
             if (metric !== null && metric !== undefined) {
-                const midX = (x1 + x2) / 2;
-                const midY = (y1 + y2) / 2;
+                const mid = getPathMidpoint(points);
                 ctx.fillStyle = '#111';
                 ctx.font = '11px Arial';
                 ctx.textAlign = 'center';
                 const label = (currentMetric === 'percent') ? (Math.round(pct) + '%') : humanBits(metric);
                 ctx.strokeStyle = '#fff';
                 ctx.lineWidth = 3;
-                ctx.strokeText(label, midX, midY - 5);
-                ctx.fillText(label, midX, midY - 5);
+                ctx.strokeText(label, mid.x, mid.y - 5);
+                ctx.fillText(label, mid.x, mid.y - 5);
             }
             // Link alert badge (diamond)
             if (link.alerts && link.alerts.count > 0) {
-                const midX = (x1 + x2) / 2;
-                const midY = (y1 + y2) / 2;
+                const mid = getPathMidpoint(points);
                 const size = 5;
                 ctx.save();
-                ctx.translate(midX + 10, midY - 10);
+                ctx.translate(mid.x + 10, mid.y - 10);
                 ctx.rotate(Math.PI / 4);
                 const sev = (link.alerts.severity || 'warning');
                 ctx.fillStyle = (sev === 'severe' || sev === 'critical') ? '#dc3545' : '#ffc107';
@@ -566,36 +660,26 @@
                 ctx.restore();
             }
             // store geometry for hover
-            storeLinkGeom(link, x1, y1, x2, y2, pct);
+            storeLinkGeom(link, x1, y1, x2, y2, pct, points);
         }
         
-        function drawFlowParticles(link, x1, y1, x2, y2, pct) {
+        function drawFlowParticles(link, x1, y1, x2, y2, pct, pathPoints) {
             const live = link.live || {};
             const inBps = live.in_bps || 0;
             const outBps = live.out_bps || 0;
             
-            // Skip if no traffic
             if (inBps === 0 && outBps === 0) return;
-            
-            const dx = x2 - x1;
-            const dy = y2 - y1;
-            const length = Math.sqrt(dx * dx + dy * dy);
+
+            const points = pathPoints || [{x:x1,y:y1},{x:x2,y:y2}];
+            const length = pathLength(points);
             if (length === 0) return;
             
-            const nx = dx / length;
-            const ny = dy / length;
-            
-            // Calculate particle properties based on traffic
-            const maxFlow = Math.max(inBps, outBps);
             const relativeFlow = pct ? pct / 100 : 0.5;
             const particleCount = Math.max(1, Math.floor((length / 50) * relativeFlow * particleDensity));
-            const particleSpacing = length / (particleCount + 1);
             const speedFactor = 0.5 + (relativeFlow * 1.5) * particleSpeed;
             
-            // Create unique link ID
             const linkId = `${link.id || (x1 + '-' + y1 + '-' + x2 + '-' + y2)}`;
             
-            // Initialize particles for this link if needed
             if (!particles[linkId]) {
                 particles[linkId] = {
                     forward: [],
@@ -604,7 +688,6 @@
                     outRatio: outBps / (inBps + outBps + 0.001)
                 };
                 
-                // Create forward particles (source to dest)
                 if (outBps > 0) {
                     for (let i = 0; i < particleCount * particles[linkId].outRatio; i++) {
                         particles[linkId].forward.push({
@@ -616,7 +699,6 @@
                     }
                 }
                 
-                // Create backward particles (dest to source)
                 if (inBps > 0) {
                     for (let i = 0; i < particleCount * particles[linkId].inRatio; i++) {
                         particles[linkId].backward.push({
@@ -631,51 +713,45 @@
             
             const linkParticles = particles[linkId];
             
-            // Update and draw forward particles
             ctx.save();
             if (linkParticles.forward && Array.isArray(linkParticles.forward)) {
                 linkParticles.forward.forEach(particle => {
                 particle.progress += (particle.speed * 0.005);
                 if (particle.progress > 1) particle.progress -= 1;
                 
-                const px = x1 + (dx * particle.progress);
-                const py = y1 + (dy * particle.progress);
+                const pos = getPointOnPath(points, particle.progress);
                 
-                // Draw particle with glow effect
                 ctx.globalAlpha = particle.opacity * 0.3;
                 ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
-                ctx.arc(px, py, particle.size * 2, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
                 ctx.fill();
                 
                 ctx.globalAlpha = particle.opacity;
                 ctx.fillStyle = '#40ff40';
                 ctx.beginPath();
-                ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
                 ctx.fill();
                 });
             }
             
-            // Update and draw backward particles
             if (linkParticles.backward && Array.isArray(linkParticles.backward)) {
                 linkParticles.backward.forEach(particle => {
                 particle.progress += (particle.speed * 0.005);
                 if (particle.progress > 1) particle.progress -= 1;
                 
-                const px = x2 - (dx * particle.progress);
-                const py = y2 - (dy * particle.progress);
+                const pos = getPointOnPath(points, 1 - particle.progress);
                 
-                // Draw particle with glow effect
                 ctx.globalAlpha = particle.opacity * 0.3;
                 ctx.fillStyle = '#0080ff';
                 ctx.beginPath();
-                ctx.arc(px, py, particle.size * 2, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
                 ctx.fill();
                 
                 ctx.globalAlpha = particle.opacity;
                 ctx.fillStyle = '#40a0ff';
                 ctx.beginPath();
-                ctx.arc(px, py, particle.size, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
                 ctx.fill();
                 });
             }
@@ -1021,11 +1097,12 @@
         });
 
         // Hover tooltip for link bandwidth
-        function storeLinkGeom(link, x1, y1, x2, y2, pct) {
+        function storeLinkGeom(link, x1, y1, x2, y2, pct, pathPoints) {
             const inBps = link.live?.in_bps ?? 0;
             const outBps = link.live?.out_bps ?? 0;
             const bandwidth = link.bandwidth_bps || link.bandwidth || null;
-            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps,bandwidth, link});
+            const points = pathPoints || [{x:x1,y:y1},{x:x2,y:y2}];
+            linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps,bandwidth,link,points});
         }
 
         function distToSegment(px, py, x1, y1, x2, y2) {
@@ -1036,6 +1113,15 @@
             t = Math.max(0, Math.min(1, t));
             const projX = x1 + t*dx, projY = y1 + t*dy;
             return Math.hypot(px - projX, py - projY);
+        }
+
+        function distToPath(px, py, points) {
+            let minDist = Infinity;
+            for (let i = 1; i < points.length; i++) {
+                const d = distToSegment(px, py, points[i-1].x, points[i-1].y, points[i].x, points[i].y);
+                if (d < minDist) minDist = d;
+            }
+            return minDist;
         }
 
         function humanBits(v) {
@@ -1078,12 +1164,21 @@
             let best = null, bestDist = 12; // threshold px
             if (!nbest) {
                 for (const g of linkGeoms) {
-                    const lx1 = g.x1 * viewScale + viewOffsetX;
-                    const ly1 = g.y1 * viewScale + viewOffsetY;
-                    const lx2 = g.x2 * viewScale + viewOffsetX;
-                    const ly2 = g.y2 * viewScale + viewOffsetY;
-                    const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
-                    if (d < bestDist) { bestDist = d; best = g; }
+                    if (g.points && g.points.length > 2) {
+                        const pts = g.points.map(p => ({
+                            x: p.x * viewScale + viewOffsetX,
+                            y: p.y * viewScale + viewOffsetY
+                        }));
+                        const d = distToPath(x, y, pts);
+                        if (d < bestDist) { bestDist = d; best = g; }
+                    } else {
+                        const lx1 = g.x1 * viewScale + viewOffsetX;
+                        const ly1 = g.y1 * viewScale + viewOffsetY;
+                        const lx2 = g.x2 * viewScale + viewOffsetX;
+                        const ly2 = g.y2 * viewScale + viewOffsetY;
+                        const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
+                        if (d < bestDist) { bestDist = d; best = g; }
+                    }
                 }
             }
             const tooltip = document.getElementById('tooltip');
@@ -1136,12 +1231,21 @@
             // Else link
             let best = null, bestDist = 10;
             for (const g of linkGeoms) {
-                const lx1 = g.x1 * viewScale + viewOffsetX;
-                const ly1 = g.y1 * viewScale + viewOffsetY;
-                const lx2 = g.x2 * viewScale + viewOffsetX;
-                const ly2 = g.y2 * viewScale + viewOffsetY;
-                const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
-                if (d < bestDist) { bestDist = d; best = g; }
+                if (g.points && g.points.length > 2) {
+                    const pts = g.points.map(p => ({
+                        x: p.x * viewScale + viewOffsetX,
+                        y: p.y * viewScale + viewOffsetY
+                    }));
+                    const d = distToPath(x, y, pts);
+                    if (d < bestDist) { bestDist = d; best = g; }
+                } else {
+                    const lx1 = g.x1 * viewScale + viewOffsetX;
+                    const ly1 = g.y1 * viewScale + viewOffsetY;
+                    const lx2 = g.x2 * viewScale + viewOffsetX;
+                    const ly2 = g.y2 * viewScale + viewOffsetY;
+                    const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
+                    if (d < bestDist) { bestDist = d; best = g; }
+                }
             }
             if (best && best.link) {
                 const pA = best.link.port_id_a || null;

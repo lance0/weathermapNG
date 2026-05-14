@@ -5,6 +5,17 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-05-14
+
+### Added
+- **Via points and via style for links** (closes #5): Links now support `via_points` (waypoints) and `via_style` (curved/angled/straight) stored in the link's `style` JSON column — no database migration required.
+  - **Embed viewer**: Links with via_points render as multi-segment paths. Curved via_style uses Catmull-Rom spline interpolation. Flow particles and heatmap overlay follow waypoint paths.
+  - **Modern editor**: Double-click a link to add a via point, drag via points to reposition, double-click/del to remove. Via style dropdown in link properties panel (Straight/Angled/Curved).
+  - **Blade editor**: Via-point-aware link rendering and hit-testing.
+  - **API**: `style.via_points` and `style.via_style` pass through all existing endpoints (create, update, save, import) with no backend changes needed.
+
+---
+
 ## [1.6.1] - 2026-02-11
 
 ### Added
