@@ -1547,16 +1547,37 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
     function saveMap() {
         updateStatus('Saving...');
         
-        const formData = new FormData();
-        formData.append('id', mapId);
-        formData.append('nodes', JSON.stringify(nodes));
-        formData.append('links', JSON.stringify(links));
-        formData.append('ajax_action', 'save-map');
-        formData.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+        const payload = {
+            options: {
+                width: <?php echo (int)$map['width']; ?>,
+                height: <?php echo (int)$map['height']; ?>
+            },
+            nodes: nodes.map(n => ({
+                id: String(n.id || n.dbId || ''),
+                label: n.label || '',
+                x: n.x || 0,
+                y: n.y || 0,
+                device_id: n.device_id || null,
+                meta: n.meta || {}
+            })),
+            links: links.map(l => ({
+                src_node_id: l.src_node_id,
+                dst_node_id: l.dst_node_id,
+                port_id_a: l.port_id_a || null,
+                port_id_b: l.port_id_b || null,
+                bandwidth_bps: parseInt(l.bandwidth, 10) || null,
+                style: l.style || {}
+            }))
+        };
 
-        fetch('/plugin/v1/WeathermapNG', {
+        fetch('/plugin/WeathermapNG/api/maps/' + mapId + '/save', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
         })
         .then(response => response.json())
         .then(data => {

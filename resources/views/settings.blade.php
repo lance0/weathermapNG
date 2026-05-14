@@ -212,8 +212,8 @@
                                     <label class="form-label">Link Style</label>
                                     <select class="form-select" name="link_style">
                                         <option value="straight" {{ config('weathermapng.link_style') == 'straight' ? 'selected' : '' }}>Straight</option>
+                                        <option value="angled" {{ config('weathermapng.link_style') == 'angled' ? 'selected' : '' }}>Angled</option>
                                         <option value="curved" {{ config('weathermapng.link_style') == 'curved' ? 'selected' : '' }}>Curved</option>
-                                        <option value="orthogonal" {{ config('weathermapng.link_style') == 'orthogonal' ? 'selected' : '' }}>Orthogonal</option>
                                     </select>
                                 </div>
                                 
