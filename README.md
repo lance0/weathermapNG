@@ -10,6 +10,7 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 
 - **Real-time Visualization**: Live traffic data with animated flow indicators
 - **Professional Editor**: 3-panel layout with toolbox, canvas, and properties sidebar
+- **Via Points & Curved Links**: Route links through intermediate waypoints with straight, angled, or Catmull-Rom curved paths
 - **Zoom, Pan & Minimap**: Mouse-wheel zoom, middle-click pan, click-to-navigate minimap
 - **Keyboard Shortcuts**: Ctrl+S save, Ctrl+Z/Y undo/redo, arrow nudge, Delete, +/-/0 zoom
 - **Undo/Redo**: 50-state history with full node and link state tracking
@@ -77,6 +78,7 @@ chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 
 - Use the device dropdown in the right sidebar to add nodes
 - Drag nodes to position them; enable grid snapping for alignment
+- Double-click a link to add a waypoint; drag to reposition; double-click again to remove
 - Use Ctrl+Z/Y to undo/redo, arrow keys to nudge selected nodes
 - Scroll wheel to zoom, middle-click to pan around large maps
 - Export maps as JSON for backup or sharing
@@ -100,6 +102,8 @@ php /opt/librenms/html/plugins/WeathermapNG/database/seed-demo.php
         width="800" height="600" frameborder="0">
 </iframe>
 ```
+
+Optional query parameters: `metric` (percent/in/out/sum), `sse=0` (force polling), `nav=0` (disable pan/zoom), `scale=bytes`. See [Embed Viewer Guide](docs/EMBED.md).
 
 ## Troubleshooting
 
