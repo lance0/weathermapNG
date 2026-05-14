@@ -45,6 +45,9 @@ return [
         'node_radius' => 10,
         'link_width' => 2,
     ],
+    'link_style' => 'straight',
+    'show_bandwidth' => true,
+    'show_percentages' => true,
 
     // Security settings
     'security' => [

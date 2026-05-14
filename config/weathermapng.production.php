@@ -34,6 +34,11 @@ return [
         'link_critical' => '#dc3545',
     ],
     
+    // Display
+    'link_style' => 'straight',
+    'show_bandwidth' => true,
+    'show_percentages' => true,
+    
     // Security
     'allow_embed' => true,
     'max_image_size' => 2048, // KB

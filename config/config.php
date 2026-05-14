@@ -40,6 +40,9 @@ return [
         'node_radius' => 10,
         'link_width' => 2,
     ],
+    'link_style' => 'straight',         // Default via_style: straight | angled | curved
+    'show_bandwidth' => true,           // Show bandwidth labels on embed viewer
+    'show_percentages' => true,         // Show percentage labels on embed viewer
     'security' => [
         'allow_embed' => true,
         'embed_domains' => ['localhost', '*.yourdomain.com'],

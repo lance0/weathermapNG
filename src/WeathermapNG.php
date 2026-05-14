@@ -119,6 +119,9 @@ class WeathermapNG
                 'node_radius' => 10,
                 'link_width' => 2,
             ],
+            'link_style' => 'straight',
+            'show_bandwidth' => true,
+            'show_percentages' => true,
             'security' => [
                 'allow_embed' => true,
                 'embed_domains' => ['localhost', '*.yourdomain.com'],

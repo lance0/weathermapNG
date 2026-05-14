@@ -126,7 +126,12 @@ The plugin is production-ready with core features complete:
 - [x] Interactive via point editing in modern editor (add, drag, delete)
 - [x] Flow particles follow waypoint paths
 - [x] Catmull-Rom spline interpolation for curved via style
-- [x] Automated GitHub Actions dependency updates (Dependabot)
+- [x] Global link_style setting wired to embed and blade editors
+- [x] show_bandwidth / show_percentages settings honored in embed viewer
+- [x] Via style dropdown in blade editor link modal
+- [x] Version dynamically read from composer.json
+- [x] Fixed modern editor saveMap endpoint (was posting to nonexistent route)
+- [x] Settings terminology aligned (orthogonal → angled)
 
 ### v1.6.1
 - [x] Professional 3-panel editor layout (toolbox, canvas, properties sidebar)
