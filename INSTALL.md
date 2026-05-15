@@ -157,6 +157,19 @@ php artisan cache:clear
 ### LibreNMS validate.php reports extra wmng_* tables
 WeathermapNG creates `wmng_*` tables for maps, nodes, links, templates, and versions. If LibreNMS `validate.php` reports these as extra tables and offers to drop them, answer `n`.
 
+### LibreNMS validate.php reports utf8mb4_bin collation on JSON columns
+MySQL and MariaDB store JSON-backed columns with binary JSON comparison semantics, so LibreNMS may report `utf8mb4_bin` collation warnings for these columns:
+
+- `wmng_map_templates.config`
+- `wmng_nodes.meta`
+- `wmng_maps.options`
+- `wmng_links.style`
+
+These columns are expected for WeathermapNG. Do not alter them unless a future WeathermapNG release includes a migration for that change.
+
+### Duplicate WeathermapNG rows in the plugins table
+Current installers normalize LibreNMS plugin registration after enabling WeathermapNG. If an older install left an inactive duplicate `WeathermapNG` row in the LibreNMS `plugins` table, rerun `quick-install.sh` as the `librenms` user. It keeps one active WeathermapNG row and removes stale duplicates.
+
 ### "Interface PageHook not found" error
 LibreNMS v2 doesn't support PageHook. This plugin uses MenuEntryHook and SettingsHook only.
 

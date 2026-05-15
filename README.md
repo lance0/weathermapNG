@@ -144,6 +144,10 @@ php artisan config:clear
 
 LibreNMS `validate.php` may report `wmng_*` tables as extra tables. Those tables belong to WeathermapNG and should not be dropped.
 
+It may also report `utf8mb4_bin` collation warnings on JSON-backed WeathermapNG columns such as `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, and `wmng_links.style`. Those warnings are expected for the current schema.
+
+If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` table, rerun `quick-install.sh` as the `librenms` user. The installer normalizes plugin registration and removes stale duplicate rows.
+
 ### Permission Errors
 
 ```bash

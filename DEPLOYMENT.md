@@ -143,6 +143,9 @@ After install or upgrade:
 6. Open the embed view.
 7. Check `/plugin/WeathermapNG/ready`.
 8. Run LibreNMS `validate.php`; ignore `wmng_*` extra-table warnings unless you are uninstalling.
+9. If `validate.php` reports `utf8mb4_bin` collation on `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, or `wmng_links.style`, treat that as expected JSON-column behavior.
+
+If an older deployment shows duplicate `WeathermapNG` rows in the LibreNMS `plugins` table, rerun `quick-install.sh` as the `librenms` user. The installer keeps one active row and removes stale duplicates.
 
 ## Background Poller
 

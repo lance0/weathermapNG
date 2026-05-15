@@ -116,6 +116,82 @@ echo "[5/7] Enabling plugin..."
 if [ -f "$LIBRENMS_PATH/lnms" ]; then
     cd "$LIBRENMS_PATH"
     ./lnms plugin:enable WeathermapNG 2>/dev/null || echo "  Note: Plugin may already be enabled"
+
+    echo "  Normalizing WeathermapNG plugin registration..."
+    php <<'PHP'
+<?php
+
+try {
+    $root = getcwd();
+    if (!is_file($root . '/vendor/autoload.php') || !is_file($root . '/bootstrap/app.php')) {
+        echo "  Warning: Could not find LibreNMS bootstrap; skipped plugin row normalization\n";
+        exit(0);
+    }
+
+    require_once $root . '/vendor/autoload.php';
+    $app = require_once $root . '/bootstrap/app.php';
+
+    if (method_exists($app, 'make')) {
+        $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+        if (method_exists($kernel, 'bootstrap')) {
+            $kernel->bootstrap();
+        }
+    }
+
+    $schema = Illuminate\Support\Facades\Schema::class;
+    $db = Illuminate\Support\Facades\DB::class;
+
+    if (!$schema::hasTable('plugins')) {
+        echo "  Warning: LibreNMS plugins table not found; skipped plugin row normalization\n";
+        exit(0);
+    }
+
+    $columns = $schema::getColumnListing('plugins');
+    $required = ['plugin_id', 'plugin_name', 'plugin_active'];
+    $missing = array_diff($required, $columns);
+    if (!empty($missing)) {
+        echo "  Warning: LibreNMS plugins table is missing expected column(s): " . implode(', ', $missing) . "\n";
+        echo "  Warning: Skipped plugin row normalization\n";
+        exit(0);
+    }
+
+    $rows = $db::table('plugins')
+        ->where('plugin_name', 'WeathermapNG')
+        ->orderBy('plugin_id')
+        ->get();
+
+    if ($rows->isEmpty()) {
+        echo "  Warning: No WeathermapNG plugin row found after enable step\n";
+        exit(0);
+    }
+
+    $activeRows = $rows
+        ->filter(fn ($row) => (int) $row->plugin_active === 1)
+        ->values();
+
+    $keep = $activeRows->isNotEmpty()
+        ? $activeRows->sortByDesc('plugin_id')->first()
+        : $rows->sortByDesc('plugin_id')->first();
+
+    $db::table('plugins')
+        ->where('plugin_name', 'WeathermapNG')
+        ->where('plugin_id', $keep->plugin_id)
+        ->update(['plugin_active' => 1]);
+
+    $deleted = $db::table('plugins')
+        ->where('plugin_name', 'WeathermapNG')
+        ->where('plugin_id', '!=', $keep->plugin_id)
+        ->delete();
+
+    if ($deleted > 0) {
+        echo "  Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
+    } else {
+        echo "  WeathermapNG plugin registration is already normalized\n";
+    }
+} catch (Throwable $e) {
+    echo "  Warning: Plugin row normalization failed: {$e->getMessage()}\n";
+}
+PHP
 else
     echo "  Skipped: lnms not found (enable manually with: ./lnms plugin:enable WeathermapNG)"
 fi
@@ -159,6 +235,7 @@ echo "Next steps:"
 echo "  1. Visit: https://your-server/plugin/WeathermapNG"
 echo "  2. Create your first map!"
 echo "  3. If LibreNMS validate.php flags wmng_* as extra tables, keep them."
+echo "     JSON column collation warnings on wmng_* JSON columns are expected."
 echo ""
 echo "Optional - Create demo data:"
 echo "  php $PLUGIN_DIR/database/seed-demo.php"

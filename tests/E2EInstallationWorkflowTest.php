@@ -46,6 +46,46 @@ class E2EInstallationWorkflowTest extends TestCase
         $this->assertStringContainsString('FORCE=1 COMPOSER_ALLOW_SUPERUSER=1 composer require', $scriptContent);
     }
 
+    public function test_quick_install_normalizes_duplicate_plugin_rows(): void
+    {
+        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
+
+        $this->assertStringContainsString('Normalizing WeathermapNG plugin registration', $scriptContent);
+        $this->assertStringContainsString("where('plugin_name', 'WeathermapNG')", $scriptContent);
+        $this->assertStringContainsString("'plugin_id', 'plugin_name', 'plugin_active'", $scriptContent);
+        $this->assertStringContainsString('sortByDesc(\'plugin_id\')->first()', $scriptContent);
+        $this->assertStringContainsString("update(['plugin_active' => 1])", $scriptContent);
+        $this->assertStringContainsString("where('plugin_id', '!=', \$keep->plugin_id)", $scriptContent);
+        $this->assertStringContainsString('Cleaned $deleted duplicate WeathermapNG plugin row(s)', $scriptContent);
+    }
+
+    public function test_quick_install_plugin_row_cleanup_is_defensive(): void
+    {
+        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
+
+        $this->assertStringContainsString("hasTable('plugins')", $scriptContent);
+        $this->assertStringContainsString('getColumnListing(\'plugins\')', $scriptContent);
+        $this->assertStringContainsString('missing expected column(s)', $scriptContent);
+        $this->assertStringContainsString('Skipped plugin row normalization', $scriptContent);
+        $this->assertStringContainsString('Plugin row normalization failed', $scriptContent);
+    }
+
+    public function test_install_docs_cover_plugin_duplicates_and_json_collation_warnings(): void
+    {
+        $install = file_get_contents(__DIR__ . '/../INSTALL.md');
+        $readme = file_get_contents(__DIR__ . '/../README.md');
+        $deployment = file_get_contents(__DIR__ . '/../DEPLOYMENT.md');
+
+        foreach ([$install, $readme, $deployment] as $content) {
+            $this->assertStringContainsString('duplicate', strtolower($content));
+            $this->assertStringContainsString('utf8mb4_bin', $content);
+            $this->assertStringContainsString('wmng_map_templates.config', $content);
+            $this->assertStringContainsString('wmng_nodes.meta', $content);
+            $this->assertStringContainsString('wmng_maps.options', $content);
+            $this->assertStringContainsString('wmng_links.style', $content);
+        }
+    }
+
     public function test_quick_install_script_sets_up_database(): void
     {
         $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
