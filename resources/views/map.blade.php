@@ -10,10 +10,10 @@
                 <h1><i class="fas fa-map"></i> {{ $map->title ?? $map->name }}</h1>
                 <div>
                     <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-secondary">
-                        <i class="fas fa-arrow-left"></i> Back to Maps
+                        <i class="fas fa-arrow-left" aria-hidden="true"></i> Back to Maps
                     </a>
-                    <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" class="btn btn-primary" target="_blank">
-                        <i class="fas fa-external-link-alt"></i> Open Embed
+                    <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" class="btn btn-default" target="_blank" rel="noopener noreferrer" aria-label="Open live map {{ $map->title ?? $map->name }}">
+                        <i class="fas fa-external-link-alt" aria-hidden="true"></i> Open Live Map
                     </a>
                 </div>
             </div>
@@ -49,8 +49,7 @@
                         <div class="col-md-6">
                             <div class="alert alert-info">
                                 <h6><i class="fas fa-info-circle"></i> Map Status</h6>
-                                <p>This map is configured but the live rendering functionality is not yet implemented.</p>
-                                <p>Nodes and links data will be displayed here once the rendering engine is complete.</p>
+                                <p>This compatibility page summarizes the map. Use the live map view for current rendering and traffic data.</p>
                             </div>
                         </div>
                     </div>
@@ -59,7 +58,7 @@
         </div>
     </div>
 
-    <!-- Map Canvas Placeholder -->
+    <!-- Map Preview -->
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
@@ -67,12 +66,14 @@
                     <h5 class="mb-0">Map Visualization</h5>
                 </div>
                 <div class="card-body text-center">
-                    <div style="width: {{ $map->width }}px; height: {{ $map->height }}px; border: 2px dashed #dee2e6; margin: 0 auto; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa;">
+                    <div style="width: {{ $map->width }}px; height: {{ $map->height }}px; border: 2px solid #dee2e6; margin: 0 auto; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa;">
                         <div class="text-muted">
                             <i class="fas fa-map fa-3x mb-3"></i>
-                            <h4>Map Canvas</h4>
+                            <h4>Map Preview</h4>
                             <p>{{ $map->width }} x {{ $map->height }} pixels</p>
-                            <small>Rendering engine coming soon...</small>
+                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" class="btn btn-default btn-sm" target="_blank" rel="noopener noreferrer" aria-label="Open live map preview for {{ $map->title ?? $map->name }}">
+                                <i class="fas fa-external-link-alt" aria-hidden="true"></i> Open Live Map
+                            </a>
                         </div>
                     </div>
                 </div>

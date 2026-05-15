@@ -436,11 +436,68 @@
             </div>
         </div>
 
+        <!-- Editor Confirmation Modal -->
+        <div class="modal fade" id="editorConfirmModal" tabindex="-1" role="dialog" aria-labelledby="editorConfirmTitle" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editorConfirmTitle">Confirm Action</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="modal-body" id="editorConfirmBody"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="editorConfirmCancel" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" id="editorConfirmAction">Continue</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         @endsection
 
         @section('scripts')
         <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
         <script>
+            let pendingEditorConfirmAction = null;
+            let pendingEditorCancelAction = null;
+            let editorConfirmAccepted = false;
+
+            function showEditorConfirm(title, message, confirmText, confirmClass, onConfirm, onCancel = null) {
+                pendingEditorConfirmAction = onConfirm;
+                pendingEditorCancelAction = onCancel;
+                editorConfirmAccepted = false;
+
+                document.getElementById('editorConfirmTitle').textContent = title;
+                document.getElementById('editorConfirmBody').textContent = message;
+
+                const actionButton = document.getElementById('editorConfirmAction');
+                actionButton.textContent = confirmText;
+                actionButton.className = `btn ${confirmClass}`;
+
+                $('#editorConfirmModal').modal('show');
+            }
+
+            document.getElementById('editorConfirmAction')?.addEventListener('click', function() {
+                const action = pendingEditorConfirmAction;
+                pendingEditorConfirmAction = null;
+                pendingEditorCancelAction = null;
+                editorConfirmAccepted = true;
+                $('#editorConfirmModal').modal('hide');
+
+                if (typeof action === 'function') {
+                    action();
+                }
+            });
+
+            $('#editorConfirmModal').on('hidden.bs.modal', function() {
+                if (!editorConfirmAccepted && typeof pendingEditorCancelAction === 'function') {
+                    pendingEditorCancelAction();
+                }
+                pendingEditorConfirmAction = null;
+                pendingEditorCancelAction = null;
+                editorConfirmAccepted = false;
+            });
+
             // ===== Theme Detection =====
             function detectTheme() {
                 const container = document.querySelector('.editor-container');
@@ -984,32 +1041,37 @@
                     n.x > newWidth - nodeRadius || n.y > newHeight - nodeRadius
                 );
 
-                if (outOfBounds.length > 0) {
-                    const choice = confirm(
-                        `${outOfBounds.length} node(s) will be outside the new canvas bounds.\n\n` +
-                        `Click OK to automatically move them inside bounds.\n` +
-                        `Click Cancel to keep the current canvas size.`
-                    );
+                const applyCanvasResize = () => {
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    renderEditor();
+                    WMNGToast.info(`Canvas resized to ${newWidth}x${newHeight}`, { duration: 2000 });
+                };
 
-                    if (choice) {
-                        // Auto-adjust nodes to fit within new bounds
-                        outOfBounds.forEach(node => {
-                            node.x = Math.min(node.x, newWidth - nodeRadius);
-                            node.y = Math.min(node.y, newHeight - nodeRadius);
-                        });
-                    } else {
-                        // Revert input values
-                        document.getElementById('map-width').value = canvas.width;
-                        document.getElementById('map-height').value = canvas.height;
-                        return;
-                    }
+                const revertCanvasResizeInputs = () => {
+                    document.getElementById('map-width').value = canvas.width;
+                    document.getElementById('map-height').value = canvas.height;
+                };
+
+                if (outOfBounds.length > 0) {
+                    showEditorConfirm(
+                        'Resize Canvas',
+                        `${outOfBounds.length} node(s) will be outside the new canvas bounds. Continue to move them inside the new bounds, or cancel to keep the current canvas size.`,
+                        'Resize Canvas',
+                        'btn-primary',
+                        function() {
+                            outOfBounds.forEach(node => {
+                                node.x = Math.min(node.x, newWidth - nodeRadius);
+                                node.y = Math.min(node.y, newHeight - nodeRadius);
+                            });
+                            applyCanvasResize();
+                        },
+                        revertCanvasResizeInputs
+                    );
+                    return;
                 }
 
-                // Apply new canvas size
-                canvas.width = newWidth;
-                canvas.height = newHeight;
-                renderEditor();
-                WMNGToast.info(`Canvas resized to ${newWidth}x${newHeight}`, { duration: 2000 });
+                applyCanvasResize();
             }
 
             document.addEventListener('DOMContentLoaded', initCanvasResizeValidation);
@@ -1340,12 +1402,19 @@
             }
 
             function clearCanvas() {
-                if (!confirm('Clear all nodes and links?')) return;
-                nodes = [];
-                links = [];
-                selectedNode = null;
-                renderEditor();
-                renderLinksList();
+                showEditorConfirm(
+                    'Clear Canvas',
+                    'Clear all nodes and links from this map? This can be undone with the editor undo history.',
+                    'Clear Canvas',
+                    'btn-danger',
+                    function() {
+                        nodes = [];
+                        links = [];
+                        selectedNode = null;
+                        renderEditor();
+                        renderLinksList();
+                    }
+                );
             }
 
             function openVersionSaveModal() {
@@ -1463,114 +1532,126 @@
             }
 
             function restoreVersion(versionId) {
-                if (!confirm('Restore to this version? Current changes will be lost.')) {
-                    return;
-                }
-                
-                WMNGLoading.show('Restoring version...');
-                
-                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId + '/restore', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': getCsrfToken(),
+                showEditorConfirm(
+                    'Restore Version',
+                    'Restore to this version? Current unsaved changes will be lost.',
+                    'Restore Version',
+                    'btn-primary',
+                    function() {
+                        WMNGLoading.show('Restoring version...');
+
+                        fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId + '/restore', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': getCsrfToken(),
+                            }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            WMNGLoading.hide();
+                            if (data.success) {
+                                WMNGToast.success('Version restored successfully!', { duration: 3000 });
+                                $('#versionHistoryModal').modal('hide');
+
+                                if (data.snapshot) {
+                                    const snapshot = JSON.parse(data.snapshot);
+                                    if (snapshot && Array.isArray(snapshot.nodes)) {
+                                        nodes = snapshot.nodes;
+                                    }
+                                    if (snapshot && Array.isArray(snapshot.links)) {
+                                        links = snapshot.links;
+                                    }
+                                    if (snapshot && snapshot.map) {
+                                        const mapData = snapshot.map;
+                                        if (mapData.title) document.getElementById('map-title').value = mapData.title;
+                                        if (mapData.width) document.getElementById('map-width').value = mapData.width;
+                                        if (mapData.height) document.getElementById('map-height').value = mapData.height;
+                                    }
+                                }
+
+                                renderEditor();
+                            } else {
+                                WMNGToast.error('Failed to restore version: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                            }
+                        })
+                        .catch(error => {
+                            WMNGLoading.hide();
+                            WMNGToast.error('Error restoring version: ' + error.message, { duration: 3000 });
+                        });
                     }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    WMNGLoading.hide();
-                    if (data.success) {
-                        WMNGToast.success('Version restored successfully!', { duration: 3000 });
-                        $('#versionHistoryModal').modal('hide');
-                        
-                        if (data.snapshot) {
-                            const snapshot = JSON.parse(data.snapshot);
-                            if (snapshot && Array.isArray(snapshot.nodes)) {
-                                nodes = snapshot.nodes;
-                            }
-                            if (snapshot && Array.isArray(snapshot.links)) {
-                                links = snapshot.links;
-                            }
-                            if (snapshot && snapshot.map) {
-                                const mapData = snapshot.map;
-                                if (mapData.title) document.getElementById('map-title').value = mapData.title;
-                                if (mapData.width) document.getElementById('map-width').value = mapData.width;
-                                if (mapData.height) document.getElementById('map-height').value = mapData.height;
-                            }
-                        }
-                        
-                        renderEditor();
-                    } else {
-                        WMNGToast.error('Failed to restore version: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                    }
-                })
-                .catch(error => {
-                    WMNGLoading.hide();
-                    WMNGToast.error('Error restoring version: ' + error.message, { duration: 3000 });
-                });
+                );
             }
 
             function deleteVersion(versionId) {
-                if (!confirm('Delete this version permanently? This cannot be undone.')) {
-                    return;
-                }
-                
-                WMNGLoading.show('Deleting version...');
-                
-                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': getCsrfToken(),
+                showEditorConfirm(
+                    'Delete Version',
+                    'Delete this version permanently? This cannot be undone.',
+                    'Delete Version',
+                    'btn-danger',
+                    function() {
+                        WMNGLoading.show('Deleting version...');
+
+                        fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': getCsrfToken(),
+                            }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            WMNGLoading.hide();
+                            if (data.success) {
+                                WMNGToast.success('Version deleted successfully!', { duration: 3000 });
+                                loadVersions();
+                            } else {
+                                WMNGToast.error('Failed to delete version: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                            }
+                        })
+                        .catch(error => {
+                            WMNGLoading.hide();
+                            WMNGToast.error('Error deleting version: ' + error.message, { duration: 3000 });
+                        });
                     }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    WMNGLoading.hide();
-                    if (data.success) {
-                        WMNGToast.success('Version deleted successfully!', { duration: 3000 });
-                        loadVersions();
-                    } else {
-                        WMNGToast.error('Failed to delete version: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                    }
-                })
-                .catch(error => {
-                    WMNGLoading.hide();
-                    WMNGToast.error('Error deleting version: ' + error.message, { duration: 3000 });
-                });
+                );
             }
 
             function clearOldVersions() {
-                if (!confirm('Delete all but the latest 20 versions?')) {
-                    return;
-                }
-                
-                WMNGLoading.show('Clearing old versions...');
-                
-                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/cleanup', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': getCsrfToken(),
+                showEditorConfirm(
+                    'Clear Old Versions',
+                    'Delete all but the latest 20 versions? This cannot be undone.',
+                    'Clear Old Versions',
+                    'btn-danger',
+                    function() {
+                        WMNGLoading.show('Clearing old versions...');
+
+                        fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/cleanup', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': getCsrfToken(),
+                            }
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            WMNGLoading.hide();
+                            if (data.success) {
+                                const count = data.deleted_count || 0;
+                                WMNGToast.success('Cleared ' + count + ' old versions!', { duration: 3000 });
+                                loadVersions();
+                            } else {
+                                WMNGToast.error('Failed to clear versions: ' + (data.message || 'Unknown error'), { duration: 3000 });
+                            }
+                        })
+                        .catch(error => {
+                            WMNGLoading.hide();
+                            WMNGToast.error('Error clearing versions: ' + error.message, { duration: 3000 });
+                        });
                     }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    WMNGLoading.hide();
-                    if (data.success) {
-                        const count = data.deleted_count || 0;
-                        WMNGToast.success('Cleared ' + count + ' old versions!', { duration: 3000 });
-                        loadVersions();
-                    } else {
-                        WMNGToast.error('Failed to clear versions: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                    }
-                })
-                .catch(error => {
-                    WMNGLoading.hide();
-                    WMNGToast.error('Error clearing versions: ' + error.message, { duration: 3000 });
-                });
+                );
             }
 
             function exportVersions() {
@@ -1816,39 +1897,48 @@ function saveSelectedNode() {
             selectedNode.interfaceId = payload.meta.interface_id;
             renderEditor();
         } else {
-            alert('Failed to save node: ' + (d.message || 'Unknown error'));
+            WMNGToast.error('Failed to save node: ' + (d.message || 'Unknown error'), { duration: 3000 });
         }
+    }).catch(error => {
+        WMNGToast.error('Failed to save node: ' + error.message, { duration: 3000 });
     });
 }
 
 function deleteSelectedNode() {
     if (!selectedNode) return;
-    if (!confirm('Delete this node and attached links?')) return;
-    saveState(); // Save for undo
-
     const nodeToDelete = selectedNode;
     const nodeId = nodeToDelete.id || nodeToDelete.dbId;
 
-    // Helper to clean up after deletion
-    function finishDelete() {
-        nodes = nodes.filter(n => n !== nodeToDelete);
-        links = links.filter(l => l.srcId !== nodeId && l.dstId !== nodeId && l.srcId !== nodeToDelete.dbId && l.dstId !== nodeToDelete.dbId);
-        selectedNode = null;
-        populateNodeProperties(null);
-        renderEditor();
-        renderLinksList();
-    }
+    showEditorConfirm(
+        'Delete Node',
+        'Delete this node and attached links? This can be undone with the editor undo history.',
+        'Delete Node',
+        'btn-danger',
+        function() {
+            saveState(); // Save for undo
 
-    // If node is saved in DB, delete from server
-    if (mapId && nodeToDelete.dbId) {
-        fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/node/' + nodeToDelete.dbId, {
-            method: 'DELETE',
-            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-        }).then(() => finishDelete());
-    } else {
-        // Node only exists locally
-        finishDelete();
-    }
+            // Helper to clean up after deletion
+            function finishDelete() {
+                nodes = nodes.filter(n => n !== nodeToDelete);
+                links = links.filter(l => l.srcId !== nodeId && l.dstId !== nodeId && l.srcId !== nodeToDelete.dbId && l.dstId !== nodeToDelete.dbId);
+                selectedNode = null;
+                populateNodeProperties(null);
+                renderEditor();
+                renderLinksList();
+            }
+
+            // If node is saved in DB, delete from server
+            if (mapId && nodeToDelete.dbId) {
+                fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/node/' + nodeToDelete.dbId, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                }).then(() => finishDelete());
+            } else {
+                // Node only exists locally
+                finishDelete();
+            }
+        }
+    );
 }
 
 function renderLinksList() {
@@ -1944,13 +2034,20 @@ function saveLink() {
 }
 
 function deleteLink(linkIndex) {
-    if (!confirm('Delete this link?')) return;
-    saveState(); // Save for undo
-    links.splice(linkIndex, 1);
-    renderEditor();
-    renderLinksList();
-    $('#linkModal').modal('hide');
-    currentLinkIndex = null;
+    showEditorConfirm(
+        'Delete Link',
+        'Delete this link? This can be undone with the editor undo history.',
+        'Delete Link',
+        'btn-danger',
+        function() {
+            saveState(); // Save for undo
+            links.splice(linkIndex, 1);
+            renderEditor();
+            renderLinksList();
+            $('#linkModal').modal('hide');
+            currentLinkIndex = null;
+        }
+    );
 }
 
 // Wire up modal buttons
@@ -2059,24 +2156,31 @@ function selectNodeByIndex(idx) {
 function deleteNodeByIndex(idx) {
     if (idx >= 0 && idx < nodes.length) {
         const node = nodes[idx];
-        if (!confirm(`Delete node "${node.label}"?`)) return;
-        saveState();
+        showEditorConfirm(
+            'Delete Node',
+            `Delete node "${node.label || 'Node ' + (idx + 1)}"? This can be undone with the editor undo history.`,
+            'Delete Node',
+            'btn-danger',
+            function() {
+                saveState();
 
-        const nodeId = node.id || node.dbId;
-        nodes.splice(idx, 1);
-        links = links.filter(l => l.srcId !== nodeId && l.dstId !== nodeId && l.srcId !== node.dbId && l.dstId !== node.dbId);
+                const nodeId = node.id || node.dbId;
+                nodes.splice(idx, 1);
+                links = links.filter(l => l.srcId !== nodeId && l.dstId !== nodeId && l.srcId !== node.dbId && l.dstId !== node.dbId);
 
-        if (selectedNode === node) {
-            selectedNode = null;
-            populateNodeProperties(null);
-        }
+                if (selectedNode === node) {
+                    selectedNode = null;
+                    populateNodeProperties(null);
+                }
 
-        markUnsaved();
-        renderEditor();
-        renderNodesList();
-        renderLinksList();
-        updateStatusCounts();
-        updateToolbarState();
+                markUnsaved();
+                renderEditor();
+                renderNodesList();
+                renderLinksList();
+                updateStatusCounts();
+                updateToolbarState();
+            }
+        );
     }
 }
 

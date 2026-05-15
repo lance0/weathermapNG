@@ -39,7 +39,7 @@
                 @foreach($links as $link)
                     <tr>
                         <td>
-                            <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" target="_blank">
+                            <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" target="_blank" rel="noopener noreferrer" aria-label="Open map {{ $link->map->title ?? $link->map->name }}">
                                 {{ $link->map->title ?? $link->map->name }}
                             </a>
                         </td>
@@ -55,8 +55,8 @@
                         </td>
                         <td>
                             <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" 
-                               class="btn btn-xs btn-default" target="_blank">
-                                <i class="fa fa-external-link"></i> View
+                               class="btn btn-xs btn-default" target="_blank" rel="noopener noreferrer" aria-label="View map {{ $link->map->title ?? $link->map->name }}">
+                                <i class="fa fa-external-link" aria-hidden="true"></i> View
                             </a>
                         </td>
                     </tr>

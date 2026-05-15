@@ -39,7 +39,7 @@ The next phase should focus on polish, reliability, and maintainability before l
 
 These are patch-level improvements unless they require new user-facing behavior.
 
-- [ ] **Embed controls cleanup**
+- [x] **Embed controls cleanup**
   - Fix malformed generated zoom button HTML in the embed view.
   - Replace inline string-generated controls with safer DOM construction or templates.
   - Standardize iconography with Font Awesome instead of emoji controls.
@@ -71,6 +71,21 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Reduce noisy theme-detection console logging.
   - Avoid broad mutation observers where a narrower theme hook will work.
   - Move repeated inline styles toward shared CSS classes.
+
+- [x] **LibreNMS hook and legacy view polish**
+  - Align hook and compatibility views with LibreNMS Bootstrap button conventions.
+  - Add safe external-link attributes and accessible labels to remaining map entry points.
+  - Remove stale legacy rendering placeholder copy in favor of live-map entry points.
+
+- [x] **Settings admin polish**
+  - Replace browser alert and confirm flows with Bootstrap feedback and confirmation UI.
+  - Keep settings preview rendering text-safe.
+  - Make unavailable restore behavior explicit instead of presenting placeholder implementation copy.
+
+- [x] **Index and editor confirmation polish**
+  - Replace browser destructive-action prompts in active index and editor views with Bootstrap modals.
+  - Preserve existing delete, restore, cleanup, resize, and undo-aware editor behavior after confirmation.
+  - Route editor save errors through toast feedback instead of browser alerts.
 
 - [ ] **Validation coverage**
   - Add screenshot checks for the index, editor, and embed view at representative viewport sizes.

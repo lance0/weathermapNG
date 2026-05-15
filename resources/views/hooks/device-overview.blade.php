@@ -12,8 +12,8 @@
                         <ul class="list-group">
                             @foreach($maps as $map)
                                 <li class="list-group-item">
-                                    <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank">
-                                        <i class="fa fa-map"></i> {{ $map->title ?? $map->name }}
+                                    <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank" rel="noopener noreferrer" aria-label="Open map {{ $map->title ?? $map->name }}">
+                                        <i class="fa fa-map" aria-hidden="true"></i> {{ $map->title ?? $map->name }}
                                     </a>
                                     <span class="badge">{{ $map->device_nodes->count() }} node(s)</span>
                                     <div class="small text-muted">
@@ -22,8 +22,8 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm">
-                            <i class="fa fa-map"></i> View All Maps
+                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-default btn-sm">
+                            <i class="fa fa-map" aria-hidden="true"></i> View All Maps
                         </a>
                     </div>
                 </div>

@@ -673,6 +673,30 @@
     </div>
 </div>
 
+<!-- Delete Map Confirmation Modal -->
+<div class="modal fade" id="deleteMapModal" tabindex="-1" role="dialog" aria-labelledby="deleteMapModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteMapModalTitle">
+                    <i class="fas fa-trash-alt text-danger" aria-hidden="true"></i>
+                    Delete Map
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteMapModalBody" class="mb-0"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteMapBtn">Delete Map</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Confirmation Form (hidden) -->
 <form id="deleteMapForm" method="POST" style="display: none;">
     @csrf
@@ -683,6 +707,8 @@
 @section('scripts')
 <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
 <script>
+let pendingDeleteMapId = null;
+
 // ===== Theme Detection =====
 function detectTheme() {
     const container = document.querySelector('.wmng-index');
@@ -815,12 +841,21 @@ $('#importMapForm').on('submit', function(e) {
 
 // ===== Delete Map =====
 function deleteMap(mapId, mapName) {
-    if (!confirm(`Delete map "${mapName}"? This cannot be undone.`)) return;
+    pendingDeleteMapId = mapId;
+    const body = document.getElementById('deleteMapModalBody');
+    if (body) {
+        body.textContent = `Delete map "${mapName}"? This cannot be undone.`;
+    }
+    $('#deleteMapModal').modal('show');
+}
+
+document.getElementById('confirmDeleteMapBtn')?.addEventListener('click', function() {
+    if (!pendingDeleteMapId) return;
 
     const form = document.getElementById('deleteMapForm');
-    form.action = '{{ url("plugin/WeathermapNG/map") }}/' + mapId;
+    form.action = '{{ url("plugin/WeathermapNG/map") }}/' + pendingDeleteMapId;
     form.submit();
-}
+});
 
 // ===== Search & Sort =====
 document.addEventListener('DOMContentLoaded', function() {

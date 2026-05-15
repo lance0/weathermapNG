@@ -42,8 +42,8 @@
                 <h3 class="panel-title">
                     Network Maps
                     @if($can_create)
-                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm float-end">
-                            <i class="fa fa-plus"></i> Create New Map
+                        <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-success btn-sm pull-right">
+                            <i class="fa fa-plus" aria-hidden="true"></i> Create New Map
                         </a>
                     @endif
                 </h3>
@@ -56,7 +56,7 @@
                                 <div class="panel panel-default">
                                     <div class="panel-body">
                                         <h4>
-                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}">
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" aria-label="View map {{ $map->title ?? $map->name }}">
                                                 {{ $map->title ?? $map->name }}
                                             </a>
                                         </h4>
@@ -70,16 +70,16 @@
                                         </p>
                                         <div class="btn-group">
                                             <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
-                                               class="btn btn-sm btn-primary">
-                                                <i class="fa fa-eye"></i> View
+                                               class="btn btn-sm btn-default" aria-label="View map {{ $map->title ?? $map->name }}">
+                                                <i class="fa fa-eye" aria-hidden="true"></i> View
+                                            </a>
+                                            <a href="{{ url('plugin/WeathermapNG/editor/' . $map->id) }}"
+                                               class="btn btn-sm btn-primary" aria-label="Edit map {{ $map->title ?? $map->name }}">
+                                                <i class="fa fa-edit" aria-hidden="true"></i> Edit
                                             </a>
                                             <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
-                                               class="btn btn-sm btn-default">
-                                                <i class="fa fa-edit"></i> Edit
-                                            </a>
-                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" 
-                                               target="_blank" class="btn btn-sm btn-default">
-                                                <i class="fa fa-external-link"></i> Embed
+                                               target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-default" aria-label="Open embedded view for {{ $map->title ?? $map->name }}">
+                                                <i class="fa fa-external-link" aria-hidden="true"></i> Embed
                                             </a>
                                         </div>
                                     </div>
@@ -91,8 +91,8 @@
                     <div class="alert alert-info">
                         <i class="fa fa-info-circle"></i> No maps have been created yet.
                         @if($can_create)
-                            <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-primary btn-sm">
-                                Create your first map
+                            <a href="{{ url('plugin/WeathermapNG') }}" class="btn btn-success btn-sm">
+                                <i class="fa fa-plus" aria-hidden="true"></i> Create your first map
                             </a>
                         @endif
                     </div>

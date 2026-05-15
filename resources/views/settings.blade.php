@@ -6,7 +6,7 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <h1><i class="fas fa-cog"></i> WeathermapNG Settings</h1>
+            <h1><i class="fas fa-cog" aria-hidden="true"></i> WeathermapNG Settings</h1>
             <p class="text-muted">Configure global settings for network weather maps</p>
         </div>
     </div>
@@ -41,6 +41,7 @@
         </div>
         
         <div class="col-md-9">
+            <div id="settings-alerts" aria-live="polite"></div>
             <form id="settings-form" method="POST" action="{{ url('plugin/WeathermapNG/api/settings') }}">
                 @csrf
                 
@@ -505,14 +506,14 @@
                                 
                                 <h6>Manual Actions</h6>
                                 <div class="d-grid gap-2">
-                                    <button type="button" class="btn btn-primary" onclick="createBackup()">
-                                        <i class="fas fa-download"></i> Create Backup Now
+                                    <button type="button" class="btn btn-success" onclick="createBackup()">
+                                        <i class="fas fa-download" aria-hidden="true"></i> Create Backup Now
                                     </button>
                                     <button type="button" class="btn btn-warning" onclick="restoreBackup()">
-                                        <i class="fas fa-upload"></i> Restore from Backup
+                                        <i class="fas fa-upload" aria-hidden="true"></i> Restore from Backup
                                     </button>
                                     <button type="button" class="btn btn-danger" onclick="resetToDefaults()">
-                                        <i class="fas fa-undo"></i> Reset to Defaults
+                                        <i class="fas fa-undo" aria-hidden="true"></i> Reset to Defaults
                                     </button>
                                 </div>
                             </div>
@@ -527,10 +528,10 @@
                             <span id="save-status" class="text-muted"></span>
                             <div>
                                 <button type="button" class="btn btn-secondary" onclick="previewSettings()">
-                                    <i class="fas fa-eye"></i> Preview
+                                    <i class="fas fa-eye" aria-hidden="true"></i> Preview
                                 </button>
                                 <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-save"></i> Save Settings
+                                    <i class="fas fa-save" aria-hidden="true"></i> Save Settings
                                 </button>
                             </div>
                         </div>
@@ -542,15 +543,32 @@
 </div>
 
 <!-- Preview Modal -->
-<div class="modal fade" id="previewModal" tabindex="-1">
+<div class="modal fade" id="previewModal" tabindex="-1" role="dialog" aria-labelledby="previewModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Settings Preview</h5>
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <h5 class="modal-title" id="previewModalTitle">Settings Preview</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <div id="preview-content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="settingsConfirmModal" tabindex="-1" role="dialog" aria-labelledby="settingsConfirmTitle" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="settingsConfirmTitle">Confirm Action</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body" id="settingsConfirmBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="settingsConfirmAction">Continue</button>
             </div>
         </div>
     </div>
@@ -559,6 +577,55 @@
 
 @section('scripts')
 <script>
+let pendingSettingsAction = null;
+
+function showSettingsAlert(message, type = 'danger') {
+    const container = document.getElementById('settings-alerts');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible`;
+    alert.setAttribute('role', 'alert');
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'close';
+    close.setAttribute('data-dismiss', 'alert');
+    close.setAttribute('aria-label', 'Close');
+    close.innerHTML = '&times;';
+
+    alert.appendChild(text);
+    alert.appendChild(close);
+    container.appendChild(alert);
+}
+
+function showSettingsConfirm(title, message, confirmText, confirmClass, onConfirm) {
+    pendingSettingsAction = onConfirm;
+    document.getElementById('settingsConfirmTitle').textContent = title;
+    document.getElementById('settingsConfirmBody').textContent = message;
+
+    const actionButton = document.getElementById('settingsConfirmAction');
+    actionButton.textContent = confirmText;
+    actionButton.className = `btn ${confirmClass}`;
+
+    $('#settingsConfirmModal').modal('show');
+}
+
+document.getElementById('settingsConfirmAction')?.addEventListener('click', function() {
+    const action = pendingSettingsAction;
+    pendingSettingsAction = null;
+    $('#settingsConfirmModal').modal('hide');
+
+    if (typeof action === 'function') {
+        action();
+    }
+});
+
 // Enable/disable SNMP options
 document.getElementById('snmp-enabled')?.addEventListener('change', function() {
     document.getElementById('snmp-options').style.display = this.checked ? 'block' : 'none';
@@ -591,15 +658,16 @@ document.getElementById('settings-form')?.addEventListener('submit', function(e)
         if (data.success) {
             document.getElementById('save-status').innerHTML = 
                 '<i class="fas fa-check-circle text-success"></i> Settings saved successfully';
+            showSettingsAlert('Settings saved successfully.', 'success');
             setTimeout(() => {
                 document.getElementById('save-status').innerHTML = '';
             }, 3000);
         } else {
-            alert('Error saving settings: ' + data.message);
+            showSettingsAlert('Error saving settings: ' + (data.message || 'Unknown error'));
         }
     })
     .catch(error => {
-        alert('Error saving settings: ' + error);
+        showSettingsAlert('Error saving settings: ' + error);
     });
 });
 
@@ -612,59 +680,78 @@ function previewSettings() {
         settings[key] = value;
     }
     
-    document.getElementById('preview-content').innerHTML = 
-        '<pre>' + JSON.stringify(settings, null, 2) + '</pre>';
+    const preview = document.getElementById('preview-content');
+    preview.innerHTML = '';
+
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(settings, null, 2);
+    preview.appendChild(pre);
     
     $('#previewModal').modal('show');
 }
 
 // Create backup
 function createBackup() {
-    if (!confirm('Create a backup of all WeathermapNG data?')) return;
-    
-    fetch('{{ url("plugin/WeathermapNG/api/backup/create") }}', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+    showSettingsConfirm(
+        'Create Backup',
+        'Create a backup of all WeathermapNG data now?',
+        'Create Backup',
+        'btn-success',
+        function() {
+            fetch('{{ url("plugin/WeathermapNG/api/backup/create") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSettingsAlert('Backup created successfully: ' + data.filename, 'success');
+                } else {
+                    showSettingsAlert('Error creating backup: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                showSettingsAlert('Error creating backup: ' + error);
+            });
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Backup created successfully: ' + data.filename);
-        } else {
-            alert('Error creating backup: ' + data.message);
-        }
-    });
+    );
 }
 
 // Restore backup
 function restoreBackup() {
-    if (!confirm('This will restore WeathermapNG data from a backup. Continue?')) return;
-    
-    // In production, this would show a file picker or list of available backups
-    alert('Restore functionality would be implemented here');
+    showSettingsAlert('Restore from backup is not available in this settings screen yet. Use a manual backup file until restore selection is implemented.', 'warning');
 }
 
 // Reset to defaults
 function resetToDefaults() {
-    if (!confirm('This will reset all settings to their default values. Are you sure?')) return;
-    
-    fetch('{{ url("plugin/WeathermapNG/api/settings/reset") }}', {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+    showSettingsConfirm(
+        'Reset Settings',
+        'Reset all WeathermapNG settings to their default values? This cannot be undone.',
+        'Reset Settings',
+        'btn-danger',
+        function() {
+            fetch('{{ url("plugin/WeathermapNG/api/settings/reset") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showSettingsAlert('Settings reset to defaults.', 'success');
+                    location.reload();
+                } else {
+                    showSettingsAlert('Error resetting settings: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                showSettingsAlert('Error resetting settings: ' + error);
+            });
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert('Settings reset to defaults');
-            location.reload();
-        } else {
-            alert('Error resetting settings: ' + data.message);
-        }
-    });
+    );
 }
 </script>
 @endsection

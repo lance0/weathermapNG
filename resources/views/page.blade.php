@@ -15,13 +15,14 @@
                     <h3 class="card-title">
                         <i class="fas fa-map"></i> {{ $title }}
                         <div class="float-right">
-                            <button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#createMapModal">
-                                <i class="fas fa-plus"></i> Create New Map
+                            <button type="button" class="btn btn-success btn-sm" data-toggle="modal" data-target="#createMapModal">
+                                <i class="fas fa-plus" aria-hidden="true"></i> Create New Map
                             </button>
                         </div>
                     </h3>
                 </div>
                 <div class="card-body">
+                    <div id="legacyPageAlerts" aria-live="polite"></div>
                     @if(count($maps) > 0)
                         <div class="table-responsive">
                             <table class="table table-hover">
@@ -39,7 +40,7 @@
                                     @foreach($maps as $map)
                                     <tr>
                                         <td>
-                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank">
+                                            <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank" rel="noopener noreferrer" aria-label="Open map {{ $map->name }}">
                                                 {{ $map->name }}
                                             </a>
                                         </td>
@@ -50,12 +51,12 @@
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
-                                                   class="btn btn-primary" title="View" target="_blank">
-                                                    <i class="fas fa-eye"></i>
+                                                   class="btn btn-default" title="View" target="_blank" rel="noopener noreferrer" aria-label="View map {{ $map->name }}">
+                                                    <i class="fas fa-eye" aria-hidden="true"></i>
                                                 </a>
-                                                <button onclick="deleteMap({{ $map->id }}, '{{ $map->name }}')"
-                                                        class="btn btn-danger" title="Delete">
-                                                    <i class="fas fa-trash"></i>
+                                                <button type="button" onclick="deleteMap({{ $map->id }}, '{{ addslashes($map->name) }}')"
+                                                        class="btn btn-danger" title="Delete" aria-label="Delete map {{ $map->name }}">
+                                                    <i class="fas fa-trash" aria-hidden="true"></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -68,8 +69,8 @@
                         <div class="alert alert-info">
                             <i class="fas fa-info-circle"></i>
                             No weather maps have been created yet.
-                            <button class="btn btn-primary btn-sm ml-2" data-toggle="modal" data-target="#createMapModal">
-                                <i class="fas fa-plus"></i> Create Your First Map
+                            <button type="button" class="btn btn-success btn-sm ml-2" data-toggle="modal" data-target="#createMapModal">
+                                <i class="fas fa-plus" aria-hidden="true"></i> Create Your First Map
                             </button>
                         </div>
                     @endif
@@ -87,7 +88,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Create New Map</h5>
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
@@ -119,7 +120,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Map</button>
+                    <button type="submit" class="btn btn-success">Create Map</button>
                 </div>
             </div>
         </form>
@@ -129,6 +130,29 @@
 <script>
 function createNewMap() {
     $('#createMapModal').modal('show');
+}
+
+function showPageAlert(message, type = 'danger') {
+    const container = document.getElementById('legacyPageAlerts');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible`;
+    alert.setAttribute('role', 'alert');
+
+    const text = document.createTextNode(message);
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'close';
+    close.setAttribute('data-dismiss', 'alert');
+    close.setAttribute('aria-label', 'Close');
+    close.innerHTML = '&times;';
+
+    alert.appendChild(text);
+    alert.appendChild(close);
+    container.appendChild(alert);
 }
 
 function deleteMap(mapId, mapName) {
@@ -145,11 +169,11 @@ function deleteMap(mapId, mapName) {
             if (data.success) {
                 location.reload();
             } else {
-                alert('Error deleting map: ' + (data.message || 'Unknown error'));
+                showPageAlert('Error deleting map: ' + (data.message || 'Unknown error'));
             }
         })
         .catch(error => {
-            alert('Error deleting map: ' + error.message);
+            showPageAlert('Error deleting map: ' + error.message);
         });
     }
 }
@@ -177,11 +201,11 @@ $('#createMapForm').on('submit', function(e) {
                 location.reload();
             }
         } else {
-            alert('Error creating map: ' + (data.message || 'Unknown error'));
+            showPageAlert('Error creating map: ' + (data.message || 'Unknown error'));
         }
     })
     .catch(error => {
-        alert('Error creating map: ' + error.message);
+        showPageAlert('Error creating map: ' + error.message);
     });
 });
 </script>
