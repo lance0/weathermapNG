@@ -1,6 +1,6 @@
 # WeathermapNG Deployment Guide
 
-This guide covers production deployment and maintenance for WeathermapNG `v1.6.4+`.
+This guide covers production deployment and maintenance for WeathermapNG `v1.6.5+`.
 
 For a first install, start with [INSTALL.md](INSTALL.md). This document focuses on production checks, Docker notes, monitoring, backup, and recovery.
 
@@ -232,6 +232,6 @@ php database/setup.php
 
 | WeathermapNG | LibreNMS | PHP | Database |
 |--------------|----------|-----|----------|
-| 1.6.4+ | Latest stable recommended | 8.2+ | LibreNMS MySQL/MariaDB database |
+| 1.6.5+ | Latest stable recommended | 8.2+ | LibreNMS MySQL/MariaDB database |
 
 PostgreSQL is not currently documented as a supported production target for this plugin.

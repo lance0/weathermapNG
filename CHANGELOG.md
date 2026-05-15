@@ -5,6 +5,17 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] - 2026-05-15
+
+### Changed
+- **Installer idempotency**: Quick install now normalizes LibreNMS plugin registration after enablement, keeping one active `WeathermapNG` row and removing stale duplicate rows.
+- **Install guidance**: README, install, and deployment docs now explain expected `wmng_*` validation warnings and JSON-column `utf8mb4_bin` collation warnings.
+- **UI polish**: Improved LibreNMS-facing views with safer external links, Bootstrap-style confirmations, inline settings feedback, and broader accessibility coverage.
+
+### Fixed
+- **Duplicate plugin registration**: Fixed clean reinstall cases where LibreNMS could keep an inactive duplicate `WeathermapNG` row in the `plugins` table (issue #9).
+- **Browser prompt rough edges**: Replaced active index/editor/settings browser `alert()` and `confirm()` flows with Bootstrap modals or toast/inline feedback.
+
 ## [1.6.4] - 2026-05-15
 
 ### Added
