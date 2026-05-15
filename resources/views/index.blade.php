@@ -290,6 +290,8 @@
 
 /* ===== Template Cards ===== */
 .template-card {
+    width: 100%;
+    text-align: left;
     background: var(--idx-card-bg);
     border: 1px solid var(--idx-card-border);
     border-radius: 10px;
@@ -297,24 +299,34 @@
     margin-bottom: 1rem;
     transition: all 0.2s ease;
     cursor: pointer;
+    font: inherit;
+    color: inherit;
 }
 .template-card:hover {
     border-color: #667eea;
     box-shadow: 0 4px 12px var(--idx-card-shadow-hover);
     transform: translateY(-2px);
 }
+.template-card:focus {
+    border-color: #667eea;
+    outline: 2px solid #667eea;
+    outline-offset: 2px;
+}
 .template-card-icon {
+    display: block;
     font-size: 2rem;
     color: #667eea;
     margin-bottom: 0.75rem;
 }
 .template-card-title {
+    display: block;
     font-size: 1.1rem;
     font-weight: 600;
     color: var(--idx-text);
     margin-bottom: 0.5rem;
 }
 .template-card-desc {
+    display: block;
     font-size: 0.9rem;
     color: var(--idx-text-muted);
     margin-bottom: 0.75rem;
@@ -332,6 +344,8 @@
     padding: 0.3em 0.6em;
 }
 .template-card-btn {
+    display: block;
+    text-align: center;
     width: 100%;
 }
 .category-basic { background-color: #28a745; }
@@ -384,7 +398,7 @@
                             aria-label="Import map from file">
                         <i class="fas fa-file-import" aria-hidden="true"></i> Import
                     </button>
-                    <button class="btn btn-primary" data-toggle="modal" data-target="#createMapModal"
+                    <button class="btn btn-success" data-toggle="modal" data-target="#createMapModal"
                             aria-label="Create new map">
                         <i class="fas fa-plus" aria-hidden="true"></i> Create Map
                     </button>
@@ -472,7 +486,7 @@
                         </div>
                         <div class="map-card-actions">
                             <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
-                               class="map-card-action" target="_blank" title="View map"
+                               class="map-card-action" target="_blank" rel="noopener noreferrer" title="View map"
                                aria-label="View map {{ $map->name }}">
                                 <i class="fas fa-eye" aria-hidden="true"></i>
                             </a>
@@ -502,7 +516,7 @@
                         </div>
                         <h3>No maps yet</h3>
                         <p>Create your first network map to visualize your infrastructure with real-time traffic data.</p>
-                        <button class="btn btn-primary btn-lg" data-toggle="modal" data-target="#createMapModal"
+                        <button class="btn btn-success btn-lg" data-toggle="modal" data-target="#createMapModal"
                                 aria-label="Create your first map">
                             <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create Your First Map
                         </button>
@@ -602,7 +616,7 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary" id="createMapSubmitBtn">
+                            <button type="submit" class="btn btn-success" id="createMapSubmitBtn">
                                 <i class="fas fa-plus mr-1" aria-hidden="true"></i>Create Map
                             </button>
                         </div>
@@ -711,7 +725,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
     observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
-    observer.observe(document.head, { childList: true, subtree: true });
 });
 
 // ===== Create Map Form =====
@@ -923,22 +936,22 @@ function renderTemplates(templates) {
         const card = document.createElement('div');
         card.className = 'col-md-6 col-lg-4';
         card.innerHTML = `
-            <div class="template-card" onclick="selectTemplate(${template.id})">
-                <div class="template-card-icon">
+            <button type="button" class="template-card" onclick="selectTemplate(${template.id})" aria-label="Use template ${escapeHtml(template.title || template.name)}">
+                <span class="template-card-icon">
                     <i class="${template.icon || 'fas fa-map'}"></i>
-                </div>
-                <div class="template-card-title">${escapeHtml(template.title || template.name)}</div>
-                <div class="template-card-desc">${escapeHtml(template.description || '')}</div>
-                <div class="template-card-meta">
+                </span>
+                <span class="template-card-title">${escapeHtml(template.title || template.name)}</span>
+                <span class="template-card-desc">${escapeHtml(template.description || '')}</span>
+                <span class="template-card-meta">
                     <span class="badge badge-secondary">${template.width}x${template.height}</span>
                     <span class="badge ${categoryClass}">${template.category || 'custom'}</span>
                     ${nodeCount > 0 ? `<span class="badge badge-light">${nodeCount} nodes</span>` : ''}
                     ${linkCount > 0 ? `<span class="badge badge-light">${linkCount} links</span>` : ''}
-                </div>
-                <button type="button" class="btn btn-primary btn-sm template-card-btn" onclick="event.stopPropagation(); selectTemplate(${template.id})">
+                </span>
+                <span class="btn btn-success btn-sm template-card-btn">
                     <i class="fas fa-plus mr-1"></i>Use Template
-                </button>
-            </div>
+                </span>
+            </button>
         `;
         grid.appendChild(card);
     });

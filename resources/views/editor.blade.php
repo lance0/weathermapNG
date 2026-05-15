@@ -119,6 +119,9 @@
 /* Tool button states */
 .tool-btn.link-active { background: var(--editor-accent-orange) !important; color: #fff !important; animation: pulse 1s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) {
+    .tool-btn.link-active { animation: none; }
+}
 
 /* Canvas styling */
 #map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); }
@@ -132,37 +135,37 @@
 <div class="editor-container">
     <!-- Left Toolbox -->
     <div class="editor-toolbox">
-        <button class="tool-btn" onclick="addNode()" title="Add Node (from sidebar device)">
+        <button type="button" class="tool-btn" onclick="addNode()" title="Add Node (from sidebar device)" aria-label="Add node from selected device">
             <i class="fas fa-plus"></i>
         </button>
-        <button class="tool-btn" id="link-mode-btn" onclick="toggleLinkMode()" title="Link Mode - Click two nodes to connect">
+        <button type="button" class="tool-btn" id="link-mode-btn" onclick="toggleLinkMode()" title="Link Mode - Click two nodes to connect" aria-label="Toggle link mode">
             <i class="fas fa-link"></i>
         </button>
         <div class="tool-divider"></div>
-        <button class="tool-btn" id="snap-grid-btn" onclick="toggleSnapToGrid()" title="Snap to Grid">
+        <button type="button" class="tool-btn" id="snap-grid-btn" onclick="toggleSnapToGrid()" title="Snap to Grid" aria-label="Toggle snap to grid">
             <i class="fas fa-th"></i>
         </button>
-        <button class="tool-btn" onclick="duplicateSelectedNode()" title="Duplicate Selected" id="duplicate-btn" disabled>
+        <button type="button" class="tool-btn" onclick="duplicateSelectedNode()" title="Duplicate Selected" id="duplicate-btn" aria-label="Duplicate selected node" disabled>
             <i class="fas fa-copy"></i>
         </button>
-        <button class="tool-btn" onclick="deleteSelectedNode()" title="Delete Selected" id="delete-node-btn" disabled>
+        <button type="button" class="tool-btn" onclick="deleteSelectedNode()" title="Delete Selected" id="delete-node-btn" aria-label="Delete selected node" disabled>
             <i class="fas fa-trash"></i>
         </button>
         <div class="tool-divider"></div>
-        <button class="tool-btn" onclick="undo()" title="Undo (Ctrl+Z)">
+        <button type="button" class="tool-btn" onclick="undo()" title="Undo (Ctrl+Z)" aria-label="Undo">
             <i class="fas fa-undo"></i>
         </button>
-        <button class="tool-btn" onclick="redo()" title="Redo (Ctrl+Y)">
+        <button type="button" class="tool-btn" onclick="redo()" title="Redo (Ctrl+Y)" aria-label="Redo">
             <i class="fas fa-redo"></i>
         </button>
         <div style="flex:1"></div>
-        <button class="tool-btn" onclick="zoomIn()" title="Zoom In (+)">
+        <button type="button" class="tool-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">
             <i class="fas fa-search-plus"></i>
         </button>
-        <button class="tool-btn" onclick="zoomOut()" title="Zoom Out (-)">
+        <button type="button" class="tool-btn" onclick="zoomOut()" title="Zoom Out (-)" aria-label="Zoom out">
             <i class="fas fa-search-minus"></i>
         </button>
-        <button class="tool-btn" onclick="resetZoom()" title="Reset Zoom (0)">
+        <button type="button" class="tool-btn" onclick="resetZoom()" title="Reset Zoom (0)" aria-label="Reset zoom">
             <i class="fas fa-compress-arrows-alt"></i>
         </button>
     </div>
@@ -184,14 +187,14 @@
                     &bull; <span id="zoom-level">100%</span>
                 </small>
                 @if($map)
-                <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank" class="btn btn-sm btn-outline-info mr-2" title="Preview">
+                <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-info mr-2" title="Preview" aria-label="Preview map">
                     <i class="fas fa-eye"></i>
                 </a>
                 @endif
-                <button class="btn btn-sm btn-outline-secondary mr-2" onclick="openVersionHistory()" title="Version History">
+                <button type="button" class="btn btn-sm btn-outline-secondary mr-2" onclick="openVersionHistory()" title="Version History">
                     <i class="fas fa-history"></i>
                 </button>
-                <button class="btn btn-sm btn-success" onclick="saveMap()">
+                <button type="button" class="btn btn-sm btn-success" onclick="saveMap()">
                     <i class="fas fa-save"></i> Save
                 </button>
             </div>
@@ -229,7 +232,7 @@
                         <option value="">Select interface...</option>
                     </select>
                 </div>
-                <button class="btn btn-primary btn-sm btn-block" onclick="addNode()">
+                <button class="btn btn-success btn-sm btn-block" onclick="addNode()">
                     <i class="fas fa-plus"></i> Add to Canvas
                 </button>
             </div>
@@ -329,7 +332,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Configure Link</h5>
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
@@ -372,7 +375,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Save Version</h5>
-                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
@@ -410,7 +413,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Version History</h5>
-                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
                     </div>
                     <div class="modal-body">
                         <div id="version-list" class="editor-version-list">
@@ -460,7 +463,6 @@
 
                         const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
                         isDark = brightness < 128;
-                        console.log('WeathermapNG: Detected from', element.tagName, 'bg:', bg, 'brightness:', brightness);
                         break;
                     }
                 }
@@ -479,7 +481,6 @@
                 }
 
                 container.classList.toggle('dark-theme', isDark);
-                console.log('WeathermapNG Editor: Theme detected as', isDark ? 'dark' : 'light');
             }
 
             // Run on load with slight delay to ensure styles are applied
@@ -489,8 +490,6 @@
                 const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
                 observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
                 observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-bs-theme'] });
-                // Also watch for stylesheet changes
-                observer.observe(document.head, { childList: true, subtree: true });
             });
 
             let mapId = {{ $map->id ?? 'null' }};

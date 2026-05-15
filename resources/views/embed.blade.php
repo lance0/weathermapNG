@@ -77,6 +77,61 @@
             font-size: 12px;
             z-index: 1000;
         }
+
+        .btn {
+            display: inline-block;
+            font-weight: 400;
+            color: #212529;
+            text-align: center;
+            vertical-align: middle;
+            user-select: none;
+            background-color: transparent;
+            border: 1px solid transparent;
+            padding: 0.375rem 0.75rem;
+            font-size: 1rem;
+            line-height: 1.5;
+            border-radius: 0.25rem;
+            cursor: pointer;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            border-radius: 0.2rem;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+        .btn-secondary {
+            color: #fff;
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+
+        .btn-light {
+            color: #212529;
+            background-color: #fff;
+            border-color: #ccc;
+        }
+
+        .wmng-control-label {
+            background: #fff;
+            border: 1px solid #ccc;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.2rem;
+            font-size: 0.875rem;
+        }
+
+        .wmng-control-label select {
+            border: 0;
+            font-size: 0.875rem;
+            background: transparent;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -110,10 +165,10 @@
         </div>
         <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
         <div id="controls" style="position:absolute; top:55px; left:10px; z-index:1000; display:flex; gap:8px; align-items:center;">
-            <button id="toggle-transport" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Live: loading…</button>
-            <button id="toggle-flow" style="background:#007bff; color:#fff; border:1px solid #007bff; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Toggle flow animation">🌊 Flow</button>
+            <button type="button" id="toggle-transport" class="btn btn-light btn-sm" aria-label="Live update status">Live: loading…</button>
+            <button type="button" id="toggle-flow" class="btn btn-primary btn-sm" aria-label="Toggle flow animation" title="Toggle flow animation"><i class="fas fa-water" aria-hidden="true"></i> Flow</button>
             <div style="position:relative;">
-                <button id="viz-settings" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;" title="Visualization settings">⚙️</button>
+                <button type="button" id="viz-settings" class="btn btn-light btn-sm" aria-label="Visualization settings" title="Visualization settings"><i class="fas fa-cog" aria-hidden="true"></i></button>
                 <div id="viz-menu" style="position:absolute; top:100%; left:0; background:#fff; border:1px solid #ccc; border-radius:4px; padding:10px; min-width:250px; display:none; margin-top:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
                     <div style="font-size:12px; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">Flow Animation</div>
                     <div style="margin-bottom:8px;">
@@ -126,16 +181,16 @@
                     </div>
                 </div>
             </div>
-            <label style="background:#fff; border:1px solid #ccc; padding:2px 6px; border-radius:4px; font-size:12px;">
+            <label class="wmng-control-label">
                 Metric
-                <select id="metric-select" style="border:none; outline:none; font-size:12px;">
+                <select id="metric-select">
                     <option value="percent">Percent</option>
                     <option value="in">Inbound</option>
                     <option value="out">Outbound</option>
                     <option value="sum">In+Out</option>
                 </select>
             </label>
-            <button id="export-png" title="Export PNG" style="background:#fff; border:1px solid #ccc; padding:4px 8px; border-radius:4px; cursor:pointer;">Export PNG</button>
+            <button type="button" id="export-png" class="btn btn-light btn-sm" aria-label="Export map as PNG" title="Export PNG">Export PNG</button>
         </div>
         <div id="legend" style="position:absolute; bottom:10px; left:10px; background:rgba(255,255,255,0.9); border:1px solid #ddd; border-radius:4px; font-size:12px; padding:6px 8px; z-index:1000;">
             <div style="font-weight:600; margin-bottom:4px;">Legend</div>
@@ -318,13 +373,19 @@
                 group.style.display = 'inline-flex';
                 group.style.gap = '4px';
                 group.style.marginLeft = '6px';
-                group.innerHTML = `
-                  <button id="zoom-in" title="Zoom In (+)" style="background:#fff; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">+</nbutton>
-                  <button id="zoom-out" title="Zoom Out (-)" style="background:#fff; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">−</nbutton>
-                  <button id="zoom-reset" title="Reset" style="background:#fff; border:1px solid #ccc; padding:2px 8px; border-radius:4px; cursor:pointer;">Reset</nbutton>
-                `;
-                // Fix accidental newlines in buttons
-                group.innerHTML = group.innerHTML.replaceAll('\nbutton','button');
+                function createZoomButton(id, label, text) {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.id = id;
+                    button.className = 'btn btn-light btn-sm';
+                    button.title = label;
+                    button.setAttribute('aria-label', label);
+                    button.textContent = text;
+                    return button;
+                }
+                group.appendChild(createZoomButton('zoom-in', 'Zoom In (+)', '+'));
+                group.appendChild(createZoomButton('zoom-out', 'Zoom Out (-)', '-'));
+                group.appendChild(createZoomButton('zoom-reset', 'Reset zoom', 'Reset'));
                 controls.appendChild(group);
                 const c = canvas;
                 document.getElementById('zoom-in').addEventListener('click', () => zoomAt(c.width/2, c.height/2, 1.2));
@@ -842,13 +903,11 @@
                 flowAnimationEnabled = !flowAnimationEnabled;
                 const btn = document.getElementById('toggle-flow');
                 if (flowAnimationEnabled) {
-                    btn.style.background = '#007bff';
-                    btn.style.color = '#fff';
-                    btn.style.borderColor = '#007bff';
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-primary');
                 } else {
-                    btn.style.background = '#6c757d';
-                    btn.style.color = '#fff';
-                    btn.style.borderColor = '#6c757d';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-secondary');
                     particles = []; // Clear particles when disabled
                 }
             });
