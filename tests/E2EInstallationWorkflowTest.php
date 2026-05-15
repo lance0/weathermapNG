@@ -33,6 +33,19 @@ class E2EInstallationWorkflowTest extends TestCase
         $this->assertStringContainsString('Composer install failed', $scriptContent);
     }
 
+    public function test_quick_install_script_guards_native_root_runs(): void
+    {
+        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
+        $this->assertStringContainsString('Do not run quick-install.sh as root', $scriptContent);
+        $this->assertStringContainsString('WEATHERMAPNG_ALLOW_ROOT', $scriptContent);
+    }
+
+    public function test_quick_install_script_forces_librenms_composer_registration(): void
+    {
+        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
+        $this->assertStringContainsString('FORCE=1 COMPOSER_ALLOW_SUPERUSER=1 composer require', $scriptContent);
+    }
+
     public function test_quick_install_script_sets_up_database(): void
     {
         $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');

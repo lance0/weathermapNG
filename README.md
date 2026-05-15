@@ -30,10 +30,12 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 ```bash
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-cd WeathermapNG && ./quick-install.sh
+sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
 ```
 
 The script automatically installs dependencies, registers the Composer package with LibreNMS, sets up database tables, configures permissions, and enables the plugin.
+Run it as the `librenms` user on native installs; running as root can leave root-owned Composer files behind.
 
 ### Manual Install
 
@@ -47,7 +49,7 @@ composer install --no-dev
 # 2. Register with LibreNMS Composer
 cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 
 # 3. Setup database
@@ -134,7 +136,7 @@ If no WeathermapNG routes are listed, register the plugin as a Composer path pac
 ```bash
 cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan config:clear
@@ -170,7 +172,7 @@ git pull
 composer install --no-dev --optimize-autoloader
 php database/setup.php
 cd /opt/librenms
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan route:clear

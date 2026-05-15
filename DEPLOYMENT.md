@@ -23,8 +23,8 @@ The supported install flow is:
 ```bash
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-cd WeathermapNG
-./quick-install.sh
+chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
 ```
 
 The installer performs the important steps:
@@ -50,7 +50,7 @@ composer install --no-dev --optimize-autoloader
 
 cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 
 cd /opt/librenms/html/plugins/WeathermapNG
@@ -82,7 +82,7 @@ Then run setup as the `librenms` user inside the container:
 ```bash
 docker exec -u librenms <container> composer install -d /opt/librenms/html/plugins/WeathermapNG --no-dev --optimize-autoloader
 docker exec -u librenms <container> bash -lc 'cd /opt/librenms && composer config repositories.weathermapng "{\"type\":\"path\",\"url\":\"html/plugins/WeathermapNG\",\"options\":{\"symlink\":true}}"'
-docker exec -u librenms <container> bash -lc 'cd /opt/librenms && composer require "librenms/weathermapng:*" --with-dependencies'
+docker exec -u librenms <container> bash -lc 'cd /opt/librenms && FORCE=1 composer require "librenms/weathermapng:*" --with-dependencies --no-interaction'
 docker exec -u librenms <container> php /opt/librenms/artisan package:discover
 docker exec -u librenms <container> php /opt/librenms/html/plugins/WeathermapNG/database/setup.php
 docker exec -u librenms <container> bash -lc 'cd /opt/librenms && php artisan optimize:clear && php artisan route:clear && php artisan view:clear && php artisan config:clear && php artisan cache:clear'
@@ -101,7 +101,7 @@ composer install --no-dev --optimize-autoloader
 php database/setup.php
 
 cd /opt/librenms
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan route:clear
@@ -189,7 +189,7 @@ If `/plugin/WeathermapNG` loads partially or routes such as editor/API/health ar
 ```bash
 cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan route:list | grep -iE 'weathermap|wmng'

@@ -24,6 +24,16 @@ if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
     echo "Detected Docker environment"
 fi
 
+if [ "$(id -u)" -eq 0 ] && [ "$IN_DOCKER" = false ] && [ "${WEATHERMAPNG_ALLOW_ROOT:-0}" != "1" ]; then
+    echo "Error: Do not run quick-install.sh as root on native LibreNMS installs."
+    echo "Run it as the LibreNMS user so Composer does not create root-owned files:"
+    echo "  chown -R librenms:librenms $PLUGIN_DIR"
+    echo "  sudo -u librenms -H bash -lc 'cd $PLUGIN_DIR && ./quick-install.sh'"
+    echo ""
+    echo "If you really need to override this guard, set WEATHERMAPNG_ALLOW_ROOT=1."
+    exit 1
+fi
+
 # Find LibreNMS installation
 if [ ! -d "$LIBRENMS_PATH" ]; then
     # Try common locations
@@ -56,6 +66,13 @@ fi
 # Install dependencies
 echo "[2/7] Installing dependencies..."
 cd "$PLUGIN_DIR"
+if [ ! -w "$PLUGIN_DIR" ]; then
+    echo "Error: Plugin directory is not writable by $(id -un)."
+    echo "Fix ownership first, for example:"
+    echo "  chown -R librenms:librenms $PLUGIN_DIR"
+    exit 1
+fi
+
 if ! composer install --no-dev --optimize-autoloader 2>&1; then
     echo "Error: Composer install failed"
     exit 1
@@ -70,11 +87,11 @@ if [ -f "$LIBRENMS_PATH/composer.json" ]; then
         exit 1
     fi
 
-    if ! COMPOSER_ALLOW_SUPERUSER=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction 2>&1; then
+    if ! FORCE=1 COMPOSER_ALLOW_SUPERUSER=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction 2>&1; then
         echo "Error: Could not add WeathermapNG to the LibreNMS Composer install"
         echo "  Try running from $LIBRENMS_PATH:"
         echo "  composer config repositories.weathermapng '{\"type\":\"path\",\"url\":\"$PLUGIN_DIR\",\"options\":{\"symlink\":true}}'"
-        echo "  composer require 'librenms/weathermapng:*' --with-dependencies"
+        echo "  FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction"
         exit 1
     fi
 

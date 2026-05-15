@@ -7,8 +7,11 @@ For most users, use the automated installer:
 ```bash
 cd /opt/librenms/html/plugins
 git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-cd WeathermapNG && ./quick-install.sh
+chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
+sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
 ```
+
+Run the installer as the `librenms` user, not root. Running as root can leave root-owned Composer files in the plugin directory and cause later installs to fail with permission errors such as `file_put_contents(./composer.lock): Failed to open stream: Permission denied`.
 
 ## Docker Installation
 
@@ -35,7 +38,7 @@ docker exec -u librenms <container_name> composer install -d /opt/librenms/html/
 
 # Register the plugin package with LibreNMS Composer
 docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && composer config repositories.weathermapng "{\"type\":\"path\",\"url\":\"html/plugins/WeathermapNG\",\"options\":{\"symlink\":true}}"'
-docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && composer require "librenms/weathermapng:*" --with-dependencies'
+docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && FORCE=1 composer require "librenms/weathermapng:*" --with-dependencies --no-interaction'
 docker exec -u librenms <container_name> php /opt/librenms/artisan package:discover
 
 # Setup database
@@ -78,7 +81,7 @@ LibreNMS must know about the package before Laravel can discover the service pro
 ```bash
 cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 ```
 
@@ -142,7 +145,7 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 ```bash
 cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan route:clear
@@ -194,7 +197,7 @@ cd /opt/librenms/html/plugins/WeathermapNG
 git pull
 composer install --no-dev
 cd /opt/librenms
-composer require 'librenms/weathermapng:*' --with-dependencies
+FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan config:clear
