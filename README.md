@@ -21,7 +21,7 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies
-- **Map Versioning**: Save, restore, and export version history
+- **Map Versioning Foundation**: Snapshot storage and history services for map rollback workflows
 
 ## Quick Start
 
@@ -157,18 +157,27 @@ php database/setup.php
 
 ### Maps Not Updating
 
-- Check cron job: `crontab -u librenms -l | grep weathermap`
-- Verify poller: `ps aux | grep map-poller`
+- Verify the map has valid device and port associations.
+- Check that the LibreNMS user can read the relevant RRD files.
+- If you use the optional poller, check its cron entry and logs.
+- Use demo mode to separate rendering issues from live data issues.
 
 ## Updating
 
 ```bash
 cd /opt/librenms/html/plugins/WeathermapNG
 git pull
-composer install --no-dev
+composer install --no-dev --optimize-autoloader
+php database/setup.php
 cd /opt/librenms
-php artisan cache:clear
+composer require 'librenms/weathermapng:*' --with-dependencies
+php artisan package:discover
+php artisan optimize:clear
+php artisan route:clear
 php artisan view:clear
+php artisan config:clear
+php artisan cache:clear
+php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
 ## Architecture
@@ -201,8 +210,12 @@ composer quality
 ## Documentation
 
 - [Detailed Installation Guide](INSTALL.md)
+- [Deployment Guide](DEPLOYMENT.md)
 - [API Documentation](API.md)
 - [Embed Viewer Guide](docs/EMBED.md)
+- [Versioning Guide](VERSIONING.md)
+- [Performance Notes](PERFORMANCE.md)
+- [Roadmap](ROADMAP.md)
 - [Configuration Reference](config/config.php)
 
 ## Contributing

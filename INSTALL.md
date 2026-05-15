@@ -185,7 +185,7 @@ This plugin follows the LibreNMS v2 architecture:
 - Hooks implement interfaces (MenuEntryHook, SettingsHook)
 - Views use namespace `WeathermapNG::`
 - Routes under `/plugin/WeathermapNG`
-- Uses Composer package discovery (no plugin.json)
+- Uses Composer package discovery rather than the legacy plugin manifest
 
 ## Updating
 

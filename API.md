@@ -1,1098 +1,196 @@
-# WeathermapNG API Documentation
+# WeathermapNG API And Route Reference
 
-All API endpoints require LibreNMS authentication (session cookies or API token).
+Routes are registered through `routes/web.php` when LibreNMS discovers the Composer package provider. If routes are missing, run package discovery from the LibreNMS root and verify with:
+
+```bash
+cd /opt/librenms
+php artisan route:list | grep -iE 'weathermap|wmng'
+```
 
 ## Authentication
 
-Most endpoints require authentication. Use one of these methods:
+Most plugin routes are inside LibreNMS `web` and `auth` middleware. Use an authenticated LibreNMS browser session for the editor and UI-driven API calls.
 
-### Session Cookie Authentication (Web UI)
-```bash
-# Get session cookie by logging into LibreNMS web interface
-# Then include the session cookie in requests
-curl -b 'laravel_session=YOUR_SESSION_COOKIE' \
-     https://librenms/plugin/WeathermapNG/api/maps/1/json
-```
+Public probe routes are intentionally limited:
 
-### API Token Authentication
-```bash
-# Use X-Auth-Token header
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/maps/1/json
-```
+- `GET /plugin/WeathermapNG/health`
+- `GET /plugin/WeathermapNG/ready`
+- `GET /plugin/WeathermapNG/live`
 
----
+Detailed health, stats, metrics, map management, editor, templates, import/export, and live map data require LibreNMS authentication.
 
-## Maps
+## Page Routes
 
-### List All Maps
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/plugin/WeathermapNG` | Map index |
+| `GET` | `/plugin/WeathermapNG/install` | Installer UI |
+| `POST` | `/plugin/WeathermapNG/install` | Run installer |
+| `GET` | `/plugin/WeathermapNG/editor/{map?}` | Editor for an existing or new map |
+| `GET` | `/plugin/WeathermapNG/view/{map}` | Full map view |
+| `GET` | `/plugin/WeathermapNG/embed/{map}` | Embed viewer |
 
-```http
-GET /plugin/WeathermapNG
-```
+## Map Data Routes
 
-**Response:**
-```json
-[
-    {
-        "id": 1,
-        "name": "my_map",
-        "title": "My Network Map",
-        "width": 800,
-        "height": 600,
-        "created_at": "2025-01-30T10:00:00Z",
-        "updated_at": "2025-01-30T10:00:00Z"
-    }
-]
-```
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/json` | Serialized map model |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/live` | Current traffic/status payload |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/sse` | Server-Sent Events live stream |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/export` | Export a map |
+| `POST` | `/plugin/WeathermapNG/api/import` | Import a map |
+| `POST` | `/plugin/WeathermapNG/api/maps/{map}/save` | Save full editor state |
 
-**Example:**
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG
-```
+Example live payload shape:
 
----
-
-### Get Map Data (JSON)
-
-```http
-GET /plugin/WeathermapNG/api/maps/{id}/json
-```
-
-**Response:**
 ```json
 {
+  "ts": 1738284000,
+  "links": {
+    "1": {
+      "in": 52428800,
+      "out": 104857600,
+      "in_perc": 33,
+      "out_perc": 67
+    }
+  },
+  "nodes": {
+    "1": {
+      "status": "up",
+      "alerts": {
+        "count": 0,
+        "severity": "ok"
+      }
+    }
+  }
+}
+```
+
+## Lookup Routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/plugin/WeathermapNG/api/devices` | Device lookup for the editor |
+| `GET` | `/plugin/WeathermapNG/api/device/{id}/ports` | Ports for one LibreNMS device |
+
+## Map Management Routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map` | Create a map |
+| `PUT` | `/plugin/WeathermapNG/map/{map}` | Update map metadata |
+| `DELETE` | `/plugin/WeathermapNG/map/{map}` | Delete a map |
+| `POST` | `/plugin/WeathermapNG/map/{map}/autodiscover` | Run current auto-discovery flow |
+
+Create map request:
+
+```json
+{
+  "name": "production_map",
+  "title": "Production Network Map",
+  "width": 1200,
+  "height": 800
+}
+```
+
+Typical response:
+
+```json
+{
+  "success": true,
+  "map": {
     "id": 1,
-    "name": "my_map",
-    "title": "My Network Map",
-    "width": 800,
-    "height": 600,
-    "nodes": [
-        {
-            "id": 1,
-            "map_id": 1,
-            "label": "Router-A",
-            "x": 100,
-            "y": 200,
-            "device_id": 42,
-            "meta": {
-                "hostname": "router-a.example.com"
-            }
-        }
-    ],
-    "links": [
-        {
-            "id": 1,
-            "map_id": 1,
-            "src_node_id": 1,
-            "dst_node_id": 2,
-            "port_id_a": 101,
-            "port_id_b": 102,
-            "bandwidth_bps": 1000000000,
-            "style": {
-                "color": "#007bff",
-                "width": 3
-            }
-        }
-    ]
-}
-```
-
-**Example:**
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/maps/1/json
-```
-
----
-
-### Get Live Map Data
-
-```http
-GET /plugin/WeathermapNG/api/maps/{id}/live
-```
-
-Returns real-time bandwidth and status data.
-
-**Response:**
-```json
-{
-    "ts": 1738284000,
-    "links": {
-        "1": {
-            "in": 52428800,
-            "out": 104857600,
-            "in_perc": 33,
-            "out_perc": 67
-        }
-    },
-    "nodes": {
-        "1": {
-            "status": "up",
-            "alerts": {
-                "count": 0,
-                "severity": "ok"
-            }
-        }
-    }
-}
-```
-
-**Example:**
-```bash
-# Poll every 5 seconds for live updates
-while true; do
-    curl -H "X-Auth-Token: YOUR_TOKEN" \
-         https://librenms/plugin/WeathermapNG/api/maps/1/live
-    sleep 5
-done
-```
-
----
-
-### Save Full Map (D3 Editor)
-
-```http
-POST /plugin/WeathermapNG/api/maps/{id}/save
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-    "nodes": [
-        {"id": 1, "label": "Router-A", "x": 100, "y": 200, "device_id": 42}
-    ],
-    "links": [
-        {"id": 1, "src_node_id": 1, "dst_node_id": 2, "style": {"color": "#007bff"}}
-    ]
-}
-```
-
-**Response:**
-```json
-{
-    "success": true,
-    "message": "Map saved successfully"
-}
-```
-
-**Example:**
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d @map.json \
-     https://librenms/plugin/WeathermapNG/api/maps/1/save
-```
-
-**Error Response:**
-```json
-{
-    "success": false,
-    "message": "Map not found"
-}
-```
-
----
-
-### Create Map
-
-```http
-POST /plugin/WeathermapNG/map
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-    "name": "my_map",
-    "title": "My Network Map",
-    "width": 1024,
-    "height": 768
-}
-```
-
-**Response:**
-```json
-{
-    "success": true,
-    "map": {
-        "id": 1,
-        "name": "my_map",
-        "title": "My Network Map",
-        "width": 1024,
-        "height": 768
-    },
-    "redirect": "https://librenms/plugin/WeathermapNG/editor/1"
-}
-```
-
-**Examples:**
-
-Minimal map (uses defaults):
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{"name": "minimal_map"}' \
-     https://librenms/plugin/WeathermapNG/map
-```
-
-Full specification:
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "name": "production_map",
-         "title": "Production Network Map",
-         "width": 1200,
-         "height": 800
-     }' \
-     https://librenms/plugin/WeathermapNG/map
-```
-
-**Validation Errors:**
-```json
-{
-    "success": false,
-    "message": "The name field is required."
-}
-```
-
----
-
-### Update Map
-
-```http
-PUT /plugin/WeathermapNG/map/{id}
-```
-
-**Request Body:**
-```json
-{
-    "title": "Updated Map Title",
+    "name": "production_map",
+    "title": "Production Network Map",
     "width": 1200,
-    "height": 900
+    "height": 800
+  },
+  "redirect": "https://librenms/plugin/WeathermapNG/editor/1"
 }
 ```
 
-**Example:**
-```bash
-curl -X PUT \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "title": "Updated Map Title",
-         "width": 1200
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1
-```
+## Node Routes
 
----
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map/{map}/nodes` | Store node through collection route |
+| `POST` | `/plugin/WeathermapNG/map/{map}/node` | Create one node |
+| `PATCH` | `/plugin/WeathermapNG/map/{map}/node/{node}` | Update one node |
+| `DELETE` | `/plugin/WeathermapNG/map/{map}/node/{node}` | Delete one node |
 
-### Delete Map
+Create node request:
 
-```http
-DELETE /plugin/WeathermapNG/map/{id}
-```
-
-**Example:**
-```bash
-curl -X DELETE \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/map/1
-```
-
----
-
-## Map Items (Editor CRUD)
-
-### Create Node
-
-```http
-POST /plugin/WeathermapNG/map/{id}/node
-Content-Type: application/json
-```
-
-**Request Body:**
 ```json
 {
-    "label": "Router-A",
-    "x": 150,
-    "y": 250,
-    "device_id": 42
+  "label": "Core Router",
+  "x": 400,
+  "y": 300,
+  "device_id": 42
 }
 ```
 
-**Response:**
-```json
-{
-    "success": true,
-    "node": {
-        "id": 5,
-        "map_id": 1,
-        "label": "Router-A",
-        "x": 150,
-        "y": 250,
-        "device_id": 42
-    }
-}
-```
+## Link Routes
 
-**Example:**
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "label": "Core Router",
-         "x": 400,
-         "y": 300,
-         "device_id": 42
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/node
-```
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map/{map}/links` | Store link through collection route |
+| `POST` | `/plugin/WeathermapNG/map/{map}/link` | Create one link |
+| `PATCH` | `/plugin/WeathermapNG/map/{map}/link/{link}` | Update one link |
+| `DELETE` | `/plugin/WeathermapNG/map/{map}/link/{link}` | Delete one link |
 
-**Without Device:**
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "label": "Label Node",
-         "x": 100,
-         "y": 200
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/node
-```
-
----
-
-### Update Node
-
-```http
-PATCH /plugin/WeathermapNG/map/{id}/node/{nodeId}
-```
-
-**Request Body:**
-```json
-{
-    "label": "Updated Label",
-    "x": 200,
-    "y": 250
-}
-```
-
-**Example:**
-```bash
-curl -X PATCH \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "label": "Updated Label",
-         "x": 200,
-         "y": 250
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/node/5
-```
-
----
-
-### Delete Node
-
-```http
-DELETE /plugin/WeathermapNG/map/{id}/node/{nodeId}
-```
-
-**Example:**
-```bash
-curl -X DELETE \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/map/1/node/5
-```
-
----
-
-### Create Link
-
-```http
-POST /plugin/WeathermapNG/map/{id}/link
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-    "src_node_id": 1,
-    "dst_node_id": 2,
-    "port_id_a": 101,
-    "port_id_b": 102,
-    "bandwidth_bps": 1000000000
-}
-```
-
-**Response:**
-```json
-{
-    "success": true,
-    "link": {
-        "id": 3,
-        "src_node_id": 1,
-        "dst_node_id": 2,
-        "port_id_a": 101,
-        "port_id_b": 102,
-        "bandwidth_bps": 1000000000
-    }
-}
-```
-
-**Example:**
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "src_node_id": 1,
-         "dst_node_id": 2,
-         "port_id_a": 101,
-         "port_id_b": 102,
-         "bandwidth_bps": 1000000000
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/link
-```
-
-**Without Bandwidth (uses RRD):**
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "src_node_id": 1,
-         "dst_node_id": 2
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/link
-```
-
-**Error Response:**
-```json
-{
-    "success": false,
-    "message": "Link would create a cycle in the graph"
-}
-```
-
----
-
-### Update Link
-
-```http
-PATCH /plugin/WeathermapNG/map/{id}/link/{linkId}
-```
-
-**Request Body:**
-```json
-{
-    "port_id_a": 103,
-    "bandwidth_bps": 2000000000,
-    "style": {
-        "color": "#dc3545",
-        "width": 5
-    }
-}
-```
-
-**Example:**
-```bash
-curl -X PATCH \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "bandwidth_bps": 2000000000,
-         "style": {
-             "color": "#dc3545"
-         }
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/link/3
-```
-
----
-
-### Delete Link
-
-```http
-DELETE /plugin/WeathermapNG/map/{id}/link/{linkId}
-```
-
-**Example:**
-```bash
-curl -X DELETE \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/map/1/link/3
-```
-
----
-
-### Link Style & Via Points
-
-Links support waypoint routing via the `style` JSON column. No database migration is required.
-
-#### Link `style` object
+Create link request:
 
 ```json
 {
+  "src_node_id": 1,
+  "dst_node_id": 2,
+  "port_id_a": 101,
+  "port_id_b": 102,
+  "bandwidth_bps": 1000000000,
+  "style": {
+    "via_style": "angled",
     "via_points": [
-        {"x": 200, "y": 150},
-        {"x": 400, "y": 100}
-    ],
-    "via_style": "curved"
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `via_points` | `array` of `{x, y}` | Ordered list of intermediate waypoints the link passes through. Empty or missing = straight line from src to dst. |
-| `via_style` | `string` | `"straight"` (default), `"angled"` (sharp corners at waypoints), or `"curved"` (smooth Catmull-Rom spline through waypoints). |
-
-These fields are included automatically in all link API responses (GET, POST, PATCH, save, import) and are persisted through the existing `style` JSON column.
-
----
-
-## Discovery
-
-### Auto-Discover Topology
-
-> **Note**: Auto-discovery is currently disabled in v1.6.0. Use manual node/link creation instead. This feature will be re-implemented using LLDP/CDP data in a future release.
-
-```http
-POST /plugin/WeathermapNG/map/{id}/autodiscover
-Content-Type: application/json
-```
-
-**Request Body:**
-```json
-{
-    "min_degree": 1,
-    "os": "ios,junos"
-}
-```
-
-**Parameters:**
-- `min_degree` (optional): Minimum neighbor degree for devices to include
-- `os` (optional): Comma-separated list of device OS to filter
-
-**Response:**
-```json
-{
-    "success": true,
-    "message": "Discovered 12 devices and 15 links",
-    "devices": [
-        {
-            "device_id": 42,
-            "hostname": "router1.example.com",
-            "os": "ios"
-        }
-    ],
-    "links": [
-        {
-            "src_device_id": 42,
-            "dst_device_id": 43,
-            "src_port_id": 101,
-            "dst_port_id": 102
-        }
+      {"x": 500, "y": 240}
     ]
+  }
 }
 ```
 
-**Examples:**
-
-Basic discovery (all devices with at least 1 link):
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{"min_degree": 1}' \
-     https://librenms/plugin/WeathermapNG/map/1/autodiscover
-```
-
-Filter by OS:
-```bash
-curl -X POST \
-     -H "Content-Type: application/json" \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -d '{
-         "min_degree": 2,
-         "os": "ios,junos,cisco-ios"
-     }' \
-     https://librenms/plugin/WeathermapNG/map/1/autodiscover
-```
-
----
-
-## Devices
-
-### Get All Devices
-
-```http
-GET /plugin/WeathermapNG/api/devices
-```
-
-**Response:**
-```json
-[
-    {
-        "id": 42,
-        "hostname": "router1.example.com",
-        "sysName": "Router1",
-        "os": "ios",
-        "location": "Rack A"
-    }
-]
-```
-
-**Example:**
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/devices
-```
-
----
-
-### Search Devices
-
-```http
-GET /plugin/WeathermapNG/api/devices/search?q=router
-```
-
-**Response:**
-```json
-[
-    {
-        "id": 42,
-        "hostname": "router1.example.com",
-        "sysName": "Router1"
-    }
-]
-```
-
-**Example:**
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/devices/search?q=router
-```
-
----
-
-### Get Device Ports
-
-```http
-GET /plugin/WeathermapNG/api/device/{id}/ports
-```
-
-**Parameters:**
-- `q`: Server-side filter (optional)
-
-**Response:**
-```json
-[
-    {
-        "port_id": 101,
-        "ifName": "GigabitEthernet0/0",
-        "ifDescr": "WAN Interface",
-        "ifSpeed": 1000000000
-    }
-]
-```
-
-**Examples:**
-
-Get all ports:
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/device/42/ports
-```
-
-Filter ports:
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     'https://librenms/plugin/WeathermapNG/api/device/42/ports?q=Gig'
-```
-
----
-
-## Health & Monitoring
-
-### Basic Health Check
-
-```http
-GET /plugin/WeathermapNG/health
-```
-
-**Response:**
-```json
-{
-    "status": "healthy",
-    "timestamp": "2025-01-30T10:00:00Z",
-    "version": "1.6.0",
-    "checks": {
-        "database": {"status": "healthy"},
-        "rrd": {"status": "healthy"},
-        "output": {"status": "healthy"}
-    }
-}
-```
-
-**Example:**
-```bash
-curl https://librenms/plugin/WeathermapNG/health
-```
-
-**Unhealthy Response:**
-```json
-{
-    "status": "unhealthy",
-    "checks": {
-        "database": {
-            "status": "unhealthy",
-            "message": "Connection refused"
-        }
-    }
-}
-```
-
----
-
-### Statistics
-
-```http
-GET /plugin/WeathermapNG/metrics
-```
-
-**Response:**
-```json
-{
-    "maps": 12,
-    "nodes": 156,
-    "links": 89,
-    "devices": 45
-}
-```
-
-**Example:**
-```bash
-curl https://librenms/plugin/WeathermapNG/metrics
-```
-
----
-
-### Readiness Probe (for Kubernetes/Docker)
-
-```http
-GET /plugin/WeathermapNG/ready
-```
-
-**Response (Ready):**
-```json
-{
-    "ready": true
-}
-```
-
-**Response (Not Ready):**
-```json
-{
-    "ready": false,
-    "reason": "Database connection failed"
-}
-```
-
-**Example:**
-```bash
-# Kubernetes liveness probe
-curl https://librenms/plugin/WeathermapNG/ready
-```
-
----
-
-### Liveness Probe (for Kubernetes/Docker)
-
-```http
-GET /plugin/WeathermapNG/live
-```
-
-**Response:**
-```json
-{
-    "alive": true
-}
-```
-
-**Example:**
-```bash
-# Kubernetes liveness probe
-curl https://librenms/plugin/WeathermapNG/live
-```
-
----
-
-### Prometheus Metrics
-
-```http
-GET /plugin/WeathermapNG/metrics
-```
-
-**Response (Prometheus format):**
-```
-# HELP weathermapng_maps_total Total number of maps
-# TYPE weathermapng_maps_total gauge
-weathermapng_maps_total 12
-
-# HELP weathermapng_nodes_total Total number of nodes
-# TYPE weathermapng_nodes_total gauge
-weathermapng_nodes_total 156
-```
-
-**Example:**
-```bash
-# Scrape metrics every 15 seconds
-while true; do
-    curl https://librenms/plugin/WeathermapNG/metrics
-    sleep 15
-done
-```
-
----
-
-## Import/Export
-
-### Export Map
-
-```http
-GET /plugin/WeathermapNG/api/maps/{id}/export
-```
-
-**Parameters:**
-- `format`: `json` (default) or `xml`
-
-**Response:**
-```json
-{
-    "map": {
-        "id": 1,
-        "name": "my_map"
-    },
-    "nodes": [...],
-    "links": [...]
-}
-```
-
-**Example:**
-```bash
-curl -H "X-Auth-Token: YOUR_TOKEN" \
-     https://librenms/plugin/WeathermapNG/api/maps/1/export?format=json
-```
-
----
-
-### Import Map
-
-```http
-POST /plugin/WeathermapNG/api/import
-Content-Type: multipart/form-data
-```
-
-**Request:**
-```bash
-curl -X POST \
-     -H "X-Auth-Token: YOUR_TOKEN" \
-     -F "file=@map-export.json" \
-     https://librenms/plugin/WeathermapNG/api/import
-```
-
-**Response:**
-```json
-{
-    "success": true,
-    "map_id": 5,
-    "message": "Map imported successfully"
-}
-```
-
-**Error Response:**
-```json
-{
-    "success": false,
-    "message": "Invalid JSON format"
-}
-```
-
----
-
-## Embedding
-
-### Embed Map (authenticated)
-
-```http
-GET /plugin/WeathermapNG/embed/{id}
-```
-
-**Query parameters:**
-- `metric`: `percent` (default), `in`, `out`, `sum`
-- `sse`: `1` to enable Server-Sent Events if available
-- `w`, `h`: Override viewport width/height in pixels
-
-**Example:**
-```html
-<!-- Basic embed -->
-<iframe src="https://librenms/plugin/WeathermapNG/embed/1"
-        width="100%" height="600" frameborder="0"></iframe>
-
-<!-- Custom size -->
-<iframe src="https://librenms/plugin/WeathermapNG/embed/1?w=1200&h=800"
-        width="1200" height="800" frameborder="0"></iframe>
-
-<!-- Show traffic in/out -->
-<iframe src="https://librenms/plugin/WeathermapNG/embed/1?metric=in"
-        width="100%" height="600" frameborder="0"></iframe>
-```
-
----
-
-### Public Embed (if configured)
-
-```http
-GET /plugin/WeathermapNG/public/embed/{id}
-```
-
-Same query parameters as authenticated embed.
-
----
-
-## Response Codes
-
-| Code | Meaning | Action |
-|-------|----------|---------|
-| 200 | Success | Request was successful |
-| 201 | Created | Resource was created |
-| 400 | Bad Request | Invalid input data |
-| 401 | Unauthorized | Authentication required/invalid |
-| 404 | Not Found | Resource doesn't exist |
-| 422 | Unprocessable Entity | Validation failed |
-| 500 | Server Error | Internal server error |
-| 503 | Service Unavailable | Service temporarily down |
-
----
-
-## Error Response Format
-
-All endpoints return JSON with the following structure:
-
-**Success:**
-```json
-{
-    "success": true,
-    "data": { ... }
-}
-```
-
-**Error:**
-```json
-{
-    "success": false,
-    "message": "Human readable error message",
-    "errors": {
-        "field_name": ["Validation error details"]
-    }
-}
-```
-
----
-
-## Common Error Patterns
-
-### Authentication Errors
-```json
-{
-    "success": false,
-    "message": "Unauthenticated"
-}
-```
-**Solution:** Provide valid X-Auth-Token header or session cookie
-
----
-
-### Validation Errors
-```json
-{
-    "success": false,
-    "message": "The given data was invalid.",
-    "errors": {
-        "name": ["The name field is required."],
-        "width": ["The width must be between 100 and 4096."]
-    }
-}
-```
-**Solution:** Fix validation errors and retry request
-
----
-
-### Not Found Errors
-```json
-{
-    "success": false,
-    "message": "Map not found"
-}
-```
-**Solution:** Verify the resource ID exists
-
----
-
-## Rate Limiting
-
-API requests are rate-limited. Recommended limits:
-
-- **GET requests**: 60 requests per minute
-- **POST/PUT/PATCH**: 30 requests per minute
-- **DELETE requests**: 20 requests per minute
-
-If you exceed the rate limit, you'll receive:
+## Template Routes
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/plugin/WeathermapNG/templates` | List templates |
+| `GET` | `/plugin/WeathermapNG/templates/{id}` | Show one template |
+| `POST` | `/plugin/WeathermapNG/templates` | Create a template |
+| `PUT` | `/plugin/WeathermapNG/templates/{id}` | Update a template |
+| `DELETE` | `/plugin/WeathermapNG/templates/{id}` | Delete a template |
+| `POST` | `/plugin/WeathermapNG/templates/{id}/create-map` | Create a map from a template |
+
+## Health And Metrics Routes
+
+| Auth | Method | Path | Purpose |
+|------|--------|------|---------|
+| Public | `GET` | `/plugin/WeathermapNG/health` | Basic health |
+| Public | `GET` | `/plugin/WeathermapNG/ready` | Readiness probe |
+| Public | `GET` | `/plugin/WeathermapNG/live` | Basic liveness |
+| Authenticated | `GET` | `/plugin/WeathermapNG/health/detailed` | Detailed health |
+| Authenticated | `GET` | `/plugin/WeathermapNG/health/stats` | Plugin stats |
+| Authenticated | `GET` | `/plugin/WeathermapNG/metrics` | Prometheus-style metrics |
+
+## Version History Routes
+
+The codebase includes `MapVersionController` and editor UI for map version history, but the authoritative route list is `routes/web.php`. If version routes are added or restored, update this section and `VERSIONING.md` in the same change.
+
+## Error Shape
+
+Most JSON write endpoints return a success flag and a message on errors:
 
 ```json
 {
-    "success": false,
-    "message": "Too many requests. Please slow down."
+  "success": false,
+  "message": "Map not found"
 }
 ```
 
----
-
-## Pagination
-
-List endpoints that return many items support pagination:
-
-```
-GET /plugin/WeathermapNG/api/devices?page=1&per_page=50
-```
-
-**Response:**
-```json
-{
-    "data": [ ... ],
-    "meta": {
-        "current_page": 1,
-        "per_page": 50,
-        "total": 245,
-        "last_page": 5
-    }
-}
-```
-
----
-
-## Version Information
-
-Current API version: **1.6.0**
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+Validation errors may include field-level details depending on the controller/request class.
