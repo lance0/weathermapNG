@@ -33,7 +33,7 @@ git clone https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG && ./quick-install.sh
 ```
 
-The script automatically installs dependencies, sets up database tables, configures permissions, and enables the plugin.
+The script automatically installs dependencies, registers the Composer package with LibreNMS, sets up database tables, configures permissions, and enables the plugin.
 
 ### Manual Install
 
@@ -44,17 +44,30 @@ git clone https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 composer install --no-dev
 
-# 2. Setup database
+# 2. Register with LibreNMS Composer
+cd /opt/librenms
+composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer require 'librenms/weathermapng:*' --with-dependencies
+php artisan package:discover
+
+# 3. Setup database
+cd /opt/librenms/html/plugins/WeathermapNG
 php database/setup.php
 
-# 3. Configure LibreNMS
+# 4. Configure LibreNMS
 cd /opt/librenms
-php artisan cache:clear
+php artisan optimize:clear
+php artisan route:clear
 php artisan view:clear
+php artisan config:clear
+php artisan cache:clear
 chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 
-# 4. Enable plugin
+# 5. Enable plugin
 ./lnms plugin:enable WeathermapNG
+
+# 6. Verify routes
+php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
 ### Requirements
@@ -111,9 +124,23 @@ Optional query parameters: `metric` (percent/in/out/sum), `sse=0` (force polling
 
 ```bash
 cd /opt/librenms
+php artisan route:list | grep -iE 'weathermap|wmng'
 php artisan cache:clear
 php artisan view:clear
 ```
+
+If no WeathermapNG routes are listed, register the plugin as a Composer path package:
+
+```bash
+cd /opt/librenms
+composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer require 'librenms/weathermapng:*' --with-dependencies
+php artisan package:discover
+php artisan optimize:clear
+php artisan config:clear
+```
+
+LibreNMS `validate.php` may report `wmng_*` tables as extra tables. Those tables belong to WeathermapNG and should not be dropped.
 
 ### Permission Errors
 
@@ -176,7 +203,7 @@ composer quality
 - [Detailed Installation Guide](INSTALL.md)
 - [API Documentation](API.md)
 - [Embed Viewer Guide](docs/EMBED.md)
-- [Configuration Reference](config/weathermapng.php)
+- [Configuration Reference](config/config.php)
 
 ## Contributing
 

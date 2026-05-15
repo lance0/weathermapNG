@@ -117,10 +117,10 @@ if (!$docker_detected) {
 
 // 1. PHP Version Check
 check_and_fix('PHP Version', function() {
-    if (version_compare(PHP_VERSION, '8.0.0', '>=')) {
+    if (version_compare(PHP_VERSION, '8.2.0', '>=')) {
         return true;
     }
-    return "PHP " . PHP_VERSION . " found, requires 8.0+";
+    return "PHP " . PHP_VERSION . " found, requires 8.2+";
 }, null); // Can't auto-fix PHP version
 
 // 2. PHP Extensions Check
@@ -161,16 +161,16 @@ $plugin_path = __DIR__;
 // Detect plugin architecture
 $architecture = 'unknown';
 $hook_based_files = [
-    'app/Plugins/WeathermapNG/Menu.php',
-    'app/Plugins/WeathermapNG/Page.php',
-    'app/Plugins/WeathermapNG/Settings.php'
+    'src/WeathermapNGProvider.php',
+    'src/Hooks/MenuEntry.php',
+    'src/Hooks/Settings.php'
 ];
 
 $traditional_files = [
     'WeathermapNG.php',
     'composer.json',
-    'routes.php',
-    'Http/Controllers/MapController.php'
+    'routes/web.php',
+    'src/Http/Controllers/MapController.php'
 ];
 
 // Check for hook-based architecture
@@ -183,7 +183,7 @@ foreach ($hook_based_files as $file) {
 
 if ($hook_files_found >= 2) {
     $architecture = 'hook-based';
-    $required_files = array_merge(['composer.json', 'routes.php'], $hook_based_files);
+    $required_files = array_merge(['composer.json', 'routes/web.php'], $hook_based_files);
 } else {
     $architecture = 'traditional';
     $required_files = $traditional_files;
@@ -202,7 +202,7 @@ foreach ($required_files as $file) {
 
 // 4. Configuration File Check
 check_and_fix('Configuration file', function() use ($plugin_path) {
-    if (file_exists($plugin_path . '/config/weathermapng.php')) {
+    if (file_exists($plugin_path . '/config/config.php')) {
         return true;
     }
     return "Configuration file missing";
@@ -227,7 +227,7 @@ return [
 ];
 PHP;
     
-    if (file_put_contents($config_dir . '/weathermapng.php', $default_config)) {
+    if (file_put_contents($config_dir . '/config.php', $default_config)) {
         return true;
     }
     return "Failed to create configuration file";

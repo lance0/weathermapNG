@@ -245,8 +245,9 @@ test_plugin_installation() {
     # Check plugin files
     local plugin_files=(
         "WeathermapNG.php"
-        "routes.php"
-        "plugin.json"
+        "routes/web.php"
+        "composer.json"
+        "src/WeathermapNGProvider.php"
     )
     
     for file in "${plugin_files[@]}"; do

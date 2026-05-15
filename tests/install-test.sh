@@ -44,10 +44,10 @@ test_prerequisites() {
     test_start "Prerequisites detection"
     
     # Test PHP version check
-    if php -r "exit(version_compare(PHP_VERSION, '8.0.0', '>=') ? 0 : 1);"; then
+    if php -r "exit(version_compare(PHP_VERSION, '8.2.0', '>=') ? 0 : 1);"; then
         test_pass "PHP version check"
     else
-        test_fail "PHP version check" "PHP 8.0+ required"
+        test_fail "PHP version check" "PHP 8.2+ required"
     fi
     
     # Test required commands

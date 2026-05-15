@@ -5,6 +5,22 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] - 2026-05-15
+
+### Added
+- **Install CI coverage**: Added Composer path package registration, mocked quick-install flow, install guidance alignment checks, and a weekly/manual LibreNMS Docker smoke test.
+
+### Changed
+- **LibreNMS package registration**: Quick install now registers WeathermapNG as a Composer path package in the LibreNMS root before running package discovery.
+- **Install verification**: Quick install now verifies WeathermapNG routes and creates required output directories.
+- **Health routes**: Detailed stats and Prometheus metrics now require authenticated access, while liveness/readiness endpoints remain available for probes.
+- **Requirements**: Runtime checks now consistently require PHP 8.2+ to match Composer requirements.
+
+### Fixed
+- **Route discovery failure**: Fixed installs that appeared successful but did not load WeathermapNG Laravel routes until Composer package registration was performed manually.
+- **Fresh readiness checks**: Fixed readiness failures caused by missing output directory configuration/directories.
+- **Legacy test drift**: Updated install verification scripts and tests away from obsolete `plugin.json` and `routes.php` expectations.
+
 ## [1.6.2] - 2026-05-14
 
 ### Added

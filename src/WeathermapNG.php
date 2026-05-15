@@ -38,6 +38,11 @@ class WeathermapNG
 
     public function getVersion()
     {
+        $versionFile = dirname(__DIR__) . '/VERSION';
+        if (is_readable($versionFile)) {
+            return trim(file_get_contents($versionFile));
+        }
+
         $composer = json_decode(file_get_contents(dirname(__DIR__) . '/composer.json'), true);
         return $composer['version'] ?? '0.0.0';
     }
@@ -79,7 +84,7 @@ class WeathermapNG
     public function checkRequirements()
     {
         $requirements = [
-            'php' => version_compare(PHP_VERSION, '8.0.0', '>='),
+            'php' => version_compare(PHP_VERSION, '8.2.0', '>='),
             'gd' => extension_loaded('gd'),
             'json' => extension_loaded('json'),
             'pdo' => extension_loaded('pdo'),

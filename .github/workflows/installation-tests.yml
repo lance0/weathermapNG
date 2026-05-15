@@ -9,7 +9,13 @@ on:
       - 'docker-compose*.yml'
       - '.env.*'
       - 'composer.json'
+      - 'README.md'
+      - 'INSTALL.md'
+      - 'tests/**/*'
       - '.github/workflows/installation-tests.yml'
+  schedule:
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
   pull_request:
     branches: [main]
     paths:
@@ -18,6 +24,10 @@ on:
       - 'docker-compose*.yml'
       - '.env.*'
       - 'composer.json'
+      - 'README.md'
+      - 'INSTALL.md'
+      - 'tests/**/*'
+      - '.github/workflows/installation-tests.yml'
 
 jobs:
   script-validation:
@@ -95,6 +105,179 @@ jobs:
             echo "  OK: src/Hooks/$hook.php"
           done
 
+  composer-registration:
+    runs-on: ubuntu-latest
+    name: Composer Path Registration
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: gd, json, mbstring
+          tools: composer:v2
+
+      - name: Register plugin as LibreNMS path package
+        run: |
+          set -euo pipefail
+
+          LIBRENMS_ROOT="$(mktemp -d)"
+          mkdir -p "$LIBRENMS_ROOT/html/plugins"
+          ln -s "$GITHUB_WORKSPACE" "$LIBRENMS_ROOT/html/plugins/WeathermapNG"
+
+          cd "$LIBRENMS_ROOT"
+          composer init --no-interaction --name=weathermapng/ci-librenms --type=project
+          composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
+          composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction --no-progress
+
+          composer show librenms/weathermapng
+          test -L vendor/librenms/weathermapng || test -d vendor/librenms/weathermapng
+
+      - name: Validate Laravel provider metadata
+        run: |
+          php <<'PHP'
+          <?php
+          $composer = json_decode(file_get_contents("composer.json"), true);
+          $providers = $composer["extra"]["laravel"]["providers"] ?? [];
+          if (! in_array("LibreNMS\\Plugins\\WeathermapNG\\WeathermapNGProvider", $providers, true)) {
+              fwrite(STDERR, "Missing Laravel provider metadata\n");
+              exit(1);
+          }
+          PHP
+
+  mocked-install:
+    runs-on: ubuntu-latest
+    name: Mock Quick Install Flow
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run quick install against mocked LibreNMS
+        run: |
+          set -euo pipefail
+
+          WORK="$(mktemp -d)"
+          LIBRENMS_ROOT="$WORK/librenms"
+          FAKE_BIN="$WORK/bin"
+          LOG="$WORK/install.log"
+
+          mkdir -p "$LIBRENMS_ROOT" "$FAKE_BIN"
+          touch "$LIBRENMS_ROOT/composer.json" "$LIBRENMS_ROOT/artisan"
+
+          cat > "$LIBRENMS_ROOT/lnms" <<'SH'
+          #!/usr/bin/env bash
+          echo "lnms $*" >> "$INSTALL_LOG"
+          SH
+          chmod +x "$LIBRENMS_ROOT/lnms"
+
+          cat > "$FAKE_BIN/composer" <<'SH'
+          #!/usr/bin/env bash
+          echo "composer $PWD $*" >> "$INSTALL_LOG"
+          SH
+          chmod +x "$FAKE_BIN/composer"
+
+          cat > "$FAKE_BIN/chown" <<'SH'
+          #!/usr/bin/env bash
+          echo "chown $*" >> "$INSTALL_LOG"
+          SH
+          chmod +x "$FAKE_BIN/chown"
+
+          cat > "$FAKE_BIN/php" <<'SH'
+          #!/usr/bin/env bash
+          echo "php $PWD $*" >> "$INSTALL_LOG"
+          if [ "${1:-}" = "-r" ]; then
+              if printf '%s' "${2:-}" | grep -q 'echo PHP_VERSION'; then
+                  printf '8.2.99'
+              fi
+              exit 0
+          fi
+          if [ "${1:-}" = "database/setup.php" ]; then
+              exit 0
+          fi
+          if [ "${1:-}" = "artisan" ] && [ "${2:-}" = "route:list" ]; then
+              printf 'GET plugin/WeathermapNG/health weathermapng.health\n'
+              exit 0
+          fi
+          exit 0
+          SH
+          chmod +x "$FAKE_BIN/php"
+
+          INSTALL_LOG="$LOG" PATH="$FAKE_BIN:$PATH" LIBRENMS_PATH="$LIBRENMS_ROOT" ./quick-install.sh
+
+          grep -F 'composer '"$LIBRENMS_ROOT"' config repositories.weathermapng' "$LOG"
+          grep -F "composer $LIBRENMS_ROOT require librenms/weathermapng:* --with-dependencies --no-interaction" "$LOG"
+          grep -F "php $LIBRENMS_ROOT artisan package:discover" "$LOG"
+          grep -F "php $GITHUB_WORKSPACE database/setup.php" "$LOG"
+          grep -F "lnms plugin:enable WeathermapNG" "$LOG"
+          grep -F "php $LIBRENMS_ROOT artisan route:list" "$LOG"
+          grep -F "php $LIBRENMS_ROOT artisan config:clear" "$LOG"
+
+  weekly-librenms-smoke:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    name: Weekly LibreNMS Install Smoke
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Start LibreNMS stack
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.simple.yml up -d db redis librenms
+
+      - name: Wait for LibreNMS container
+        run: |
+          set -euo pipefail
+          timeout 300 bash -c '
+            until docker compose -f docker-compose.simple.yml exec -T librenms test -f /opt/librenms/artisan; do
+              docker compose -f docker-compose.simple.yml ps
+              sleep 10
+            done
+          '
+
+      - name: Run plugin quick install
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.simple.yml exec -T librenms bash -lc '
+            cd /opt/librenms/html/plugins/WeathermapNG
+            LIBRENMS_PATH=/opt/librenms ./quick-install.sh
+          '
+
+      - name: Verify package routes
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.simple.yml exec -T librenms bash -lc '
+            cd /opt/librenms
+            php artisan route:list | grep -iE "weathermap|wmng"
+            php artisan route:list | grep -i "weathermapng.ready"
+          '
+
+      - name: Verify unauthenticated health endpoints
+        run: |
+          set -euo pipefail
+          timeout 180 bash -c '
+            until curl -fsS http://127.0.0.1:8000/plugin/WeathermapNG/live >/dev/null; do
+              docker compose -f docker-compose.simple.yml ps
+              sleep 10
+            done
+          '
+          curl -fsS http://127.0.0.1:8000/plugin/WeathermapNG/live
+          curl -fsS http://127.0.0.1:8000/plugin/WeathermapNG/health
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.simple.yml logs --tail=300
+
+      - name: Stop LibreNMS stack
+        if: always()
+        run: docker compose -f docker-compose.simple.yml down -v
+
   documentation-check:
     runs-on: ubuntu-latest
     name: Documentation Validation
@@ -110,6 +293,23 @@ jobs:
             test -f "$doc" || (echo "MISSING: $doc" && exit 1)
             echo "  OK: $doc"
           done
+
+      - name: Check install guidance stays aligned
+        run: |
+          set -euo pipefail
+
+          for file in quick-install.sh README.md INSTALL.md; do
+            grep -F 'composer config repositories.weathermapng' "$file"
+            grep -F 'librenms/weathermapng' "$file"
+            grep -E 'route:list.*weathermap|route:list.*wmng' "$file"
+          done
+
+          for file in quick-install.sh README.md INSTALL.md; do
+            grep -F 'wmng_*' "$file"
+          done
+
+          grep -F 'validate.php' README.md
+          grep -F 'validate.php' INSTALL.md
 
   security-check:
     runs-on: ubuntu-latest

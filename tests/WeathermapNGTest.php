@@ -71,7 +71,7 @@ class WeathermapNGTest extends TestCase
     public function test_php_requirement_passes_on_current_version(): void
     {
         $reqs = $this->plugin->checkRequirements();
-        $this->assertTrue($reqs['php'], 'PHP 8.0+ should be satisfied');
+        $this->assertTrue($reqs['php'], 'PHP 8.2+ should be satisfied');
     }
 
     public function test_json_extension_is_available(): void

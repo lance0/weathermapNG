@@ -22,21 +22,21 @@ class WeathermapNGProvider extends ServiceProvider
         $pluginManager->publishHook($pluginName, MenuEntryHook::class, MenuEntry::class);
         $pluginManager->publishHook($pluginName, SettingsHook::class, Settings::class);
 
-        if (! $pluginManager->pluginEnabled($pluginName)) {
-            return; // if plugin is disabled, don't boot
-        }
-
-        // Load routes
-        $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
-
-        // Load views with namespace
-        $this->loadViewsFrom(__DIR__ . '/../resources/views', $pluginName);
-
         // Register config
         $this->mergeConfigFrom(
             __DIR__ . '/../config/config.php',
             'weathermapng'
         );
+
+        // Keep install and health routes available before the plugin is enabled.
+        $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
+
+        // Load views with namespace
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', $pluginName);
+
+        if (! $pluginManager->pluginEnabled($pluginName)) {
+            return; // if plugin is disabled, hooks and publishable assets are skipped
+        }
 
         // Publish assets if running in console
         if ($this->app->runningInConsole()) {

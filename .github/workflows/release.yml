@@ -27,9 +27,34 @@ jobs:
       - name: Validate composer.json
         run: composer validate --no-check-publish
 
+      - name: Validate release version metadata
+        run: |
+          php <<'PHP'
+          <?php
+          $version = trim(file_get_contents('VERSION'));
+          $tag = preg_replace('/^v/', '', getenv('GITHUB_REF_NAME') ?: '');
+          $composer = json_decode(file_get_contents('composer.json'), true);
+          $changelog = file_get_contents('CHANGELOG.md');
+
+          if ($tag !== $version) {
+              fwrite(STDERR, "Tag v{$tag} does not match VERSION {$version}\n");
+              exit(1);
+          }
+
+          if (($composer['version'] ?? null) !== $version) {
+              fwrite(STDERR, "composer.json version does not match VERSION\n");
+              exit(1);
+          }
+
+          if (! str_contains($changelog, "## [{$version}]")) {
+              fwrite(STDERR, "CHANGELOG.md is missing ## [{$version}]\n");
+              exit(1);
+          }
+          PHP
+
       - name: Get version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog for release
         id: changelog
@@ -39,19 +64,21 @@ jobs:
           if [ -z "$PREV_TAG" ]; then
             CHANGES=$(git log --pretty=format:"- %s" HEAD)
           else
-            CHANGES=$(git log --pretty=format:"- %s" ${PREV_TAG}..HEAD)
+            CHANGES=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
           fi
-          echo "CHANGES<<EOF" >> $GITHUB_OUTPUT
-          echo "$CHANGES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "CHANGES<<EOF"
+            echo "$CHANGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create release archive
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION="${{ steps.version.outputs.VERSION }}"
           mkdir -p dist
           # Create archive excluding dev files
-          git archive --format=zip --prefix=WeathermapNG/ -o dist/WeathermapNG-${VERSION}.zip HEAD
-          git archive --format=tar.gz --prefix=WeathermapNG/ -o dist/WeathermapNG-${VERSION}.tar.gz HEAD
+          git archive --format=zip --prefix=WeathermapNG/ -o "dist/WeathermapNG-${VERSION}.zip" HEAD
+          git archive --format=tar.gz --prefix=WeathermapNG/ -o "dist/WeathermapNG-${VERSION}.tar.gz" HEAD
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3

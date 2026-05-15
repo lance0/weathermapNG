@@ -2,8 +2,8 @@
 // config/settings.php
 return [
     'map_dir' => __DIR__ . '/maps/',
-    'output_dir' => __DIR__ . '/output/maps/',
-    'thumbnail_dir' => __DIR__ . '/output/thumbnails/',
+    'output_dir' => __DIR__ . '/../output/maps/',
+    'thumbnail_dir' => __DIR__ . '/../output/thumbnails/',
     'poll_interval' => 300, // 5 minutes
     'default_width' => 800,
     'default_height' => 600,

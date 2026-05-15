@@ -50,12 +50,14 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::put('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'update'])->name('weathermapng.templates.update');
     Route::delete('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'destroy'])->name('weathermapng.templates.destroy');
     Route::post('plugin/WeathermapNG/templates/{id}/create-map', [MapTemplateController::class, 'createFromTemplate'])->name('weathermapng.templates.create-map');
+
+    Route::get('plugin/WeathermapNG/health/detailed', [HealthController::class, 'detailed'])->name('weathermapng.health.detailed');
+    Route::get('plugin/WeathermapNG/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
+    Route::get('plugin/WeathermapNG/metrics', [HealthController::class, 'metrics'])->name('weathermapng.metrics');
 });
 
 Route::prefix('plugin/WeathermapNG')->group(function () {
     Route::get('/health', [HealthController::class, 'check'])->name('weathermapng.health');
-    Route::get('/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
     Route::get('/ready', [HealthController::class, 'ready'])->name('weathermapng.ready');
     Route::get('/live', [HealthController::class, 'live'])->name('weathermapng.alive');
-    Route::get('/metrics', [HealthController::class, 'metrics'])->name('weathermapng.metrics');
 });

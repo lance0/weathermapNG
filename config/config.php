@@ -7,6 +7,8 @@ return [
     'thresholds'    => [50,80,95],  // % utilization thresholds
     'scale'         => 'bits',      // 'bits' or 'bytes'
     'rrd_base'      => '/opt/librenms/rrd',
+    'output_dir'    => __DIR__ . '/../output/maps/',
+    'thumbnail_dir' => __DIR__ . '/../output/thumbnails/',
     'rrdcached'     => [
         'socket' => null,           // e.g. /var/run/rrdcached.sock
     ],

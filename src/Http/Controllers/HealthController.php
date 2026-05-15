@@ -260,10 +260,10 @@ class HealthController
     private function checkDatabase(): array
     {
         try {
-            $mapCount = Map::count();
+            DB::connection()->getPdo();
             return [
                 'status' => 'healthy',
-                'message' => "Database connected, {$mapCount} maps found"
+                'message' => 'Database connected'
             ];
         } catch (\Exception $exception) {
             $this->getLogger()->error('Health check database failure', ['error' => $exception->getMessage()]);
@@ -398,6 +398,11 @@ class HealthController
 
     private function getVersion(): string
     {
+        $versionFile = __DIR__ . '/../../../VERSION';
+        if (is_readable($versionFile)) {
+            return trim(file_get_contents($versionFile));
+        }
+
         $composerJson = __DIR__ . '/../../../composer.json';
         if (file_exists($composerJson)) {
             $composer = json_decode(file_get_contents($composerJson), true);

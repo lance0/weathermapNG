@@ -42,10 +42,10 @@ echo PHP_EOL;
 
 // 1. Check PHP version
 echo "Checking PHP version..." . PHP_EOL;
-if (version_compare(PHP_VERSION, '8.0.0', '>=')) {
+if (version_compare(PHP_VERSION, '8.2.0', '>=')) {
     pass("PHP version " . PHP_VERSION . " meets requirements");
 } else {
-    fail("PHP version " . PHP_VERSION . " is too old (need 8.0+)");
+    fail("PHP version " . PHP_VERSION . " is too old (need 8.2+)");
 }
 
 // 2. Check required PHP extensions
@@ -85,12 +85,12 @@ echo PHP_EOL . "Checking plugin files..." . PHP_EOL;
 $plugin_dir = dirname(__FILE__);
 
 $required_files = [
-    'plugin.json' => 'Plugin manifest',
-    'routes.php' => 'Route definitions',
-    'config/weathermapng.php' => 'Configuration file',
-    'app/Plugins/WeathermapNG/Menu.php' => 'Menu hook',
-    'app/Plugins/WeathermapNG/Page.php' => 'Page hook',
-    'app/Plugins/WeathermapNG/Settings.php' => 'Settings hook',
+    'composer.json' => 'Composer package manifest',
+    'routes/web.php' => 'Route definitions',
+    'config/config.php' => 'Configuration file',
+    'src/WeathermapNGProvider.php' => 'Service provider',
+    'src/Hooks/MenuEntry.php' => 'Menu hook',
+    'src/Hooks/Settings.php' => 'Settings hook',
 ];
 
 foreach ($required_files as $file => $description) {
@@ -104,11 +104,8 @@ foreach ($required_files as $file => $description) {
 // 5. Check hook classes
 echo PHP_EOL . "Checking hook classes..." . PHP_EOL;
 $hook_classes = [
-    'App\Plugins\WeathermapNG\Menu',
-    'App\Plugins\WeathermapNG\Page',
-    'App\Plugins\WeathermapNG\Settings',
-    'App\Plugins\WeathermapNG\DeviceOverview',
-    'App\Plugins\WeathermapNG\PortTab',
+    'LibreNMS\Plugins\WeathermapNG\Hooks\MenuEntry',
+    'LibreNMS\Plugins\WeathermapNG\Hooks\Settings',
 ];
 
 foreach ($hook_classes as $class) {
@@ -166,9 +163,10 @@ foreach ($writable_dirs as $dir) {
 // 8. Check views
 echo PHP_EOL . "Checking view files..." . PHP_EOL;
 $view_files = [
-    'Resources/views/weathermapng/menu.blade.php',
-    'Resources/views/weathermapng/page.blade.php',
-    'Resources/views/weathermapng/settings.blade.php',
+    'resources/views/menu.blade.php',
+    'resources/views/page.blade.php',
+    'resources/views/settings.blade.php',
+    'resources/views/editor.blade.php',
 ];
 
 foreach ($view_files as $view) {
@@ -181,7 +179,7 @@ foreach ($view_files as $view) {
 
 // 9. Check routes
 echo PHP_EOL . "Checking routes..." . PHP_EOL;
-$routes_file = $plugin_dir . '/routes.php';
+$routes_file = $plugin_dir . '/routes/web.php';
 if (file_exists($routes_file)) {
     $routes_content = file_get_contents($routes_file);
     

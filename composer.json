@@ -2,7 +2,7 @@
   "name": "librenms/weathermapng",
   "description": "Next-generation Weathermap plugin for LibreNMS",
   "type": "librenms-plugin",
-  "version": "1.6.2",
+  "version": "1.6.4",
   "license": "MIT",
   "authors": [
     {
@@ -14,6 +14,7 @@
     "php": ">=8.2",
     "ext-gd": "*",
     "ext-json": "*",
+    "ext-mbstring": "*",
     "librenms/plugin-interfaces": "^1.0",
     "symfony/process": "^7.0"
   },

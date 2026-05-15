@@ -52,9 +52,9 @@ class InstallController extends Controller
         return [
             'php' => [
                 'name' => 'PHP Version',
-                'required' => '8.0+',
+                'required' => '8.2+',
                 'current' => PHP_VERSION,
-                'status' => version_compare(PHP_VERSION, '8.0.0', '>=')
+                'status' => version_compare(PHP_VERSION, '8.2.0', '>=')
             ],
             'gd' => [
                 'name' => 'GD Extension',

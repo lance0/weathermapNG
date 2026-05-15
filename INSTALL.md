@@ -33,15 +33,24 @@ Then run setup inside the container:
 # Install dependencies
 docker exec -u librenms <container_name> composer install -d /opt/librenms/html/plugins/WeathermapNG --no-dev
 
+# Register the plugin package with LibreNMS Composer
+docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && composer config repositories.weathermapng "{\"type\":\"path\",\"url\":\"html/plugins/WeathermapNG\",\"options\":{\"symlink\":true}}"'
+docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && composer require "librenms/weathermapng:*" --with-dependencies'
+docker exec -u librenms <container_name> php /opt/librenms/artisan package:discover
+
 # Setup database
 docker exec -u librenms <container_name> php /opt/librenms/html/plugins/WeathermapNG/database/setup.php
 
 # Enable plugin
 docker exec -u librenms <container_name> /opt/librenms/lnms plugin:enable WeathermapNG
 
-# Clear caches
+# Clear caches and verify routes
+docker exec -u librenms <container_name> php /opt/librenms/artisan optimize:clear
+docker exec -u librenms <container_name> php /opt/librenms/artisan route:clear
 docker exec -u librenms <container_name> php /opt/librenms/artisan cache:clear
 docker exec -u librenms <container_name> php /opt/librenms/artisan view:clear
+docker exec -u librenms <container_name> php /opt/librenms/artisan config:clear
+docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && php artisan route:list | grep -iE "weathermap|wmng"'
 ```
 
 **Important**: Always run commands as the `librenms` user (`-u librenms`), not root.
@@ -63,26 +72,46 @@ cd WeathermapNG
 composer install --no-dev --optimize-autoloader
 ```
 
-### 2. Database Setup
+### 2. Register Composer Package
+LibreNMS must know about the package before Laravel can discover the service provider, routes, and views:
+
 ```bash
+cd /opt/librenms
+composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer require 'librenms/weathermapng:*' --with-dependencies
+php artisan package:discover
+```
+
+### 3. Database Setup
+```bash
+cd /opt/librenms/html/plugins/WeathermapNG
 php database/setup.php
 ```
 
-### 3. LibreNMS Configuration
+### 4. LibreNMS Configuration
 ```bash
 cd /opt/librenms
+php artisan optimize:clear
+php artisan route:clear
 php artisan cache:clear
 php artisan view:clear
 php artisan config:clear
 chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 ```
 
-### 4. Enable Plugin
+### 5. Enable Plugin
 ```bash
 ./lnms plugin:enable WeathermapNG
 ```
 
-### 5. Setup Background Polling (Optional)
+### 6. Verify Routes
+```bash
+php artisan route:list | grep -iE 'weathermap|wmng'
+```
+
+If this returns nothing, repeat the Composer registration step from the LibreNMS root and clear caches again.
+
+### 7. Setup Background Polling (Optional)
 ```bash
 # Add to cron for automatic updates
 echo "*/5 * * * * librenms php /opt/librenms/html/plugins/WeathermapNG/bin/map-poller.php" | sudo tee -a /etc/cron.d/librenms
@@ -99,6 +128,31 @@ cd /opt/librenms
 php artisan view:clear
 php artisan cache:clear
 ```
+
+### Plugin page loads but routes are missing
+If `/plugin/WeathermapNG` responds but editor, API, health, or ready routes are missing, Laravel did not discover the Composer package.
+
+**Check:**
+```bash
+cd /opt/librenms
+php artisan route:list | grep -iE 'weathermap|wmng'
+```
+
+**Solution:**
+```bash
+cd /opt/librenms
+composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer require 'librenms/weathermapng:*' --with-dependencies
+php artisan package:discover
+php artisan optimize:clear
+php artisan route:clear
+php artisan view:clear
+php artisan config:clear
+php artisan cache:clear
+```
+
+### LibreNMS validate.php reports extra wmng_* tables
+WeathermapNG creates `wmng_*` tables for maps, nodes, links, templates, and versions. If LibreNMS `validate.php` reports these as extra tables and offers to drop them, answer `n`.
 
 ### "Interface PageHook not found" error
 LibreNMS v2 doesn't support PageHook. This plugin uses MenuEntryHook and SettingsHook only.
@@ -131,7 +185,7 @@ This plugin follows the LibreNMS v2 architecture:
 - Hooks implement interfaces (MenuEntryHook, SettingsHook)
 - Views use namespace `WeathermapNG::`
 - Routes under `/plugin/WeathermapNG`
-- Uses composer autoloading (no plugin.json)
+- Uses Composer package discovery (no plugin.json)
 
 ## Updating
 
@@ -140,6 +194,10 @@ cd /opt/librenms/html/plugins/WeathermapNG
 git pull
 composer install --no-dev
 cd /opt/librenms
+composer require 'librenms/weathermapng:*' --with-dependencies
+php artisan package:discover
+php artisan optimize:clear
+php artisan config:clear
 php artisan view:clear
 ```
 
@@ -147,7 +205,8 @@ php artisan view:clear
 
 1. Check the menu for "Network Maps" entry
 2. Visit `/plugin/WeathermapNG`
-3. Try creating a test map
+3. Run `php artisan route:list | grep -iE 'weathermap|wmng'`
+4. Try creating a test map
 
 ## Background Poller (Optional)
 

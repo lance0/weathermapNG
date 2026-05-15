@@ -34,6 +34,30 @@ jobs:
       - name: Validate composer.json
         run: composer validate --no-check-publish
 
+      - name: Validate version metadata
+        run: |
+          php <<'PHP'
+          <?php
+          $version = trim(file_get_contents('VERSION'));
+          $composer = json_decode(file_get_contents('composer.json'), true);
+          $changelog = file_get_contents('CHANGELOG.md');
+
+          if (! preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/', $version)) {
+              fwrite(STDERR, "VERSION is not SemVer: {$version}\n");
+              exit(1);
+          }
+
+          if (($composer['version'] ?? null) !== $version) {
+              fwrite(STDERR, "composer.json version does not match VERSION\n");
+              exit(1);
+          }
+
+          if (! str_contains($changelog, "## [{$version}]")) {
+              fwrite(STDERR, "CHANGELOG.md is missing ## [{$version}]\n");
+              exit(1);
+          }
+          PHP
+
   test:
     runs-on: ubuntu-latest
     name: PHPUnit (${{ matrix.php-version }})
