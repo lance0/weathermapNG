@@ -2,7 +2,7 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.6.4 (Stable)
+## Current Status: v1.6.5 (Stable)
 
 The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place:
 
@@ -18,6 +18,7 @@ The plugin is usable today for production-oriented network map visualization, wi
 - Device-type node icons: router, switch, server, firewall
 - Composer path package install flow for LibreNMS
 - Weekly/manual install CI coverage against LibreNMS
+- Idempotent LibreNMS plugin registration cleanup during reinstall
 
 The next phase should focus on polish, reliability, and maintainability before large new features. The project already has enough capability to be useful; the main opportunity is making the existing workflows feel dependable and finished.
 
@@ -76,6 +77,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Align hook and compatibility views with LibreNMS Bootstrap button conventions.
   - Add safe external-link attributes and accessible labels to remaining map entry points.
   - Remove stale legacy rendering placeholder copy in favor of live-map entry points.
+  - Replace remaining legacy map delete browser prompt with Bootstrap confirmation UI.
 
 - [x] **Settings admin polish**
   - Replace browser alert and confirm flows with Bootstrap feedback and confirmation UI.
@@ -233,6 +235,13 @@ These ideas are intentionally parked until the core product feels polished and m
 ---
 
 ## Completed Features
+
+### v1.6.5
+
+- [x] Quick install normalizes LibreNMS plugin registration after enablement.
+- [x] Duplicate inactive `WeathermapNG` rows are cleaned from the LibreNMS `plugins` table.
+- [x] Install docs explain expected `wmng_*` and JSON-column `utf8mb4_bin` warnings.
+- [x] Legacy map list delete action uses Bootstrap confirmation instead of a browser prompt.
 
 ### v1.6.4
 

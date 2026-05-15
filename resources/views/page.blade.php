@@ -127,7 +127,27 @@
     </div>
 </div>
 
+<div class="modal fade" id="legacyDeleteMapModal" tabindex="-1" role="dialog" aria-labelledby="legacyDeleteMapTitle" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="legacyDeleteMapTitle">Delete Map</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="legacyDeleteMapMessage" class="mb-0">Delete this map? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmLegacyDeleteMapBtn">Delete Map</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+let pendingLegacyDeleteMapId = null;
+
 function createNewMap() {
     $('#createMapModal').modal('show');
 }
@@ -156,27 +176,42 @@ function showPageAlert(message, type = 'danger') {
 }
 
 function deleteMap(mapId, mapName) {
-    if (confirm(`Are you sure you want to delete the map "${mapName}"? This action cannot be undone.`)) {
-        fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}`, {
-            method: 'DELETE',
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                showPageAlert('Error deleting map: ' + (data.message || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            showPageAlert('Error deleting map: ' + error.message);
-        });
+    pendingLegacyDeleteMapId = mapId;
+
+    const message = document.getElementById('legacyDeleteMapMessage');
+    if (message) {
+        message.textContent = `Delete the map "${mapName}"? This action cannot be undone.`;
     }
+
+    $('#legacyDeleteMapModal').modal('show');
 }
+
+document.getElementById('confirmLegacyDeleteMapBtn')?.addEventListener('click', function() {
+    if (!pendingLegacyDeleteMapId) return;
+
+    const mapId = pendingLegacyDeleteMapId;
+    pendingLegacyDeleteMapId = null;
+    $('#legacyDeleteMapModal').modal('hide');
+
+    fetch(`{{ url('plugin/WeathermapNG/map') }}/${mapId}`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            showPageAlert('Error deleting map: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        showPageAlert('Error deleting map: ' + error.message);
+    });
+});
 
 // Handle create map form submission
 $('#createMapForm').on('submit', function(e) {

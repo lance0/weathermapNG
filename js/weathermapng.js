@@ -162,18 +162,65 @@ function drawGrid() {
 }
 
 function clearCanvas() {
-    if (confirm('Are you sure you want to clear all nodes from the canvas?')) {
+    const clear = function() {
         nodes = [];
         render();
+    };
+
+    showCanvasDecision(clear);
+}
+
+function showCanvasDecision(onAction) {
+    if (!window.jQuery) {
+        if (window.WMNGToast) {
+            WMNGToast.warning('Use the active editor toolbar to clear the canvas.', { duration: 4000 });
+        }
+        return;
     }
+
+    let modal = document.getElementById('canvasDecisionModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'canvasDecisionModal';
+        modal.tabIndex = -1;
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-labelledby', 'canvasDecisionTitle');
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="canvasDecisionTitle">Clear Canvas</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">Clear all nodes from this canvas?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" data-canvas-action>Clear Canvas</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    modal.querySelector('[data-canvas-action]').onclick = function() {
+        window.jQuery(modal).modal('hide');
+        onAction();
+    };
+    window.jQuery(modal).modal('show');
 }
 
 // Make functions globally available
 window.initCanvas = initCanvas;
 window.clearCanvas = clearCanvas;
 window.addNode = function() {
-    // This will be overridden by the editor template
-    console.log('Add node function should be overridden');
+    if (window.WMNGToast) {
+        WMNGToast.info('Use the active editor toolbar to add nodes.', { duration: 3000 });
+    }
 };
 
 // Auto-initialize if canvas exists

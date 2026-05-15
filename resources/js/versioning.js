@@ -9,22 +9,25 @@
     function init(mapId) {
         currentMapId = mapId;
         setupEventListeners();
-    checkAutoSave();
-    loadVersionHistory();
-    startAutoSaveTimer();
+        checkAutoSave();
+        loadVersionHistory();
+        startAutoSaveTimer();
     }
 
     function setupEventListeners() {
         document.addEventListener('DOMContentLoaded', () => {
             setupModalListeners();
-        setupVersionButtons();
-        setupAutoSaveToggle();
-        setupKeyboardShortcuts();
+            setupVersionButtons();
+            setupAutoSaveToggle();
+            setupKeyboardShortcuts();
         });
     }
 
     function setupModalListeners() {
-        document.getElementById('versionModal').addEventListener('hidden.bs.modal', () => {
+        const modal = document.getElementById('versionModal');
+        if (!modal) return;
+
+        modal.addEventListener('hidden.bs.modal', () => {
             loadVersionHistory();
         });
     }
@@ -71,8 +74,12 @@
 
     function checkAutoSave() {
         const checkbox = document.getElementById('auto-save');
+        if (!checkbox) return;
+
         const enabled = checkbox.checked;
         const saveBtn = document.getElementById('save-version-btn');
+
+        if (!saveBtn) return;
 
         if (enabled) {
             saveBtn.innerHTML = '<i class="fas fa-save"></i> Saving...';
@@ -84,9 +91,13 @@
     }
 
     function saveVersion() {
-        const name = document.getElementById('version-name').value.trim();
-        const desc = document.getElementById('version-desc').value.trim();
-        const autoSave = document.getElementById('auto-save').checked;
+        const nameInput = document.getElementById('version-name');
+        const descInput = document.getElementById('version-desc');
+        const autoSaveInput = document.getElementById('auto-save');
+
+        const name = nameInput ? nameInput.value.trim() : '';
+        const desc = descInput ? descInput.value.trim() : '';
+        const autoSave = autoSaveInput ? autoSaveInput.checked : false;
 
         if (!name) {
             WMNGToast.error('Please enter a version name');
@@ -103,7 +114,6 @@
         fetch(`/plugin/WeathermapNG/maps/${currentMapId}/versions`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
             },
             body: formData
@@ -113,7 +123,10 @@
             WMNGLoading.hide();
             if (data.success) {
                 WMNGToast.success('Version saved successfully!', { duration: 2000 });
-                document.getElementById('versionModal').classList.add('hide');
+                const modal = document.getElementById('versionModal');
+                if (modal && window.jQuery) {
+                    window.jQuery(modal).modal('hide');
+                }
                 loadVersionHistory();
             } else {
                 WMNGToast.error('Failed to save version: ' + (data.message || 'Unknown error'), { duration: 4000 });
@@ -126,6 +139,9 @@
     }
 
     function loadVersionHistory() {
+        const container = document.getElementById('version-list');
+        if (!container) return;
+
         WMNGLoading.show('Loading versions...');
 
         fetch(`/plugin/WeathermapNG/maps/${currentMapId}/versions`)
@@ -136,13 +152,14 @@
             })
             .catch(error => {
                 WMNGLoading.hide();
-                document.getElementById('version-list').innerHTML =
-                    '<div class="text-center text-danger">Error loading versions: ' + error.message + '</div>';
+                container.textContent = 'Error loading versions: ' + error.message;
+                container.className = 'text-center text-danger';
             });
     }
 
     function renderVersionList(versions) {
         const container = document.getElementById('version-list');
+        if (!container) return;
         
         if (!versions || !versions.length) {
             container.innerHTML = `
@@ -173,16 +190,16 @@
                         <span class="badge badge-info">by ${version.created_by || 'Unknown'}</span>
                     </div>
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary" onclick="restoreVersion(${version.id})">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="restoreVersion(${version.id})">
                             <i class="fas fa-undo"></i> Restore
                         </button>
-                        <button class="btn btn-sm btn-outline-info" onclick="compareWithPrevious(${version.id})">
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="compareWithPrevious(${version.id})" disabled aria-disabled="true">
                             <i class="fas fa-code-compare"></i> Compare
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVersion(${version.id})">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteVersion(${version.id})">
                             <i class="fas fa-trash"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="viewVersionDetails(${version.id})">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="viewVersionDetails(${version.id})" disabled aria-disabled="true">
                             <i class="fas fa-info-circle"></i> Details
                         </button>
                     </div>
@@ -193,10 +210,16 @@
     }
 
     function restoreVersion(versionId) {
-        if (!confirm('Restore this version? Current changes will be lost.')) {
-            return;
-        }
+        showVersionDecision(
+            'Restore Version',
+            'Restore this version? Current changes will be lost.',
+            'Restore Version',
+            'btn-primary',
+            () => restoreVersionRequest(versionId)
+        );
+    }
 
+    function restoreVersionRequest(versionId) {
         WMNGLoading.show('Restoring version...');
 
         fetch(`/plugin/WeathermapNG/maps/${currentMapId}/versions/${versionId}/restore`)
@@ -217,10 +240,16 @@
     }
 
     function deleteVersion(versionId) {
-        if (!confirm('Delete this version permanently? This cannot be undone.')) {
-            return;
-        }
+        showVersionDecision(
+            'Delete Version',
+            'Delete this version permanently? This cannot be undone.',
+            'Delete Version',
+            'btn-danger',
+            () => deleteVersionRequest(versionId)
+        );
+    }
 
+    function deleteVersionRequest(versionId) {
         WMNGLoading.show('Deleting version...');
 
         fetch(`/plugin/WeathermapNG/maps/${currentMapId}/versions/${versionId}`, {
@@ -247,11 +276,66 @@
     }
 
     function compareWithPrevious(versionId) {
-        alert('Compare feature coming soon! Select two versions from history to compare side-by-side.');
+        WMNGToast.info('Version comparison is not available yet.', { duration: 3000 });
     }
 
     function viewVersionDetails(versionId) {
-        alert('Version details view coming soon! View full snapshot of version.');
+        WMNGToast.info('Version details are not available yet.', { duration: 3000 });
+    }
+
+    function showVersionDecision(title, message, actionText, actionClass, onAction) {
+        const modal = getVersionDecisionModal();
+        modal.querySelector('.modal-title').textContent = title;
+        modal.querySelector('.modal-body p').textContent = message;
+
+        const actionButton = modal.querySelector('[data-version-action]');
+        actionButton.textContent = actionText;
+        actionButton.className = `btn ${actionClass}`;
+        actionButton.onclick = () => {
+            if (window.jQuery) {
+                window.jQuery(modal).modal('hide');
+            }
+            onAction();
+        };
+
+        if (window.jQuery) {
+            window.jQuery(modal).modal('show');
+        } else {
+            WMNGToast.warning(message, { duration: 4000 });
+        }
+    }
+
+    function getVersionDecisionModal() {
+        let modal = document.getElementById('versionDecisionModal');
+        if (modal) return modal;
+
+        modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'versionDecisionModal';
+        modal.tabIndex = -1;
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-labelledby', 'versionDecisionTitle');
+        modal.setAttribute('aria-hidden', 'true');
+        modal.innerHTML = `
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="versionDecisionTitle">Confirm Action</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" data-version-action>Continue</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        return modal;
     }
 
     let autoSaveTimer = null;
@@ -260,7 +344,7 @@
         if (autoSaveTimer) clearInterval(autoSaveTimer);
         autoSaveTimer = setInterval(() => {
             const checkbox = document.getElementById('auto-save');
-            if (checkbox.checked) {
+            if (checkbox && checkbox.checked) {
                 saveVersion();
             }
         }, 5 * 60 * 1000); // 5 minutes
@@ -289,9 +373,16 @@
         restoreVersion,
         deleteVersion,
         renderVersionList,
+        compareWithPrevious,
+        viewVersionDetails,
         getTotalVersions,
         getCurrentMapId,
     };
+
+    window.restoreVersion = restoreVersion;
+    window.deleteVersion = deleteVersion;
+    window.compareWithPrevious = compareWithPrevious;
+    window.viewVersionDetails = viewVersionDetails;
 
     // Make available globally for other scripts
     if (typeof window.WMNGToast === 'undefined') {

@@ -111,8 +111,13 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString('type="button" class="btn btn-success btn-sm"', $legacyPage);
         $this->assertStringContainsString('type="submit" class="btn btn-success"', $legacyPage);
         $this->assertStringContainsString('class="btn btn-danger" title="Delete" aria-label="Delete map', $legacyPage);
+        $this->assertStringContainsString('id="legacyDeleteMapModal"', $legacyPage);
+        $this->assertStringContainsString('id="confirmLegacyDeleteMapBtn"', $legacyPage);
+        $this->assertStringContainsString("$('#legacyDeleteMapModal').modal('show');", $legacyPage);
         $this->assertStringContainsString('showPageAlert(', $legacyPage);
         $this->assertStringNotContainsString('alert(\'Error', $legacyPage);
+        $this->assertStringNotContainsString('confirm(', $legacyPage);
+        $this->assertStringNotContainsString('alert(', $legacyPage);
 
         $this->assertStringContainsString('Open Live Map', $mapPage);
         $this->assertStringContainsString('class="btn btn-default"', $mapPage);
@@ -177,6 +182,42 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString("WMNGToast.error('Failed to save node:", $editor);
         $this->assertStringNotContainsString('confirm(', $editor);
         $this->assertStringNotContainsString('alert(', $editor);
+    }
+
+    public function test_standalone_versioning_and_canvas_scripts_avoid_browser_prompts(): void
+    {
+        foreach ([
+            'resources/js/versioning.js',
+            'resources/js/weathermapng.js',
+            'js/weathermapng.js',
+        ] as $file) {
+            $content = file_get_contents(__DIR__ . '/../' . $file);
+
+            $this->assertStringNotContainsString('confirm(', $content, "$file should avoid native confirmation prompts");
+            $this->assertStringNotContainsString('alert(', $content, "$file should avoid native alert prompts");
+            $this->assertStringNotContainsString('console.log', $content, "$file should avoid debug logging");
+        }
+
+        $versioning = file_get_contents(__DIR__ . '/../resources/js/versioning.js');
+        $this->assertStringContainsString('id = \'versionDecisionModal\'', $versioning);
+        $this->assertStringContainsString("WMNGToast.info('Version comparison is not available yet.'", $versioning);
+        $this->assertStringContainsString("WMNGToast.info('Version details are not available yet.'", $versioning);
+        $this->assertStringContainsString('body: formData', $versioning);
+        $this->assertMatchesRegularExpression(
+            "/method: 'POST',\n\\s+headers: \\{\n\\s+'X-CSRF-TOKEN'/",
+            $versioning
+        );
+    }
+
+    public function test_roadmap_tracks_current_stable_release_and_recent_polish(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../ROADMAP.md');
+
+        $this->assertStringContainsString('## Current Status: v1.6.5 (Stable)', $content);
+        $this->assertStringContainsString('Idempotent LibreNMS plugin registration cleanup during reinstall', $content);
+        $this->assertStringContainsString('### v1.6.5', $content);
+        $this->assertStringContainsString('Duplicate inactive `WeathermapNG` rows are cleaned', $content);
+        $this->assertStringContainsString('Legacy map list delete action uses Bootstrap confirmation', $content);
     }
 
     /**
