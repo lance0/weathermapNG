@@ -252,7 +252,7 @@ jobs:
       - name: Verify package routes
         run: |
           set -euo pipefail
-          docker compose -f docker-compose.simple.yml exec -T librenms bash -lc '
+          docker compose -f docker-compose.simple.yml exec -T -u librenms librenms bash -lc '
             cd /opt/librenms
             php artisan route:list | grep -iE "weathermap|wmng"
             php artisan route:list | grep -i "weathermapng.ready"
