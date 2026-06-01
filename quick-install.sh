@@ -34,6 +34,20 @@ if [ "$(id -u)" -eq 0 ] && [ "$IN_DOCKER" = false ] && [ "${WEATHERMAPNG_ALLOW_R
     exit 1
 fi
 
+# Run a shell command string, dropping privileges to the librenms user when we
+# are root inside the LibreNMS container. LibreNMS refuses to run artisan as
+# root (CommandStartingListener), so any composer require / artisan / lnms call
+# that targets the LibreNMS install must run as a non-root user. Outside the
+# container this is just `bash -c`.
+wmng_run_as_librenms() {
+    local cmd="$1"
+    if [ "$IN_DOCKER" = true ] && [ "$(id -u)" -eq 0 ] && id librenms >/dev/null 2>&1; then
+        su librenms -s /bin/bash -c "$cmd"
+    else
+        bash -c "$cmd"
+    fi
+}
+
 # Find LibreNMS installation
 if [ ! -d "$LIBRENMS_PATH" ]; then
     # Try common locations
@@ -87,7 +101,7 @@ if [ -f "$LIBRENMS_PATH/composer.json" ]; then
         exit 1
     fi
 
-    if ! FORCE=1 COMPOSER_ALLOW_SUPERUSER=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction 2>&1; then
+    if ! wmng_run_as_librenms "FORCE=1 COMPOSER_ALLOW_SUPERUSER=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction 2>&1"; then
         echo "Error: Could not add WeathermapNG to the LibreNMS Composer install"
         echo "  Try running from $LIBRENMS_PATH:"
         echo "  composer config repositories.weathermapng '{\"type\":\"path\",\"url\":\"$PLUGIN_DIR\",\"options\":{\"symlink\":true}}'"
@@ -96,7 +110,7 @@ if [ -f "$LIBRENMS_PATH/composer.json" ]; then
     fi
 
     if [ -f "$LIBRENMS_PATH/artisan" ]; then
-        php artisan package:discover 2>/dev/null || echo "  Warning: package:discover failed"
+        wmng_run_as_librenms "php artisan package:discover 2>/dev/null" || echo "  Warning: package:discover failed"
     fi
 else
     echo "  Skipped: composer.json not found at $LIBRENMS_PATH"
@@ -115,7 +129,7 @@ fi
 echo "[5/7] Enabling plugin..."
 if [ -f "$LIBRENMS_PATH/lnms" ]; then
     cd "$LIBRENMS_PATH"
-    ./lnms plugin:enable WeathermapNG 2>/dev/null || echo "  Note: Plugin may already be enabled"
+    wmng_run_as_librenms "./lnms plugin:enable WeathermapNG 2>/dev/null" || echo "  Note: Plugin may already be enabled"
 
     echo "  Normalizing WeathermapNG plugin registration..."
     php <<'PHP'
@@ -200,13 +214,13 @@ fi
 echo "[6/7] Clearing caches and verifying routes..."
 if [ -f "$LIBRENMS_PATH/artisan" ]; then
     cd "$LIBRENMS_PATH"
-    php artisan optimize:clear 2>/dev/null || echo "  Warning: optimize:clear failed (may need sudo)"
-    php artisan route:clear 2>/dev/null || echo "  Warning: route:clear failed"
-    php artisan view:clear 2>/dev/null || echo "  Warning: view:clear failed"
-    php artisan config:clear 2>/dev/null || echo "  Warning: config:clear failed"
-    php artisan cache:clear 2>/dev/null || echo "  Warning: cache:clear failed"
+    wmng_run_as_librenms "php artisan optimize:clear 2>/dev/null" || echo "  Warning: optimize:clear failed (may need sudo)"
+    wmng_run_as_librenms "php artisan route:clear 2>/dev/null" || echo "  Warning: route:clear failed"
+    wmng_run_as_librenms "php artisan view:clear 2>/dev/null" || echo "  Warning: view:clear failed"
+    wmng_run_as_librenms "php artisan config:clear 2>/dev/null" || echo "  Warning: config:clear failed"
+    wmng_run_as_librenms "php artisan cache:clear 2>/dev/null" || echo "  Warning: cache:clear failed"
 
-    if php artisan route:list 2>/dev/null | grep -qiE "weathermap|wmng"; then
+    if wmng_run_as_librenms "php artisan route:list 2>/dev/null" | grep -qiE "weathermap|wmng"; then
         echo "  WeathermapNG routes detected"
     else
         echo "  Warning: WeathermapNG routes were not detected"

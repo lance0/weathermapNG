@@ -5,6 +5,11 @@ All notable changes to WeathermapNG will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Quick install inside LibreNMS container**: `quick-install.sh` now drops privileges to the `librenms` user before invoking `composer require`, `php artisan`, and `./lnms` against the LibreNMS install. LibreNMS's `CommandStartingListener` rejects `artisan` as root, which was breaking the weekly LibreNMS Docker smoke test (and any host that ran the installer as root inside the container).
+
 ## [1.6.5] - 2026-05-15
 
 ### Changed
