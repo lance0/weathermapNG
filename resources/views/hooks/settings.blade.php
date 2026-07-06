@@ -74,13 +74,14 @@ $settings = array_merge([
                 <div class="col-sm-9">
                     <div class="checkbox">
                         <label>
+                            <input type="hidden" name="enable_api_fallback" value="0">
                             <input type="checkbox" name="enable_api_fallback" value="1" 
                                    @if($settings['enable_api_fallback']) checked @endif>
                             Enable API fallback when RRD files are not available
                         </label>
                     </div>
                     <div class="checkbox">
-                        <label>
+                            <input type="hidden" name="allow_embed" value="0">
                             <input type="checkbox" name="allow_embed" value="1" 
                                    @if($settings['allow_embed']) checked @endif>
                             Allow embedding maps in external sites
@@ -88,6 +89,7 @@ $settings = array_merge([
                     </div>
                     <div class="checkbox">
                         <label>
+                            <input type="hidden" name="debug" value="0">
                             <input type="checkbox" name="debug" value="1" 
                                    @if($settings['debug']) checked @endif>
                             Enable debug logging

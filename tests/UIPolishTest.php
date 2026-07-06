@@ -176,6 +176,11 @@ class UIPolishTest extends TestCase
 
         // CSRF token present
         $this->assertStringContainsString('@csrf', $content);
+
+        // Checkbox hidden fallbacks (unchecked boxes submit 0)
+        $this->assertStringContainsString('type="hidden" name="enable_api_fallback" value="0"', $content);
+        $this->assertStringContainsString('type="hidden" name="allow_embed" value="0"', $content);
+        $this->assertStringContainsString('type="hidden" name="debug" value="0"', $content);
     }
 
     public function test_active_index_and_editor_use_bootstrap_confirmation_modals(): void
