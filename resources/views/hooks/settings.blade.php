@@ -81,6 +81,7 @@ $settings = array_merge([
                         </label>
                     </div>
                     <div class="checkbox">
+                        <label>
                             <input type="hidden" name="allow_embed" value="0">
                             <input type="checkbox" name="allow_embed" value="1" 
                                    @if($settings['allow_embed']) checked @endif>
