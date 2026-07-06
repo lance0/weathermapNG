@@ -7,8 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-06
+
+### Security
+- **Admin-only authorization**: All map mutation endpoints (create, update, delete, save, import, auto-discover, node/link CRUD, template CRUD, version save/restore/delete, install) now require admin privileges. Read endpoints (view, embed, export, live, SSE, templates, versions) remain open to all authenticated users. Uses LibreNMS's existing `hasGlobalAdmin()` / `isAdmin()` / `level >= 10` checks. Dead `MapPolicy` and `NodePolicy` classes removed.
+
 ### Fixed
+- **Cross-map link deletion bug**: `NodeService::deleteNode` used an unscoped `orWhere` that could delete links on other maps when removing a node. Now scoped inside a closure group.
+- **LinkService bulk/update validation bypass**: `storeLinks` and `updateLink` now validate node map membership and port/device pairing, matching the protections already in `createLink`. Prevents cross-map links and port/device mismatches via bulk save and update paths.
+- **Import non-transactional path**: `RenderController::import` now routes through `MapService::importMap` (DB-transactional) instead of reimplementing import without a transaction. Also extends `MapService` to accept `src`/`dst` link keys and preserve full `options` on import.
+- **MapLinkController update error response**: Widened catch to include `InvalidArgumentException` so validation failures return 400 instead of 500.
+- **MapCacheService invalid eager loads**: `getMapForEditor` referenced non-existent relations (`destNode`, `portA`, `portB`, `device`) that would throw on call. Fixed to use actual relation names.
+- **Demo traffic jitter**: Demo-mode link and node traffic now uses deterministic per-ID sine waves instead of `rand()`, eliminating per-tick jitter on SSE/live endpoints.
 - **Quick install inside LibreNMS container**: `quick-install.sh` now drops privileges to the `librenms` user before invoking `composer require`, `php artisan`, and `./lnms` against the LibreNMS install. LibreNMS's `CommandStartingListener` rejects `artisan` as root, which was breaking the weekly LibreNMS Docker smoke test (and any host that ran the installer as root inside the container).
+
+### Changed
+- **N+1 query elimination**: Eager-loads `nodes`/`links` at controller entry points; adds batch-prefetch caches for device lookups (`Node::preloadDevices`), port-name lookups (`Link::preloadPortNames`), device metrics (`DeviceMetricsService::getMetricsForDevices`), and RRD port/device info (`RrdDataService` request-local caches via `PortUtilService::preloadForPorts`). A 50-node/50-link map goes from ~400 queries to ~10 on the live/embed/sse path.
+- **Alert data consolidation**: `NodeDataService::buildAlertData` now returns real alert data (was an empty placeholder). `LinkDataService::buildLinkAlerts` batched to a single `portAlerts` query. Dead `MapDataBuilder` and `SseStreamService` classes removed.
+- **sumPortTraffic no longer re-fetches map**: Threaded the eager-loaded links collection through `buildNodeData` instead of re-accessing `$node->map->links` per node.
+- **toJsonModel preserves accessor fields**: Restored `device_name`, `status`, `source_port_name`, `destination_port_name`, `bandwidth_formatted` in `Map::toJsonModel` output (were dropped during eager-load refactor).
 
 ## [1.6.5] - 2026-05-15
 
