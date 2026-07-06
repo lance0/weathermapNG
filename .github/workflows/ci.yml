@@ -109,7 +109,13 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install Composer dependencies
-        run: docker run --rm -v "$PWD":/app -w /app composer:2 composer install --no-interaction --no-progress --prefer-dist
+        run: |
+          docker run --rm \
+            --entrypoint composer \
+            -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+            -w /opt/librenms/html/plugins/WeathermapNG \
+            librenms/librenms:latest \
+            install --no-interaction --no-progress --prefer-dist
 
       - name: Run PHPUnit inside LibreNMS Docker image
         run: |
