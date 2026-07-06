@@ -100,7 +100,8 @@ jobs:
             ```bash
             cd /opt/librenms/html/plugins
             curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/WeathermapNG-${{ steps.version.outputs.VERSION }}.tar.gz | tar xz
-            cd WeathermapNG && ./quick-install.sh
+            chown -R librenms:librenms WeathermapNG
+            sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
             ```
           files: |
             dist/WeathermapNG-${{ steps.version.outputs.VERSION }}.zip
