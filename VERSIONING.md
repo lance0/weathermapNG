@@ -95,7 +95,9 @@ The following items are planned, not guaranteed current behavior:
 
 These items belong on the roadmap until implemented and tested.
 
-## Best Practices
+## Best Practices (for when version-history routes are restored)
+
+The version-history controller and service are implemented but its routes are not currently registered in `routes/web.php`, so these actions are not available in the UI today. The guidance below applies once those routes are restored:
 
 - Save a named version before large layout changes.
 - Use clear names such as `before-core-rack-rework` or `wan-cleanup-2026-05`.

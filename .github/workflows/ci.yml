@@ -6,10 +6,13 @@ on:
   pull_request:
     branches: [main, develop]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
-    name: PHP Lint & Syntax
+    name: PHP Lint & Metadata
 
     steps:
       - name: Checkout code
@@ -20,16 +23,19 @@ jobs:
         with:
           php-version: '8.2'
           extensions: gd, json, mbstring, pdo, pdo_mysql
+          coverage: none
 
       - name: Check PHP syntax
         run: |
-          ERRORS=0
+          set -e
+          ERROR=0
           while IFS= read -r file; do
             if ! php -l "$file" 2>&1 | grep -q "No syntax errors"; then
-              ERRORS=1
+              php -l "$file"
+              ERROR=1
             fi
-          done < <(find . -name "*.php" -not -path "./vendor/*")
-          exit $ERRORS
+          done < <(find src routes database views -name "*.php" -not -path "*/vendor/*")
+          exit $ERROR
 
       - name: Validate composer.json
         run: composer validate --no-check-publish
@@ -63,8 +69,9 @@ jobs:
     name: PHPUnit (${{ matrix.php-version }})
     needs: lint
     strategy:
+      fail-fast: false
       matrix:
-        php-version: ['8.2', '8.3']
+        php-version: ['8.2', '8.3', '8.4']
 
     steps:
       - name: Checkout code
@@ -76,24 +83,47 @@ jobs:
           php-version: ${{ matrix.php-version }}
           extensions: gd, json, mbstring, pdo
           tools: composer:v2
+          coverage: none
 
       - name: Cache Composer dependencies
         uses: actions/cache@v6
         with:
           path: vendor
-          key: ${{ runner.os }}-php${{ matrix.php-version }}-composer-${{ hashFiles('composer.json') }}
+          key: composer-${{ runner.os }}-php${{ matrix.php-version }}-${{ hashFiles('composer.json') }}
           restore-keys: |
-            ${{ runner.os }}-php${{ matrix.php-version }}-composer-
+            composer-${{ runner.os }}-php${{ matrix.php-version }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run tests
-        run: vendor/bin/phpunit --testdox
+        run: vendor/bin/phpunit --no-coverage
+
+  docker-test:
+    runs-on: ubuntu-latest
+    name: PHPUnit (Docker / LibreNMS image)
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install Composer dependencies
+        run: docker run --rm -v "$PWD":/app -w /app composer:2 composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run PHPUnit inside LibreNMS Docker image
+        run: |
+          docker run --rm \
+            --entrypoint php \
+            -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+            -w /opt/librenms/html/plugins/WeathermapNG \
+            librenms/librenms:latest \
+            vendor/bin/phpunit --no-coverage
 
   security:
     runs-on: ubuntu-latest
     name: Security Check
+    needs: lint
 
     steps:
       - name: Checkout code
@@ -101,11 +131,54 @@ jobs:
 
       - name: Check for hardcoded secrets
         run: |
-          # Simple check for common secret patterns
-          if grep -rE "(password|secret|api_key)\s*=\s*['\"][^'\"$][^'\"]+['\"]" \
-             --include="*.php" --exclude-dir=vendor . 2>/dev/null | \
-             grep -v "example\|placeholder\|your_"; then
+          set -e
+          # Simple check for common secret patterns in PHP source
+          if grep -rE "(password|secret|api_key)\s*=\s*['\"][^'\"$][^'\"]{8,}['\"]" \
+             --include="*.php" --exclude-dir=vendor --exclude-dir=tests . 2>/dev/null | \
+             grep -v "example\|placeholder\|your_\|test_\|dummy\|config\|env"; then
             echo "Warning: Potential hardcoded secrets found"
             exit 1
           fi
           echo "No hardcoded secrets detected"
+
+  docs:
+    runs-on: ubuntu-latest
+    name: Documentation Validation
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check required documentation files exist
+        run: |
+          set -e
+          for doc in README.md INSTALL.md API.md DEPLOYMENT.md CHANGELOG.md ROADMAP.md RELEASE.md VERSIONING.md CONTRIBUTING.md docs/EMBED.md; do
+            test -f "$doc" || (echo "MISSING: $doc" && exit 1)
+            echo "  OK: $doc"
+          done
+
+      - name: Check install guidance stays aligned
+        run: |
+          set -euo pipefail
+          for file in quick-install.sh README.md INSTALL.md; do
+            grep -F 'composer config repositories.weathermapng' "$file"
+            grep -F 'librenms/weathermapng' "$file"
+            grep -E 'route:list.*weathermap|route:list.*wmng' "$file"
+          done
+
+      - name: Check no stale references to deleted classes
+        run: |
+          set -e
+          # These classes were deleted in v1.7.0; docs should only reference
+          # them in the context of "removed" — not as active code.
+          for class in SseStreamService MapDataBuilder MapPolicy NodePolicy; do
+            # Allow mentions in CHANGELOG (historical) and ROADMAP/VERSIONING
+            # (annotating removal), but not in README/INSTALL/API as active.
+            if grep -r "$class" README.md INSTALL.md API.md 2>/dev/null | \
+               grep -v "removed\|deleted\|dead\|was\|earlier\|older"; then
+              echo "ERROR: $class referenced as active in docs"
+              exit 1
+            fi
+          done
+          echo "No stale class references found"

@@ -23,6 +23,7 @@ jobs:
         with:
           php-version: '8.2'
           extensions: gd, json, mbstring, pdo
+          coverage: none
 
       - name: Validate composer.json
         run: composer validate --no-check-publish
@@ -76,7 +77,9 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.VERSION }}"
           mkdir -p dist
-          # Create archive excluding dev files
+          # git archive includes everything tracked in the repo; the --prefix
+          # wraps the content in a WeathermapNG/ directory so it extracts to
+          # the correct plugin path.
           git archive --format=zip --prefix=WeathermapNG/ -o "dist/WeathermapNG-${VERSION}.zip" HEAD
           git archive --format=tar.gz --prefix=WeathermapNG/ -o "dist/WeathermapNG-${VERSION}.tar.gz" HEAD
 
@@ -91,13 +94,12 @@ jobs:
             ${{ steps.changelog.outputs.CHANGES }}
 
             ### Installation
-            See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md) for installation instructions.
+            See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md) for detailed installation instructions.
 
             ### Quick Install
             ```bash
             cd /opt/librenms/html/plugins
-            curl -sL https://github.com/${{ github.repository }}/archive/${{ steps.version.outputs.VERSION }}.tar.gz | tar xz
-            mv weathermapNG-* WeathermapNG
+            curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/WeathermapNG-${{ steps.version.outputs.VERSION }}.tar.gz | tar xz
             cd WeathermapNG && ./quick-install.sh
             ```
           files: |

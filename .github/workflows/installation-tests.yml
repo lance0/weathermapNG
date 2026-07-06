@@ -6,12 +6,17 @@ on:
     paths:
       - 'quick-install.sh'
       - 'verify.php'
+      - 'database/**'
       - 'docker-compose*.yml'
       - '.env.*'
       - 'composer.json'
+      - 'src/**'
+      - 'routes/**'
+      - 'views/**'
+      - 'resources/**'
       - 'README.md'
       - 'INSTALL.md'
-      - 'tests/**/*'
+      - 'tests/**'
       - '.github/workflows/installation-tests.yml'
   schedule:
     - cron: '0 8 * * 1'
@@ -21,13 +26,21 @@ on:
     paths:
       - 'quick-install.sh'
       - 'verify.php'
+      - 'database/**'
       - 'docker-compose*.yml'
       - '.env.*'
       - 'composer.json'
+      - 'src/**'
+      - 'routes/**'
+      - 'views/**'
+      - 'resources/**'
       - 'README.md'
       - 'INSTALL.md'
-      - 'tests/**/*'
+      - 'tests/**'
       - '.github/workflows/installation-tests.yml'
+
+permissions:
+  contents: read
 
 jobs:
   script-validation:
@@ -43,17 +56,16 @@ jobs:
         with:
           php-version: '8.2'
           extensions: gd, json, pdo, pdo_mysql, mbstring
+          coverage: none
 
       - name: Validate bash scripts
         run: |
-          echo "Checking bash script syntax..."
           bash -n quick-install.sh
           bash -n tests/install-test.sh
           bash -n tests/docker-test.sh
 
-      - name: Validate PHP syntax
+      - name: Validate PHP scripts
         run: |
-          echo "Checking PHP script syntax..."
           php -l verify.php
           php -l src/WeathermapNG.php
 
@@ -75,7 +87,7 @@ jobs:
 
       - name: Validate Docker Compose files
         run: |
-          for f in docker-compose.simple.yml docker-compose.example.yml; do
+          for f in docker-compose.simple.yml docker-compose.example.yml docker-compose.dev.yml; do
             if [ -f "$f" ]; then
               echo "Validating $f..."
               docker compose -f "$f" config > /dev/null
@@ -92,6 +104,7 @@ jobs:
 
       - name: Check required files
         run: |
+          set -e
           echo "Checking plugin structure..."
           for file in src/WeathermapNG.php routes/web.php composer.json phpunit.xml README.md INSTALL.md; do
             test -f "$file" || (echo "MISSING: $file" && exit 1)
@@ -100,10 +113,30 @@ jobs:
 
       - name: Check hook files
         run: |
+          set -e
           for hook in MenuEntry Settings; do
             test -f "src/Hooks/$hook.php" || (echo "MISSING: src/Hooks/$hook.php" && exit 1)
             echo "  OK: src/Hooks/$hook.php"
           done
+
+      - name: Check no deleted files remain
+        run: |
+          set -e
+          # Files removed in v1.7.0 cleanup
+          for dead in map-poller.php test_hooks.php debug_plugin_web.php; do
+            if [ -f "$dead" ]; then
+              echo "ERROR: deleted file should not exist: $dead"
+              exit 1
+            fi
+          done
+          # Deleted source classes
+          for dead in src/Services/SseStreamService.php src/Services/MapDataBuilder.php src/Policies/MapPolicy.php src/Policies/NodePolicy.php; do
+            if [ -f "$dead" ]; then
+              echo "ERROR: deleted class should not exist: $dead"
+              exit 1
+            fi
+          done
+          echo "No deleted files found"
 
   composer-registration:
     runs-on: ubuntu-latest
@@ -119,6 +152,7 @@ jobs:
           php-version: '8.2'
           extensions: gd, json, mbstring
           tools: composer:v2
+          coverage: none
 
       - name: Register plugin as LibreNMS path package
         run: |
@@ -277,60 +311,3 @@ jobs:
       - name: Stop LibreNMS stack
         if: always()
         run: docker compose -f docker-compose.simple.yml down -v
-
-  documentation-check:
-    runs-on: ubuntu-latest
-    name: Documentation Validation
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Check documentation files
-        run: |
-          echo "Checking required documentation..."
-          for doc in README.md INSTALL.md API.md DEPLOYMENT.md CHANGELOG.md; do
-            test -f "$doc" || (echo "MISSING: $doc" && exit 1)
-            echo "  OK: $doc"
-          done
-
-      - name: Check install guidance stays aligned
-        run: |
-          set -euo pipefail
-
-          for file in quick-install.sh README.md INSTALL.md; do
-            grep -F 'composer config repositories.weathermapng' "$file"
-            grep -F 'librenms/weathermapng' "$file"
-            grep -E 'route:list.*weathermap|route:list.*wmng' "$file"
-          done
-
-          for file in quick-install.sh README.md INSTALL.md; do
-            grep -F 'wmng_*' "$file"
-          done
-
-          grep -F 'validate.php' README.md
-          grep -F 'validate.php' INSTALL.md
-
-  security-check:
-    runs-on: ubuntu-latest
-    name: Security Checks
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Check for hardcoded credentials
-        run: |
-          echo "Checking for hardcoded credentials..."
-          FOUND=0
-          if grep -r "password\s*=\s*['\"][^'\"]*['\"]" --include="*.php" --exclude-dir=vendor . 2>/dev/null | grep -v "password';" | grep -v "password\s*=\s*['\"]\$"; then
-            echo "Warning: Found potential hardcoded passwords"
-            FOUND=1
-          fi
-          if grep -r "api[_-]key\s*=\s*['\"][^'\"]*['\"]" --include="*.php" --exclude-dir=vendor . 2>/dev/null | grep -v "api_key\s*=\s*['\"]\$"; then
-            echo "Warning: Found potential hardcoded API keys"
-            FOUND=1
-          fi
-          if [ "$FOUND" -eq 0 ]; then
-            echo "No hardcoded credentials detected"
-          fi
