@@ -11,7 +11,7 @@ The plugin is usable today for production-oriented network map visualization, wi
 - Dark/light theme auto-detection to match LibreNMS
 - Real-time traffic visualization using LibreNMS RRD data
 - Flow animations with particle effects
-- Map versioning foundation (storage and services; routes not yet registered)
+- Map versioning foundation (storage and services; editor UI removed in v1.7.0; routes not registered)
 - Server-Sent Events for live updates
 - Embeddable views with navigation bar
 - Demo mode for testing
@@ -354,7 +354,7 @@ These ideas are intentionally parked until the core product feels polished and m
 
 ### v1.5.x
 
-- [x] Map versioning foundation: storage, services, and editor UI (history routes later unregistered; see v1.7.0 notes).
+- [x] Map versioning foundation: storage and services only (editor UI removed in v1.7.0; routes not registered — see VERSIONING.md).
 - [x] Auto-save functionality.
 - [x] Demo mode for testing without devices.
 - [x] Docker development environment.
