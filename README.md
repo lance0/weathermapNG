@@ -26,7 +26,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies
-- **Map Versioning**: Snapshot, compare, and restore map versions
+- **Map Versioning Foundation**: Snapshot storage and history services for map rollback workflows (routes not yet registered — see [VERSIONING.md](VERSIONING.md))
 
 ## Quick Start
 
@@ -167,7 +167,7 @@ WeathermapNG follows a modular service-oriented architecture:
 | LinkDataService | Link alerts and port-level aggregation |
 | PortUtilService | RRD-based traffic data for links |
 | MapService | Map CRUD and JSON import/export |
-| MapVersionService | Version snapshots, compare, and restore |
+| MapVersionService | Version snapshot storage (foundation — routes not yet registered) |
 | RenderController | Live rendering and inline Server-Sent Events streaming |
 
 SSE is handled inline in `RenderController::sse` — there is no separate streaming service.
