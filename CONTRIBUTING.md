@@ -7,10 +7,12 @@ Thanks for helping improve WeathermapNG. The project is a LibreNMS v2 plugin, so
 - PHP 8.2 or newer
 - Composer
 - Git
-- Docker, recommended for LibreNMS integration testing
+- Docker (required for running tests and lint — there is no PHP binary on the host; the LibreNMS image provides the matching PHP runtime)
 - LibreNMS development or test instance for UI/install validation
 
 ## Development Setup
+
+> The plugin runs inside LibreNMS, and there is no PHP binary on the development host. Use the LibreNMS Docker image to run PHP tooling (tests, lint, composer) so the environment matches production exactly.
 
 ### Local Package Setup
 
@@ -19,15 +21,21 @@ git clone https://github.com/lance0/weathermapNG.git
 cd weathermapNG
 composer install
 composer validate --no-check-publish
-composer test
 ```
 
-If your host does not have the right PHP extensions, use the same Docker image pattern as CI/local validation:
+### Running Tests
+
+There is no PHP binary on the host — run the suite through the LibreNMS Docker image:
 
 ```bash
-docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/app -w /app weathermapng-php-composer validate --no-check-publish
-docker run --rm --entrypoint sh -u "$(id -u):$(id -g)" -v "$PWD":/app -w /app weathermapng-php-composer -lc 'vendor/bin/phpunit'
+docker run --rm --entrypoint php \
+  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+  -w /opt/librenms/html/plugins/WeathermapNG \
+  librenms/librenms:latest \
+  vendor/bin/phpunit --no-coverage
 ```
+
+The current suite has 178 tests, 579 assertions, and 18 skipped tests. The skipped tests are pre-existing stubs that require a live Eloquent/DB connection and are skipped when running outside a full LibreNMS environment; they are not regressions. When you add a feature, add tests for it.
 
 ### LibreNMS Plugin Setup
 
@@ -65,11 +73,11 @@ WeathermapNG/
 ├── routes/web.php                # Plugin routes
 ├── src/
 │   ├── WeathermapNGProvider.php  # Composer-discovered Laravel provider
+│   ├── AdminCheck.php            # Shared admin-gate trait for controllers/hooks
 │   ├── Hooks/                    # LibreNMS plugin hooks
 │   ├── Http/Controllers/         # Web/API controllers
 │   ├── Http/Requests/            # Request validation
 │   ├── Models/                   # Eloquent models
-│   ├── Policies/                 # Authorization policies
 │   ├── RRD/                      # RRD helpers
 │   └── Services/                 # Core domain/services
 ├── resources/
@@ -105,26 +113,77 @@ WeathermapNG/
 
 ## Testing
 
-Run the package tests:
+Run the full suite with the LibreNMS Docker image (see Development Setup):
 
 ```bash
-composer test
+docker run --rm --entrypoint php \
+  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+  -w /opt/librenms/html/plugins/WeathermapNG \
+  librenms/librenms:latest \
+  vendor/bin/phpunit --no-coverage
 ```
+
+The suite currently has 178 tests, 579 assertions, and 18 skipped tests. The skipped tests are pre-existing stubs that need a live Eloquent/DB connection and are skipped outside a full LibreNMS environment — they are not regressions. When you add a feature, add tests for it.
 
 Useful focused checks:
 
 ```bash
-./vendor/bin/phpunit tests/DocsPathsTest.php
-./vendor/bin/phpunit tests/RoutesSmokeTest.php
-./vendor/bin/phpunit tests/VersionMetadataTest.php
+docker run --rm --entrypoint php \
+  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+  -w /opt/librenms/html/plugins/WeathermapNG \
+  librenms/librenms:latest \
+  vendor/bin/phpunit tests/RoutesSmokeTest.php
+```
+
+## Linting
+
+There is no PHP binary on the host, so lint a file through the LibreNMS Docker image:
+
+```bash
+docker run --rm --entrypoint php \
+  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+  -w /opt/librenms/html/plugins/WeathermapNG \
+  librenms/librenms:latest \
+  -l <file>
 ```
 
 Before release-oriented changes, also validate:
 
 ```bash
-composer validate --no-check-publish
+docker run --rm --entrypoint composer \
+  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
+  -w /opt/librenms/html/plugins/WeathermapNG \
+  librenms/librenms:latest \
+  validate --no-check-publish
 git diff --check
 ```
+
+## Architecture
+
+WeathermapNG is a LibreNMS v2 plugin that uses LibreNMS's hook-based architecture. The service provider is `src/WeathermapNGProvider.php` (note: `WeathermapNGServiceProvider.php` was an earlier name that has been removed — always reference `WeathermapNGProvider.php`). The provider publishes `MenuEntry` and `Settings` hooks, merges plugin config, and registers routes/views through Composer package discovery.
+
+## Authorization Model
+
+All mutation (write) endpoints require an admin user; read endpoints are open to any authenticated user. Admin gating is implemented by the `AdminCheck` trait (`src/AdminCheck.php`), which checks `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`.
+
+When you add a new mutation endpoint, import and use the trait and call `requireAdmin()` at the top of the method:
+
+```php
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
+
+class MyController extends Controller
+{
+    use AdminCheck;
+
+    public function store(Request $request): JsonResponse
+    {
+        $this->requireAdmin();
+        // ...
+    }
+}
+```
+
+`requireAdmin()` aborts with 403 if the authenticated user is not an admin. Read-only endpoints do not need this guard.
 
 ## Documentation
 

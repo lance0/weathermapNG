@@ -14,6 +14,19 @@ WeathermapNG renders maps in browser canvas views and reads live traffic from Li
 - Minimap redraw cost
 - Label density on large maps
 
+## N+1 Query Elimination (v1.7.0)
+
+v1.7.0 removes the per-node and per-link query loops that dominated live, embed, and SSE response time on medium-to-large maps. The live/embed/sse paths now prime all caches in a single pass before serializing map data:
+
+- **Eager-loads at controller entry** — each read controller calls `$map->load(['nodes', 'links'])` so the map's relations are fetched in one query instead of lazy-loading row by row.
+- **`NodeDataService::preloadForMap(Map $map)`** — primes every cache the serializer needs in one pass: device records for node-name/status accessors, port names for link label rendering, and RRD port/device info for traffic lookups.
+- **Batch caches**, each keyed request-local so the same work is never repeated within a single render:
+  - `Node::preloadDevices(array $deviceIds)` — one query for all device names/states on the map.
+  - `Link::preloadPortNames(array $portIds)` — one query for all `ifName` values across both ends of every link.
+  - `RrdDataService` request-local caches — RRD file metadata for the linked ports is resolved once and reused for the whole request.
+
+**Measured effect:** on a 50-node / 50-link map, the live/embed/sse paths dropped from ~400 queries to ~10 queries. Gains scale with map size; the previous N+1 pattern issued roughly one query per node plus one per link plus accessory lookups, while the batched path issues a small constant number regardless of node/link count.
+
 ## Cache Service
 
 `src/Services/MapCacheService.php` provides cache helpers for map data. Cache keys are intentionally scoped by map/resource so writes can invalidate the relevant map data without relying on unsafe wildcard cache clearing.

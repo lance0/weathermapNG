@@ -1,6 +1,6 @@
 # WeathermapNG Deployment Guide
 
-This guide covers production deployment and maintenance for WeathermapNG `v1.6.5+`.
+This guide covers production deployment and maintenance for WeathermapNG `v1.7.0+`.
 
 For a first install, start with [INSTALL.md](INSTALL.md). This document focuses on production checks, Docker notes, monitoring, backup, and recovery.
 
@@ -228,10 +228,21 @@ php database/setup.php
 - Keep file ownership aligned with the LibreNMS runtime user.
 - Do not expose backup files, `.env`, logs, or SQL dumps under the web root.
 
+### Authorization Model
+
+As of v1.7.0, WeathermapNG enforces a two-tier authorization model on top of LibreNMS `web` + `auth` middleware:
+
+- **Read endpoints** are open to any authenticated LibreNMS user. This includes viewing maps and the editor, embed, JSON and image export, the live data endpoint, the SSE stream, device/port lookups, template listings, and the `health/detailed`, `health/stats`, and `metrics` endpoints.
+- **Mutation endpoints** require an admin user — `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`. This covers creating, updating, and deleting maps, nodes, and links; saving a map; importing a map; running auto-discovery; creating, updating, and deleting templates; creating a map from a template; and running the install controller.
+
+The three public probe endpoints — `/health`, `/ready`, and `/live` — are intentionally unauthenticated so external health checks can reach them.
+
+This model replaces the older per-map policy approach. The `MapPolicy` and `NodePolicy` classes were removed in v1.7.0; authorization is now enforced at the controller level using LibreNMS's global admin check, and there is no per-map ownership configuration to maintain.
+
 ## Compatibility
 
 | WeathermapNG | LibreNMS | PHP | Database |
 |--------------|----------|-----|----------|
-| 1.6.5+ | Latest stable recommended | 8.2+ | LibreNMS MySQL/MariaDB database |
+| 1.7.0+ | Latest stable recommended | 8.2+ | LibreNMS MySQL/MariaDB database |
 
 PostgreSQL is not currently documented as a supported production target for this plugin.

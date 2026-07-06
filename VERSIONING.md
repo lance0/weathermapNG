@@ -26,13 +26,17 @@ The release version is stored in:
 
 CI and release validation should keep these aligned. A release tag must match the project version.
 
+## Authorization Model In v1.7.0
+
+v1.7.0 standardized authorization on a simple admin-only model: maps have no per-user ownership and there is no `user_id` column on `wmng_maps`. Any authenticated LibreNMS user can read maps, templates, lookups, and health detail; all `POST`/`PUT`/`PATCH`/`DELETE` operations require an admin (`hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`), enforced by the shared `AdminCheck` trait in each controller. Public health/readiness/liveness probes remain unauthenticated. Earlier per-map policy scaffolding (`MapPolicy`, `NodePolicy`) has been removed. See [API.md](API.md) for the per-route breakdown.
+
 ## Pre-release Checklist
 
-Before tagging a release:
+The full pre-release validation flow — syntax checks, `composer validate`, the test suite, CI verification, version-source alignment, tagging, and manual QA — lives in [RELEASE.md](RELEASE.md). Follow that checklist before tagging any release. The quick checks below are a fast pre-flight, not a substitute for the full release readiness flow:
 
 ```bash
 composer validate --no-check-publish
-composer test
+vendor/bin/phpunit --no-coverage
 ```
 
 Also verify:
@@ -43,6 +47,7 @@ Also verify:
 - `quick-install.sh` still registers the package and discovers routes.
 - Public health/readiness endpoints remain minimal.
 - Authenticated detail/metrics endpoints remain protected.
+- Read endpoints stay open to authenticated users; mutation endpoints stay admin-only.
 
 ## Current Map Version History Foundation
 

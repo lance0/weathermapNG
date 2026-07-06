@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.6.5 (Stable)
+## Current Status: v1.7.0 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus a wave of performance, authorization, and correctness hardening landed in v1.7.0:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
@@ -46,7 +46,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Standardize iconography with Font Awesome instead of emoji controls.
   - Ensure all embed controls have accessible labels.
 
-- [ ] **Editor accessibility pass**
+- [x] **Editor accessibility pass**
   - Add `aria-label` and explicit `type="button"` to icon-only toolbar controls.
   - Add keyboard and focus affordances for critical editor actions.
   - Provide useful fallback text or alternate structured editing affordances for canvas-only workflows.
@@ -94,7 +94,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Add an accessibility smoke test for obvious regressions.
   - Keep Composer, install, route, and version metadata checks green.
 
-- [ ] **Release readiness checklist**
+- [x] **Release readiness checklist**
   - Document the exact pre-release validation flow: Composer validate, PHPUnit, install CI, smoke install, changelog, tag, release notes.
   - Keep a short manual QA checklist for editor, embed, settings, install, and upgrade paths.
   - Define what qualifies as patch, minor, and major work for this plugin.
@@ -104,11 +104,50 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Verify upgrade behavior when config files, output directories, or validation tables already exist.
   - Make failure messages actionable when Composer registration, route discovery, or database setup fails.
 
+### v1.7.0 - Performance, Authorization & Correctness Hardening ✅
+
+These improvements shipped in v1.7.0. The bulk of the work was reliability, safety, and maintainability rather than new user-facing features.
+
+- [x] **N+1 query elimination (Wave 1 + Wave 2)**
+  - Eager-load map, node, link, and version relations instead of lazy loading.
+  - Batch per-row caches (node data, device metadata, port names) so a 50-node map goes from ~400 queries down to ~10.
+  - Covers MapCacheService eager loads, NodeDevice batch loading, and LinkPortName batch resolution.
+
+- [x] **Admin-only authorization**
+  - All 24 mutation endpoints require an admin via the `AdminCheck` trait (`requireAdmin()`).
+  - Read endpoints remain open to any authenticated user.
+  - `MapPolicy` and `NodePolicy` (dead authorization stubs) were removed in favor of the central trait.
+
+- [x] **Editor accessibility pass**
+  - `aria-label` and explicit `type="button"` on icon-only toolbar controls.
+  - Focus-visible outlines preserved for keyboard navigation instead of overriding them.
+
+- [x] **`mergeMapOptions` data-loss fix**
+  - `mergeMapOptions` now preserves all option keys on save, not just `width`/`height`/`background`.
+  - Custom options are no longer silently dropped when a map is updated.
+
+- [x] **Release readiness checklist**
+  - `RELEASE.md` created with the exact pre-release validation flow and manual QA checklist.
+
+- [x] **Dead code removal**
+  - Removed `SseStreamService`, `MapDataBuilder`, `MapPolicy`, `NodePolicy`, `test_hooks.php`, `debug_plugin_web.php`, and the root `map-poller.php`.
+  - Canonical poller is now `bin/map-poller.php`.
+
+- [x] **Demo traffic deterministic**
+  - Demo mode now generates traffic from deterministic per-id sine waves instead of `rand()`, so traffic is smooth and jitter-free across renders.
+
+- [x] **Correctness fixes**
+  - `NodeService::deleteNode`: removed an `orWhere` that could delete the wrong rows.
+  - `LinkService`: added input validation for link create/update.
+  - `RenderController::import`: wrapped in a transaction so a failed import rolls back cleanly.
+  - `MapCacheService`: eager-load fixes prevent stale/missing relation data.
+  - `MapLinkController`: narrowed a broad `catch` that was swallowing real errors.
+
 ---
 
 ## Near Term
 
-### v1.7.0 - Editor Workflow & Map Management
+### v1.8.0 - Editor Workflow & Map Management
 
 This release should make existing authoring workflows faster and less error-prone before adding major visualization features.
 
@@ -151,7 +190,7 @@ This release should make existing authoring workflows faster and less error-pron
 
 ## Medium Term
 
-### v1.8.0 - Discovery & Advanced Data
+### v1.9.0 - Discovery & Advanced Data
 
 - [ ] **LLDP/CDP Auto-Discovery**
   - Query LibreNMS `links` table for actual topology.
@@ -176,7 +215,7 @@ This release should make existing authoring workflows faster and less error-pron
   - Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.
   - Add graceful degradation controls for very large maps: reduced particles, lower update rate, or simplified labels.
 
-### v1.9.0 - Historical Views & Export
+### v1.10.0 - Historical Views & Export
 
 - [ ] **Historical Playback**
   - Timeline scrubber.
@@ -235,6 +274,17 @@ These ideas are intentionally parked until the core product feels polished and m
 ---
 
 ## Completed Features
+
+### v1.7.0 ✅
+
+- [x] N+1 query elimination (Wave 1 + Wave 2): eager-loads + batch caches, ~400 → ~10 queries on a 50-node map.
+- [x] Admin-only authorization: all 24 mutation endpoints require admin via the `AdminCheck` trait.
+- [x] Editor accessibility pass: `aria-label`, `type="button"`, focus-visible outlines.
+- [x] `mergeMapOptions` data-loss fix: preserves all option keys, not just `width`/`height`/`background`.
+- [x] Release readiness checklist: `RELEASE.md` created.
+- [x] Dead code removal: `SseStreamService`, `MapDataBuilder`, `MapPolicy`, `NodePolicy`, `test_hooks.php`, `debug_plugin_web.php`, root `map-poller.php`; canonical poller is now `bin/map-poller.php`.
+- [x] Demo traffic deterministic: per-id sine waves instead of `rand()`, smooth and jitter-free.
+- [x] Correctness fixes: `NodeService::deleteNode` `orWhere`, `LinkService` validation, `RenderController` import transaction, `MapCacheService` eager loads, `MapLinkController` catch widening.
 
 ### v1.6.5
 

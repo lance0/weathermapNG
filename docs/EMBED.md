@@ -4,7 +4,7 @@
 
 - Route: `plugin/WeathermapNG/embed/{map}`
 - Renders a compact canvas-based viewer suitable for dashboards/iframes
-- Supports live updates via polling or optional SSE
+- **Auth**: The embed view is a read endpoint open to all authenticated LibreNMS users; no admin role required. (Map editing and all 24 mutation endpoints are admin-only.)
 
 ## Features
 

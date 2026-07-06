@@ -7,17 +7,25 @@ cd /opt/librenms
 php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
-## Authentication
+## Authentication & Authorization
 
-Most plugin routes are inside LibreNMS `web` and `auth` middleware. Use an authenticated LibreNMS browser session for the editor and UI-driven API calls.
+All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, or a LibreNMS `level >= 10` and otherwise `abort(403)`.
 
-Public probe routes are intentionally limited:
+### Public probe routes (no auth)
+
+These sit outside the `auth` group and are intentionally minimal so they can back health checks and load balancers:
 
 - `GET /plugin/WeathermapNG/health`
 - `GET /plugin/WeathermapNG/ready`
 - `GET /plugin/WeathermapNG/live`
 
-Detailed health, stats, metrics, map management, editor, templates, import/export, and live map data require LibreNMS authentication.
+### Read routes (open to all authenticated users)
+
+`GET` map index/show/editor/view/embed/json/live/sse/export, `GET templates` index/show, `GET /api/devices` and `GET /api/device/{id}/ports` lookups, and `GET /health/detailed`, `/health/stats`, `/metrics`. None of these call `requireAdmin()`.
+
+### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`)
+
+Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at the top of the controller action and `abort(403)` for non-admins. This covers all map CRUD, node CRUD, link CRUD, template CRUD, full-map save, import, auto-discovery, and the install runner. The `GET /plugin/WeathermapNG/install` UI is authenticated (it sits in the `auth` group); its `POST` counterpart is admin-only.
 
 ## Page Routes
 

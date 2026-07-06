@@ -1,6 +1,10 @@
-# WeathermapNG - Network Visualization for LibreNMS
+# WeathermapNG — Network Visualization for LibreNMS
 
-A modern network weathermap plugin for LibreNMS v2 that provides real-time network topology visualization with traffic flow animations.
+A modern network weathermap plugin for LibreNMS that provides real-time network topology visualization with animated traffic flow.
+
+![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
+![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
+![Version 1.7.0](https://img.shields.io/badge/version-1.7.0-0078D4)
 
 ![WeathermapNG Live View](wmng.png)
 
@@ -17,15 +21,18 @@ A modern network weathermap plugin for LibreNMS v2 that provides real-time netwo
 - **Dark/Light Mode**: Auto-detects LibreNMS theme and matches it
 - **Grid Snapping**: Toggle snap-to-grid for precise node alignment
 - **RRD-based Traffic Data**: Real-time bandwidth from LibreNMS RRD files
-- **Server-Sent Events**: Live updates without polling
+- **Server-Sent Events**: Live updates without polling (streamed inline from the render controller)
+- **Admin-Only Authorization**: All 24 mutation endpoints require admin (`hasGlobalAdmin()`, `isAdmin()`, or level ≥ 10); read endpoints are open to every authenticated user
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies
-- **Map Versioning Foundation**: Snapshot storage and history services for map rollback workflows
+- **Map Versioning**: Snapshot, compare, and restore map versions
 
 ## Quick Start
 
 ### One-Command Install (Recommended)
+
+Three commands get you running on a native LibreNMS install:
 
 ```bash
 cd /opt/librenms/html/plugins
@@ -34,43 +41,30 @@ sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
 ```
 
-The script automatically installs dependencies, registers the Composer package with LibreNMS, sets up database tables, configures permissions, and enables the plugin.
-Run it as the `librenms` user on native installs; running as root can leave root-owned Composer files behind.
+The script installs dependencies, registers the Composer package with LibreNMS, sets up database tables, configures permissions, and enables the plugin. Run it as the `librenms` user — running as root can leave root-owned Composer files behind.
 
-### Manual Install
+### Docker
+
+A Docker-based install is available for development and testing. See [INSTALL.md](INSTALL.md) for the full Docker setup.
+
+### Demo Mode
+
+Try the plugin without real LibreNMS devices — demo mode generates smooth, deterministic simulated traffic (per-id sine waves, jitter-free):
 
 ```bash
-# 1. Clone and install
-cd /opt/librenms/html/plugins
-git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-cd WeathermapNG
-composer install --no-dev
-
-# 2. Register with LibreNMS Composer
-cd /opt/librenms
-composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
-php artisan package:discover
-
-# 3. Setup database
-cd /opt/librenms/html/plugins/WeathermapNG
-php database/setup.php
-
-# 4. Configure LibreNMS
-cd /opt/librenms
-php artisan optimize:clear
-php artisan route:clear
-php artisan view:clear
-php artisan config:clear
-php artisan cache:clear
-chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
-
-# 5. Enable plugin
-./lnms plugin:enable WeathermapNG
-
-# 6. Verify routes
-php artisan route:list | grep -iE 'weathermap|wmng'
+echo "WEATHERMAPNG_DEMO_MODE=true" >> /opt/librenms/.env
+php /opt/librenms/html/plugins/WeathermapNG/database/seed-demo.php
 ```
+
+See [INSTALL.md](INSTALL.md) for details and sample topologies.
+
+### First Map
+
+1. **Open the plugin** at `https://your-librenms/plugin/WeathermapNG`
+2. **Create a map** — click "Create New Map" or pick a template
+3. **Configure** the name, title, and dimensions
+4. **Design** in the canvas editor: add devices from the right sidebar, drag to position, draw links between nodes
+5. **Save** — your map is live with real-time traffic data
 
 ### Requirements
 
@@ -79,38 +73,9 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 - Composer
 - MySQL/MariaDB
 
-**Access the plugin at**: `https://your-librenms/plugin/WeathermapNG`
+## Embedding
 
-## Getting Started
-
-1. **Access the Plugin**: Navigate to `https://your-librenms/plugin/WeathermapNG`
-2. **Create Map**: Click "Create New Map" or select a template
-3. **Configure**: Enter name, title, and dimensions
-4. **Design**: Use the canvas editor to add devices and connections
-5. **Save**: Your map is now live with real-time traffic data
-
-### Tips
-
-- Use the device dropdown in the right sidebar to add nodes
-- Drag nodes to position them; enable grid snapping for alignment
-- Double-click a link to add a waypoint; drag to reposition; double-click again to remove
-- Use Ctrl+Z/Y to undo/redo, arrow keys to nudge selected nodes
-- Scroll wheel to zoom, middle-click to pan around large maps
-- Export maps as JSON for backup or sharing
-
-### Demo Mode
-
-Test the plugin without real LibreNMS devices:
-
-```bash
-# Enable demo mode (generates simulated traffic)
-echo "WEATHERMAPNG_DEMO_MODE=true" >> /opt/librenms/.env
-
-# Create sample network topology
-php /opt/librenms/html/plugins/WeathermapNG/database/seed-demo.php
-```
-
-## Embedding Maps
+Drop a map into any dashboard with an iframe:
 
 ```html
 <iframe src="https://your-librenms/plugin/WeathermapNG/embed/1"
@@ -118,7 +83,7 @@ php /opt/librenms/html/plugins/WeathermapNG/database/seed-demo.php
 </iframe>
 ```
 
-Optional query parameters: `metric` (percent/in/out/sum), `sse=0` (force polling), `nav=0` (disable pan/zoom), `scale=bytes`. See [Embed Viewer Guide](docs/EMBED.md).
+Optional query parameters: `metric` (`percent`/`in`/`out`/`sum`), `sse=0` (force polling), `nav=0` (disable pan/zoom), `scale=bytes`. See the [Embed Viewer Guide](docs/EMBED.md).
 
 ## Troubleshooting
 
@@ -142,11 +107,9 @@ php artisan optimize:clear
 php artisan config:clear
 ```
 
-LibreNMS `validate.php` may report `wmng_*` tables as extra tables. Those tables belong to WeathermapNG and should not be dropped.
+LibreNMS `validate.php` may report `wmng_*` tables as extra tables — those belong to WeathermapNG and should not be dropped. It may also report `utf8mb4_bin` collation warnings on JSON-backed columns such as `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, and `wmng_links.style`; those are expected for the current schema.
 
-It may also report `utf8mb4_bin` collation warnings on JSON-backed WeathermapNG columns such as `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, and `wmng_links.style`. Those warnings are expected for the current schema.
-
-If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` table, rerun `quick-install.sh` as the `librenms` user. The installer normalizes plugin registration and removes stale duplicate rows.
+If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` table, rerun `quick-install.sh` as the `librenms` user — the installer normalizes plugin registration and removes stale duplicates.
 
 ### Permission Errors
 
@@ -154,19 +117,14 @@ If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` ta
 sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 ```
 
-### Database Issues
-
-```bash
-cd /opt/librenms/html/plugins/WeathermapNG
-php database/setup.php
-```
-
 ### Maps Not Updating
 
 - Verify the map has valid device and port associations.
 - Check that the LibreNMS user can read the relevant RRD files.
-- If you use the optional poller, check its cron entry and logs.
+- If you use the optional poller (`bin/map-poller.php`), check its cron entry and logs.
 - Use demo mode to separate rendering issues from live data issues.
+
+More troubleshooting in [INSTALL.md](INSTALL.md).
 
 ## Updating
 
@@ -186,6 +144,18 @@ php artisan cache:clear
 php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
+## Documentation
+
+- [Installation Guide](INSTALL.md) — detailed setup, Docker, demo mode, and troubleshooting
+- [Deployment Guide](DEPLOYMENT.md)
+- [API Documentation](API.md)
+- [Embed Viewer Guide](docs/EMBED.md)
+- [Performance Notes](PERFORMANCE.md)
+- [Roadmap](ROADMAP.md)
+- [Release Notes](RELEASE.md)
+- [Versioning Guide](VERSIONING.md)
+- [Contributing](CONTRIBUTING.md)
+
 ## Architecture
 
 WeathermapNG follows a modular service-oriented architecture:
@@ -197,32 +167,30 @@ WeathermapNG follows a modular service-oriented architecture:
 | LinkDataService | Link alerts and port-level aggregation |
 | PortUtilService | RRD-based traffic data for links |
 | MapService | Map CRUD and JSON import/export |
-| SseStreamService | Real-time Server-Sent Events streaming |
+| MapVersionService | Version snapshots, compare, and restore |
+| RenderController | Live rendering and inline Server-Sent Events streaming |
+
+SSE is handled inline in `RenderController::sse` — there is no separate streaming service.
 
 ## Development
 
 ### Running Tests
 
 ```bash
-composer test
+vendor/bin/phpunit
 ```
 
-### Code Quality
+### Docker Test Suite
 
 ```bash
-composer quality
+./tests/docker-test.sh
 ```
 
-## Documentation
+### Installation Tests
 
-- [Detailed Installation Guide](INSTALL.md)
-- [Deployment Guide](DEPLOYMENT.md)
-- [API Documentation](API.md)
-- [Embed Viewer Guide](docs/EMBED.md)
-- [Versioning Guide](VERSIONING.md)
-- [Performance Notes](PERFORMANCE.md)
-- [Roadmap](ROADMAP.md)
-- [Configuration Reference](config/config.php)
+```bash
+./tests/install-test.sh
+```
 
 ## Contributing
 
@@ -235,4 +203,4 @@ Pull requests welcome. Please follow PSR-12 coding standards and include tests.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+MIT License — see [LICENSE](LICENSE)
