@@ -12,12 +12,15 @@ class RenderControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
         $nodeDataService = $this->createMock(
             \LibreNMS\Plugins\WeathermapNG\Services\NodeDataService::class
         );
 
-        $this->controller = new RenderController($nodeDataService);
+        $mapService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
+        );
+
+        $this->controller = new RenderController($nodeDataService, $mapService);
     }
 
     public function test_controller_can_be_instantiated()
@@ -41,7 +44,11 @@ class RenderControllerTest extends TestCase
             \LibreNMS\Plugins\WeathermapNG\Services\NodeDataService::class
         );
 
-        $controller = new RenderController($nodeDataService);
+        $mapService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
+        );
+
+        $controller = new RenderController($nodeDataService, $mapService);
 
         $this->assertInstanceOf(RenderController::class, $controller);
     }

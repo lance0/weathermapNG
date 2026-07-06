@@ -37,6 +37,18 @@ class Map extends Model
 
     public function toJsonModel()
     {
+        // Prime batch caches so accessor-backed fields (device_name, status,
+        // source_port_name, destination_port_name) don't fire N+1 queries.
+        $deviceIds = $this->nodes->pluck('device_id')->filter()->unique()->values()->all();
+        Node::preloadDevices($deviceIds);
+
+        $portIds = $this->links->flatMap(fn($l) => [$l->port_id_a, $l->port_id_b])
+            ->filter(fn($id) => $id !== null && $id !== 0)
+            ->unique()
+            ->values()
+            ->all();
+        Link::preloadPortNames($portIds);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -45,15 +57,27 @@ class Map extends Model
             'height' => $this->height,
             'background' => $this->background,
             'options' => $this->options ?? new \stdClass(),
-            'nodes' => $this->nodes()->get(['id', 'label', 'x', 'y', 'device_id', 'meta'])->toArray(),
-            'links' => $this->links()->get([
-                'id',
-                'src_node_id as src',
-                'dst_node_id as dst',
-                'port_id_a',
-                'port_id_b',
-                'bandwidth_bps',
-                'style'
+            'nodes' => $this->nodes->map(fn($n) => [
+                'id' => $n->id,
+                'label' => $n->label,
+                'x' => $n->x,
+                'y' => $n->y,
+                'device_id' => $n->device_id,
+                'meta' => $n->meta,
+                'device_name' => $n->device_name,
+                'status' => $n->status,
+            ])->toArray(),
+            'links' => $this->links->map(fn($l) => [
+                'id' => $l->id,
+                'src' => $l->src_node_id,
+                'dst' => $l->dst_node_id,
+                'port_id_a' => $l->port_id_a,
+                'port_id_b' => $l->port_id_b,
+                'bandwidth_bps' => $l->bandwidth_bps,
+                'style' => $l->style,
+                'source_port_name' => $l->source_port_name,
+                'destination_port_name' => $l->destination_port_name,
+                'bandwidth_formatted' => $l->bandwidth_formatted,
             ])->toArray(),
         ];
     }

@@ -14,6 +14,17 @@ class PortUtilService
         $this->rrdService = $rrdService;
     }
 
+    /**
+     * Prime the RrdDataService request-local caches for port and device info
+     so getPortData() doesn't fire per-port queries during bulk link traffic
+     reads. Delegates to the same RrdDataService instance used by getPortData.
+     */
+    public function preloadForPorts(array $portIds, array $deviceIds): void
+    {
+        $this->rrdService->preloadPortInfo($portIds);
+        $this->rrdService->preloadDeviceInfo($deviceIds);
+    }
+
     public function linkUtilBits(array $link): array
     {
         $portA = $link['port_id_a'] ?? null;

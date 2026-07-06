@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
 use LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService;
@@ -10,6 +11,8 @@ use LibreNMS\Plugins\WeathermapNG\Http\Requests\UpdateMapRequest;
 
 class MapController
 {
+    use AdminCheck;
+
     private $mapService;
     private $autoDiscoveryService;
 
@@ -42,14 +45,15 @@ class MapController
 
     public function create(CreateMapRequest $request): mixed
     {
+        $this->requireAdmin();
         $validated = $request->sanitize($request->validated());
         $map = $this->mapService->createMap($validated);
 
         return $this->handleCreateResponse($request, $map);
     }
-
     public function update(UpdateMapRequest $request, Map $map): \Illuminate\Http\JsonResponse
     {
+        $this->requireAdmin();
         $validated = $request->sanitize($request->validated());
         $this->mapService->updateMap($map, $validated);
 
@@ -58,9 +62,9 @@ class MapController
             'map' => $map,
         ]);
     }
-
     public function destroy(Map $map): mixed
     {
+        $this->requireAdmin();
         $this->mapService->deleteMap($map);
 
         return $this->handleDeleteResponse();
@@ -68,7 +72,8 @@ class MapController
 
     public function save(\Illuminate\Http\Request $request, Map $map): \Illuminate\Http\JsonResponse
     {
-        $validatedData = $this->validateSaveRequest($request->all());
+        $this->requireAdmin();
+        $validatedData = $request->all();
 
         try {
             $this->mapService->saveMap($map, $validatedData);
@@ -83,9 +88,9 @@ class MapController
             ], 500);
         }
     }
-
     public function autoDiscover(\Illuminate\Http\Request $request, Map $map): \Illuminate\Http\JsonResponse
     {
+        $this->requireAdmin();
         $params = $this->autoDiscoveryService->validateDiscoveryParams($request->all());
 
         try {
@@ -100,11 +105,6 @@ class MapController
                 'message' => 'Auto-discovery failed: ' . $e->getMessage(),
             ], 500);
         }
-    }
-
-    private function validateSaveRequest(array $data): array
-    {
-        return $data;
     }
 
     private function getDevicesForEditor(): \Illuminate\Support\Collection

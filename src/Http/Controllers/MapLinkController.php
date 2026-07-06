@@ -5,11 +5,13 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use LibreNMS\Plugins\WeathermapNG\Services\LinkService;
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class MapLinkController
 {
+    use AdminCheck;
     private $linkService;
 
     public function __construct(LinkService $linkService)
@@ -19,6 +21,7 @@ class MapLinkController
 
     public function store(Request $request, Map $map): JsonResponse
     {
+        $this->requireAdmin();
         $validated = $request->validate([
             'links' => 'required|array',
             'links.*.src_node_id' => 'required|integer|exists:wmng_nodes,id',
@@ -35,6 +38,7 @@ class MapLinkController
 
     public function create(Request $request, Map $map): JsonResponse
     {
+        $this->requireAdmin();
         $data = $request->validate([
             'src_node_id' => 'required|integer|exists:wmng_nodes,id',
             'dst_node_id' => 'required|integer|exists:wmng_nodes,id',
@@ -54,6 +58,7 @@ class MapLinkController
 
     public function update(Request $request, Map $map, Link $link): JsonResponse
     {
+        $this->requireAdmin();
         $data = $request->validate([
             'src_node_id' => 'sometimes|integer',
             'dst_node_id' => 'sometimes|integer',
@@ -66,13 +71,14 @@ class MapLinkController
         try {
             $link = $this->linkService->updateLink($map, $link, $data);
             return response()->json(['success' => true, 'link' => $link]);
-        } catch (\RuntimeException $e) {
+        } catch (\InvalidArgumentException | \RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 
     public function delete(Map $map, Link $link): JsonResponse
     {
+        $this->requireAdmin();
         try {
             $this->linkService->deleteLink($map, $link);
             return response()->json(['success' => true]);

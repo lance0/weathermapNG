@@ -41,6 +41,37 @@ class DeviceDataService
         return $this->deviceMetrics->getDeviceMetrics((int) $node->device_id);
     }
 
+    /**
+     * Fetch metrics for many nodes in two queries total.
+     *
+     * @param array|Collection $nodes
+     * @return array<int, array{cpu: ?float, mem: ?float}>
+     */
+    public function getNodeMetricsBatch($nodes): array
+    {
+        $nodes = is_array($nodes) ? $nodes : iterator_to_array($nodes);
+
+        $deviceIds = [];
+        foreach ($nodes as $node) {
+            if (!empty($node->device_id)) {
+                $deviceIds[] = (int) $node->device_id;
+            }
+        }
+
+        $metricsByDevice = $this->deviceMetrics->getMetricsForDevices($deviceIds);
+
+        $result = [];
+        foreach ($nodes as $node) {
+            if (!empty($node->device_id) && isset($metricsByDevice[(int) $node->device_id])) {
+                $result[$node->id] = $metricsByDevice[(int) $node->device_id];
+            } else {
+                $result[$node->id] = ['cpu' => null, 'mem' => null];
+            }
+        }
+
+        return $result;
+    }
+
     public function getDeviceTraffic(int $deviceId): array
     {
         try {

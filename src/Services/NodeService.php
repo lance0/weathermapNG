@@ -39,8 +39,10 @@ class NodeService
         try {
             DB::transaction(function () use ($node, $map) {
                 $map->links()
-                    ->where('src_node_id', $node->id)
-                    ->orWhere('dst_node_id', $node->id)
+                    ->where(function ($q) use ($node) {
+                        $q->where('src_node_id', $node->id)
+                          ->orWhere('dst_node_id', $node->id);
+                    })
                     ->delete();
 
                 $node->delete();

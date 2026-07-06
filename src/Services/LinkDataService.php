@@ -25,24 +25,30 @@ class LinkDataService
 
     public function buildLinkAlerts(Map $map): array
     {
+        // Collect all port IDs across all links in one pass, fetch alerts
+        // in a single query, then compute per-link counts from the map.
+        $allPortIds = [];
+        foreach ($map->links as $link) {
+            if ($link->port_id_a) {
+                $allPortIds[] = $link->port_id_a;
+            }
+            if ($link->port_id_b) {
+                $allPortIds[] = $link->port_id_b;
+            }
+        }
+
+        $portAlerts = $this->alertService->portAlerts(array_values(array_unique($allPortIds)));
+
         $linkAlerts = [];
         foreach ($map->links as $link) {
-            $alertInfo = $this->buildLinkAlertInfo($link);
-            if ($alertInfo['alert_count'] > 0) {
-                $linkAlerts[$link->id] = $alertInfo;
+            $alertInfo = $this->calculateLinkAlertInfo($link, $portAlerts);
+            if (!empty($alertInfo)) {
+                $linkAlerts[$link->id] = array_merge($this->getLinkBaseData(), $alertInfo);
             }
         }
         return $linkAlerts;
     }
 
-    private function buildLinkAlertInfo(Link $link): array
-    {
-        $portIds = array_filter([$link->port_id_a, $link->port_id_b]);
-        $portAlerts = $this->alertService->portAlerts($portIds);
-        $alertInfo = $this->calculateLinkAlertInfo($link, $portAlerts);
-
-        return array_merge($this->getLinkBaseData(), $alertInfo);
-    }
 
     private function getLinkBaseData(): array
     {

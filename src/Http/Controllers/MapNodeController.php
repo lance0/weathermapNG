@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeService;
@@ -10,6 +11,8 @@ use Illuminate\Http\JsonResponse;
 
 class MapNodeController
 {
+    use AdminCheck;
+
     private $nodeService;
 
     public function __construct(NodeService $nodeService)
@@ -19,6 +22,8 @@ class MapNodeController
 
     public function store(Request $request, Map $map): JsonResponse
     {
+        $this->requireAdmin();
+
         $validated = $request->validate([
             'nodes' => 'required|array',
             'nodes.*.label' => 'required|string|max:255',
@@ -34,6 +39,8 @@ class MapNodeController
 
     public function create(Request $request, Map $map): JsonResponse
     {
+        $this->requireAdmin();
+
         $data = $request->validate([
             'label' => 'required|string|max:255',
             'x' => 'required|numeric',
@@ -49,6 +56,8 @@ class MapNodeController
 
     public function update(Request $request, Map $map, Node $node): JsonResponse
     {
+        $this->requireAdmin();
+
         $data = $request->validate([
             'label' => 'sometimes|string|max:255',
             'x' => 'sometimes|numeric',
@@ -67,6 +76,8 @@ class MapNodeController
 
     public function delete(Map $map, Node $node): JsonResponse
     {
+        $this->requireAdmin();
+
         try {
             $this->nodeService->deleteNode($map, $node);
             return response()->json(['success' => true]);

@@ -18,8 +18,8 @@ class IntegrationTest extends TestCase
     {
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\PortUtilService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\AlertService'));
-        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\MapDataBuilder'));
-        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\SseStreamService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\LinkDataService'));
+        $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\MapVersionService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\MapService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\NodeService'));
         $this->assertTrue(class_exists('LibreNMS\Plugins\WeathermapNG\Services\LinkService'));
@@ -36,11 +36,11 @@ class IntegrationTest extends TestCase
             \LibreNMS\Plugins\WeathermapNG\Services\NodeDataService::class
         );
 
-        $sseStreamService = $this->createMock(
-            \LibreNMS\Plugins\WeathermapNG\Services\SseStreamService::class
+        $mapService = $this->createMock(
+            \LibreNMS\Plugins\WeathermapNG\Services\MapService::class
         );
 
-        $controller = new \LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController($nodeDataService, $sseStreamService);
+        $controller = new \LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController($nodeDataService, $mapService);
 
         $this->assertInstanceOf(\LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController::class, $controller);
     }

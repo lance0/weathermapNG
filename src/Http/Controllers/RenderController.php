@@ -3,6 +3,8 @@
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
+use LibreNMS\Plugins\WeathermapNG\Services\MapService;
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeDataService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -11,11 +13,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RenderController
 {
-    private $nodeDataService;
+    use AdminCheck;
 
-    public function __construct(NodeDataService $nodeDataService)
+    private $nodeDataService;
+    private $mapService;
+
+    public function __construct(NodeDataService $nodeDataService, MapService $mapService)
     {
         $this->nodeDataService = $nodeDataService;
+        $this->mapService = $mapService;
     }
 
     public function json(Map $map): JsonResponse
@@ -25,6 +31,8 @@ class RenderController
 
     public function live(Map $map): JsonResponse
     {
+        $map->load(['nodes', 'links']);
+        $this->nodeDataService->preloadForMap($map);
         $data = [
             'ts' => time(),
             'links' => $this->nodeDataService->buildLinkData($map),
@@ -37,6 +45,8 @@ class RenderController
 
     public function embed(Map $map): View
     {
+        $map->load(['nodes', 'links']);
+        $this->nodeDataService->preloadForMap($map);
         $mapData = $map->toJsonModel();
         $mapId = $map->id;
 
@@ -56,6 +66,7 @@ class RenderController
         $format = $request->get('format', 'json');
 
         if ($format === 'json') {
+            $map->load(['nodes', 'links']);
             return response()->json($map->toJsonModel())
                            ->header('Content-Disposition', 'attachment; filename="' . $map->name . '.json"');
         }
@@ -65,27 +76,20 @@ class RenderController
 
     public function import(Request $request): JsonResponse
     {
+        $this->requireAdmin();
         $validated = $request->validate([
             'file' => 'required|file|mimes:json|max:10240',
             'name' => 'required|string|max:255|unique:wmng_maps,name',
             'title' => 'nullable|string|max:255',
         ]);
 
-        $file = $request->file('file');
-        if (!$file) {
-            return response()->json(['error' => 'No file uploaded'], 400);
+        try {
+            $map = $this->mapService->importMap($request, $validated);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        $content = file_get_contents($file->getRealPath());
-        $data = json_decode($content, true);
-
-        if (!$data || !isset($data['nodes']) || !isset($data['links'])) {
-            return response()->json(['error' => 'Invalid map file format'], 400);
-        }
-
-        $map = $this->createMapFromImport($validated, $data);
-        $nodeIdMap = $this->importNodes($map, $data['nodes']);
-        $this->importLinks($map, $data['links'], $nodeIdMap);
 
         return response()->json([
             'success' => true,
@@ -96,72 +100,11 @@ class RenderController
 
     public function sse(Map $map, Request $request): StreamedResponse
     {
+        $map->load(['nodes', 'links']);
+        $this->nodeDataService->preloadForMap($map);
         $interval = max(1, (int) $request->get('interval', 5));
         $maxSeconds = (int) $request->get('max', 300);  // 5 minutes default
 
         return $this->nodeDataService->stream($map, $interval, $maxSeconds);
-    }
-
-    private function createMapFromImport(array $validated, array $data): Map
-    {
-        return Map::create([
-            'name' => $validated['name'],
-            'title' => $validated['title'] ?? $validated['name'],
-            'options' => $data['options'] ?? [],
-        ]);
-    }
-
-    private function importNodes(Map $map, array $nodes): array
-    {
-        $nodeIdMap = [];
-
-        foreach ($nodes as $nodeData) {
-            $new = \LibreNMS\Plugins\WeathermapNG\Models\Node::create([
-                'map_id' => $map->id,
-                'label' => $nodeData['label'] ?? ('node-' . uniqid()),
-                'x' => $nodeData['x'] ?? 0,
-                'y' => $nodeData['y'] ?? 0,
-                'device_id' => $nodeData['device_id'] ?? null,
-                'meta' => $nodeData['meta'] ?? [],
-            ]);
-
-            $oldId = $nodeData['id'] ?? $nodeData['node_id'] ?? null;
-            if ($oldId !== null) {
-                $nodeIdMap[$oldId] = $new->id;
-            }
-        }
-
-        return $nodeIdMap;
-    }
-
-    private function importLinks(Map $map, array $links, array $nodeIdMap): void
-    {
-        foreach ($links as $linkData) {
-            $sourceId = $this->resolveNodeId($linkData, $nodeIdMap, 'src');
-            $targetId = $this->resolveNodeId($linkData, $nodeIdMap, 'dst');
-
-            if (!$sourceId || !$targetId) {
-                continue;
-            }
-
-            \LibreNMS\Plugins\WeathermapNG\Models\Link::create([
-                'map_id' => $map->id,
-                'src_node_id' => $sourceId,
-                'dst_node_id' => $targetId,
-                'port_id_a' => $linkData['port_id_a'] ?? null,
-                'port_id_b' => $linkData['port_id_b'] ?? null,
-                'bandwidth_bps' => $linkData['bandwidth_bps'] ?? null,
-                'style' => $linkData['style'] ?? [],
-            ]);
-        }
-    }
-
-    private function resolveNodeId(array $linkData, array $nodeIdMap, string $type): ?int
-    {
-        $key = $type === 'src' ? 'source' : 'target';
-        $altKey = $type === 'src' ? 'src_node_id' : 'dst_node_id';
-
-        $oldId = $linkData[$type] ?? $linkData[$key] ?? $linkData[$altKey] ?? null;
-        return $nodeIdMap[$oldId] ?? (is_numeric($oldId) ? (int)$oldId : null);
     }
 }

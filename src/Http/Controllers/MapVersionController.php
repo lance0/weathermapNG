@@ -8,9 +8,11 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
 use LibreNMS\Plugins\WeathermapNG\Services\MapVersionService;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 
 class MapVersionController extends Controller
 {
+    use AdminCheck;
     private $mapVersionService;
     private $mapService;
 
@@ -77,6 +79,7 @@ class MapVersionController extends Controller
 
     public function store(\Illuminate\Http\Request $request, int $mapId): JsonResponse
     {
+        $this->requireAdmin();
         $map = Map::findOrFail($mapId);
         $userId = auth()->id();
 
@@ -98,6 +101,7 @@ class MapVersionController extends Controller
 
     public function restore(int $versionId): JsonResponse
     {
+        $this->requireAdmin();
         $version = MapVersion::findOrFail($versionId);
         $this->mapVersionService->restoreVersion($version);
 
@@ -138,6 +142,7 @@ class MapVersionController extends Controller
 
     public function destroy(int $versionId): JsonResponse
     {
+        $this->requireAdmin();
         $version = MapVersion::findOrFail($versionId);
 
         $this->mapVersionService->deleteVersionsOlderThan($version);
@@ -221,6 +226,7 @@ class MapVersionController extends Controller
 
     public function updateSettings(\Illuminate\Http\Request $request): JsonResponse
     {
+        $this->requireAdmin();
         return response()->json([
             'success' => true,
             'message' => 'Settings updated successfully',
@@ -230,6 +236,7 @@ class MapVersionController extends Controller
 
     public function autoSave(\Illuminate\Http\Request $request, int $mapId): JsonResponse
     {
+        $this->requireAdmin();
         $map = Map::findOrFail($mapId);
 
         if (!$request->has('name')) {

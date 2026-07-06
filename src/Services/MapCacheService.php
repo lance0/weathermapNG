@@ -95,11 +95,10 @@ class MapCacheService
 
             $mapData = $map->toArray();
             $mapData['nodes'] = Node::where('map_id', $mapId)
-                ->with('device')
                 ->get()
                 ->toArray();
             $mapData['links'] = Link::where('map_id', $mapId)
-                ->with(['sourceNode.device', 'destNode.device', 'portA', 'portB'])
+                ->with(['sourceNode', 'destinationNode'])
                 ->get()
                 ->toArray();
 

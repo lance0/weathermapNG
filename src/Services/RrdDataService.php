@@ -9,10 +9,61 @@ use Illuminate\Support\Facades\Log;
 class RrdDataService
 {
     private RRDTool $rrdTool;
+    private array $portInfoCache = [];
+    private array $deviceInfoCache = [];
 
     public function __construct(RRDTool $rrdTool)
     {
         $this->rrdTool = $rrdTool;
+    }
+    public function preloadPortInfo(array $portIds): void
+    {
+        $ids = array_values(array_unique(array_filter($portIds, fn ($id) => $id > 0)));
+        if (empty($ids)) {
+            return;
+        }
+
+        try {
+            $rows = class_exists('\\App\\Models\\Port')
+                ? \App\Models\Port::whereIn('port_id', $ids)
+                    ->get(['device_id', 'ifIndex', 'ifName', 'port_id'])->keyBy('port_id')
+                : DB::table('ports')->whereIn('port_id', $ids)
+                    ->get(['device_id', 'ifIndex', 'ifName', 'port_id'])->keyBy('port_id');
+
+            foreach ($ids as $id) {
+                $this->portInfoCache[$id] = $rows->has($id) ? (array) $rows->get($id) : null;
+            }
+        } catch (\Exception $e) {
+            Log::debug('Failed to preload port info: ' . $e->getMessage());
+        }
+    }
+
+    public function preloadDeviceInfo(array $deviceIds): void
+    {
+        $ids = array_values(array_unique(array_filter($deviceIds, fn ($id) => $id > 0)));
+        if (empty($ids)) {
+            return;
+        }
+
+        try {
+            $rows = class_exists('\\App\\Models\\Device')
+                ? \App\Models\Device::whereIn('device_id', $ids)
+                    ->get(['hostname', 'sysName', 'rrd_path'])->keyBy('device_id')
+                : DB::table('devices')->whereIn('device_id', $ids)
+                    ->get(['hostname', 'sysName', 'rrd_path'])->keyBy('device_id');
+
+            foreach ($ids as $id) {
+                $this->deviceInfoCache[$id] = $rows->has($id) ? (array) $rows->get($id) : null;
+            }
+        } catch (\Exception $e) {
+            Log::debug('Failed to preload device info: ' . $e->getMessage());
+        }
+    }
+
+    public function flushRequestCache(): void
+    {
+        $this->portInfoCache = [];
+        $this->deviceInfoCache = [];
     }
 
     public function getPortTraffic(int $portId): ?array
@@ -32,6 +83,10 @@ class RrdDataService
 
     private function getPortInfo(int $portId): ?array
     {
+        if (array_key_exists($portId, $this->portInfoCache)) {
+            return $this->portInfoCache[$portId];
+        }
+
         try {
             $query = class_exists('\\App\\Models\\Port')
                 ? \App\Models\Port::select('device_id', 'ifIndex', 'ifName', 'port_id')
@@ -39,7 +94,7 @@ class RrdDataService
                 : DB::table('ports')->select('device_id', 'ifIndex', 'ifName', 'port_id')
                     ->where('port_id', $portId)->first();
 
-            return $query ? (array) $query : null;
+            return $this->portInfoCache[$portId] = $query ? (array) $query : null;
         } catch (\Exception $e) {
             Log::debug("Failed to get port info for port {$portId}: " . $e->getMessage());
             return null;
@@ -87,6 +142,10 @@ class RrdDataService
 
     private function getDeviceInfo(int $deviceId): ?array
     {
+        if (array_key_exists($deviceId, $this->deviceInfoCache)) {
+            return $this->deviceInfoCache[$deviceId];
+        }
+
         try {
             $device = class_exists('\\App\\Models\\Device')
                 ? \App\Models\Device::select('hostname', 'sysName', 'rrd_path')
@@ -94,7 +153,7 @@ class RrdDataService
                 : DB::table('devices')->select('hostname', 'sysName', 'rrd_path')
                     ->where('device_id', $deviceId)->first();
 
-            return $device ? (array) $device : null;
+            return $this->deviceInfoCache[$deviceId] = $device ? (array) $device : null;
         } catch (\Exception $e) {
             Log::debug("Failed to get device info for device {$deviceId}: " . $e->getMessage());
             return null;

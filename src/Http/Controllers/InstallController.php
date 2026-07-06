@@ -5,11 +5,14 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\WeathermapNG;
 use Exception;
 
 class InstallController extends Controller
 {
+    use AdminCheck;
+
     public function index(): \Illuminate\View\View
     {
         $requirements = $this->checkRequirements();
@@ -26,6 +29,7 @@ class InstallController extends Controller
 
     public function install(): \Illuminate\Http\JsonResponse
     {
+        $this->requireAdmin();
         try {
             $plugin = new WeathermapNG();
 

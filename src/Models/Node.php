@@ -3,12 +3,16 @@
 namespace LibreNMS\Plugins\WeathermapNG\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Node extends Model
 {
     protected $table = 'wmng_nodes';
     protected $fillable = ['map_id', 'label', 'x', 'y', 'device_id', 'meta'];
     protected $casts = ['meta' => 'array'];
+
+    /** @var array<int, array<string,mixed>|null> Batch-prefetch cache for device lookups. */
+    private static array $deviceCache = [];
 
     public function map()
     {
@@ -25,33 +29,94 @@ class Node extends Model
         return $this->hasMany(Link::class, 'dst_node_id');
     }
 
-    public function getDeviceNameAttribute()
+    /**
+     * Flush the static device prefetch cache.
+     */
+    public static function flushDeviceCache(): void
     {
-        if (!$this->device_id) {
-            return null;
+        self::$deviceCache = [];
+    }
+
+    /**
+     * Prefetch a set of devices in a single query and cache their array forms.
+     *
+     * @param array<int> $deviceIds
+     */
+    public static function preloadDevices(array $deviceIds): void
+    {
+        $ids = array_values(array_unique(array_filter($deviceIds, fn ($id) => $id !== null && $id !== 0)));
+        if (empty($ids)) {
+            return;
         }
 
-        $device = $this->fetchDevice($this->device_id);
-        return $device ? $device->hostname : null;
+        $remaining = array_values(array_filter($ids, fn ($id) => !array_key_exists($id, self::$deviceCache)));
+        if (empty($remaining)) {
+            return;
+        }
+
+        if (class_exists('App\\Models\\Device')) {
+            $devices = \App\Models\Device::whereIn('device_id', $remaining)
+                ->get(['device_id', 'hostname', 'status'])
+                ->keyBy('device_id');
+            foreach ($devices as $deviceId => $device) {
+                self::$deviceCache[$deviceId] = (array) $device;
+            }
+        } else {
+            $devices = DB::table('devices')
+                ->whereIn('device_id', $remaining)
+                ->get(['device_id', 'hostname', 'status'])
+                ->keyBy('device_id');
+            foreach ($devices as $deviceId => $device) {
+                self::$deviceCache[$deviceId] = (array) $device;
+            }
+        }
+
+        // Record null for any device that was not found, so single-row lookups don't re-fire.
+        foreach ($remaining as $id) {
+            self::$deviceCache[$id] ??= null;
+        }
+    }
+
+    public function getDeviceNameAttribute()
+    {
+        $device = $this->resolveDevice($this->device_id);
+        return $device['hostname'] ?? null;
     }
 
     public function getStatusAttribute()
     {
-        if (!$this->device_id) {
-            return 'unknown';
-        }
-
-        $device = $this->fetchDevice($this->device_id);
+        $device = $this->resolveDevice($this->device_id);
         return $this->parseDeviceStatus($device);
     }
 
-    private function fetchDevice(int $deviceId)
+    /**
+     * Resolve a device row from the static cache, falling back to a single fetch.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function resolveDevice(?int $deviceId): ?array
     {
-        if (class_exists('App\\Models\\Device')) {
-            return \App\Models\Device::find($deviceId);
+        if ($deviceId === null || $deviceId === 0) {
+            return null;
         }
 
-        return dbFetchRow("SELECT hostname, status FROM devices WHERE device_id = ?", [$deviceId]);
+        if (array_key_exists($deviceId, self::$deviceCache)) {
+            return self::$deviceCache[$deviceId];
+        }
+
+        $device = $this->fetchDevice($deviceId);
+        return self::$deviceCache[$deviceId] = $device;
+    }
+
+    private function fetchDevice(int $deviceId): ?array
+    {
+        if (class_exists('App\\Models\\Device')) {
+            $device = \App\Models\Device::find($deviceId);
+            return $device ? (array) $device : null;
+        }
+
+        $row = dbFetchRow("SELECT hostname, status FROM devices WHERE device_id = ?", [$deviceId]);
+        return $row ?: null;
     }
 
     private function parseDeviceStatus($device): string

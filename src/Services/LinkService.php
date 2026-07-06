@@ -12,13 +12,7 @@ class LinkService
 {
     public function createLink(Map $map, array $data): Link
     {
-        $this->validateLinkData($data);
-
-        $srcNode = Node::find($data['src_node_id']);
-        $dstNode = Node::find($data['dst_node_id']);
-
-        $this->validateNodesBelongToMap($map, $srcNode, $dstNode);
-        $this->validatePortDevicePairing($data, $srcNode, $dstNode);
+        $this->validateLinkForMap($map, $data);
 
         return Link::create([
             'map_id' => $map->id,
@@ -35,6 +29,17 @@ class LinkService
     {
         $this->validateLinkOwnership($map, $link);
 
+        $newData = array_merge(
+            [
+                'src_node_id' => $link->src_node_id,
+                'dst_node_id' => $link->dst_node_id,
+                'port_id_a' => $link->port_id_a,
+                'port_id_b' => $link->port_id_b,
+            ],
+            $data
+        );
+        $this->validateLinkForMap($map, $newData);
+
         $link->fill($data);
         $link->save();
 
@@ -47,6 +52,17 @@ class LinkService
         $link->delete();
     }
 
+    private function validateLinkForMap(Map $map, array $linkData): void
+    {
+        $this->validateLinkData($linkData);
+
+        $srcNode = Node::find($linkData['src_node_id']);
+        $dstNode = Node::find($linkData['dst_node_id']);
+
+        $this->validateNodesBelongToMap($map, $srcNode, $dstNode);
+        $this->validatePortDevicePairing($linkData, $srcNode, $dstNode);
+    }
+
     public function storeLinks(Map $map, array $linksData): void
     {
         try {
@@ -54,6 +70,8 @@ class LinkService
                 $map->links()->delete();
 
                 foreach ($linksData as $linkData) {
+                    $this->validateLinkForMap($map, $linkData);
+
                     Link::create([
                         'map_id' => $map->id,
                         'src_node_id' => $linkData['src_node_id'],

@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use LibreNMS\Plugins\WeathermapNG\Models\MapTemplate;
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 
 class MapTemplateController extends Controller
 {
+    use AdminCheck;
+
     public function index(): JsonResponse
     {
         $templates = MapTemplate::all();
@@ -38,6 +41,7 @@ class MapTemplateController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $this->requireAdmin();
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'title' => 'nullable|string|max:255',
@@ -63,6 +67,7 @@ class MapTemplateController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        $this->requireAdmin();
         $template = MapTemplate::find($id);
 
         if (!$template) {
@@ -94,6 +99,7 @@ class MapTemplateController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
+        $this->requireAdmin();
         $template = MapTemplate::find($id);
 
         if (!$template) {
@@ -120,6 +126,7 @@ class MapTemplateController extends Controller
 
     public function createFromTemplate(Request $request, int $id): JsonResponse
     {
+        $this->requireAdmin();
         $template = MapTemplate::find($id);
 
         if (!$template) {

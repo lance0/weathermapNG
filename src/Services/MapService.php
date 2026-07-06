@@ -133,9 +133,8 @@ class MapService
     private function createLinks(Map $map, array $linksData, array $nodeIdMap): void
     {
         foreach ($linksData as $linkData) {
-            $sourceId = $this->resolveNodeId($linkData['src_node_id'] ?? $linkData['source'] ?? null, $nodeIdMap);
-            $targetId = $this->resolveNodeId($linkData['dst_node_id'] ?? $linkData['target'] ?? null, $nodeIdMap);
-
+            $sourceId = $this->resolveNodeId($linkData['src_node_id'] ?? $linkData['source'] ?? $linkData['src'] ?? null, $nodeIdMap);
+            $targetId = $this->resolveNodeId($linkData['dst_node_id'] ?? $linkData['target'] ?? $linkData['dst'] ?? null, $nodeIdMap);
             if (!$sourceId || !$targetId) {
                 continue;
             }
@@ -181,11 +180,15 @@ class MapService
 
         try {
             return DB::transaction(function () use ($data, $validated) {
-                $map = $this->createMap([
+                $options = $data['options'] ?? [];
+                if (empty($options)) {
+                    $options = ['width' => 800, 'height' => 600, 'background' => '#ffffff'];
+                }
+
+                $map = Map::create([
                     'name' => $validated['name'],
                     'title' => $validated['title'] ?? $validated['name'],
-                    'width' => $data['options']['width'] ?? null,
-                    'height' => $data['options']['height'] ?? null,
+                    'options' => $options,
                 ]);
 
                 $nodeIdMap = $this->createNodes($map, $data['nodes']);
