@@ -188,7 +188,7 @@ Create link request:
 
 ## Version History Routes
 
-The codebase includes `MapVersionController` and editor UI for map version history, but the authoritative route list is `routes/web.php`. If version routes are added or restored, update this section and `VERSIONING.md` in the same change.
+The codebase includes `MapVersionController`, `MapVersionService`, and model code, but version-history routes are not registered in `routes/web.php` and the editor UI was removed in v1.7.0 (broken backend). If version routes are added or restored, update this section and `VERSIONING.md` in the same change.
 
 ## Error Shape
 
