@@ -332,7 +332,7 @@ These ideas are intentionally parked until the core product feels polished and m
 - [x] Node boundary checking and canvas resize validation.
 - [x] Node duplication and inline property editing.
 - [x] Link mode with visual feedback.
-- [x] Unsaved changes indicator and auto-save support.
+- [x] Unsaved changes indicator (auto-save wiring removed in v1.7.0 — referenced non-existent elements).
 - [x] Fixed link bandwidth utilization calculation accuracy.
 - [x] Templates gallery with built-in map templates.
 - [x] Main index page redesign with search, sort, improved cards, and empty state.
@@ -355,7 +355,7 @@ These ideas are intentionally parked until the core product feels polished and m
 ### v1.5.x
 
 - [x] Map versioning foundation: storage and services only (editor UI removed in v1.7.0; routes not registered — see VERSIONING.md).
-- [x] Auto-save functionality.
+- [x] Auto-save functionality (wiring removed in v1.7.0 — dead code referencing non-existent elements).
 - [x] Demo mode for testing without devices.
 - [x] Docker development environment.
 - [x] Improved install scripts.

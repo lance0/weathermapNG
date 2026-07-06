@@ -57,9 +57,12 @@ Implemented foundation:
 
 - Data model and table for named map versions with optional descriptions.
 - Service/controller code for saving, restoring, listing, comparing, deleting, and exporting versions.
-- Editor UI hooks for version actions.
-- Auto-save support from the editor flow.
 - Retain snapshots of nodes, links, and map settings.
+
+Removed in v1.7.0 (broken backend, routes not registered):
+
+- Editor UI hooks for version actions (buttons, modals, and inline JS removed from editor).
+- Auto-save support from the editor flow (dead code removed — referenced non-existent elements).
 
 Before documenting version-history endpoints as public API, verify they are registered in `routes/web.php` and covered by route tests.
 
@@ -80,7 +83,7 @@ The table is created by `database/setup.php` on fresh installs and upgrades.
 
 Routes are registered from `routes/web.php` through Laravel package discovery. That file is the authoritative route list.
 
-The codebase includes `MapVersionController`, `MapVersionService`, model code, and editor UI hooks for version history. If version-history routes are added or restored, update this document and [API.md](API.md) in the same change.
+The codebase includes `MapVersionController`, `MapVersionService`, and model code (routes are not registered in `routes/web.php`; editor UI was removed in v1.7.0). If version-history routes are added or restored, update this document and [API.md](API.md) in the same change.
 
 ## Planned Map Versioning Work
 
