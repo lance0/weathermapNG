@@ -29,10 +29,15 @@ class MapService
 
     public function updateMap(Map $map, array $data): Map
     {
-        $options = $map->options ?? [];
-        $options['width'] = $data['width'] ?? $options['width'] ?? 800;
-        $options['height'] = $data['height'] ?? $options['height'] ?? 600;
-        $options['background'] = $data['background'] ?? $options['background'] ?? '#ffffff';
+        $options = array_merge($map->options ?? [], array_filter([
+            'width' => $data['width'] ?? null,
+            'height' => $data['height'] ?? null,
+            'background' => $data['background'] ?? null,
+        ], fn($value) => $value !== null));
+
+        // Ensure width/height always have defaults
+        $options['width'] = $options['width'] ?? 800;
+        $options['height'] = $options['height'] ?? 600;
 
         $update = ['options' => $options];
         if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
@@ -81,7 +86,6 @@ class MapService
         if (!empty($data['options'])) {
             $updates['options'] = $this->mergeMapOptions($map->options ?? [], $data['options']);
         }
-
         if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
             $updates['title'] = $data['title'];
         }
@@ -93,11 +97,14 @@ class MapService
 
     private function mergeMapOptions(array $currentOptions, array $newOptions): array
     {
-        return array_merge($currentOptions, array_filter([
-            'width' => $newOptions['width'] ?? $currentOptions['width'] ?? 800,
-            'height' => $newOptions['height'] ?? $currentOptions['height'] ?? 600,
-            'background' => $newOptions['background'] ?? $currentOptions['background'] ?? null,
-        ], fn($value) => $value !== null));
+        $merged = array_merge($currentOptions, $newOptions);
+
+        // Ensure width/height/background always have defaults
+        $merged['width'] = $merged['width'] ?? 800;
+        $merged['height'] = $merged['height'] ?? 600;
+        $merged['background'] = $merged['background'] ?? '#ffffff';
+
+        return $merged;
     }
 
     private function replaceMapContent(Map $map, array $data): void

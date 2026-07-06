@@ -232,7 +232,7 @@
                         <option value="">Select interface...</option>
                     </select>
                 </div>
-                <button class="btn btn-success btn-sm btn-block" onclick="addNode()">
+                <button type="button" class="btn btn-success btn-sm btn-block" onclick="addNode()" aria-label="Add node to canvas">
                     <i class="fas fa-plus"></i> Add to Canvas
                 </button>
             </div>
@@ -261,9 +261,9 @@
                     </select>
                 </div>
                 <div class="btn-group btn-group-sm d-flex">
-                    <button class="btn btn-primary" onclick="saveSelectedNode()"><i class="fas fa-check"></i> Apply</button>
-                    <button class="btn btn-secondary" onclick="duplicateSelectedNode()" title="Duplicate"><i class="fas fa-copy"></i></button>
-                    <button class="btn btn-danger" onclick="deleteSelectedNode()" title="Delete"><i class="fas fa-trash"></i></button>
+                    <button type="button" class="btn btn-primary" onclick="saveSelectedNode()" aria-label="Apply node changes"><i class="fas fa-check"></i> Apply</button>
+                    <button type="button" class="btn btn-secondary" onclick="duplicateSelectedNode()" title="Duplicate" aria-label="Duplicate selected node"><i class="fas fa-copy"></i></button>
+                    <button type="button" class="btn btn-danger" onclick="deleteSelectedNode()" title="Delete" aria-label="Delete selected node"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
         </div>
@@ -315,10 +315,10 @@
         <div class="panel">
             <div class="panel-header"><i class="fas fa-ellipsis-h mr-1"></i> Actions</div>
             <div class="panel-body">
-                <button class="btn btn-outline-secondary btn-sm btn-block mb-1" onclick="exportJson()">
+                <button type="button" class="btn btn-outline-secondary btn-sm btn-block mb-1" onclick="exportJson()" aria-label="Export map as JSON">
                     <i class="fas fa-download"></i> Export JSON
                 </button>
-                <button class="btn btn-outline-danger btn-sm btn-block" onclick="clearCanvas()">
+                <button type="button" class="btn btn-outline-danger btn-sm btn-block" onclick="clearCanvas()" aria-label="Clear canvas">
                     <i class="fas fa-trash"></i> Clear Canvas
                 </button>
             </div>
@@ -543,7 +543,9 @@
             // Run on load with slight delay to ensure styles are applied
             document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(detectTheme, 100);
-                // Watch for class/style changes that might indicate theme switch
+                // Watch for class/style changes that might indicate theme switch.
+                // NOTE: This broad body observer could be replaced with a narrower hook
+                // (e.g. a LibreNMS theme event or data-bs-theme attribute listener) in a future refactor.
                 const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
                 observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
                 observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'data-bs-theme'] });

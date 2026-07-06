@@ -50,7 +50,7 @@ unset($link);
                             <a href="/plugin/v1/WeathermapNG/editor/<?php echo $mapId; ?>" class="btn btn-warning">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
-                            <button class="btn btn-info" onclick="refreshMap()">
+                            <button type="button" class="btn btn-info" onclick="refreshMap()" aria-label="Refresh map">
                                 <i class="fas fa-sync"></i> Refresh
                             </button>
                         </div>

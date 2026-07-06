@@ -10,6 +10,14 @@
     --weathermap-light: #f8f9fa;
     --weathermap-dark: #343a40;
     --weathermap-border: #dee2e6;
+    --weathermap-focus: #4a90d9;
+}
+
+/* Keyboard focus visibility — ensure outlines are visible for keyboard users */
+button:focus-visible,
+a:focus-visible {
+    outline: 2px solid var(--weathermap-focus, #4a90d9);
+    outline-offset: 2px;
 }
 
 /* Main container styles */

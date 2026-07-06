@@ -77,11 +77,11 @@
                     <!-- Install Button -->
                     <div class="text-center">
                         @if($steps['requirements'])
-                            <button class="btn btn-primary btn-lg" id="installBtn" onclick="startInstallation()">
+                            <button type="button" class="btn btn-primary btn-lg" id="installBtn" onclick="startInstallation()" aria-label="Start installation">
                                 <i class="fas fa-play"></i> Start Installation
                             </button>
                         @else
-                            <button class="btn btn-secondary btn-lg" disabled>
+                            <button type="button" class="btn btn-secondary btn-lg" disabled aria-label="Fix requirements first">
                                 <i class="fas fa-exclamation-triangle"></i> Fix Requirements First
                             </button>
                         @endif

@@ -394,11 +394,11 @@
                     <p class="wmng-subtitle">Real-time network topology visualization with live traffic data</p>
                 </div>
                 <div class="wmng-header-actions">
-                    <button class="btn btn-outline-secondary" data-toggle="modal" data-target="#importMapModal"
+                    <button type="button" class="btn btn-outline-secondary" data-toggle="modal" data-target="#importMapModal"
                             aria-label="Import map from file">
                         <i class="fas fa-file-import" aria-hidden="true"></i> Import
                     </button>
-                    <button class="btn btn-success" data-toggle="modal" data-target="#createMapModal"
+                    <button type="button" class="btn btn-success" data-toggle="modal" data-target="#createMapModal"
                             aria-label="Create new map">
                         <i class="fas fa-plus" aria-hidden="true"></i> Create Map
                     </button>
@@ -500,7 +500,7 @@
                                aria-label="Export map {{ $map->name }}">
                                 <i class="fas fa-download" aria-hidden="true"></i>
                             </a>
-                            <button class="map-card-action danger" title="Delete map"
+                            <button type="button" class="map-card-action danger" title="Delete map"
                                     onclick="deleteMap({{ $map->id }}, '{{ addslashes($map->name) }}')"
                                     aria-label="Delete map {{ $map->name }}">
                                 <i class="fas fa-trash" aria-hidden="true"></i>
@@ -516,7 +516,7 @@
                         </div>
                         <h3>No maps yet</h3>
                         <p>Create your first network map to visualize your infrastructure with real-time traffic data.</p>
-                        <button class="btn btn-success btn-lg" data-toggle="modal" data-target="#createMapModal"
+                        <button type="button" class="btn btn-success btn-lg" data-toggle="modal" data-target="#createMapModal"
                                 aria-label="Create your first map">
                             <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create Your First Map
                         </button>
@@ -532,7 +532,7 @@
             </div>
             <h3>No matching maps</h3>
             <p>Try a different search term or clear the filter.</p>
-            <button class="btn btn-outline-secondary" onclick="document.getElementById('map-search').value=''; document.getElementById('map-search').dispatchEvent(new Event('input'));">
+            <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('map-search').value=''; document.getElementById('map-search').dispatchEvent(new Event('input'));" aria-label="Clear search filter">
                 Clear Search
             </button>
         </div>
@@ -748,6 +748,8 @@ function detectTheme() {
 
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(detectTheme, 100);
+    // NOTE: This broad body observer could be replaced with a narrower hook
+    // (e.g. a LibreNMS theme event or data-bs-theme attribute listener) in a future refactor.
     const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
     observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });

@@ -33,7 +33,7 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
 </head>
 <body class="weathermap-editor">
     <!-- Toolbar -->
-    <div class="editor-toolbar">
+    <div class="editor-toolbar" role="toolbar" aria-label="Editor toolbar">
         <div class="toolbar-title">
             <h2>
                 <i class="fas fa-edit"></i> 
@@ -41,25 +41,25 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
             </h2>
         </div>
         <div class="toolbar-actions">
-            <button class="btn-toolbar" onclick="toggleGrid()">
+            <button type="button" class="btn-toolbar" onclick="toggleGrid()" aria-label="Toggle grid">
                 <i class="fas fa-border-all"></i> Grid
             </button>
-            <button class="btn-toolbar" onclick="toggleSnap()">
+            <button type="button" class="btn-toolbar" onclick="toggleSnap()" aria-label="Toggle snap to grid">
                 <i class="fas fa-magnet"></i> Snap
             </button>
-            <button class="btn-toolbar" onclick="undo()">
+            <button type="button" class="btn-toolbar" onclick="undo()" aria-label="Undo">
                 <i class="fas fa-undo"></i> Undo
             </button>
-            <button class="btn-toolbar" onclick="redo()">
+            <button type="button" class="btn-toolbar" onclick="redo()" aria-label="Redo">
                 <i class="fas fa-redo"></i> Redo
             </button>
-            <button class="btn-toolbar btn-toolbar-danger" onclick="clearAll()">
+            <button type="button" class="btn-toolbar btn-toolbar-danger" onclick="clearAll()" aria-label="Clear all">
                 <i class="fas fa-trash"></i> Clear
             </button>
-            <button class="btn-toolbar btn-toolbar-primary" onclick="saveMap()">
+            <button type="button" class="btn-toolbar btn-toolbar-primary" onclick="saveMap()" aria-label="Save map">
                 <i class="fas fa-save"></i> Save
             </button>
-            <button class="btn-toolbar" onclick="exitEditor()">
+            <button type="button" class="btn-toolbar" onclick="exitEditor()" aria-label="Exit editor">
                 <i class="fas fa-times"></i> Exit
             </button>
         </div>
@@ -72,27 +72,27 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
             <div class="sidebar-section">
                 <h3>Tools</h3>
                 <div class="tool-grid">
-                    <button class="tool-btn" onclick="setTool('select')" data-tool="select">
+                    <button type="button" class="tool-btn" onclick="setTool('select')" data-tool="select" aria-label="Select tool">
                         <i class="fas fa-mouse-pointer"></i>
                         <span>Select</span>
                     </button>
-                    <button class="tool-btn" onclick="setTool('node')" data-tool="node">
+                    <button type="button" class="tool-btn" onclick="setTool('node')" data-tool="node" aria-label="Add node tool">
                         <i class="fas fa-circle"></i>
                         <span>Add Node</span>
                     </button>
-                    <button class="tool-btn" onclick="setTool('link')" data-tool="link">
+                    <button type="button" class="tool-btn" onclick="setTool('link')" data-tool="link" aria-label="Add link tool">
                         <i class="fas fa-link"></i>
                         <span>Add Link</span>
                     </button>
-                    <button class="tool-btn" onclick="setTool('text')" data-tool="text">
+                    <button type="button" class="tool-btn" onclick="setTool('text')" data-tool="text" aria-label="Add text tool">
                         <i class="fas fa-font"></i>
                         <span>Add Text</span>
                     </button>
-                    <button class="tool-btn" onclick="setTool('move')" data-tool="move">
+                    <button type="button" class="tool-btn" onclick="setTool('move')" data-tool="move" aria-label="Pan tool">
                         <i class="fas fa-arrows-alt"></i>
                         <span>Pan</span>
                     </button>
-                    <button class="tool-btn" onclick="setTool('delete')" data-tool="delete">
+                    <button type="button" class="tool-btn" onclick="setTool('delete')" data-tool="delete" aria-label="Delete tool">
                         <i class="fas fa-eraser"></i>
                         <span>Delete</span>
                     </button>
@@ -103,19 +103,19 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
             <div class="sidebar-section">
                 <h3>Node Templates</h3>
                 <div class="tool-grid">
-                    <button class="tool-btn" onclick="addTemplateNode('router')">
+                    <button type="button" class="tool-btn" onclick="addTemplateNode('router')" aria-label="Add router node">
                         <i class="fas fa-server"></i>
                         <span>Router</span>
                     </button>
-                    <button class="tool-btn" onclick="addTemplateNode('switch')">
+                    <button type="button" class="tool-btn" onclick="addTemplateNode('switch')" aria-label="Add switch node">
                         <i class="fas fa-network-wired"></i>
                         <span>Switch</span>
                     </button>
-                    <button class="tool-btn" onclick="addTemplateNode('firewall')">
+                    <button type="button" class="tool-btn" onclick="addTemplateNode('firewall')" aria-label="Add firewall node">
                         <i class="fas fa-shield-alt"></i>
                         <span>Firewall</span>
                     </button>
-                    <button class="tool-btn" onclick="addTemplateNode('server')">
+                    <button type="button" class="tool-btn" onclick="addTemplateNode('server')" aria-label="Add server node">
                         <i class="fas fa-database"></i>
                         <span>Server</span>
                     </button>
@@ -146,7 +146,7 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <button class="btn btn-primary btn-sm mt-2" onclick="assignDevice()">
+                    <button type="button" class="btn btn-primary btn-sm mt-2" onclick="assignDevice()" aria-label="Assign device to selected node">
                         Assign to Selected
                     </button>
                 </div>
@@ -171,13 +171,13 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName, type FROM devices O
                 
                 <!-- Zoom Controls -->
                 <div class="zoom-controls">
-                    <button class="zoom-btn" onclick="zoomIn()">
+                    <button type="button" class="zoom-btn" onclick="zoomIn()" aria-label="Zoom in">
                         <i class="fas fa-plus"></i>
                     </button>
-                    <button class="zoom-btn" onclick="resetZoom()">
+                    <button type="button" class="zoom-btn" onclick="resetZoom()" aria-label="Reset zoom">
                         <i class="fas fa-compress"></i>
                     </button>
-                    <button class="zoom-btn" onclick="zoomOut()">
+                    <button type="button" class="zoom-btn" onclick="zoomOut()" aria-label="Zoom out">
                         <i class="fas fa-minus"></i>
                     </button>
                 </div>

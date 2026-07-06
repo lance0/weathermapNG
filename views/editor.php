@@ -40,7 +40,7 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName FROM devices ORDER B
                             <a href="/plugin/v1/WeathermapNG" class="btn btn-default btn-sm">
                                 <i class="fas fa-arrow-left"></i> Back
                             </a>
-                            <button class="btn btn-success btn-sm" onclick="saveMap()">
+                            <button type="button" class="btn btn-success btn-sm" onclick="saveMap()" aria-label="Save map">
                                 <i class="fas fa-save"></i> Save
                             </button>
                         </div>
@@ -64,13 +64,13 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName FROM devices ORDER B
                             <div class="panel panel-info">
                                 <div class="panel-heading">Tools</div>
                                 <div class="panel-body">
-                                    <button class="btn btn-primary btn-block" onclick="addNode()">
+                                    <button type="button" class="btn btn-primary btn-block" onclick="addNode()" aria-label="Add node">
                                         <i class="fas fa-plus"></i> Add Node
                                     </button>
-                                    <button class="btn btn-info btn-block" onclick="addLink()">
+                                    <button type="button" class="btn btn-info btn-block" onclick="addLink()" aria-label="Add link">
                                         <i class="fas fa-link"></i> Add Link
                                     </button>
-                                    <button class="btn btn-warning btn-block" onclick="clearSelection()">
+                                    <button type="button" class="btn btn-warning btn-block" onclick="clearSelection()" aria-label="Clear selection">
                                         <i class="fas fa-times"></i> Clear Selection
                                     </button>
                                     <hr>
@@ -83,7 +83,7 @@ $devices = dbFetchRows("SELECT device_id, hostname, sysName FROM devices ORDER B
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <button class="btn btn-sm btn-success btn-block" onclick="assignDevice()">
+                                    <button type="button" class="btn btn-sm btn-success btn-block" onclick="assignDevice()" aria-label="Assign device to selected node">
                                         Assign to Selected Node
                                     </button>
                                 </div>
