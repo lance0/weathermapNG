@@ -191,9 +191,6 @@
                     <i class="fas fa-eye"></i>
                 </a>
                 @endif
-                <button type="button" class="btn btn-sm btn-outline-secondary mr-2" onclick="openVersionHistory()" title="Version History">
-                    <i class="fas fa-history"></i>
-                </button>
                 <button type="button" class="btn btn-sm btn-success" onclick="saveMap()">
                     <i class="fas fa-save"></i> Save
                 </button>
@@ -206,7 +203,6 @@
                     width="{{ $map->width ?? config('weathermapng.default_width', 800) }}"
                     height="{{ $map->height ?? config('weathermapng.default_height', 600) }}">
             </canvas>
-            <div id="link-tooltip" class="editor-link-tooltip"></div>
             <!-- Minimap -->
             <canvas id="editor-minimap" width="150" height="100"
                     style="position: absolute; bottom: 20px; right: 20px; z-index: 100; background: rgba(255,255,255,0.95); border: 1px solid #ccc; border-radius: 4px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
@@ -368,74 +364,6 @@
         </div>
     </div>
 </div>
-
-        <!-- Version Save Modal -->
-        <div class="modal fade" id="versionModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Save Version</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label for="version-name" class="form-label">Version Name</label>
-                            <input type="text" class="form-control" id="version-name"
-                                   placeholder="e.g. Experiment 1" maxlength="100">
-                            <small class="form-text text-muted">Max 100 characters</small>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" id="version-desc"
-                                      placeholder="What did you change in this version?" rows="3" maxlength="1000"></textarea>
-                            <small class="form-text text-muted">Max 1000 characters</small>
-                        </div>
-                        <div class="form-check mb-3">
-                            <label>
-                                <input type="checkbox" id="auto-save" checked>
-                                <span class="ml-2">Auto-save every 5 minutes</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-primary" onclick="saveVersion()">
-                            <i class="fas fa-save"></i> Save Version
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Version History Modal -->
-        <div class="modal fade" id="versionHistoryModal" tabindex="-1">
-            <div class="modal-dialog" style="max-width: 800px;">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Version History</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div id="version-list" class="editor-version-list">
-                            <div class="text-center text-muted py-3">
-                                <div class="spinner-border-custom text-primary" style="width: 2rem; height: 2rem;"></div>
-                                <small>Loading versions...</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-outline-danger" onclick="clearOldVersions()">
-                            <i class="fas fa-trash-alt"></i> Clear Old
-                        </button>
-                        <button type="button" class="btn btn-info" onclick="exportVersions()">
-                            <i class="fas fa-download"></i> Export
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Editor Confirmation Modal -->
         <div class="modal fade" id="editorConfirmModal" tabindex="-1" role="dialog" aria-labelledby="editorConfirmTitle" aria-hidden="true">
             <div class="modal-dialog" role="document">
@@ -596,6 +524,9 @@
             function getCsrfToken() {
                 return document.querySelector('meta[name="csrf-token"]')?.content || '';
             }
+
+            // Escape user-controlled strings before interpolating into innerHTML (XSS hardening).
+            function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
             function initCanvas() {
                 canvas = document.getElementById('map-canvas');
@@ -1419,272 +1350,6 @@
                 );
             }
 
-            function openVersionSaveModal() {
-                if (!mapId) {
-                    WMNGToast.error('Save the map before creating versions.', { duration: 3000 });
-                    return;
-                }
-                $('#versionModal').modal('show');
-            }
-
-            function saveVersion() {
-                if (!mapId) {
-                    WMNGToast.error('Save the map before creating versions.', { duration: 3000 });
-                    return;
-                }
-                const versionName = document.getElementById('version-name').value.trim();
-                const versionDesc = document.getElementById('version-desc').value.trim();
-                const autoSave = document.getElementById('auto-save').checked;
-                
-                WMNGLoading.show('Saving version...');
-                
-                const payload = {
-                    name: versionName || `v${Date.now()}`,
-                    description: versionDesc,
-                    auto_save: autoSave ? 1 : 0,
-                };
-                
-                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': getCsrfToken(),
-                    },
-                    body: JSON.stringify(payload)
-                })
-                .then(r => r.json())
-                .then(data => {
-                    WMNGLoading.hide();
-                    if (data.success) {
-                        WMNGToast.success('Version saved successfully!', { duration: 3000 });
-                        $('#versionModal').modal('hide');
-                    } else {
-                        WMNGToast.error('Failed to save version: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                    }
-                })
-                .catch(error => {
-                    WMNGLoading.hide();
-                    WMNGToast.error('Error saving version: ' + error.message, { duration: 3000 });
-                });
-            }
-
-            function openVersionHistory() {
-                if (!mapId) {
-                    WMNGToast.error('Save the map before viewing versions.', { duration: 3000 });
-                    return;
-                }
-                $('#versionHistoryModal').modal('show');
-                loadVersions();
-            }
-
-            function loadVersions() {
-                if (!mapId) return;
-                WMNGLoading.show('Loading versions...');
-                
-                const versionList = document.getElementById('version-list');
-                versionList.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border-custom text-primary" style="width: 2rem; height: 2rem;"></div><small class="d-block mt-2">Loading versions...</small></div>';
-                
-                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions', {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success && Array.isArray(data.versions)) {
-                        const versions = data.versions;
-                        let html = '';
-                        
-                        versions.forEach((version, idx) => {
-                            html += `
-                                <div class="list-group-item">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <strong>v${versions.length - idx}</strong>
-                                            <small class="text-muted">
-                                                ${version.created_at_human}
-                                                by ${version.created_by || 'Unknown'}
-                                            </small>
-                                        </div>
-                                        <button class="btn btn-sm btn-outline-primary" onclick="restoreVersion(${version.id})">
-                                            <i class="fas fa-undo"></i> Restore
-                                        </button>
-                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVersion(${version.id})">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <hr>
-                            `;
-                        });
-                        
-                        versionList.innerHTML = html || '<div class="text-center text-muted py-3">No versions saved yet. <small>Save your first version to start tracking.</small></div>';
-                    } else {
-                        versionList.innerHTML = '<div class="text-center text-muted py-3">No versions found</div>';
-                    }
-                })
-                .catch(error => {
-                    WMNGLoading.hide();
-                    versionList.innerHTML = '<div class="text-center text-danger py-3">Error loading versions: ' + error.message + '</div>';
-                })
-                .finally(() => {
-                    WMNGLoading.hide();
-                });
-            }
-
-            function restoreVersion(versionId) {
-                showEditorConfirm(
-                    'Restore Version',
-                    'Restore to this version? Current unsaved changes will be lost.',
-                    'Restore Version',
-                    'btn-primary',
-                    function() {
-                        WMNGLoading.show('Restoring version...');
-
-                        fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId + '/restore', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': getCsrfToken(),
-                            }
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            WMNGLoading.hide();
-                            if (data.success) {
-                                WMNGToast.success('Version restored successfully!', { duration: 3000 });
-                                $('#versionHistoryModal').modal('hide');
-
-                                if (data.snapshot) {
-                                    const snapshot = JSON.parse(data.snapshot);
-                                    if (snapshot && Array.isArray(snapshot.nodes)) {
-                                        nodes = snapshot.nodes;
-                                    }
-                                    if (snapshot && Array.isArray(snapshot.links)) {
-                                        links = snapshot.links;
-                                    }
-                                    if (snapshot && snapshot.map) {
-                                        const mapData = snapshot.map;
-                                        if (mapData.title) document.getElementById('map-title').value = mapData.title;
-                                        if (mapData.width) document.getElementById('map-width').value = mapData.width;
-                                        if (mapData.height) document.getElementById('map-height').value = mapData.height;
-                                    }
-                                }
-
-                                renderEditor();
-                            } else {
-                                WMNGToast.error('Failed to restore version: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                            }
-                        })
-                        .catch(error => {
-                            WMNGLoading.hide();
-                            WMNGToast.error('Error restoring version: ' + error.message, { duration: 3000 });
-                        });
-                    }
-                );
-            }
-
-            function deleteVersion(versionId) {
-                showEditorConfirm(
-                    'Delete Version',
-                    'Delete this version permanently? This cannot be undone.',
-                    'Delete Version',
-                    'btn-danger',
-                    function() {
-                        WMNGLoading.show('Deleting version...');
-
-                        fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/' + versionId, {
-                            method: 'DELETE',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': getCsrfToken(),
-                            }
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            WMNGLoading.hide();
-                            if (data.success) {
-                                WMNGToast.success('Version deleted successfully!', { duration: 3000 });
-                                loadVersions();
-                            } else {
-                                WMNGToast.error('Failed to delete version: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                            }
-                        })
-                        .catch(error => {
-                            WMNGLoading.hide();
-                            WMNGToast.error('Error deleting version: ' + error.message, { duration: 3000 });
-                        });
-                    }
-                );
-            }
-
-            function clearOldVersions() {
-                showEditorConfirm(
-                    'Clear Old Versions',
-                    'Delete all but the latest 20 versions? This cannot be undone.',
-                    'Clear Old Versions',
-                    'btn-danger',
-                    function() {
-                        WMNGLoading.show('Clearing old versions...');
-
-                        fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/cleanup', {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': getCsrfToken(),
-                            }
-                        })
-                        .then(r => r.json())
-                        .then(data => {
-                            WMNGLoading.hide();
-                            if (data.success) {
-                                const count = data.deleted_count || 0;
-                                WMNGToast.success('Cleared ' + count + ' old versions!', { duration: 3000 });
-                                loadVersions();
-                            } else {
-                                WMNGToast.error('Failed to clear versions: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                            }
-                        })
-                        .catch(error => {
-                            WMNGLoading.hide();
-                            WMNGToast.error('Error clearing versions: ' + error.message, { duration: 3000 });
-                        });
-                    }
-                );
-            }
-
-            function exportVersions() {
-                WMNGLoading.show('Exporting versions...');
-                
-                fetch('{{ url('plugin/WeathermapNG/maps') }}' + '/' + mapId + '/versions/export', {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    WMNGLoading.hide();
-                    if (data.success) {
-                        WMNGToast.success('Versions exported successfully!', { duration: 3000 });
-                        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'weathermap-versions-' + mapId + '.json';
-                        a.click();
-                    } else {
-                        WMNGToast.error('Failed to export versions: ' + (data.message || 'Unknown error'), { duration: 3000 });
-                    }
-                })
-                .catch(error => {
-                    WMNGLoading.hide();
-                    WMNGToast.error('Error exporting versions: ' + error.message, { duration: 3000 });
-                });
-            }
-
             function saveMap() {
                 const mapName = document.getElementById('map-name').value.trim();
                 const mapTitle = document.getElementById('map-title').value.trim();
@@ -1827,8 +1492,6 @@ function populateNodeProperties(node) {
     const label = document.getElementById('node-prop-label');
     const devSel = document.getElementById('node-prop-device');
     const intSel = document.getElementById('node-prop-interface');
-    const saveBtn = document.getElementById('node-prop-save');
-    const delBtn = document.getElementById('node-prop-delete');
 
     if (!node) {
         if (card) card.style.display = 'none';
@@ -1837,7 +1500,6 @@ function populateNodeProperties(node) {
 
     // Show card and enable inputs
     if (card) card.style.display = 'block';
-    [label, devSel, intSel, saveBtn, delBtn].forEach(el => { if (el) el.disabled = false; });
 
     // Populate label
     if (label) label.value = node.label || '';
@@ -1951,7 +1613,7 @@ function renderLinksList() {
         const a = findNodeById(l.srcId); const b = findNodeById(l.dstId);
         const aL = a ? a.label : l.srcId; const bL = b ? b.label : l.dstId;
         return `<div class=\"d-flex align-items-center justify-content-between mb-2\">
-            <div><i class=\"fas fa-link\"></i> ${aL} → ${bL}</div>
+            <div><i class=\"fas fa-link\"></i> ${escapeHtml(aL)} → ${escapeHtml(bL)}</div>
             <div class=\"btn-group btn-group-sm\">
                 <button class=\"btn btn-outline-secondary\" onclick=\"openLinkModal(${idx})\"><i class=\"fas fa-edit\"></i></button>
                 <button class=\"btn btn-outline-danger\" onclick=\"deleteLink(${idx})\"><i class=\"fas fa-trash\"></i></button>
@@ -2062,35 +1724,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// ========== Auto-Save Implementation ==========
-let autoSaveInterval = null;
-
-function toggleAutoSave(enabled) {
-    if (autoSaveInterval) {
-        clearInterval(autoSaveInterval);
-        autoSaveInterval = null;
-    }
-    if (enabled && mapId) {
-        autoSaveInterval = setInterval(() => {
-            saveMap();
-            WMNGToast.info('Auto-saved', { duration: 1500 });
-        }, 5 * 60 * 1000); // 5 minutes
-    }
-}
-
-// Wire up auto-save toggle (toolbar version)
-document.addEventListener('DOMContentLoaded', function() {
-    const autoSaveToggle = document.getElementById('auto-save-toggle');
-    if (autoSaveToggle) {
-        autoSaveToggle.addEventListener('change', function() {
-            toggleAutoSave(this.checked);
-        });
-        // Start auto-save if checked by default and map exists
-        if (autoSaveToggle.checked && mapId) {
-            toggleAutoSave(true);
-        }
-    }
-});
 
 // ========== Status Updates ==========
 let hasUnsavedChanges = false;
@@ -2134,7 +1767,7 @@ function renderNodesList() {
         return `<div class="d-flex align-items-center justify-content-between py-1" style="cursor: pointer;${isSelected ? ' background: var(--editor-list-selected); border-radius: 3px;' : ''} onclick="selectNodeByIndex(${idx})">
             <small class="${isSelected ? 'font-weight-bold' : ''}">
                 <i class="fas fa-circle ${isSelected ? 'text-primary' : 'text-success'}" style="font-size: 8px;"></i>
-                ${node.label || 'Node ' + (idx + 1)}
+                ${escapeHtml(node.label || 'Node ' + (idx + 1))}
             </small>
             <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="event.stopPropagation(); deleteNodeByIndex(${idx})" title="Delete">
                 <i class="fas fa-times" style="font-size: 10px;"></i>

@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.librenmsv1')
 
 @section('title', 'WeathermapNG - Installation')
 
@@ -32,9 +32,9 @@
                                         <td>{{ $req['current'] }}</td>
                                         <td>
                                             @if($req['status'])
-                                                <span class="badge bg-success"><i class="fas fa-check"></i> OK</span>
+                                                <span class="badge badge-success"><i class="fas fa-check"></i> OK</span>
                                             @else
-                                                <span class="badge bg-danger"><i class="fas fa-times"></i> Failed</span>
+                                                <span class="badge badge-danger"><i class="fas fa-times"></i> Failed</span>
                                             @endif
                                         </td>
                                     </tr>
@@ -53,22 +53,22 @@
                         <ul class="list-group" id="installSteps">
                             <li class="list-group-item d-flex align-items-center" data-step="requirements">
                                 @if($steps['requirements'])
-                                    <i class="fas fa-check text-success me-2"></i>
+                                    <i class="fas fa-check text-success mr-2"></i>
                                 @else
-                                    <i class="fas fa-times text-danger me-2"></i>
+                                    <i class="fas fa-times text-danger mr-2"></i>
                                 @endif
                                 Check System Requirements
                             </li>
                             <li class="list-group-item d-flex align-items-center" data-step="database">
-                                <i class="fas fa-clock text-warning me-2" id="step-database-icon"></i>
+                                <i class="fas fa-clock text-warning mr-2" id="step-database-icon"></i>
                                 Set Up Database Tables
                             </li>
                             <li class="list-group-item d-flex align-items-center" data-step="permissions">
-                                <i class="fas fa-clock text-warning me-2" id="step-permissions-icon"></i>
+                                <i class="fas fa-clock text-warning mr-2" id="step-permissions-icon"></i>
                                 Configure Permissions
                             </li>
                             <li class="list-group-item d-flex align-items-center" data-step="plugin">
-                                <i class="fas fa-clock text-warning me-2" id="step-plugin-icon"></i>
+                                <i class="fas fa-clock text-warning mr-2" id="step-plugin-icon"></i>
                                 Enable Plugin
                             </li>
                         </ul>
@@ -89,7 +89,7 @@
                             <div class="spinner-border text-primary" role="status">
                                 <span class="sr-only">Installing...</span>
                             </div>
-                            <span class="ms-2">Installing WeathermapNG...</span>
+                            <span class="ml-2">Installing WeathermapNG...</span>
                         </div>
                     </div>
 
@@ -175,7 +175,7 @@ function startInstallation() {
     btn.classList.add('d-none');
     spinner.classList.remove('d-none');
 
-    fetch('{{ route("weathermapng.install.post") }}', {
+    fetch('{{ route("weathermapng.install.run") }}', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -208,8 +208,7 @@ function startInstallation() {
         btn.classList.remove('d-none');
 
         document.getElementById('errorMessage').textContent = 'Network error: ' + error.message;
-        const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-        errorModal.show();
+        $('#errorModal').modal('show');
     });
 }
 
@@ -219,7 +218,7 @@ function updateProgress(percent) {
 
 function updateStepStatus(step, success) {
     const icon = document.getElementById('step-' + step + '-icon');
-    icon.className = success ? 'fas fa-check text-success me-2' : 'fas fa-times text-danger me-2';
+    icon.className = success ? 'fas fa-check text-success mr-2' : 'fas fa-times text-danger mr-2';
 }
 
 function goToPlugin() {
@@ -227,8 +226,7 @@ function goToPlugin() {
 }
 
 function retryInstallation() {
-    // Hide error modal and retry
-    bootstrap.Modal.getInstance(document.getElementById('errorModal')).hide();
+    $('#errorModal').modal('hide');
     startInstallation();
 }
 

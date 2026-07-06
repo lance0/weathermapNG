@@ -40,10 +40,10 @@
                                 <dd class="col-sm-8">{{ $map->width }} x {{ $map->height }} pixels</dd>
 
                                 <dt class="col-sm-4">Created:</dt>
-                                <dd class="col-sm-8">{{ $map->created_at->format('M j, Y H:i') }}</dd>
+                                <dd class="col-sm-8">{{ $map->created_at?->format('M j, Y H:i') ?? 'N/A' }}</dd>
 
                                 <dt class="col-sm-4">Updated:</dt>
-                                <dd class="col-sm-8">{{ $map->updated_at->format('M j, Y H:i') }}</dd>
+                                <dd class="col-sm-8">{{ $map->updated_at?->format('M j, Y H:i') ?? 'N/A' }}</dd>
                             </dl>
                         </div>
                         <div class="col-md-6">

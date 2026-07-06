@@ -31,8 +31,10 @@ class Settings implements SettingsHook
     public function handle(string $pluginName, array $settings): array
     {
         return [
-            'content_view' => "{$pluginName}::settings",
+            'content_view' => "{$pluginName}::hooks.settings",
             'settings' => $settings,
+            'title' => 'WeathermapNG Settings',
+            'saved' => request()->method() === 'POST' && !request()->has('error'),
         ];
     }
 }

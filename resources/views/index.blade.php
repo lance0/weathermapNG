@@ -501,7 +501,8 @@
                                 <i class="fas fa-download" aria-hidden="true"></i>
                             </a>
                             <button type="button" class="map-card-action danger" title="Delete map"
-                                    onclick="deleteMap({{ $map->id }}, '{{ addslashes($map->name) }}')"
+                                    data-map-id="{{ $map->id }}" data-map-name="{{ $map->name }}"
+                                    data-action="delete-map"
                                     aria-label="Delete map {{ $map->name }}">
                                 <i class="fas fa-trash" aria-hidden="true"></i>
                             </button>
@@ -630,7 +631,7 @@
 <!-- Import Map Modal -->
 <div class="modal fade" id="importMapModal" tabindex="-1" role="dialog" aria-labelledby="importMapModalTitle">
     <div class="modal-dialog modal-dialog-centered">
-        <form method="POST" action="{{ url('plugin/WeathermapNG/api/maps/import') }}" class="modal-content" id="importMapForm" enctype="multipart/form-data">
+        <form method="POST" action="{{ url('plugin/WeathermapNG/api/import') }}" class="modal-content" id="importMapForm" enctype="multipart/form-data">
             @csrf
             <div class="modal-header">
                 <h5 class="modal-title" id="importMapModalTitle">
@@ -815,7 +816,7 @@ $('#importMapForm').on('submit', function(e) {
 
     const formData = new FormData(this);
 
-    fetch('{{ url("plugin/WeathermapNG/api/maps/import") }}', {
+    fetch('{{ url("plugin/WeathermapNG/api/import") }}', {
         method: 'POST',
         body: formData,
         headers: {
@@ -850,6 +851,13 @@ function deleteMap(mapId, mapName) {
     }
     $('#deleteMapModal').modal('show');
 }
+
+// Delegated listener for delete buttons (replaces inline onclick)
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-action="delete-map"]');
+    if (!btn) return;
+    deleteMap(btn.dataset.mapId, btn.dataset.mapName);
+});
 
 document.getElementById('confirmDeleteMapBtn')?.addEventListener('click', function() {
     if (!pendingDeleteMapId) return;

@@ -54,7 +54,9 @@
                                                    class="btn btn-default" title="View" target="_blank" rel="noopener noreferrer" aria-label="View map {{ $map->name }}">
                                                     <i class="fas fa-eye" aria-hidden="true"></i>
                                                 </a>
-                                                <button type="button" onclick="deleteMap({{ $map->id }}, '{{ addslashes($map->name) }}')"
+                                                <button type="button"
+                                                        data-map-id="{{ $map->id }}" data-map-name="{{ $map->name }}"
+                                                        data-action="delete-map"
                                                         class="btn btn-danger" title="Delete" aria-label="Delete map {{ $map->name }}">
                                                     <i class="fas fa-trash" aria-hidden="true"></i>
                                                 </button>
@@ -185,6 +187,13 @@ function deleteMap(mapId, mapName) {
 
     $('#legacyDeleteMapModal').modal('show');
 }
+
+// Delegated listener for delete buttons (replaces inline onclick)
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-action="delete-map"]');
+    if (!btn) return;
+    deleteMap(btn.dataset.mapId, btn.dataset.mapName);
+});
 
 document.getElementById('confirmLegacyDeleteMapBtn')?.addEventListener('click', function() {
     if (!pendingLegacyDeleteMapId) return;

@@ -42,7 +42,7 @@
         
         <div class="col-md-9">
             <div id="settings-alerts" aria-live="polite"></div>
-            <form id="settings-form" method="POST" action="{{ url('plugin/WeathermapNG/api/settings') }}">
+            <form id="settings-form" method="POST" action="{{ route('plugin.update', ['plugin' => 'WeathermapNG']) }}">
                 @csrf
                 
                 <div class="tab-content">
@@ -640,36 +640,7 @@ document.getElementById('label-size-slider')?.addEventListener('input', function
     document.getElementById('label-size-value').textContent = this.value;
 });
 
-// Save settings
-document.getElementById('settings-form')?.addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    
-    fetch(this.action, {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('save-status').innerHTML = 
-                '<i class="fas fa-check-circle text-success"></i> Settings saved successfully';
-            showSettingsAlert('Settings saved successfully.', 'success');
-            setTimeout(() => {
-                document.getElementById('save-status').innerHTML = '';
-            }, 3000);
-        } else {
-            showSettingsAlert('Error saving settings: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        showSettingsAlert('Error saving settings: ' + error);
-    });
-});
+// Save settings — native form POST to plugin.update (no JS interception needed)
 
 // Preview settings
 function previewSettings() {
@@ -698,23 +669,7 @@ function createBackup() {
         'Create Backup',
         'btn-success',
         function() {
-            fetch('{{ url("plugin/WeathermapNG/api/backup/create") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSettingsAlert('Backup created successfully: ' + data.filename, 'success');
-                } else {
-                    showSettingsAlert('Error creating backup: ' + (data.message || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                showSettingsAlert('Error creating backup: ' + error);
-            });
+            showSettingsAlert('Backup creation is not yet available. Use database backups (mysqldump) to back up WeathermapNG data. See DEPLOYMENT.md for the backup command.', 'warning');
         }
     );
 }
@@ -732,24 +687,7 @@ function resetToDefaults() {
         'Reset Settings',
         'btn-danger',
         function() {
-            fetch('{{ url("plugin/WeathermapNG/api/settings/reset") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showSettingsAlert('Settings reset to defaults.', 'success');
-                    location.reload();
-                } else {
-                    showSettingsAlert('Error resetting settings: ' + (data.message || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                showSettingsAlert('Error resetting settings: ' + error);
-            });
+            showSettingsAlert('Settings reset is not yet available. Edit config/config.php to change defaults.', 'warning');
         }
     );
 }

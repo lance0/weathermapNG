@@ -199,6 +199,7 @@
     </div>
 
     <script>
+        function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
         const mapId = '{{ $mapId }}';
         const baseUrl = '{{ url("/") }}';
         const deviceBaseUrl = '{{ url("device") }}';
@@ -1095,7 +1096,7 @@
                 div.style.display = 'flex';
                 div.style.alignItems = 'center';
                 div.style.gap = '6px';
-                div.innerHTML = `<span style=\"display:inline-block; width:18px; height:10px; background:${it.c}; border:1px solid #999;\"></span><span>${it.l}</span>`;
+                div.innerHTML = `<span style="display:inline-block; width:18px; height:10px; background:${escapeHtml(it.c)}; border:1px solid #999;"></span><span>${escapeHtml(it.l)}</span>`;
                 rows.appendChild(div);
             });
             const metricLabel = document.createElement('div');
@@ -1147,8 +1148,7 @@
             document.getElementById('loading').style.display = 'none';
             document.getElementById('map-container').innerHTML = `
                 <div class="error">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <div>${message}</div>
+                    <div>${escapeHtml(message)}</div>
                 </div>
             `;
         }
@@ -1258,7 +1258,7 @@
                 const sum = t.sum_bps ?? n.current_value ?? 0;
                 const srcMap = { ports: 'ports', links: 'links', device: 'device', device_guess: 'device*', none: 'unknown' };
                 const src = t.source ? (srcMap[t.source] || 'unknown') : 'unknown';
-                tooltip.innerHTML = `${n.label || n.id}<br>` +
+                tooltip.innerHTML = `${escapeHtml(n.label || n.id)}<br>` +
                   `In: ${humanBits(t.in_bps ?? 0)}<br>` +
                   `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
                   `Sum: ${humanBits(sum ?? 0)}<br>` +

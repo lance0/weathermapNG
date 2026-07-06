@@ -1,3 +1,17 @@
+@php
+$title = $title ?? 'WeathermapNG Settings';
+$saved = $saved ?? false;
+$settings = array_merge([
+    'poll_interval' => 300,
+    'default_width' => 800,
+    'default_height' => 600,
+    'rrd_base' => '/opt/librenms/rrd',
+    'cache_ttl' => 60,
+    'enable_api_fallback' => false,
+    'allow_embed' => true,
+    'debug' => false,
+], $settings ?? []);
+@endphp
 <div class="card">
     <div class="card-header">
         <h3 class="card-title">{{ $title }}</h3>

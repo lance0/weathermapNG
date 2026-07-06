@@ -39,8 +39,8 @@
                 @foreach($links as $link)
                     <tr>
                         <td>
-                            <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" target="_blank" rel="noopener noreferrer" aria-label="Open map {{ $link->map->title ?? $link->map->name }}">
-                                {{ $link->map->title ?? $link->map->name }}
+                            <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" target="_blank" rel="noopener noreferrer" aria-label="Open map {{ $link->map?->title ?? $link->map?->name ?? 'Map' }}">
+                                {{ $link->map?->title ?? $link->map?->name ?? 'Map' }}
                             </a>
                         </td>
                         <td>
@@ -51,11 +51,11 @@
                             @endif
                         </td>
                         <td>
-                            {{ number_format($link->bandwidth_bps / 1000000) }} Mbps
+                            {{ $link->bandwidth_bps !== null ? number_format($link->bandwidth_bps / 1000000) . ' Mbps' : 'N/A' }}
                         </td>
                         <td>
                             <a href="{{ url('plugin/WeathermapNG/embed/' . $link->map_id) }}" 
-                               class="btn btn-xs btn-default" target="_blank" rel="noopener noreferrer" aria-label="View map {{ $link->map->title ?? $link->map->name }}">
+                               class="btn btn-xs btn-default" target="_blank" rel="noopener noreferrer" aria-label="View map {{ $link->map?->title ?? $link->map?->name ?? 'Map' }}">
                                 <i class="fa fa-external-link" aria-hidden="true"></i> View
                             </a>
                         </td>

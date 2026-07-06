@@ -152,11 +152,30 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString("pre.textContent = JSON.stringify(settings, null, 2);", $content);
         $this->assertStringContainsString("showSettingsAlert('Restore from backup is not available", $content);
         $this->assertStringContainsString('class="btn btn-success" onclick="createBackup()"', $content);
-        $this->assertStringContainsString("showSettingsAlert('Settings reset to defaults.', 'success');", $content);
+        $this->assertStringContainsString("showSettingsAlert('Settings reset is not yet available. Edit config/config.php to change defaults.', 'warning');", $content);
         $this->assertStringNotContainsString('confirm(', $content);
         $this->assertStringNotContainsString('alert(', $content);
         $this->assertStringNotContainsString('Restore functionality would be implemented here', $content);
         $this->assertStringNotContainsString("'<pre>' + JSON.stringify", $content);
+    }
+
+    public function test_hooks_settings_view_has_safe_defaults_and_plugin_update_route(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/hooks/settings.blade.php');
+
+        // Safe defaults for $title, $saved, and $settings keys
+        $this->assertStringContainsString("\$title = \$title ?? 'WeathermapNG Settings'", $content);
+        $this->assertStringContainsString("\$saved = \$saved ?? false", $content);
+        $this->assertStringContainsString("'poll_interval' => 300", $content);
+        $this->assertStringContainsString("'rrd_base' => '/opt/librenms/rrd'", $content);
+
+        // Form posts to LibreNMS plugin.update route (not a broken API endpoint)
+        $this->assertStringContainsString("route('plugin.update', ['plugin' => 'WeathermapNG'])", $content);
+        $this->assertStringNotContainsString('api/settings', $content);
+        $this->assertStringNotContainsString('api/backup', $content);
+
+        // CSRF token present
+        $this->assertStringContainsString('@csrf', $content);
     }
 
     public function test_active_index_and_editor_use_bootstrap_confirmation_modals(): void
@@ -177,8 +196,13 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString('Resize Canvas', $editor);
         $this->assertStringContainsString('Delete Node', $editor);
         $this->assertStringContainsString('Delete Link', $editor);
-        $this->assertStringContainsString('Restore Version', $editor);
-        $this->assertStringContainsString('Clear Old Versions', $editor);
+        $this->assertStringContainsString('Clear Canvas', $editor);
+        $this->assertStringNotContainsString('Restore Version', $editor);
+        $this->assertStringNotContainsString('Clear Old Versions', $editor);
+        $this->assertStringNotContainsString('openVersionHistory', $editor);
+        $this->assertStringNotContainsString('saveVersion', $editor);
+        $this->assertStringNotContainsString('id="versionModal"', $editor);
+        $this->assertStringNotContainsString('id="versionHistoryModal"', $editor);
         $this->assertStringContainsString("WMNGToast.error('Failed to save node:", $editor);
         $this->assertStringNotContainsString('confirm(', $editor);
         $this->assertStringNotContainsString('alert(', $editor);
