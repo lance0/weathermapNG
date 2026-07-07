@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-07-07
+
+### Fixed
+- **Destructive-save race wiped maps on slow load** (issue #11): The editor's Save button could fire before the asynchronous `/api/maps/{id}/json` load resolved, sending empty `nodes`/`links` arrays to a backend endpoint that deletes-then-recreates from those arrays — silently wiping the map. Added a client-side `mapDataLoaded`/`mapDataLoadFailed` gate so existing maps cannot be saved until the load completes successfully, with visible error toasts on load failure. Also added `r.ok` HTTP status checks to all fetch chains so 403/419/500 errors surface a meaningful message instead of an opaque `SyntaxError`.
+- **Malformed save payload validation**: `MapService::saveMap()` now rejects payloads missing the `nodes` or `links` key entirely when the map already has content. `MapController::save()` returns 400 for `InvalidArgumentException` (malformed payload) and 500 for other exceptions.
+- **Node delete UI divergence**: `deleteSelectedNode()` called `finishDelete()` without checking `r.ok` — on a 403/419/500 the client removed the node from local arrays while the server kept it. Now checks `r.ok`, verifies success, and only updates the UI on success; errors surface as a toast.
+- **Version restore crashes and cross-map corruption** (latent — version routes currently unregistered): `MapVersionService::restoreVersion()` had an undefined `$map` variable (would fatal on every call), unscoped `Node::where('id', ...)->update()` / `Link::where('id', ...)->update()` that could mutate rows on the wrong map, `json_decode()` on an already-decoded array cast (would TypeError in PHP 8), missing `map_id` on `Node::create`/`Link::create` (orphaned rows), no DB transaction, and wrong column writes for `width`/`height`/`background`. All fixed.
+- **Silent fetch-error swallowing** (11 sites across 6 blade files): Every `.then(r => r.json())` without an `r.ok` guard would throw an opaque `SyntaxError` on a non-2xx HTML error response, hiding the real HTTP status. All 11 sites now check `r.ok` before parsing. Read-only/poll fetches use `console.warn` + graceful fallback; mutating fetches throw `HTTP {status}` to existing `.catch` handlers so the real error surfaces.
+- **Validation errors returned as 500 instead of 400**: `MapController::autoDiscover()` and `InstallController::install()` now return 400 for `InvalidArgumentException` (input validation) and 500 for genuine server errors. `RenderController::import()` and `MapController::save()` already had this split.
+- **CSRF token lookup could throw**: `saveSelectedNode()` used `document.querySelector('meta[name="csrf-token"]').content` which throws if the meta tag is absent; switched to the `getCsrfToken()` helper with `|| ''` fallback.
+
 ## [1.7.0] - 2026-07-06
 
 ### Security
