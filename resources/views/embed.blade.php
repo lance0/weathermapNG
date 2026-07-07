@@ -268,12 +268,19 @@
         
         // Flow animation particles
         let particles = [];
-        let flowAnimationEnabled = true;
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let flowAnimationEnabled = !reducedMotion;
         let particleDensity = 1.0; // 0.5 to 2.0
         let particleSpeed = 1.0; // 0.5 to 2.0
         
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
+            // Sync flow toggle button with prefers-reduced-motion default
+            const _flowBtn = document.getElementById('toggle-flow');
+            if (_flowBtn && !flowAnimationEnabled) {
+                _flowBtn.classList.remove('btn-primary');
+                _flowBtn.classList.add('btn-secondary');
+            }
             if (mapData && !mapData.error) {
                 renderMap();
                 startLiveUpdates();
@@ -684,8 +691,12 @@
             if (!flowAnimationEnabled) {
                 const dash = Math.max(6, width * 3);
                 ctx.setLineDash([dash, dash]);
-                const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
-                ctx.lineDashOffset = - (animTick * speed);
+                // Animate dash offset only when motion is not reduced;
+                // otherwise keep the dashed line static for prefers-reduced-motion.
+                if (!reducedMotion) {
+                    const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
+                    ctx.lineDashOffset = -(animTick * speed);
+                }
             }
             ctx.stroke();
             ctx.setLineDash([]);
@@ -878,6 +889,24 @@
             return WMNG_CONFIG.colors.link_normal || '#28a745';
         }
 
+        // Single RAF loop helper. When reduced-motion is preferred and flow
+        // animation is disabled, the loop renders once then stops (animationId
+        // nulled) so we don't burn continuous animation work. Toggling flow
+        // back on calls this again to restart the loop.
+        function startAnimationLoop() {
+            function tick() {
+                animTick += 1;
+                renderMap();
+                if (flowAnimationEnabled || !reducedMotion) {
+                    animationId = requestAnimationFrame(tick);
+                } else {
+                    animationId = null;
+                }
+            }
+            if (animationId) { cancelAnimationFrame(animationId); }
+            animationId = requestAnimationFrame(tick);
+        }
+
         // Live updates via SSE (fallback to polling)
         function startLiveUpdates() {
             updateTransportButton();
@@ -906,6 +935,10 @@
                 if (flowAnimationEnabled) {
                     btn.classList.remove('btn-secondary');
                     btn.classList.add('btn-primary');
+                    // Restart RAF loop if it was stopped by the reduced-motion gate
+                    if (!animationId) {
+                        startAnimationLoop();
+                    }
                 } else {
                     btn.classList.remove('btn-primary');
                     btn.classList.add('btn-secondary');
@@ -936,21 +969,11 @@
                 document.getElementById('speed-value').textContent = particleSpeed.toFixed(1);
             });
 
-            // start animation loop
-            function tick() {
-                animTick += 1;
-                renderMap();
-                animationId = requestAnimationFrame(tick);
-            }
-            animationId = requestAnimationFrame(tick);
-        }
 
-        let pollTimer = null;
-        function stopPolling() {
-            if (pollTimer) {
-                clearInterval(pollTimer);
-                pollTimer = null;
-            }
+            // Start animation loop — only needed when something actually animates.
+            // When reduced-motion is preferred and flow is disabled, render once
+            // and rely on live-update polls / manual interactions to re-render.
+            startAnimationLoop();
         }
 
         function startSSE() {

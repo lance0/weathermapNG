@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.5] - 2026-07-07
+
+### Added
+- **Reduced-motion handling for embed flow animations** (LAN-268): When the user's OS has `prefers-reduced-motion: reduce` set, the embed view now defaults to flow animation disabled, uses static dashed lines (no `lineDashOffset` animation), and stops the `requestAnimationFrame` loop after a single render instead of running continuously. Toggling flow animation back on via the Flow button restarts the RAF loop. The editor view already had a `prefers-reduced-motion` media query for its link-mode pulse animation.
+
 ## [1.7.4] - 2026-07-07
 
 ### Changed

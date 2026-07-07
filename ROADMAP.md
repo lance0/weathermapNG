@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.7.4 (Stable)
+## Current Status: v1.7.5 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.4:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.5:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
@@ -61,7 +61,7 @@ These are patch-level improvements unless they require new user-facing behavior.
 - [ ] **Embed view responsive polish**
   - Make the top navigation and control groups wrap, collapse, or reposition cleanly.
   - Prevent controls, minimap, legend, and map content from overlapping on smaller embeds.
-  - Add reduced-motion handling for flow animations.
+  - ~~Add reduced-motion handling for flow animations.~~ *(v1.7.5)*
 
 - [ ] **Index and template gallery polish**
   - Replace decorative map-card preview art with real thumbnails or a compact rendered preview.
