@@ -1249,7 +1249,10 @@
 
                 deviceSelect.innerHTML = '<option value="">Choose a device...</option>';
                 fetch('{{ url('plugin/WeathermapNG/api/devices') }}')
-                    .then(r => r.json())
+                    .then(r => {
+                        if (!r.ok) { console.warn('Failed to load devices: HTTP ' + r.status); return []; }
+                        return r.json();
+                    })
                     .then(data => {
                         const devices = Array.isArray(data) ? data : (data.devices || []);
                         devicesCache = devices;
@@ -1270,7 +1273,10 @@
                     }
                     if (interfaceContainer) interfaceContainer.style.display = 'block';
                     fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports`)
-                        .then(r => r.json())
+                        .then(r => {
+                            if (!r.ok) { console.warn('Failed to load ports: HTTP ' + r.status); return { ports: [] }; }
+                            return r.json();
+                        })
                         .then(data => {
                             (data.ports || []).forEach(port => {
                                 const option = document.createElement('option');
@@ -1578,7 +1584,10 @@ function loadInterfacesForNode(node) {
     if (!node.deviceId) return;
 
     fetch('{{ url('plugin/WeathermapNG/api/device') }}/' + node.deviceId + '/ports')
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) { console.warn('Failed to load interfaces: HTTP ' + r.status); return { ports: [] }; }
+            return r.json();
+        })
         .then(data => {
             (data.ports || []).forEach(port => {
                 const opt = document.createElement('option');
@@ -1597,8 +1606,13 @@ function saveSelectedNode() {
     const ifaceId = document.getElementById('node-prop-interface').value || null;
     const payload = { label: label, device_id: deviceId ? parseInt(deviceId, 10) : null, meta: { interface_id: ifaceId ? parseInt(ifaceId, 10) : null } };
     fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/node/' + selectedNode.dbId, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }, body: JSON.stringify(payload)
-    }).then(r => r.json()).then(d => {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() }, body: JSON.stringify(payload)
+    }).then(r => {
+        if (!r.ok) {
+            throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+        }
+        return r.json();
+    }).then(d => {
         if (d.success) {
             selectedNode.label = label;
             selectedNode.deviceId = payload.device_id;
@@ -1705,7 +1719,10 @@ function openLinkModal(linkIndex) {
     // Load source node ports
     if (srcNode && srcNode.deviceId) {
         fetch('{{ url('plugin/WeathermapNG/api/device') }}/' + srcNode.deviceId + '/ports')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) { console.warn('Failed to load source ports: HTTP ' + r.status); return { ports: [] }; }
+                return r.json();
+            })
             .then(data => {
                 (data.ports || []).forEach(port => {
                     const opt = document.createElement('option');
@@ -1720,7 +1737,10 @@ function openLinkModal(linkIndex) {
     // Load destination node ports
     if (dstNode && dstNode.deviceId) {
         fetch('{{ url('plugin/WeathermapNG/api/device') }}/' + dstNode.deviceId + '/ports')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) { console.warn('Failed to load destination ports: HTTP ' + r.status); return { ports: [] }; }
+                return r.json();
+            })
             .then(data => {
                 (data.ports || []).forEach(port => {
                     const opt = document.createElement('option');

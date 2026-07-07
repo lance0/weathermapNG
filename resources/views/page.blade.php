@@ -209,7 +209,12 @@ document.getElementById('confirmLegacyDeleteMapBtn')?.addEventListener('click', 
             'Content-Type': 'application/json',
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             location.reload();
@@ -235,7 +240,12 @@ $('#createMapForm').on('submit', function(e) {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             $('#createMapModal').modal('hide');

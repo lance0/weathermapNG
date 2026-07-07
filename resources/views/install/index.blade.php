@@ -182,7 +182,12 @@ function startInstallation() {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+        }
+        return response.json();
+    })
     .then(data => {
         spinner.classList.add('d-none');
 

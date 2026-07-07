@@ -775,7 +775,12 @@ $('#createMapForm').on('submit', function(e) {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             WMNGToast.success('Map created successfully!');
@@ -823,7 +828,12 @@ $('#importMapForm').on('submit', function(e) {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             WMNGToast.success('Map imported successfully!');

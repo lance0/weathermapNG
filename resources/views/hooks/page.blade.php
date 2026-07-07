@@ -106,8 +106,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     const refresh = () => {
         fetch('{{ url('plugin/WeathermapNG/health/stats') }}')
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) { console.warn('Stats poll failed: HTTP ' + r.status); return null; }
+                return r.json();
+            })
             .then(d => {
+                if (!d) return;
                 const els = {
                     maps: document.querySelectorAll('h3')
                 };
