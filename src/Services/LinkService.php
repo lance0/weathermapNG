@@ -65,6 +65,10 @@ class LinkService
 
     public function storeLinks(Map $map, array $linksData): void
     {
+        if (empty($linksData) && $map->links()->exists()) {
+            throw new \InvalidArgumentException('Cannot replace links with an empty array for an existing map');
+        }
+
         try {
             DB::transaction(function () use ($map, $linksData) {
                 $map->links()->delete();

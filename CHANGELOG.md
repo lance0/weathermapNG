@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-07-07
+
+### Fixed
+- **Template map creation crash and data corruption** (LAN-256): `MapTemplateController::createFromTemplate` had missing imports for `Map`, `Node`, `Link`, and `DB` — the route was registered but would fatal on every call. Template `config` JSON was decoded without validation; malformed configs silently created incomplete maps. Node/link data was accessed without array bounds checking, causing undefined-index errors. Fixed: added missing imports, validate config structure before creation, wrap map+node+link creation in a DB transaction, return 400 for invalid configs, and use safe array access throughout.
+- **Template dimensions ignored** (LAN-256): `Map::create` was passed `width`/`height` as top-level keys, but `Map::$fillable` only accepts `name`/`title`/`options` — `width` and `height` are accessors derived from `options`. Template dimensions were silently dropped. Fixed: `width` and `height` are now stored inside `options` where the accessors expect them.
+- **NodeService/LinkService empty-array wipe** (LAN-255): `storeNodes` and `storeLinks` are delete-then-recreate operations. If called with an empty array for an existing map, all nodes/links would be deleted with no recreation. Added a guard that throws `InvalidArgumentException` when the array is empty and the map already has content.
+- **Dead MapCacheService::getMapForEditor** (LAN-257): The method had zero callers anywhere in the codebase. Deleted the dead method. Also fixed `getMapLinks()` which eager-loaded invalid relations (`destNode.device`, `portA`, `portB`) — corrected to `sourceNode.device`/`destinationNode.device` and dropped nonexistent port relations.
+
 ## [1.7.2] - 2026-07-07
 
 ### Fixed

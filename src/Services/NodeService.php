@@ -55,6 +55,10 @@ class NodeService
 
     public function storeNodes(Map $map, array $nodesData): void
     {
+        if (empty($nodesData) && $map->nodes()->exists()) {
+            throw new \InvalidArgumentException('Cannot replace nodes with an empty array for an existing map');
+        }
+
         try {
             DB::transaction(function () use ($map, $nodesData) {
                 $map->nodes()->delete();

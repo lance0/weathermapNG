@@ -62,7 +62,7 @@ class MapCacheService
     {
         return Cache::remember(self::MAP_LINKS_KEY . $mapId, self::CACHE_TTL / 2, function () use ($mapId) {
             return Link::where('map_id', $mapId)
-                ->with(['sourceNode.device', 'destNode.device', 'portA', 'portB'])
+                ->with(['sourceNode.device', 'destinationNode.device'])
                 ->get()
                 ->toArray();
         });
@@ -82,29 +82,6 @@ class MapCacheService
         });
     }
 
-    public function getMapForEditor(int $mapId): array
-    {
-        $mapKey = self::MAP_DETAIL_KEY . $mapId . ':editor';
-        
-        return Cache::remember($mapKey, self::CACHE_TTL / 4, function () use ($mapId) {
-            $map = Map::withCount(['nodes', 'links'])->find($mapId);
-            
-            if (!$map) {
-                return null;
-            }
-
-            $mapData = $map->toArray();
-            $mapData['nodes'] = Node::where('map_id', $mapId)
-                ->get()
-                ->toArray();
-            $mapData['links'] = Link::where('map_id', $mapId)
-                ->with(['sourceNode', 'destinationNode'])
-                ->get()
-                ->toArray();
-
-            return $mapData;
-        });
-    }
 
     public function invalidateMap(int $mapId): void
     {

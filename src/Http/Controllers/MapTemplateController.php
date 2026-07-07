@@ -5,7 +5,11 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\MapTemplate;
+use LibreNMS\Plugins\WeathermapNG\Models\Node;
+use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 
 class MapTemplateController extends Controller
@@ -140,45 +144,74 @@ class MapTemplateController extends Controller
             'name' => 'required|string|max:255|unique:wmng_maps,name',
         ]);
 
-        $mapData = [
-            'name' => $validated['name'],
-            'title' => $template->title,
-            'width' => $template->width,
-            'height' => $template->height,
-            'options' => $template->config,
-        ];
-
-        $map = Map::create($mapData);
-
-        $config = json_decode($template->config, true);
-
-        if (isset($config['default_nodes'])) {
-            foreach ($config['default_nodes'] as $idx => $nodeData) {
-                Node::create([
-                    'map_id' => $map->id,
-                    'label' => $nodeData['label'],
-                    'x' => $nodeData['x'],
-                    'y' => $nodeData['y'],
-                    'device_id' => null,
-                ]);
-            }
+        $config = $this->decodeTemplateConfig($template->config);
+        if ($config === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Template config is not valid JSON',
+            ], 400);
         }
 
-        if (isset($config['default_links'])) {
-            $nodeIds = DB::table('wmng_nodes')
-                ->where('map_id', $map->id)
-                ->pluck('id')
-                ->toArray();
+        $configError = $this->validateTemplateConfig($config);
+        if ($configError !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => $configError,
+            ], 400);
+        }
 
-            foreach ($config['default_links'] as $linkData) {
-                if (isset($nodeIds[$linkData['src_node_idx']]) && isset($nodeIds[$linkData['dst_node_idx']])) {
+        $map = null;
+        try {
+            DB::transaction(function () use ($validated, $template, $config, &$map) {
+                $options = $config;
+                $options['width'] = $template->width;
+                $options['height'] = $template->height;
+
+                $map = Map::create([
+                    'name' => $validated['name'],
+                    'title' => $template->title,
+                    'options' => $options,
+                ]);
+
+                $nodeIds = [];
+                foreach ($config['default_nodes'] as $nodeData) {
+                    $node = Node::create([
+                        'map_id' => $map->id,
+                        'label' => $nodeData['label'] ?? 'Node',
+                        'x' => $nodeData['x'] ?? 0,
+                        'y' => $nodeData['y'] ?? 0,
+                        'device_id' => null,
+                    ]);
+                    $nodeIds[] = $node->id;
+                }
+
+                foreach ($config['default_links'] as $linkData) {
+                    $srcIdx = $linkData['src_node_idx'] ?? null;
+                    $dstIdx = $linkData['dst_node_idx'] ?? null;
+
+                    if (!array_key_exists($srcIdx, $nodeIds) || !array_key_exists($dstIdx, $nodeIds)) {
+                        throw new \InvalidArgumentException(
+                            "Link references invalid node index (src={$srcIdx}, dst={$dstIdx})"
+                        );
+                    }
+
                     Link::create([
                         'map_id' => $map->id,
-                        'src_node_id' => $nodeIds[$linkData['src_node_idx']],
-                        'dst_node_id' => $nodeIds[$linkData['dst_node_idx']],
+                        'src_node_id' => $nodeIds[$srcIdx],
+                        'dst_node_id' => $nodeIds[$dstIdx],
                     ]);
                 }
-            }
+            });
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create map from template: ' . $e->getMessage(),
+            ], 500);
         }
 
         return response()->json([
@@ -186,5 +219,44 @@ class MapTemplateController extends Controller
             'map' => $map,
             'message' => 'Map created from template',
         ], 201);
+    }
+
+    private function decodeTemplateConfig($config): ?array
+    {
+        if (is_array($config)) {
+            return $config;
+        }
+
+        $decoded = json_decode($config, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function validateTemplateConfig(array $config): ?string
+    {
+        if (!array_key_exists('default_nodes', $config) || !is_array($config['default_nodes'])) {
+            return 'Template config must contain a "default_nodes" array';
+        }
+
+        if (!array_key_exists('default_links', $config) || !is_array($config['default_links'])) {
+            return 'Template config must contain a "default_links" array';
+        }
+
+        foreach ($config['default_nodes'] as $i => $node) {
+            if (!is_array($node)) {
+                return "default_nodes[$i] must be an object";
+            }
+        }
+
+        foreach ($config['default_links'] as $i => $link) {
+            if (!is_array($link)) {
+                return "default_links[$i] must be an object";
+            }
+            if (!array_key_exists('src_node_idx', $link) || !array_key_exists('dst_node_idx', $link)) {
+                return "default_links[$i] must contain src_node_idx and dst_node_idx";
+            }
+        }
+
+        return null;
     }
 }
