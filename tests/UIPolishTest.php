@@ -241,8 +241,9 @@ class UIPolishTest extends TestCase
     public function test_roadmap_tracks_current_stable_release_and_recent_polish(): void
     {
         $content = file_get_contents(__DIR__ . '/../ROADMAP.md');
+        $version = trim(file_get_contents(__DIR__ . '/../VERSION'));
 
-        $this->assertStringContainsString('## Current Status: v1.7.3 (Stable)', $content);
+        $this->assertStringContainsString("## Current Status: v{$version} (Stable)", $content);
         $this->assertStringContainsString('Idempotent LibreNMS plugin registration cleanup during reinstall', $content);
         $this->assertStringContainsString('### v1.6.5', $content);
         $this->assertStringContainsString('Duplicate inactive `WeathermapNG` rows are cleaned', $content);

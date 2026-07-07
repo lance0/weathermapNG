@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.7.3 (Stable)
+## Current Status: v1.7.4 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.3:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.4:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
@@ -68,10 +68,10 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Convert clickable `div` cards into proper button/link structures.
   - Preserve current search, sort, badges, and map metadata.
 
-- [ ] **Theme and UI cleanup**
-  - Reduce noisy theme-detection console logging.
-  - Avoid broad mutation observers where a narrower theme hook will work.
-  - Move repeated inline styles toward shared CSS classes.
+- [ ] **Theme and UI cleanup** *(v1.7.4: narrowed MutationObserver filters to class/data-bs-theme only, dropping the style attribute which fired detectTheme on any change to the style attribute of `<body>`/`<html>`; no console.log/debug found in theme detection code)*
+  - ~~Reduce noisy theme-detection console logging.~~ *(none found)*
+  - ~~Avoid broad mutation observers where a narrower theme hook will work.~~ *(narrowed in v1.7.4)*
+  - Move repeated inline styles toward shared CSS classes. *(deferred — Linear free workspace issue limit reached; tracked in project comment)*
 
 - [x] **LibreNMS hook and legacy view polish**
   - Align hook and compatibility views with LibreNMS Bootstrap button conventions.
@@ -99,10 +99,10 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Keep a short manual QA checklist for editor, embed, settings, install, and upgrade paths.
   - Define what qualifies as patch, minor, and major work for this plugin.
 
-- [ ] **Upgrade safety**
-  - Add explicit upgrade notes for users moving from older install methods.
-  - Verify upgrade behavior when config files, output directories, or validation tables already exist.
-  - Make failure messages actionable when Composer registration, route discovery, or database setup fails.
+- [x] **Upgrade safety** *(v1.7.4: added "Upgrade safety" subsection to INSTALL.md)*
+  - ~~Add explicit upgrade notes for users moving from older install methods.~~ *(v1.7.4)*
+  - ~~Verify upgrade behavior when config files, output directories, or validation tables already exist.~~ *(v1.7.4)*
+  - ~~Make failure messages actionable when Composer registration, route discovery, or database setup fails.~~ *(v1.7.4)*
 
 ### v1.7.0 - Performance, Authorization & Correctness Hardening ✅
 

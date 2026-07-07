@@ -749,11 +749,12 @@ function detectTheme() {
 
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(detectTheme, 100);
-    // NOTE: This broad body observer could be replaced with a narrower hook
-    // (e.g. a LibreNMS theme event or data-bs-theme attribute listener) in a future refactor.
+    // Watch for class/data-bs-theme changes that indicate a theme switch.
+    // Only class and data-bs-theme attributes — not style, which fires on
+    // every inline style change and causes unnecessary detectTheme calls.
     const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-bs-theme'] });
 });
 
 // ===== Create Map Form =====

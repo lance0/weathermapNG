@@ -341,6 +341,22 @@ php artisan config:clear
 php artisan view:clear
 ```
 
+### Upgrade safety
+
+**Database tables.** The `database/setup.php` migration creates any missing `wmng_*` tables and adds any missing columns to existing ones (e.g. `ALTER TABLE wmng_maps ADD COLUMN title`). It never drops tables, columns, or map data — existing maps, nodes, links, templates, and versions are preserved across upgrades. The only destructive write is to the LibreNMS `plugins` table, where stale duplicate `WeathermapNG` rows are removed by the normalizer (see below).
+
+**Config files.** WeathermapNG stores all configuration in the LibreNMS `plugins` table row (plugin name, version, status). There are no separate config files to migrate. If you previously edited a legacy config file from an older plugin version, those settings are not carried forward — reconfigure via Settings → WeathermapNG.
+
+**Output directories.** The `resources/output/` directory (if present from an older install) is unused by v1.7.x and can be safely removed. WeathermapNG generates PNG/SVG output on-demand via the render controller; no scheduled weathermap process is required.
+
+**Duplicate plugin rows.** If you upgraded from a v1.x install, you may have a legacy `version=1` row alongside a `version=2` row in the LibreNMS `plugins` table. Both `quick-install.sh` and `database/setup.php` normalize this automatically as of v1.7.2. See [Duplicate WeathermapNG rows](#duplicate-weathermapng-rows-in-the-plugins-table) below.
+
+**Composer registration.** If `composer require` fails with a class-not-found error, run `php artisan package:discover` and `php artisan optimize:clear` to re-register the plugin's service provider and clear cached route/config/view bindings.
+
+**Route discovery.** If the "Network Maps" menu entry is missing after upgrade, run `php artisan route:list | grep -iE 'weathermap|wmng'` to verify routes are registered. If no routes appear, ensure the plugin is enabled (`./lnms plugin:enable WeathermapNG`) and `package:discover` has been run.
+
+**Rollback.** To roll back to a previous version, `git checkout <tag>` in the plugin directory and re-run `composer install --no-dev && php artisan package:discover && php artisan optimize:clear`. Database tables from the newer version remain but are harmless — no down migrations are needed.
+
 ## Verifying Installation
 
 1. Check the menu for "Network Maps" entry

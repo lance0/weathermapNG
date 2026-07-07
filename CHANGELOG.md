@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.4] - 2026-07-07
+
+### Changed
+- **Narrowed theme-detection MutationObserver filters** (LAN-267): The theme-detection observers on `<body>` and `<html>` were filtered to `['class', 'style']` / `['class', 'style', 'data-bs-theme']`. The `style` filter caused `detectTheme` to fire on any change to the `style` attribute of `<body>` or `<html>`, including unrelated LibreNMS UI updates that toggle inline styles on the root elements. Narrowed to `['class']` on `<body>` and `['class', 'data-bs-theme']` on `<html>` — theme changes are signaled through class names or the `data-bs-theme` attribute, not root-element inline styles. Applied to both `editor.blade.php` and `index.blade.php`.
+
+### Added
+- **Upgrade safety documentation** (LAN-265): INSTALL.md "Updating" section now includes an "Upgrade safety" subsection covering: `database/setup.php` creates missing `wmng_*` tables and adds missing columns but never drops tables, columns, or map data (the only destructive write is removing duplicate `plugins` rows), config files (none — all config in plugins table row), output directories (`resources/output/` from older installs is unused and removable), duplicate plugin rows (normalized by v1.7.2 setup.php), Composer registration troubleshooting, route discovery troubleshooting, and rollback procedure.
+
 ## [1.7.3] - 2026-07-07
 
 ### Fixed
