@@ -1639,8 +1639,20 @@ function deleteSelectedNode() {
             if (mapId && nodeToDelete.dbId) {
                 fetch('{{ url('plugin/WeathermapNG/map') }}' + '/' + mapId + '/node/' + nodeToDelete.dbId, {
                     method: 'DELETE',
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-                }).then(() => finishDelete());
+                    headers: { 'X-CSRF-TOKEN': getCsrfToken() }
+                }).then(r => {
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+                    }
+                    return r.json().catch(() => ({}));
+                }).then(data => {
+                    if (data.success === false) {
+                        throw new Error(data.message || 'Server refused to delete node');
+                    }
+                    finishDelete();
+                }).catch(err => {
+                    WMNGToast.error('Failed to delete node: ' + err.message, { duration: 3000 });
+                });
             } else {
                 // Node only exists locally
                 finishDelete();
