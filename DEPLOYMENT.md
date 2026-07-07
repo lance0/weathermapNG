@@ -145,7 +145,7 @@ After install or upgrade:
 8. Run LibreNMS `validate.php`; ignore `wmng_*` extra-table warnings unless you are uninstalling.
 9. If `validate.php` reports `utf8mb4_bin` collation on `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, or `wmng_links.style`, treat that as expected JSON-column behavior.
 
-If an older deployment shows duplicate `WeathermapNG` rows in the LibreNMS `plugins` table, rerun `quick-install.sh` as the `librenms` user. The installer keeps one active row and removes stale duplicates.
+If an older deployment shows duplicate `WeathermapNG` rows in the LibreNMS `plugins` table, rerun `quick-install.sh` or `php database/setup.php` as the `librenms` user. Both normalize plugin registration: keep one active `version=2` row, promote legacy `version=1` rows, and remove stale duplicates.
 
 ## Background Poller
 

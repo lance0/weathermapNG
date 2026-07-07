@@ -281,7 +281,7 @@ MySQL and MariaDB store JSON-backed columns with binary JSON comparison semantic
 These columns are expected for WeathermapNG. Do not alter them unless a future WeathermapNG release includes a migration for that change.
 
 ### Duplicate WeathermapNG rows in the plugins table
-Current installers normalize LibreNMS plugin registration after enabling WeathermapNG. If an older install left an inactive duplicate `WeathermapNG` row in the LibreNMS `plugins` table, rerun `quick-install.sh` as the `librenms` user. It keeps one active WeathermapNG row and removes stale duplicates.
+Both `quick-install.sh` and `database/setup.php` normalize LibreNMS plugin registration. If an older install left a duplicate `WeathermapNG` row in the LibreNMS `plugins` table (e.g. a legacy `version=1` row alongside a `version=2` row), rerun `quick-install.sh` or `php database/setup.php` as the `librenms` user. The normalizer keeps one active `version=2` row, promotes any legacy `version=1` row to `version=2`, and removes stale duplicates.
 
 ### "Interface PageHook not found" error
 LibreNMS v2 doesn't support PageHook. This plugin uses MenuEntryHook and SettingsHook only.

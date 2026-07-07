@@ -52,11 +52,26 @@ class E2EInstallationWorkflowTest extends TestCase
 
         $this->assertStringContainsString('Normalizing WeathermapNG plugin registration', $scriptContent);
         $this->assertStringContainsString("where('plugin_name', 'WeathermapNG')", $scriptContent);
-        $this->assertStringContainsString("'plugin_id', 'plugin_name', 'plugin_active'", $scriptContent);
-        $this->assertStringContainsString('sortByDesc(\'plugin_id\')->first()', $scriptContent);
-        $this->assertStringContainsString("update(['plugin_active' => 1])", $scriptContent);
+        $this->assertStringContainsString("'plugin_id', 'plugin_name', 'plugin_active', 'version'", $scriptContent);
+        $this->assertStringContainsString('Prefer version=2 rows', $scriptContent);
+        $this->assertStringContainsString("update(['plugin_active' => 1, 'version' => 2])", $scriptContent);
         $this->assertStringContainsString("where('plugin_id', '!=', \$keep->plugin_id)", $scriptContent);
         $this->assertStringContainsString('Cleaned $deleted duplicate WeathermapNG plugin row(s)', $scriptContent);
+    }
+
+    public function test_database_setup_normalizes_duplicate_plugin_rows(): void
+    {
+        $scriptContent = file_get_contents(__DIR__ . '/../database/setup.php');
+
+        $this->assertStringContainsString('function normalizePluginRegistration', $scriptContent);
+        $this->assertStringContainsString("where('plugin_name', 'WeathermapNG')", $scriptContent);
+        $this->assertStringContainsString("'plugin_id', 'plugin_name', 'plugin_active', 'version'", $scriptContent);
+        $this->assertStringContainsString('Prefer version=2 rows', $scriptContent);
+        $this->assertStringContainsString("'plugin_active' => 1, 'version' => 2", $scriptContent);
+        $this->assertStringContainsString("where('plugin_id', '!=', \$keep->plugin_id)", $scriptContent);
+        // Verify the normalizer is called before every success exit
+        $this->assertStringContainsString('normalizePluginRegistration()', $scriptContent);
+        $this->assertStringContainsString('normalizePluginRegistration($pdo)', $scriptContent);
     }
 
     public function test_quick_install_plugin_row_cleanup_is_defensive(): void

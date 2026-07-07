@@ -161,7 +161,7 @@ try {
     }
 
     $columns = $schema::getColumnListing('plugins');
-    $required = ['plugin_id', 'plugin_name', 'plugin_active'];
+    $required = ['plugin_id', 'plugin_name', 'plugin_active', 'version'];
     $missing = array_diff($required, $columns);
     if (!empty($missing)) {
         echo "  Warning: LibreNMS plugins table is missing expected column(s): " . implode(', ', $missing) . "\n";
@@ -179,26 +179,26 @@ try {
         exit(0);
     }
 
-    $activeRows = $rows
-        ->filter(fn ($row) => (int) $row->plugin_active === 1)
-        ->values();
-
-    $keep = $activeRows->isNotEmpty()
-        ? $activeRows->sortByDesc('plugin_id')->first()
-        : $rows->sortByDesc('plugin_id')->first();
+    // Prefer version=2 rows; if none exist, promote the kept row to version=2
+    $v2Rows = $rows->filter(fn ($row) => (int) $row->version === 2)->values();
+    $activeV2 = $v2Rows->filter(fn ($row) => (int) $row->plugin_active === 1)->values();
+    $keep = $activeV2->isNotEmpty()
+        ? $activeV2->sortByDesc('plugin_id')->first()
+        : ($v2Rows->isNotEmpty() ? $v2Rows->sortByDesc('plugin_id')->first() : $rows->sortByDesc('plugin_id')->first());
 
     $db::table('plugins')
         ->where('plugin_name', 'WeathermapNG')
         ->where('plugin_id', $keep->plugin_id)
-        ->update(['plugin_active' => 1]);
+        ->update(['plugin_active' => 1, 'version' => 2]);
 
     $deleted = $db::table('plugins')
         ->where('plugin_name', 'WeathermapNG')
         ->where('plugin_id', '!=', $keep->plugin_id)
         ->delete();
 
-    if ($deleted > 0) {
-        echo "  Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
+    if ($deleted > 0 || (int) $keep->version !== 2) {
+        $action = (int) $keep->version !== 2 ? 'promoted v1→v2 and ' : '';
+        echo "  {$action}Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
     } else {
         echo "  WeathermapNG plugin registration is already normalized\n";
     }

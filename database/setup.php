@@ -190,6 +190,110 @@ function seedBuiltInTemplatesPdo(PDO $pdo): void
     echo "  ↳ Seeded " . count($templates) . " built-in templates\n";
 }
 
+/**
+ * Normalize LibreNMS plugin registration: keep one active WeathermapNG row,
+ * remove stale duplicates (including legacy version=1 rows that coexist with
+ * version=2 rows due to the composite unique key on (version, plugin_name)).
+ *
+ * Works with either Laravel facades (Schema/DB) or a PDO connection.
+ */
+function normalizePluginRegistration(?PDO $pdo = null): void
+{
+    try {
+        if ($pdo !== null) {
+            $stmt = $pdo->query("SHOW COLUMNS FROM plugins");
+            if (!$stmt) {
+                echo "  ⚠️  Could not inspect plugins table; skipped plugin row normalization\n";
+                return;
+            }
+            $cols = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'Field');
+            $required = ['plugin_id', 'plugin_name', 'plugin_active', 'version'];
+            $missing = array_diff($required, $cols);
+            if (!empty($missing)) {
+                echo "  ⚠️  Plugins table missing column(s): " . implode(', ', $missing) . "; skipped normalization\n";
+                return;
+            }
+
+            $rows = $pdo->query("SELECT * FROM plugins WHERE plugin_name = 'WeathermapNG' ORDER BY plugin_id")->fetchAll(PDO::FETCH_OBJ);
+            if (empty($rows)) {
+                echo "  ⚠️  No WeathermapNG plugin row found; skipped plugin row normalization\n";
+                return;
+            }
+
+            // Prefer version=2 rows; if none exist, promote the kept row to version=2
+            $v2Rows = array_values(array_filter($rows, fn($r) => (int)$r->version === 2));
+            $activeV2 = array_values(array_filter($v2Rows, fn($r) => (int)$r->plugin_active === 1));
+            $keep = !empty($activeV2)
+                ? $activeV2[count($activeV2) - 1]
+                : (!empty($v2Rows) ? $v2Rows[count($v2Rows) - 1] : $rows[count($rows) - 1]);
+
+            $pdo->exec("UPDATE plugins SET plugin_active = 1, version = 2 WHERE plugin_name = 'WeathermapNG' AND plugin_id = {$keep->plugin_id}");
+            $deleted = $pdo->exec("DELETE FROM plugins WHERE plugin_name = 'WeathermapNG' AND plugin_id != {$keep->plugin_id}");
+
+            if ($deleted > 0 || (int)$keep->version !== 2) {
+                $action = (int)$keep->version !== 2 ? 'promoted v1→v2 and ' : '';
+                echo "  ↳ {$action}Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
+            } else {
+                echo "  ↳ WeathermapNG plugin registration is already normalized\n";
+            }
+            return;
+        }
+
+        // Laravel facade path
+        $schema = Illuminate\Support\Facades\Schema::class;
+        $db = Illuminate\Support\Facades\DB::class;
+
+        if (!$schema::hasTable('plugins')) {
+            echo "  ⚠️  LibreNMS plugins table not found; skipped plugin row normalization\n";
+            return;
+        }
+
+        $columns = $schema::getColumnListing('plugins');
+        $required = ['plugin_id', 'plugin_name', 'plugin_active', 'version'];
+        $missing = array_diff($required, $columns);
+        if (!empty($missing)) {
+            echo "  ⚠️  Plugins table missing column(s): " . implode(', ', $missing) . "; skipped normalization\n";
+            return;
+        }
+
+        $rows = $db::table('plugins')
+            ->where('plugin_name', 'WeathermapNG')
+            ->orderBy('plugin_id')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            echo "  ⚠️  No WeathermapNG plugin row found; skipped plugin row normalization\n";
+            return;
+        }
+
+        // Prefer version=2 rows; if none exist, promote the kept row to version=2
+        $v2Rows = $rows->filter(fn($row) => (int)$row->version === 2)->values();
+        $activeV2 = $v2Rows->filter(fn($row) => (int)$row->plugin_active === 1)->values();
+        $keep = $activeV2->isNotEmpty()
+            ? $activeV2->sortByDesc('plugin_id')->first()
+            : ($v2Rows->isNotEmpty() ? $v2Rows->sortByDesc('plugin_id')->first() : $rows->sortByDesc('plugin_id')->first());
+
+        $db::table('plugins')
+            ->where('plugin_name', 'WeathermapNG')
+            ->where('plugin_id', $keep->plugin_id)
+            ->update(['plugin_active' => 1, 'version' => 2]);
+
+        $deleted = $db::table('plugins')
+            ->where('plugin_name', 'WeathermapNG')
+            ->where('plugin_id', '!=', $keep->plugin_id)
+            ->delete();
+
+        if ($deleted > 0 || (int)$keep->version !== 2) {
+            $action = (int)$keep->version !== 2 ? 'promoted v1→v2 and ' : '';
+            echo "  ↳ {$action}Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
+        } else {
+            echo "  ↳ WeathermapNG plugin registration is already normalized\n";
+        }
+    } catch (Throwable $e) {
+        echo "  ⚠️  Plugin row normalization failed: {$e->getMessage()}\n";
+    }
+}
+
 try {
     // Method 1: Try Laravel Schema approach
     echo "🔄 Attempting Laravel Schema method...\n";
@@ -228,6 +332,7 @@ try {
                 echo "✓ Added 'title' column to 'wmng_maps'\n";
             }
 
+            normalizePluginRegistration();
             echo "\n✅ All tables already exist and are up to date.\n";
             exit(0);
         }
@@ -274,6 +379,7 @@ try {
 
         // If we upgraded tables, exit successfully
         if ($tablesExist === 5) {
+            normalizePluginRegistration();
             echo "\n✅ Database upgraded successfully!\n";
             exit(0);
         }
@@ -361,7 +467,7 @@ try {
             echo "✓ Created table 'wmng_map_templates'\n";
             seedBuiltInTemplates();
         }
-
+        normalizePluginRegistration();
         echo "\n✅ Database setup completed successfully (Laravel Schema method)!\n";
         exit(0);
     } else {
@@ -394,7 +500,7 @@ try {
                 $pdo->exec("ALTER TABLE `wmng_maps` ADD COLUMN `title` varchar(255) DEFAULT NULL AFTER `name` ");
                 echo "✓ Added 'title' column to 'wmng_maps' (Direct SQL)\n";
             }
-
+            normalizePluginRegistration($pdo);
             echo "✅ All tables already exist and are up to date (Direct SQL method).\n";
             exit(0);
         }
@@ -450,6 +556,7 @@ try {
         }
 
         if ($upgraded) {
+            normalizePluginRegistration($pdo);
             echo "✅ Database upgraded successfully (Direct SQL method).\n";
             exit(0);
         }
@@ -541,6 +648,7 @@ try {
 
         $pdo->exec($sql);
         seedBuiltInTemplatesPdo($pdo);
+        normalizePluginRegistration($pdo);
         echo "✅ Database tables created successfully (Direct SQL method)!\n";
         exit(0);
 

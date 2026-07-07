@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-07-07
+
+### Fixed
+- **Duplicate plugin registration on manual install/upgrade** (issue #11, LAN-259): The plugin-row normalizer that removes stale duplicate `WeathermapNG` entries from the LibreNMS `plugins` table only ran inside `quick-install.sh`. Users who followed the manual install/upgrade path (`database/setup.php` + `lnms plugin:enable`) were left with a legacy `version=1` row alongside a new `version=2` row because LibreNMS's `plugins` table has a composite unique key on `(version, plugin_name)`, allowing both to coexist. The normalizer is now factored into `database/setup.php` so both install paths run the same cleanup. The selection logic now prefers `version=2` rows and promotes legacy `version=1` rows to `version=2` before deleting duplicates, preventing the duplicate from reappearing on the next `plugin:enable`.
+
 ## [1.7.1] - 2026-07-07
 
 ### Fixed

@@ -242,7 +242,7 @@ class UIPolishTest extends TestCase
     {
         $content = file_get_contents(__DIR__ . '/../ROADMAP.md');
 
-        $this->assertStringContainsString('## Current Status: v1.7.0 (Stable)', $content);
+        $this->assertStringContainsString('## Current Status: v1.7.2 (Stable)', $content);
         $this->assertStringContainsString('Idempotent LibreNMS plugin registration cleanup during reinstall', $content);
         $this->assertStringContainsString('### v1.6.5', $content);
         $this->assertStringContainsString('Duplicate inactive `WeathermapNG` rows are cleaned', $content);

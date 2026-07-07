@@ -4,7 +4,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
-![Version 1.7.1](https://img.shields.io/badge/version-1.7.1-0078D4)
+![Version 1.7.2](https://img.shields.io/badge/version-1.7.2-0078D4)
 
 ![WeathermapNG Live View](wmng.png)
 
@@ -109,7 +109,7 @@ php artisan config:clear
 
 LibreNMS `validate.php` may report `wmng_*` tables as extra tables — those belong to WeathermapNG and should not be dropped. It may also report `utf8mb4_bin` collation warnings on JSON-backed columns such as `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, and `wmng_links.style`; those are expected for the current schema.
 
-If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` table, rerun `quick-install.sh` as the `librenms` user — the installer normalizes plugin registration and removes stale duplicates.
+If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` table, rerun `quick-install.sh` or `php database/setup.php` as the `librenms` user — both normalize plugin registration and remove stale duplicates.
 
 ### Permission Errors
 
