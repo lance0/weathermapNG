@@ -24,36 +24,63 @@ class MapVersionService
 
     public function restoreVersion(MapVersion $version): Map
     {
-        $snapshot = json_decode($version->config_snapshot, true);
+        $map = $version->map;
+        $mapId = $version->map_id;
 
-        if (isset($snapshot['nodes'])) {
-            foreach ($snapshot['nodes'] as $nodeData) {
-                if (isset($nodeData['id'])) {
-                    Node::where('id', $nodeData['id'])->update($nodeData);
-                } else {
-                    Node::create($nodeData);
-                }
-            }
+        // config_snapshot is cast to 'array' on the model, so $version->config_snapshot
+        // is already a PHP array. Handle both string and array defensively in case
+        // the cast is removed or the raw attribute is accessed via getRawOriginal().
+        $raw = $version->config_snapshot;
+        $snapshot = is_string($raw) ? json_decode($raw, true) : $raw;
+        if (!is_array($snapshot)) {
+            throw new \InvalidArgumentException('Version snapshot is corrupt or empty.');
         }
 
-        if (isset($snapshot['links'])) {
-            foreach ($snapshot['links'] as $linkData) {
-                if (isset($linkData['id'])) {
-                    Link::where('id', $linkData['id'])->update($linkData);
-                } else {
-                    Link::create($linkData);
+        return DB::transaction(function () use ($map, $mapId, $snapshot) {
+            if (isset($snapshot['nodes']) && is_array($snapshot['nodes'])) {
+                foreach ($snapshot['nodes'] as $nodeData) {
+                    if (isset($nodeData['id'])) {
+                        Node::where('id', $nodeData['id'])
+                            ->where('map_id', $mapId)
+                            ->update($nodeData);
+                    } else {
+                        Node::create(array_merge(['map_id' => $mapId], $nodeData));
+                    }
                 }
             }
-        }
 
-        $map->update([
-            'title' => $snapshot['map']['title'] ?? null,
-            'width' => $snapshot['map']['width'] ?? null,
-            'height' => $snapshot['map']['height'] ?? null,
-            'background' => $snapshot['map']['background'] ?? null,
-        ]);
+            if (isset($snapshot['links']) && is_array($snapshot['links'])) {
+                foreach ($snapshot['links'] as $linkData) {
+                    if (isset($linkData['id'])) {
+                        Link::where('id', $linkData['id'])
+                            ->where('map_id', $mapId)
+                            ->update($linkData);
+                    } else {
+                        Link::create(array_merge(['map_id' => $mapId], $linkData));
+                    }
+                }
+            }
 
-        return $map->fresh();
+            $map->update([
+                'title' => $snapshot['map']['title'] ?? null,
+            ]);
+            // width/height/background live in the options JSON column, not as
+            // top-level columns — merge them into options.
+            $options = $map->options ?? [];
+            if (isset($snapshot['map']['width'])) {
+                $options['width'] = $snapshot['map']['width'];
+            }
+            if (isset($snapshot['map']['height'])) {
+                $options['height'] = $snapshot['map']['height'];
+            }
+            if (isset($snapshot['map']['background'])) {
+                $options['background'] = $snapshot['map']['background'];
+            }
+            $map->options = $options;
+            $map->save();
+
+            return $map->fresh();
+        });
     }
 
     public function deleteVersionsOlderThan(MapVersion $version): void
