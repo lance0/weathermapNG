@@ -81,6 +81,11 @@ class MapController
                 'success' => true,
                 'message' => 'Map saved successfully',
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

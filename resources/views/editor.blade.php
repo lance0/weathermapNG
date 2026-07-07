@@ -483,6 +483,11 @@
             let nodes = [];
             let links = [];
             let selectedNode = null;
+            // Load gate: for existing maps, saveMap() must not POST until the
+            // /json load resolves — otherwise the empty client arrays would be
+            // sent to the destructive replaceMapContent() backend, wiping the map.
+            let mapDataLoaded = !mapId;       // new maps have nothing to load
+            let mapDataLoadFailed = false;
             let devicesCache = [];
             let canvas = null;
             let ctx = null;
@@ -1179,9 +1184,18 @@
                 fetch(`{{ url('plugin/WeathermapNG/api/maps') }}/${id}/json`, {
                     headers: { 'Accept': 'application/json' }
                 })
-                .then(r => r.json())
+                .then(r => {
+                    if (!r.ok) {
+                        mapDataLoadFailed = true;
+                        throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+                    }
+                    return r.json();
+                })
                 .then(data => {
-                    if (!data) return;
+                    if (!data) {
+                        mapDataLoadFailed = true;
+                        return;
+                    }
                     nodes = (data.nodes || []).map(node => ({
                         id: node.id,
                         dbId: node.id,
@@ -1213,6 +1227,7 @@
                     if (data.width && canvas) canvas.width = data.width;
                     if (data.height && canvas) canvas.height = data.height;
 
+                    mapDataLoaded = true;
                     renderEditor();
                     renderLinksList();
                     renderNodesList();
@@ -1220,7 +1235,9 @@
                     markSaved();
                 })
                 .catch(error => {
+                    mapDataLoadFailed = true;
                     console.error('Failed to load map data', error);
+                    WMNGToast.error('Failed to load map data: ' + error.message + '. Saving is disabled until the map loads.', { duration: 5000 });
                 });
             }
 
@@ -1361,6 +1378,20 @@
                     return;
                 }
 
+                // Destructive-save guard: for an existing map, refuse to save
+                // until the /json load has completed successfully. The backend
+                // replaceMapContent() deletes all nodes/links then recreates
+                // from the client arrays — saving before the load resolves (or
+                // after it failed) would POST empty arrays and wipe the map.
+                if (mapId && !mapDataLoaded) {
+                    if (mapDataLoadFailed) {
+                        WMNGToast.error('Cannot save: map data failed to load. Reload the page and try again.', { duration: 5000 });
+                    } else {
+                        WMNGToast.warning('Map is still loading, please wait a moment and try again.', { duration: 3000 });
+                    }
+                    return;
+                }
+
                 const baseHeaders = {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
@@ -1375,7 +1406,12 @@
                         headers: baseHeaders,
                         body: JSON.stringify(payload),
                     })
-                    .then(r => r.json())
+                    .then(r => {
+                        if (!r.ok) {
+                            throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+                        }
+                        return r.json();
+                    })
                     .then(data => {
                         WMNGLoading.hide();
                         if (data.success) {
@@ -1429,7 +1465,15 @@
                     headers: baseHeaders,
                     body: JSON.stringify(payload),
                 })
-                .then(r => r.json())
+                .then(r => {
+                    // Surface non-2xx (403 admin gate, 419 CSRF, 500 server)
+                    // before trying to parse JSON — otherwise a HTML error page
+                    // throws an opaque SyntaxError and the real cause is lost.
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+                    }
+                    return r.json();
+                })
                 .then(data => {
                     WMNGLoading.hide();
                     if (data.success) {

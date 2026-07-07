@@ -64,6 +64,21 @@ class MapService
 
     public function saveMap(Map $map, array $data): void
     {
+        // API validation: refuse to wipe an existing map when the payload is
+        // malformed (no "nodes"/"links" key at all). An intentional clear sends
+        // `nodes: []` / `links: []` explicitly; a missing key means the caller
+        // never populated them. This does NOT protect against the editor race
+        // (the client always sends both keys, even when empty) — that is the
+        // client-side load gate's job.
+        if (!array_key_exists('nodes', $data) || !array_key_exists('links', $data)) {
+            $existing = $map->links()->exists() || $map->nodes()->exists();
+            if ($existing) {
+                throw new \InvalidArgumentException(
+                    'Save payload missing "nodes" or "links" key; refusing to wipe existing map content.'
+                );
+            }
+        }
+
         try {
             DB::transaction(function () use ($map, $data) {
                 $this->updateMapProperties($map, $data);
