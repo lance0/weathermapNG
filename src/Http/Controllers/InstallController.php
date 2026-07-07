@@ -43,7 +43,12 @@ class InstallController extends Controller
                     'redirect' => url('plugin/WeathermapNG')
                 ]);
             }
-        } catch (Exception $e) {
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Installation failed: ' . $e->getMessage()

@@ -1131,9 +1131,12 @@
 
         function fetchMapData() {
             fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/json`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) { console.warn('Map data fetch failed: HTTP ' + response.status); return null; }
+                    return response.json();
+                })
                 .then(data => {
-                    if (!data.error) {
+                    if (data && !data.error) {
                         mapData = data;
                         lastDataUpdate = Date.now();
                         renderMap();

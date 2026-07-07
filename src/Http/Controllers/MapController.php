@@ -104,6 +104,11 @@ class MapController
                 'success' => true,
                 'message' => 'Auto-discovery completed',
             ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 400);
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
