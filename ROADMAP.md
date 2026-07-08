@@ -2,6 +2,8 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
+*Last reviewed v1.7.8 (2026-07-08) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+
 ## Current Status: v1.7.8 (Stable)
 
 The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.8:
@@ -89,10 +91,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Preserve existing delete, restore, cleanup, resize, and undo-aware editor behavior after confirmation.
   - Route editor save errors through toast feedback instead of browser alerts.
 
-- [ ] **Validation coverage**
-  - Add screenshot checks for the index, editor, and embed view at representative viewport sizes.
-  - Add an accessibility smoke test for obvious regressions.
-  - Keep Composer, install, route, and version metadata checks green.
+- [ ] **Validation coverage** *(moved to v1.8.0)*
 
 - [x] **Release readiness checklist**
   - Document the exact pre-release validation flow: Composer validate, PHPUnit, install CI, smoke install, changelog, tag, release notes.
@@ -151,69 +150,131 @@ These improvements shipped in v1.7.0. The bulk of the work was reliability, safe
 
 This release should make existing authoring workflows faster and less error-prone before adding major visualization features.
 
+- [ ] **Version Comparison** *(activate dormant backend)*
+  - The backend is already written: `MapVersionController` has store/restore/compare/destroy/export methods, `MapVersionService` has `compareVersions()` with node/link add/remove/modify detection. Routes are NOT registered and editor UI was removed in v1.7.0.
+  - Register version routes in `routes/web.php`.
+  - Build editor UI: save-version button, version list, restore confirmation, visual diff view.
+  - Visual diff: show node/link additions, removals, and style/config changes between versions.
+  - Restore or compare without losing current version history behavior.
+  - *Highest ROI v1.8.0 item — major feature with minimal new backend work.*
+
 - [ ] **Bulk Operations**
-  - Select multiple nodes/links.
+  - Select multiple nodes/links (rubber-band, shift-click, ctrl-click).
   - Bulk delete.
-  - Bulk style changes.
+  - Bulk style changes (apply to all selected).
   - Preserve undo/redo support for bulk edits.
 
-- [ ] **Map Templates Gallery Refinement**
-  - Keep the existing templates work.
-  - Improve template card accessibility and preview quality.
-  - Add or refine common topology templates:
-    - Data center layout
-    - WAN/MPLS network
-    - Campus network
-    - Simple branch office
-
-- [ ] **Version Comparison**
-  - Visual diff between map versions.
-  - Show node/link additions, removals, and style/config changes.
-  - Restore or compare without losing current version history behavior.
-
-- [ ] **Map Organization**
-  - Tags and filtering.
-  - Favorites.
-  - Basic grouping for users with many maps.
+- [ ] **Operational diagnostics** *(backend already exists)*
+  - `HealthController` already has health/ready/live/detailed/stats/metrics endpoints. The diagnostics screen is a UI layer on top.
+  - Add admin-facing diagnostics Blade view: install status, route registration, writable paths, version metadata, LibreNMS compatibility checks.
+  - Surface stale data, missing RRD files, and broken port associations.
+  - Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.
 
 - [ ] **First-run onboarding**
   - Add a lightweight first-run state that helps users create or import their first useful map.
   - Offer demo/sample map creation only when it will not touch production data unexpectedly.
   - Link directly to install checks, docs, and troubleshooting from empty/error states.
 
-- [ ] **Operational diagnostics**
-  - Add an admin-facing diagnostics screen for install status, route registration, writable paths, version metadata, and LibreNMS compatibility checks.
-  - Surface stale data, missing RRD files, and broken port associations in a way users can act on.
-  - Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.
+- [ ] **Map Organization** *(tags only this cycle)*
+  - Tags and filtering — store in existing `wmng_maps.options` JSON column, no migration needed.
+  - Basic grouping for users with many maps.
+  - *Defer favorites (requires user_id mapping table) to v1.9.0.*
 
+- [ ] **Per-map default styling** *(NODE DEFAULT / LINK DEFAULT inheritance)*
+  - Map-level default style that propagates to all nodes/links. Change one default, restyle the entire map.
+  - Store as `default_node_style` / `default_link_style` in the map's `options` JSON column.
+  - Merge defaults at render time (existing `mergeMapOptions` pattern).
+  - *Addresses a feature operators miss from legacy weathermap tools (ranked #4 in competitive research).*
+
+- [ ] **NOC wall / kiosk mode**
+  - Fullscreen toggle with all UI chrome hidden.
+  - Auto-cycling between maps on a timer.
+  - The embed view is the foundation — add cycling and fullscreen.
+
+- [ ] **Frontend modularization** *(maintainability prerequisite)*
+  - Extract `editor.blade.php` (2047 lines) and `embed.blade.php` (1501 lines) inline JS into separate JS modules.
+  - Split canvas rendering, interaction handling, live-update logic, and planned version-comparison/bulk-ops UI into modules.
+  - Plain ES modules or IIFE namespaces — no build step required.
+  - *Not a user-facing feature but a prerequisite for v1.9.0 and v2.0.0 feature delivery.*
+
+- [ ] **Map Templates Gallery Refinement** *(stretch goal)*
+  - Add or refine common topology templates: data center, WAN/MPLS, campus, branch office.
+  - Template CRUD backend already exists (`MapTemplateController`). New templates are seeding work.
+  - Accessibility and preview quality improvements mostly done per v1.7.8.
+
+- [ ] **Validation coverage** *(moved from stale v1.6.x)*
+  - Add screenshot checks for the index, editor, and embed view at representative viewport sizes.
+  - Add an accessibility smoke test for obvious regressions.
+  - Keep Composer, install, route, and version metadata checks green.
 ---
 
 ## Medium Term
+### v1.9.0 - Discovery, Operator Integration & Advanced Data
 
-### v1.9.0 - Discovery & Advanced Data
+This release closes the biggest gaps vs legacy weathermap tools and native LibreNMS maps: click-through navigation, RRD graph hover, nested maps, and LLDP/CDP auto-discovery.
+
+- [ ] **Click-through navigation** *(CRITICAL — #1 feature gap vs legacy tools)*
+  - Click a node to open the LibreNMS device page (`/device/{id}`). Nodes already store `device_id`.
+  - Click a link to open the LibreNMS interface/port page (`/device/{id}/port/{port_id}`). Links already store port data.
+  - Configurable: open in same tab, new tab, or hover tooltip with link.
+  - *Every major competitor (legacy LibreNMS weathermap, PHP Weathermap, Zabbix, NagVis) has this. LOW effort — LibreNMS routes are stable, data already stored.*
+
+- [ ] **RRD graph hover popups** *(HIGH impact — defining weathermap UX feature)*
+  - Hover over a node/link to see an embedded RRD time-series graph, not just a text tooltip.
+  - LibreNMS exposes graph image endpoints. Use a modern CSS/JS tooltip with embedded `<img>` or `<iframe>`.
+  - *The most beloved feature of the classic PHP Weathermap (OverLib graphs). WeathermapNG's text-only tooltips are a step back.*
+
+- [ ] **Nested maps / drill-down hierarchy** *(HIGH impact for multi-scale networks)*
+  - Add `parent_map_id` foreign key to `wmng_maps` — a node can link to a sub-map instead of a device.
+  - Click a "summary" node to navigate to a detailed sub-map (e.g., campus → building → rack).
+  - Breadcrumb navigation showing the map hierarchy.
+  - *Zabbix's killer feature for networks with multiple scales. Not previously in the roadmap.*
 
 - [ ] **LLDP/CDP Auto-Discovery**
-  - Query LibreNMS `links` table for actual topology.
+  - Query LibreNMS `links` table for actual topology (protocol field: lldp/xdp/cdp, remote_port_id, remote_device_id).
   - Create accurate node/link mapping from LLDP/CDP data.
   - Replace unreliable ifIndex-based matching.
   - Keep auto-discovery optional and reviewable before creating maps.
+  - `AutoDiscoveryService` class already referenced in `MapController` constructor.
+
+- [ ] **Device status-based node icons**
+  - Node icons reflect device up/down/warning state (green/red/pulse), not just bandwidth on links.
+  - LibreNMS device status is available. WeathermapNG nodes already store `device_id`.
+  - *Partially covered by alerts integration, but the node icon itself should change, not just an overlay badge.*
 
 - [ ] **Custom Metrics**
-  - CPU and memory utilization on nodes.
-  - Latency visualization.
-  - Packet loss indicators.
+  - CPU and memory utilization on nodes (via LibreNMS `/health/processor` and `/health/mempool` endpoints).
+  - Latency visualization (via LibreNMS services API — service_type=ping).
+  - Packet loss indicators (via services API — service_ds with loss datasource).
   - Custom SNMP OID support if it can be implemented without reintroducing unreliable polling behavior.
+  - *All data sources confirmed feasible via LibreNMS API research.*
 
-- [ ] **Advanced Alerts Integration**
-  - LibreNMS alert overlay.
-  - Alert severity indicators.
-  - Click-through to alert details.
-  - Alert history on hover.
+- [ ] **Advanced Alerts Integration** *(backend substantially implemented)*
+  - ~~LibreNMS alert overlay~~ *(done: `AlertService` fetches device+port alerts, embed view renders alert badges with severity coloring)*
+  - ~~Alert severity indicators~~ *(done: critical=red, warning=yellow)*
+  - Click-through to alert details — link to LibreNMS alert detail page using device_id and alert id.
+  - Alert history on hover — query alerts without state filter, sort by timestamp.
+  - *The roadmap previously underestimated how much alert work was already done.*
 
 - [ ] **Large map performance**
   - Set practical performance budgets for node/link counts.
   - Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.
-  - Add graceful degradation controls for very large maps: reduced particles, lower update rate, or simplified labels.
+  - Graceful degradation controls: viewport culling (only draw visible nodes/links), minimap redraw throttling (max once per 100ms during pan), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold.
+  - *Canvas 2D is appropriate for 1-300 nodes with these optimizations. No engine migration needed until v2.0.0.*
+
+- [ ] **CLI tools for map management**
+  - `lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`.
+  - Follow `bin/map-poller.php` bootstrap pattern for LibreNMS environment loading.
+  - Enables automation and headless map management.
+
+- [ ] **External embedding API documentation**
+  - Document the existing `/api/maps/{map}/json` and `/api/maps/{map}/live` endpoints as a public embedding API.
+  - Add optional API token auth for non-session access (NOC dashboards, external systems).
+  - *Enables Grafana iframe panels, custom NOC walls, and status page integration without iframe hacks.*
+
+- [ ] **Map Organization favorites** *(deferred from v1.8.0)*
+  - Per-user favorites (requires user_id mapping table or column).
+  - Saved views per user.
 
 ### v1.10.0 - Historical Views & Export
 
@@ -221,17 +282,33 @@ This release should make existing authoring workflows faster and less error-pron
   - Timeline scrubber.
   - Play/pause controls.
   - Speed adjustment.
+  - Uses RRD time-range fetch via existing `RRDTool.php` class.
 
 - [ ] **Export Formats**
-  - High-resolution PNG.
+  - ~~High-resolution PNG~~ *(done: exists in embed view via `canvas.toDataURL`)*
   - SVG export.
   - PDF export.
   - Visio/draw.io format if there is enough demand.
+
+- [ ] **Config file import/export** *(portable map definitions)*
+  - Export maps to JSON or legacy `.conf` text format for version control, scripting, and migration.
+  - Import maps from config files (enables migration from legacy PHP Weathermap).
+  - *Not visual export — enables portability and automation.*
 
 - [ ] **Scheduled Reports**
   - Daily/weekly snapshots.
   - Email delivery.
   - PDF generation.
+  - Scheduled PNG/PDF snapshot generation for NOC wall displays (extend `bin/map-poller.php`).
+
+- [ ] **Grafana integration**
+  - Document Grafana IFrame panel setup (works today with `allow_embedding=true`).
+  - Explore JSON data source for native Grafana panel rendering weathermap data.
+
+- [ ] **Map lifecycle webhooks**
+  - Notify external systems (Slack, webhook) on map created/updated/deleted/version-saved.
+  - Laravel events on Eloquent model events + webhook dispatcher.
+  - *Extracted from v2.0.0 API v2 — achievable with current architecture.*
 
 ---
 
@@ -245,11 +322,14 @@ These ideas are intentionally parked until the core product feels polished and m
   - Presence indicators.
   - Conflict resolution.
   - Edit locking.
+  - Per-map access control / visibility (requires user_id or role mapping on maps).
 
 - [ ] **Advanced Auto-Layout Algorithms**
   - Force-directed graphs.
   - Hierarchical layout.
-  - Geographic placement from device data.
+  - Circular layout *(from NagVis competitive analysis)*.
+  - Geographic placement from device data (LibreNMS locations table has lat/lng).
+  - Semantic zooming: auto-clustering at low zoom, drill-down at high zoom *(matches Datadog/Kentik approach)*.
 
 - [ ] **Plugin Ecosystem**
   - Custom data source plugins.
@@ -258,19 +338,18 @@ These ideas are intentionally parked until the core product feels polished and m
 
 - [ ] **API v2**
   - GraphQL support.
-  - Webhook integrations.
   - External data sources.
 
-- [ ] **3D Visualization**
-  - Optional WebGL rendering.
-  - Geographic positioning.
-  - Building/floor layouts.
+- [ ] **WebGL Rendering Engine** *(clarified: 2D graph scale, not 3D)*
+  - Migrate from Canvas 2D to **Sigma.js + Graphology** for 10k+ node graph rendering.
+  - Keep the data model (nodes, links, live updates) unchanged — SSE/polling layer is rendering-agnostic.
+  - If 3D geographic positioning is needed, use **Three.js or deck.gl** separately.
+  - *Triggered when maps regularly exceed 300 nodes. No migration needed before that.*
 
 - [ ] **Mobile App**
   - iOS/Android companion app.
   - Push notifications for alerts.
   - Quick map viewing.
-
 ---
 
 ## Completed Features
@@ -354,8 +433,8 @@ These ideas are intentionally parked until the core product feels polished and m
 
 ### v1.5.x
 
-- [x] Map versioning foundation: storage and services only (editor UI removed in v1.7.0; routes not registered — see VERSIONING.md).
-- [x] Auto-save functionality (wiring removed in v1.7.0 — dead code referencing non-existent elements).
+- [x] Map versioning foundation: storage and services written, but **dormant** — editor UI removed in v1.7.0, routes not registered. Activate in v1.8.0 by registering routes and building UI (see VERSIONING.md).
+- ~~Auto-save functionality~~ *(removed in v1.7.0 — dead code referencing non-existent elements)*
 - [x] Demo mode for testing without devices.
 - [x] Docker development environment.
 - [x] Improved install scripts.
@@ -401,11 +480,12 @@ Want to help? Check out:
 
 ### Priority Areas
 
-1. **UX polish**: Editor, embed controls, responsive layout, accessible interactions.
-2. **Testing**: Install, UI smoke, accessibility smoke, and large-map coverage.
-3. **Documentation**: Install clarity, user guides, and upgrade/release notes.
-4. **Performance**: Large map rendering and live update efficiency.
-5. **Discovery**: LLDP/CDP topology only after the current UI and install experience are stable.
+1. **Operator workflows**: Click-through navigation to LibreNMS device pages, RRD graph hover popups, device status-based node icons — the #1 gaps vs legacy weathermap tools.
+2. **Editor productivity**: Version comparison (dormant backend ready to activate), bulk operations, per-map default styling.
+3. **Map scale**: Nested maps / drill-down hierarchy for multi-scale networks, NOC wall/kiosk mode.
+4. **Performance**: Large map rendering (viewport culling, particle throttling) and live update efficiency.
+5. **Discovery**: LLDP/CDP topology, custom metrics (CPU/memory/latency), alerts click-through.
+6. **Integration**: External embedding API, CLI tools, Grafana integration, config file import/export.
 
 ---
 
