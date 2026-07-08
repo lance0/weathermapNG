@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Save endpoint validation hardening**: `MapController::save()` now uses `SaveMapRequest` (FormRequest) instead of raw `Request`. Link `style` JSON is allowlisted to `via_style` (straight/angled/curved) and `via_points` (array of `{x,y}` with numeric bounds 0–10000); unknown style keys are rejected at validation time, not sanitized after the fact. `via_points.*` requires both `x` and `y` (no partial/null points). `title` and node labels are `strip_tags`-sanitized; via-point numeric strings cast to float before persistence.
+- **Admin gates on health endpoints**: `HealthController::stats()`, `metrics()`, and `detailed()` now call `requireAdmin()` — previously any authenticated user could read system stats, Prometheus metrics, and detailed health checks. `check()`, `ready()`, and `live()` remain public (basic liveness probes).
+
+### Changed
+- **Shared client helpers consolidated**: `resources/js/wmng-common.js` now hosts `getCsrfToken()`, `fetchJson()`, `ensureUiHelpers()`, `detectTheme()`, and `observeTheme()` — replacing inline polyfills in `editor.blade.php` and `index.blade.php`. CSRF token lookups use the helper with empty-string fallback instead of `.content` (which throws if the meta tag is absent).
+- **Dead duplicate assets removed**: Deleted root-level `js/weathermapng.js`, `css/weathermapng.css`, and `resources/js/weathermapng.js` — stale duplicates of code that lives in the blade views and `resources/css/weathermapng.css`. Removed the stale `MapVersionController` import from `routes/web.php` (version routes are not registered).
+- **Legacy `index.php` fallback fixes**: Map list now selects `title`/`options` from the correct schema (width/height live in the options JSON), version is read from the `VERSION` file, and the CSS asset path points at `resources/css/weathermapng.css`.
+
 ## [1.7.8] - 2026-07-08
 
 ### Fixed

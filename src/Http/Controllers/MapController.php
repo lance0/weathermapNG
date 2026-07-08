@@ -7,6 +7,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
 use LibreNMS\Plugins\WeathermapNG\Services\AutoDiscoveryService;
 use LibreNMS\Plugins\WeathermapNG\Http\Requests\CreateMapRequest;
+use LibreNMS\Plugins\WeathermapNG\Http\Requests\SaveMapRequest;
 use LibreNMS\Plugins\WeathermapNG\Http\Requests\UpdateMapRequest;
 
 class MapController
@@ -70,10 +71,10 @@ class MapController
         return $this->handleDeleteResponse();
     }
 
-    public function save(\Illuminate\Http\Request $request, Map $map): \Illuminate\Http\JsonResponse
+    public function save(SaveMapRequest $request, Map $map): \Illuminate\Http\JsonResponse
     {
         $this->requireAdmin();
-        $validatedData = $request->all();
+        $validatedData = $request->sanitize($request->validated());
 
         try {
             $this->mapService->saveMap($map, $validatedData);

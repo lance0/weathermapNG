@@ -415,28 +415,29 @@
         @endsection
 
         @section('scripts')
+        <script src="{{ asset('plugins/WeathermapNG/resources/js/wmng-common.js') }}"></script>
         <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
         <script>
-            // Polyfill: if ui-helpers.js fails to load or is stale (missing
-            // methods), install safe no-op/console fallbacks so the editor
-            // still works — especially saveMap, which must not crash.
-            (function() {
-                // Fill missing WMNGLoading methods individually so a stale
-                // helper with show() but not hide() doesn't crash saveMap.
+            // Shared polyfill + theme (wmng-common.js). Safe if common fails to load.
+            if (window.WMNG && typeof WMNG.ensureUiHelpers === 'function') {
+                WMNG.ensureUiHelpers();
+            } else {
                 window.WMNGLoading = window.WMNGLoading || {};
                 ['show', 'hide', 'toggle'].forEach(m => {
                     if (typeof window.WMNGLoading[m] !== 'function') {
                         window.WMNGLoading[m] = function() {};
                     }
                 });
-                // Fill missing WMNGToast methods individually.
                 window.WMNGToast = window.WMNGToast || {};
                 ['success','error','warning','info'].forEach(m => {
                     if (typeof window.WMNGToast[m] !== 'function') {
                         window.WMNGToast[m] = (msg) => console[m === 'error' ? 'error' : 'log'](msg);
                     }
                 });
-            })();
+            }
+            if (window.WMNG && typeof WMNG.observeTheme === 'function') {
+                WMNG.observeTheme('.editor-container');
+            }
         </script>
         <script>
             let pendingEditorConfirmAction = null;
@@ -477,59 +478,6 @@
                 pendingEditorConfirmAction = null;
                 pendingEditorCancelAction = null;
                 editorConfirmAccepted = false;
-            });
-
-            // ===== Theme Detection =====
-            function detectTheme() {
-                const container = document.querySelector('.editor-container');
-                if (!container) return;
-
-                let isDark = null;
-
-                // Method 1 (Primary): Check actual rendered background color
-                // This is the most reliable since it shows what user actually sees
-                const navbar = document.querySelector('.navbar, .navbar-default, .navbar-static-top, nav');
-                const elementsToCheck = [navbar, document.body].filter(Boolean);
-
-                for (const element of elementsToCheck) {
-                    const bg = window.getComputedStyle(element).backgroundColor;
-                    const rgb = bg.match(/\d+/g);
-                    if (rgb && rgb.length >= 3) {
-                        // Skip transparent backgrounds
-                        if (rgb.length === 4 && parseInt(rgb[3]) === 0) continue;
-                        if (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') continue;
-
-                        const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
-                        isDark = brightness < 128;
-                        break;
-                    }
-                }
-
-                // Method 2 (Fallback): Check for dark theme class names
-                if (isDark === null) {
-                    const allClasses = document.body.className + ' ' + document.documentElement.className;
-                    if (/\bdark\b|\bnight\b|\bdark-mode\b/i.test(allClasses)) {
-                        isDark = true;
-                    }
-                }
-
-                // Method 3 (Last resort): Default to light
-                if (isDark === null) {
-                    isDark = false;
-                }
-
-                container.classList.toggle('dark-theme', isDark);
-            }
-
-            // Run on load with slight delay to ensure styles are applied
-            document.addEventListener('DOMContentLoaded', function() {
-                setTimeout(detectTheme, 100);
-                // Watch for class/data-bs-theme changes that indicate a theme switch.
-                // Only class and data-bs-theme attributes — not style, which fires on
-                // every inline style change and causes unnecessary detectTheme calls.
-                const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
-                observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-                observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-bs-theme'] });
             });
 
             let mapId = {{ $map->id ?? 'null' }};
@@ -580,6 +528,9 @@
             });
 
             function getCsrfToken() {
+                if (window.WMNG && typeof WMNG.getCsrfToken === 'function') {
+                    return WMNG.getCsrfToken();
+                }
                 return document.querySelector('meta[name="csrf-token"]')?.content || '';
             }
 

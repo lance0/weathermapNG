@@ -1,9 +1,10 @@
 <?php
 /**
- * WeathermapNG v2 Plugin Entry Point
- * 
- * This file serves as the main entry point for the v2 plugin system
- * Accessible at: /plugin/WeathermapNG
+ * WeathermapNG legacy entry fallback
+ *
+ * Canonical UI is registered via WeathermapNGProvider routes
+ * (GET /plugin/WeathermapNG → PageController). This file remains for
+ * tools and older install paths that include index.php directly.
  */
 
 // Get the LibreNMS app instance if available
@@ -23,10 +24,11 @@ function weathermapng_get_maps() {
     if (!weathermapng_db_ready()) {
         return collect();
     }
-    
+
     try {
+        // Schema: name/title/options/timestamps — width/height live in options JSON.
         return \Illuminate\Support\Facades\DB::table('wmng_maps')
-            ->select('id', 'name', 'description', 'width', 'height', 'updated_at')
+            ->select('id', 'name', 'title', 'options', 'updated_at')
             ->orderBy('name')
             ->get();
     } catch (\Exception $e) {
@@ -34,10 +36,23 @@ function weathermapng_get_maps() {
     }
 }
 
+function weathermapng_plugin_version() {
+    $versionFile = __DIR__ . '/VERSION';
+    if (is_readable($versionFile)) {
+        $v = trim((string) file_get_contents($versionFile));
+        if ($v !== '') {
+            return $v;
+        }
+    }
+    return 'unknown';
+}
+
 // Main plugin data
+// Note: canonical UI is the Laravel route /plugin/WeathermapNG (PageController).
+// This file is a legacy fallback entry point for tools that include index.php directly.
 $title = 'WeathermapNG - Network Weather Maps';
 $maps = weathermapng_get_maps();
-$plugin_version = '1.0.0';
+$plugin_version = weathermapng_plugin_version();
 
 // Include the main view
 ?>
@@ -49,7 +64,7 @@ $plugin_version = '1.0.0';
     <title><?php echo htmlspecialchars($title); ?></title>
     
     <!-- Include WeathermapNG CSS -->
-    <link href="/plugins/WeathermapNG/css/weathermapng.css" rel="stylesheet">
+    <link href="/plugins/WeathermapNG/resources/css/weathermapng.css" rel="stylesheet">
     
     <style>
         .weathermap-hero {
@@ -201,19 +216,27 @@ $plugin_version = '1.0.0';
                             </h4>
                         </div>
                         <div class="map-card-body">
+                            <?php
+                                $mapTitle = $map->title ?? $map->name;
+                                $opts = is_string($map->options ?? null)
+                                    ? (json_decode($map->options, true) ?: [])
+                                    : (array) ($map->options ?? []);
+                                $mapW = (int) ($opts['width'] ?? 800);
+                                $mapH = (int) ($opts['height'] ?? 600);
+                            ?>
                             <p class="text-muted">
-                                <?php echo htmlspecialchars($map->description ?: 'No description'); ?>
+                                <?php echo htmlspecialchars($mapTitle ?: 'No title'); ?>
                             </p>
                             <div class="d-flex justify-content-between text-sm text-muted">
-                                <span><i class="fas fa-expand"></i> <?php echo $map->width; ?>x<?php echo $map->height; ?>px</span>
+                                <span><i class="fas fa-expand"></i> <?php echo $mapW; ?>x<?php echo $mapH; ?>px</span>
                                 <span><i class="fas fa-clock"></i> <?php echo date('M j, H:i', strtotime($map->updated_at)); ?></span>
                             </div>
                         </div>
                         <div class="map-card-footer">
-                            <a href="/plugin/v1/WeathermapNG/view/<?php echo $map->id; ?>" class="btn btn-primary btn-sm flex-fill">
+                            <a href="/plugin/WeathermapNG/view/<?php echo $map->id; ?>" class="btn btn-primary btn-sm flex-fill">
                                 <i class="fas fa-eye"></i> View
                             </a>
-                            <a href="/plugin/v1/WeathermapNG/editor/<?php echo $map->id; ?>" class="btn btn-warning btn-sm flex-fill">
+                            <a href="/plugin/WeathermapNG/editor/<?php echo $map->id; ?>" class="btn btn-warning btn-sm flex-fill">
                                 <i class="fas fa-edit"></i> Edit
                             </a>
                             <button onclick="deleteMap(<?php echo $map->id; ?>)" class="btn btn-danger btn-sm">

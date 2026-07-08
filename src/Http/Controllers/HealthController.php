@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
+use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
 use LibreNMS\Plugins\WeathermapNG\Services\DevicePortLookup;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class HealthController
 {
+    use AdminCheck;
+
     private ?Logger $logger = null;
 
     protected function getLogger(): Logger
@@ -60,6 +63,8 @@ class HealthController
 
     public function stats(): \Illuminate\Http\JsonResponse
     {
+        $this->requireAdmin();
+
         $stats = [
             'maps' => Map::count(),
             'nodes' => \DB::table('wmng_nodes')->count(),
@@ -174,6 +179,8 @@ class HealthController
      */
     public function metrics(): \Illuminate\Http\Response
     {
+        $this->requireAdmin();
+
         $metrics = [];
 
         // Database metrics
@@ -219,6 +226,8 @@ class HealthController
      */
     public function detailed(): \Illuminate\Http\JsonResponse
     {
+        $this->requireAdmin();
+
         $startTime = microtime(true);
         $checks = [];
 
