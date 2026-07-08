@@ -6,6 +6,7 @@ use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapLinkController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapNodeController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapTemplateController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapVersionController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\InstallController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\LookupController;
@@ -40,8 +41,17 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::patch('plugin/WeathermapNG/map/{map}/link/{link}', [MapLinkController::class, 'update'])->name('weathermapng.link.update');
     Route::post('plugin/WeathermapNG/map/{map}/node', [MapNodeController::class, 'create'])->name('weathermapng.node.create');
     Route::delete('plugin/WeathermapNG/map/{map}/node/{node}', [MapNodeController::class, 'delete'])->name('weathermapng.node.delete');
-    Route::post('plugin/WeathermapNG/map/{map}/link', [MapLinkController::class, 'create'])->name('weathermapng.link.create');
     Route::delete('plugin/WeathermapNG/map/{map}/link/{link}', [MapLinkController::class, 'delete'])->name('weathermapng.link.delete');
+    Route::post('plugin/WeathermapNG/map/{map}/link', [MapLinkController::class, 'create'])->name('weathermapng.link.create');
+
+    // Map versioning
+    Route::get('plugin/WeathermapNG/api/maps/{map}/versions', [MapVersionController::class, 'index'])->name('weathermapng.versions.index');
+    Route::post('plugin/WeathermapNG/api/maps/{map}/versions', [MapVersionController::class, 'store'])->name('weathermapng.versions.store');
+    Route::get('plugin/WeathermapNG/api/versions/{versionId}', [MapVersionController::class, 'show'])->name('weathermapng.versions.show');
+    Route::post('plugin/WeathermapNG/api/versions/{versionId}/restore', [MapVersionController::class, 'restore'])->name('weathermapng.versions.restore');
+    Route::get('plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}', [MapVersionController::class, 'compare'])->name('weathermapng.versions.compare');
+    Route::delete('plugin/WeathermapNG/api/versions/{versionId}', [MapVersionController::class, 'destroy'])->name('weathermapng.versions.destroy');
+    Route::get('plugin/WeathermapNG/api/maps/{map}/versions/export', [MapVersionController::class, 'export'])->name('weathermapng.versions.export');
 
     Route::get('plugin/WeathermapNG/templates', [MapTemplateController::class, 'index'])->name('weathermapng.templates.index');
     Route::get('plugin/WeathermapNG/templates/{id}', [MapTemplateController::class, 'show'])->name('weathermapng.templates.show');

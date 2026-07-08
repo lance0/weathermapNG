@@ -188,7 +188,19 @@ Create link request:
 
 ## Version History Routes
 
-The codebase includes `MapVersionController`, `MapVersionService`, and model code, but version-history routes are not registered in `routes/web.php` and the editor UI was removed in v1.7.0 (broken backend). If version routes are added or restored, update this section and `VERSIONING.md` in the same change.
+Version routes are registered in `routes/web.php` under the `web` + `auth` middleware group. All mutating endpoints require admin via `requireAdmin()`.
+
+| Auth | Method | Path | Purpose |
+|------|--------|------|---------|
+| Authenticated | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
+| Admin | `POST` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Create a named version |
+| Authenticated | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details + snapshot |
+| Admin | `POST` | `/plugin/WeathermapNG/api/versions/{versionId}/restore` | Restore map to a version |
+| Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}` | Compare two versions (returns flat diff: `nodes_added`, `nodes_removed`, `nodes_modified`, `links_added`, `links_removed`, `links_modified`) |
+| Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
+| Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
+
+Diff direction: `compare(v1, v2)` reports what changed going from v1 → v2. `nodes_added` = IDs in v2 but not v1.
 
 ## Error Shape
 

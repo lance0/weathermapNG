@@ -83,24 +83,32 @@ The table is created by `database/setup.php` on fresh installs and upgrades.
 
 Routes are registered from `routes/web.php` through Laravel package discovery. That file is the authoritative route list.
 
-The codebase includes `MapVersionController`, `MapVersionService`, and model code (routes are not registered in `routes/web.php`; editor UI was removed in v1.7.0). If version-history routes are added or restored, update this document and [API.md](API.md) in the same change.
+Version routes are registered and the editor UI is live (v1.8.0). The backend bugs in the dormant code (json_decode TypeError, wrong field names in captureSnapshot, upsert-only restore, wrong delete semantics) have been fixed. See [API.md](API.md) for the full route table.
 
-## Planned Map Versioning Work
+## Map Versioning Features
 
-The following items are planned, not guaranteed current behavior:
+The following features are implemented:
 
-- Visual diff between two map versions.
-- Side-by-side comparison UI.
+- Save named versions from the editor (Version History modal).
+- Browse version list with creator, timestamp, and description.
+- Restore a map to a previous version (true rollback with ID preservation).
+- Delete individual versions.
+- Compare two versions: shows added/removed/modified node and link IDs.
+- Export all versions for a map as JSON.
+
+## Planned Versioning Work
+
+The following items are planned, not yet implemented:
+
 - More configurable retention policies.
 - Conflict detection for future collaborative editing.
 - Storage backends beyond the current database-backed snapshot model.
 - Export formats beyond JSON.
 
-These items belong on the roadmap until implemented and tested.
-
 ## Map Version Best Practices
 
-The version-history foundation (model, service, storage) exists, but version-history UI and routes are not yet wired into the editor. When that work lands, the following practices will apply:
+Version history is live in the editor — save, restore, compare, and delete are available from the Version History modal. The following practices help get the most out of it:
+
 
 - Save a named version before large layout changes.
 - Use clear names such as `before-core-rack-rework` or `wan-cleanup-2026-05`.
