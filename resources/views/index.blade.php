@@ -709,71 +709,33 @@
 @endsection
 
 @section('scripts')
+<script src="{{ asset('plugins/WeathermapNG/resources/js/wmng-common.js') }}"></script>
 <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
 <script>
-    // Polyfill: if ui-helpers.js fails to load or is stale, install safe
-    // fallbacks so map create/import still works.
-    (function() {
-        if (!window.WMNGToast || ['success','error','warning','info'].some(m => typeof window.WMNGToast[m] !== 'function')) {
-            const _c = (level) => (msg) => console[level === 'error' ? 'error' : 'log'](msg);
-            window.WMNGToast = window.WMNGToast || {};
-            ['success','error','warning','info'].forEach(m => {
-                if (typeof window.WMNGToast[m] !== 'function') {
-                    window.WMNGToast[m] = _c(m === 'error' ? 'error' : 'log');
-                }
-            });
-        }
-    })();
+    if (window.WMNG && typeof WMNG.ensureUiHelpers === 'function') {
+        WMNG.ensureUiHelpers();
+    } else {
+        const _c = (level) => (msg) => console[level === 'error' ? 'error' : 'log'](msg);
+        window.WMNGToast = window.WMNGToast || {};
+        ['success','error','warning','info'].forEach(m => {
+            if (typeof window.WMNGToast[m] !== 'function') {
+                window.WMNGToast[m] = _c(m === 'error' ? 'error' : 'log');
+            }
+        });
+    }
+    if (window.WMNG && typeof WMNG.observeTheme === 'function') {
+        WMNG.observeTheme('.wmng-index');
+    }
 </script>
 <script>
 let pendingDeleteMapId = null;
 
-// ===== Theme Detection =====
-function detectTheme() {
-    const container = document.querySelector('.wmng-index');
-    if (!container) return;
-
-    let isDark = null;
-
-    // Check actual rendered background color
-    const navbar = document.querySelector('.navbar, .navbar-default, .navbar-static-top, nav');
-    const elementsToCheck = [navbar, document.body].filter(Boolean);
-
-    for (const element of elementsToCheck) {
-        const bg = window.getComputedStyle(element).backgroundColor;
-        const rgb = bg.match(/\d+/g);
-        if (rgb && rgb.length >= 3) {
-            if (rgb.length === 4 && parseInt(rgb[3]) === 0) continue;
-            if (bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') continue;
-
-            const brightness = (parseInt(rgb[0]) * 299 + parseInt(rgb[1]) * 587 + parseInt(rgb[2]) * 114) / 1000;
-            isDark = brightness < 128;
-            break;
-        }
+function getCsrfToken() {
+    if (window.WMNG && typeof WMNG.getCsrfToken === 'function') {
+        return WMNG.getCsrfToken();
     }
-
-    // Fallback: check for dark theme class names
-    if (isDark === null) {
-        const allClasses = document.body.className + ' ' + document.documentElement.className;
-        if (/\bdark\b|\bnight\b|\bdark-mode\b/i.test(allClasses)) {
-            isDark = true;
-        }
-    }
-
-    if (isDark === null) isDark = false;
-
-    container.classList.toggle('dark-theme', isDark);
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(detectTheme, 100);
-    // Watch for class/data-bs-theme changes that indicate a theme switch.
-    // Only class and data-bs-theme attributes — not style, which fires on
-    // every inline style change and causes unnecessary detectTheme calls.
-    const observer = new MutationObserver(() => setTimeout(detectTheme, 50));
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-bs-theme'] });
-});
 
 // ===== Create Map Form =====
 $('#createMapForm').on('submit', function(e) {
@@ -791,7 +753,7 @@ $('#createMapForm').on('submit', function(e) {
         method: 'POST',
         body: formData,
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            'X-CSRF-TOKEN': getCsrfToken()
         }
     })
     .then(response => {
@@ -844,7 +806,7 @@ $('#importMapForm').on('submit', function(e) {
         method: 'POST',
         body: formData,
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+            'X-CSRF-TOKEN': getCsrfToken()
         }
     })
     .then(response => {
@@ -1061,7 +1023,7 @@ function createMapFromTemplate(templateId, mapName) {
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'X-CSRF-TOKEN': getCsrfToken(),
             'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({ name: mapName })

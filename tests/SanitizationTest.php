@@ -104,4 +104,91 @@ class SanitizationTest extends TestCase
         $data = $this->sanitizeNodeData(['label' => '<script>document.cookie</script>Node']);
         $this->assertEquals('document.cookieNode', $data['label']);
     }
+
+    // --- SaveMapRequest link style sanitization ---
+
+    /**
+     * Mirror of SaveMapRequest::sanitize() link style block — casts numeric
+     * strings in via_points to floats so persisted JSON holds numbers.
+     */
+    private function sanitizeLinkStyle(array $data): array
+    {
+        if (!empty($data['links']) && is_array($data['links'])) {
+            foreach ($data['links'] as $i => $link) {
+                if (!is_array($link) || !isset($link['style']) || !is_array($link['style'])) {
+                    continue;
+                }
+                $style = $link['style'];
+                if (!empty($style['via_points']) && is_array($style['via_points'])) {
+                    foreach ($style['via_points'] as $j => $vp) {
+                        if (!is_array($vp)) {
+                            continue;
+                        }
+                        if (isset($vp['x']) && is_numeric($vp['x'])) {
+                            $data['links'][$i]['style']['via_points'][$j]['x'] = (float) $vp['x'];
+                        }
+                        if (isset($vp['y']) && is_numeric($vp['y'])) {
+                            $data['links'][$i]['style']['via_points'][$j]['y'] = (float) $vp['y'];
+                        }
+                    }
+                }
+            }
+        }
+        return $data;
+    }
+
+    public function test_via_point_numeric_strings_cast_to_float(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [
+                ['src_node_id' => 1, 'dst_node_id' => 2, 'style' => [
+                    'via_style' => 'curved',
+                    'via_points' => [['x' => '100', 'y' => '250']],
+                ]],
+            ],
+        ]);
+        $this->assertSame(100.0, $data['links'][0]['style']['via_points'][0]['x']);
+        $this->assertSame(250.0, $data['links'][0]['style']['via_points'][0]['y']);
+    }
+
+    public function test_via_point_floats_preserved_as_float(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [
+                ['style' => ['via_points' => [['x' => 50.5, 'y' => 75.25]]]],
+            ],
+        ]);
+        $this->assertSame(50.5, $data['links'][0]['style']['via_points'][0]['x']);
+        $this->assertSame(75.25, $data['links'][0]['style']['via_points'][0]['y']);
+    }
+
+    public function test_via_points_with_non_array_link_unchanged(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => ['not-an-array'],
+        ]);
+        $this->assertSame(['not-an-array'], $data['links']);
+    }
+
+    public function test_via_points_missing_style_key_unchanged(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [['src_node_id' => 1, 'dst_node_id' => 2]],
+        ]);
+        $this->assertArrayNotHasKey('style', $data['links'][0]);
+    }
+
+    public function test_via_points_non_array_via_points_unchanged(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [['style' => ['via_points' => 'bogus']]],
+        ]);
+        $this->assertSame('bogus', $data['links'][0]['style']['via_points']);
+    }
+
+    public function test_via_points_empty_links_unchanged(): void
+    {
+        $data = $this->sanitizeLinkStyle(['nodes' => [['label' => 'r1']]]);
+        $this->assertArrayNotHasKey('links', $data);
+    }
 }

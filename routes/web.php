@@ -5,7 +5,6 @@ use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapLinkController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapNodeController;
-use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapVersionController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapTemplateController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\HealthController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\InstallController;

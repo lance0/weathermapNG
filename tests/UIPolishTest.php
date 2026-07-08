@@ -217,8 +217,7 @@ class UIPolishTest extends TestCase
     {
         foreach ([
             'resources/js/versioning.js',
-            'resources/js/weathermapng.js',
-            'js/weathermapng.js',
+            'resources/js/wmng-common.js',
         ] as $file) {
             $content = file_get_contents(__DIR__ . '/../' . $file);
 
