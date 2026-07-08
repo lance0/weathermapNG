@@ -4,7 +4,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
-![Version 1.7.6](https://img.shields.io/badge/version-1.7.6-0078D4)
+![Version 1.7.7](https://img.shields.io/badge/version-1.7.7-0078D4)
 
 ![WeathermapNG Live View](wmng.png)
 

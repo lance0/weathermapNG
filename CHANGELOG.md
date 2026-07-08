@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-07-07
+
+### Fixed
+- **Editor save crash when ui-helpers.js fails to load** (issue #11, reopened): `saveMap()` called `WMNGLoading.show()` and `WMNGToast.*()` which are defined in `resources/js/ui-helpers.js`. If the `asset()` path 404s or serves a stale version missing methods, the save button throws `WMNGLoading.show is not a function` and the map never saves. Added a polyfill in `editor.blade.php` and `index.blade.php` that checks whether `WMNGLoading`/`WMNGToast` exist and have the expected methods; if not, installs safe no-op (loading) and console.log (toast) fallbacks. All direct `WMNGToast.*`/`WMNGLoading.*` calls in the editor and index views are now safe regardless of whether the external JS file loads.
+
 ## [1.7.6] - 2026-07-07
 
 ### Added

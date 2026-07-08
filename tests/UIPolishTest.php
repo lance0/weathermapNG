@@ -250,6 +250,20 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString('Legacy map list delete action uses Bootstrap confirmation', $content);
     }
 
+    public function test_editor_has_wmng_polyfill_and_saveMap_calls_loading(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+
+        // Polyfill fills missing methods individually
+        $this->assertStringContainsString("['show', 'hide', 'toggle']", $content);
+        $this->assertStringContainsString("['success','error','warning','info']", $content);
+        $this->assertStringContainsString('typeof window.WMNGLoading[m] !== \'function\'', $content);
+        $this->assertStringContainsString('typeof window.WMNGToast[m] !== \'function\'', $content);
+
+        // saveMap still calls WMNGLoading directly (polyfill guarantees it's safe)
+        $this->assertStringContainsString("WMNGLoading.show('Saving map...')", $content);
+        $this->assertStringContainsString('WMNGLoading.hide()', $content);
+    }
     /**
      * @return list<string>
      */

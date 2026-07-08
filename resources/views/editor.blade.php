@@ -397,6 +397,28 @@
         @section('scripts')
         <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
         <script>
+            // Polyfill: if ui-helpers.js fails to load or is stale (missing
+            // methods), install safe no-op/console fallbacks so the editor
+            // still works — especially saveMap, which must not crash.
+            (function() {
+                // Fill missing WMNGLoading methods individually so a stale
+                // helper with show() but not hide() doesn't crash saveMap.
+                window.WMNGLoading = window.WMNGLoading || {};
+                ['show', 'hide', 'toggle'].forEach(m => {
+                    if (typeof window.WMNGLoading[m] !== 'function') {
+                        window.WMNGLoading[m] = function() {};
+                    }
+                });
+                // Fill missing WMNGToast methods individually.
+                window.WMNGToast = window.WMNGToast || {};
+                ['success','error','warning','info'].forEach(m => {
+                    if (typeof window.WMNGToast[m] !== 'function') {
+                        window.WMNGToast[m] = (msg) => console[m === 'error' ? 'error' : 'log'](msg);
+                    }
+                });
+            })();
+        </script>
+        <script>
             let pendingEditorConfirmAction = null;
             let pendingEditorCancelAction = null;
             let editorConfirmAccepted = false;
@@ -1408,7 +1430,6 @@
                     }
                     return;
                 }
-
                 const baseHeaders = {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',

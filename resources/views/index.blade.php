@@ -708,6 +708,21 @@
 @section('scripts')
 <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
 <script>
+    // Polyfill: if ui-helpers.js fails to load or is stale, install safe
+    // fallbacks so map create/import still works.
+    (function() {
+        if (!window.WMNGToast || ['success','error','warning','info'].some(m => typeof window.WMNGToast[m] !== 'function')) {
+            const _c = (level) => (msg) => console[level === 'error' ? 'error' : 'log'](msg);
+            window.WMNGToast = window.WMNGToast || {};
+            ['success','error','warning','info'].forEach(m => {
+                if (typeof window.WMNGToast[m] !== 'function') {
+                    window.WMNGToast[m] = _c(m === 'error' ? 'error' : 'log');
+                }
+            });
+        }
+    })();
+</script>
+<script>
 let pendingDeleteMapId = null;
 
 // ===== Theme Detection =====
