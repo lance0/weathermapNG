@@ -150,12 +150,10 @@ These improvements shipped in v1.7.0. The bulk of the work was reliability, safe
 
 This release should make existing authoring workflows faster and less error-prone before adding major visualization features.
 
-- [ ] **Version Comparison** *(activate dormant backend)*
-  - The backend is already written: `MapVersionController` has store/restore/compare/destroy/export methods, `MapVersionService` has `compareVersions()` with node/link add/remove/modify detection. Routes are NOT registered and editor UI was removed in v1.7.0.
-  - Register version routes in `routes/web.php`.
-  - Build editor UI: save-version button, version list, restore confirmation, visual diff view.
-  - Visual diff: show node/link additions, removals, and style/config changes between versions.
-  - Restore or compare without losing current version history behavior.
+- [x] **Version Comparison** *(activated dormant backend v1.8.0)*
+  - Registered version routes in `routes/web.php` and built editor UI: save-version button, version list modal, restore confirmation, compare diff view.
+  - Fixed dormant backend bugs: `json_decode()` TypeError on cast array in compare/show/export, `captureSnapshot()` wrong field names (`database_id` → `device_id`, removed nonexistent `link.meta`), `restoreVersion()` now does true rollback with `forceCreate` preserving original IDs, `destroy()` now deletes only the selected version, `compareVersions()` returns flat lists.
+  - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store/autoSave.
   - *Highest ROI v1.8.0 item — major feature with minimal new backend work.*
 
 - [ ] **Bulk Operations**

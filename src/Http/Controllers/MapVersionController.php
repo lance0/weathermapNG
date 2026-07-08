@@ -9,6 +9,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
 use LibreNMS\Plugins\WeathermapNG\Services\MapVersionService;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
+use LibreNMS\Plugins\WeathermapNG\Http\Requests\SaveMapVersionRequest;
 
 class MapVersionController extends Controller
 {
@@ -70,14 +71,14 @@ class MapVersionController extends Controller
         return response()->json([
             'success' => true,
             'version' => $version,
-            'snapshot' => json_decode($version->config_snapshot, true),
+            'snapshot' => $version->config_snapshot,
             'created_at' => $version->created_at->toIso8601String(),
             'created_at_human' => $version->created_at_human,
             'created_by' => $version->creator->name ?? 'Unknown',
         ]);
     }
 
-    public function store(\Illuminate\Http\Request $request, int $mapId): JsonResponse
+    public function store(SaveMapVersionRequest $request, int $mapId): JsonResponse
     {
         $this->requireAdmin();
         $map = Map::findOrFail($mapId);
@@ -85,8 +86,8 @@ class MapVersionController extends Controller
 
         $version = $this->mapVersionService->createVersion(
             $map,
-            $request->input('name', 'v' . (time())),
-            $request->input('description'),
+            strip_tags($request->validated('name')),
+            $request->validated('description') ? strip_tags($request->validated('description')) : null,
             false,
             $userId
         );
@@ -118,6 +119,7 @@ class MapVersionController extends Controller
 
     public function compare(int $versionId, int $compareId): JsonResponse
     {
+        $this->requireAdmin();
         $version1 = MapVersion::findOrFail($versionId);
         $version2 = MapVersion::findOrFail($compareId);
 
@@ -145,7 +147,7 @@ class MapVersionController extends Controller
         $this->requireAdmin();
         $version = MapVersion::findOrFail($versionId);
 
-        $this->mapVersionService->deleteVersionsOlderThan($version);
+        $this->mapVersionService->deleteVersion($version);
 
         return response()->json([
             'success' => true,
@@ -156,6 +158,7 @@ class MapVersionController extends Controller
 
     public function export(int $mapId): JsonResponse
     {
+        $this->requireAdmin();
         $map = Map::findOrFail($mapId);
         $versions = $this->mapVersionService->getVersions($map);
 
@@ -175,16 +178,16 @@ class MapVersionController extends Controller
                         'description' => $version->description,
                         'created_at' => $version->created_at->toIso8601String(),
                         'created_at_human' => $version->created_at_human,
-                        'created_by' => $version->creator->name ?? 'Unknown',
-                        'snapshot' => json_decode($version->config_snapshot, true),
+                        'created_by' => $version->creator?->name ?? 'Unknown',
+                        'snapshot' => $version->config_snapshot,
                     ];
                 })->toArray(),
                 'metadata' => [
-                    'exported_at' => now(),
+                    'exported_at' => now()->toIso8601String(),
                     'total_versions' => count($versions),
                     'format' => 'json',
                     'compression' => 'none',
-                    'exported_by' => auth()->user()->name ?? 'Unknown',
+                    'exported_by' => auth()->user()?->name ?? 'Unknown',
                 ],
             ],
         ]);
@@ -234,21 +237,14 @@ class MapVersionController extends Controller
         ]);
     }
 
-    public function autoSave(\Illuminate\Http\Request $request, int $mapId): JsonResponse
+    public function autoSave(SaveMapVersionRequest $request, int $mapId): JsonResponse
     {
         $this->requireAdmin();
         $map = Map::findOrFail($mapId);
 
-        if (!$request->has('name')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Version name is required for auto-save',
-            ], 400);
-        }
-
         $version = $this->mapVersionService->createVersion(
             $map,
-            $request->input('name'),
+            strip_tags($request->validated('name')),
             null,
             true,
             auth()->id()

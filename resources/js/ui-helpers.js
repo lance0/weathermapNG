@@ -7,7 +7,7 @@
  * Toast Notification System
  * Lightweight vanilla JS toast notifications using Bootstrap 4
  */
-class WMNGToast {
+class WMNGToastManager {
     constructor(options = {}) {
         this.container = null;
         this.defaultOptions = {
@@ -128,7 +128,7 @@ class WMNGToast {
 /**
  * Loading Spinner Manager
  */
-class WMNGLoading {
+class WMNGLoadingManager {
     constructor() {
         this.overlay = null;
         this.init();
@@ -213,6 +213,6 @@ class WMNGA11y {
 }
 
 // Initialize globally
-window.WMNGToast = new WMNGToast();
-window.WMNGLoading = new WMNGLoading();
+window.WMNGToast = new WMNGToastManager();
+window.WMNGLoading = new WMNGLoadingManager();
 window.WMNGA11y = WMNGA11y;

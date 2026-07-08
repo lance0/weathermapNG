@@ -202,12 +202,13 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString('Delete Node', $editor);
         $this->assertStringContainsString('Delete Link', $editor);
         $this->assertStringContainsString('Clear Canvas', $editor);
-        $this->assertStringNotContainsString('Restore Version', $editor);
+        // Version history UI is now active (v1.8.0)
+        $this->assertStringContainsString('id="versionHistoryModal"', $editor);
+        $this->assertStringContainsString('id="versionHistoryBtn"', $editor);
+        $this->assertStringContainsString('id="versionList"', $editor);
         $this->assertStringNotContainsString('Clear Old Versions', $editor);
-        $this->assertStringNotContainsString('openVersionHistory', $editor);
-        $this->assertStringNotContainsString('saveVersion', $editor);
         $this->assertStringNotContainsString('id="versionModal"', $editor);
-        $this->assertStringNotContainsString('id="versionHistoryModal"', $editor);
+        $this->assertStringNotContainsString('openVersionHistory', $editor);
         $this->assertStringContainsString("WMNGToast.error('Failed to save node:", $editor);
         $this->assertStringNotContainsString('confirm(', $editor);
         $this->assertStringNotContainsString('alert(', $editor);

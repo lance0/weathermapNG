@@ -32,8 +32,8 @@ class UIHelpersTest extends TestCase
     public function test_ui_helpers_initializes_global_classes(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/js/ui-helpers.js');
-        $this->assertStringContainsString('window.WMNGToast = new WMNGToast()', $content);
-        $this->assertStringContainsString('window.WMNGLoading = new WMNGLoading()', $content);
+        $this->assertStringContainsString('window.WMNGToast = new WMNGToastManager()', $content);
+        $this->assertStringContainsString('window.WMNGLoading = new WMNGLoadingManager()', $content);
         $this->assertStringContainsString('window.WMNGA11y = WMNGA11y;', $content);
     }
 

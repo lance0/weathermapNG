@@ -16,6 +16,7 @@ class MapVersion extends Model
         'config_snapshot',
         'created_by',
     ];
+    const UPDATED_AT = null;
 
     protected $casts = [
         'config_snapshot' => 'array',
@@ -33,7 +34,7 @@ class MapVersion extends Model
 
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\User::class, 'created_by', 'id');
+        return $this->belongsTo(\App\Models\User::class, 'created_by', 'user_id');
     }
 
     public function getCreatedAtHumanAttribute(): string

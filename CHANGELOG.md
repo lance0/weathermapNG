@@ -10,11 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - **Save endpoint validation hardening**: `MapController::save()` now uses `SaveMapRequest` (FormRequest) instead of raw `Request`. Link `style` JSON is allowlisted to `via_style` (straight/angled/curved) and `via_points` (array of `{x,y}` with numeric bounds 0–10000); unknown style keys are rejected at validation time, not sanitized after the fact. `via_points.*` requires both `x` and `y` (no partial/null points). `title` and node labels are `strip_tags`-sanitized; via-point numeric strings cast to float before persistence.
 - **Admin gates on health endpoints**: `HealthController::stats()`, `metrics()`, and `detailed()` now call `requireAdmin()` — previously any authenticated user could read system stats, Prometheus metrics, and detailed health checks. `check()`, `ready()`, and `live()` remain public (basic liveness probes).
+- **Version endpoint admin gates**: `compare()` and `export()` now call `requireAdmin()`. `store()` and `autoSave()` use `SaveMapVersionRequest` (FormRequest) with `strip_tags()` sanitization on version name and description.
 
 ### Changed
 - **Shared client helpers consolidated**: `resources/js/wmng-common.js` now hosts `getCsrfToken()`, `fetchJson()`, `ensureUiHelpers()`, `detectTheme()`, and `observeTheme()` — replacing inline polyfills in `editor.blade.php` and `index.blade.php`. CSRF token lookups use the helper with empty-string fallback instead of `.content` (which throws if the meta tag is absent).
-- **Dead duplicate assets removed**: Deleted root-level `js/weathermapng.js`, `css/weathermapng.css`, and `resources/js/weathermapng.js` — stale duplicates of code that lives in the blade views and `resources/css/weathermapng.css`. Removed the stale `MapVersionController` import from `routes/web.php` (version routes are not registered).
+- **Dead duplicate assets removed**: Deleted root-level `js/weathermapng.js`, `css/weathermapng.css`, and `resources/js/weathermapng.js` — stale duplicates of code that lives in the blade views and `resources/css/weathermapng.css`.
 - **Legacy `index.php` fallback fixes**: Map list now selects `title`/`options` from the correct schema (width/height live in the options JSON), version is read from the `VERSION` file, and the CSS asset path points at `resources/css/weathermapng.css`.
+
+### Added
+- **Map version history** (activates dormant backend): Save named versions of a map from the editor, browse version history, restore to a previous version, delete individual versions, and compare two versions to see added/removed/modified nodes and links. Routes registered, editor UI built with delegated listeners and `escapeHtml()`/`textContent` rendering.
+
+### Fixed
+- **Version backend bugs** (dormant code, never registered): `MapVersionService::compare*()` methods called `json_decode()` on `config_snapshot` which is already cast to `array` on the model (would TypeError in PHP 8) — fixed to use the cast value directly. `captureSnapshot()` used `$node->database_id` (undefined) instead of `$node->device_id`, and included `$link->meta` (Link has no `meta` column) — both fixed. `restoreVersion()` only upserted snapshot rows without deleting absent nodes/links (not a true rollback) — now wipes and recreates with `forceCreate` to preserve original IDs. `destroy()` called `deleteVersionsOlderThan()` which deleted *newer* versions instead of the selected one — added `deleteVersion()` that deletes only the specified version. `show()` and `export()` also had the `json_decode` TypeError. `compareVersions()` returned nested objects instead of flat lists — simplified to flat `nodes_added`/`nodes_removed`/etc.
 
 ## [1.7.8] - 2026-07-08
 

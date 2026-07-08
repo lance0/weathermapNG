@@ -18,7 +18,6 @@ class MapVersionService
             'description' => $description,
             'config_snapshot' => $this->captureSnapshot($map),
             'created_by' => $userId,
-            'created_at' => now(),
         ]);
     }
 
@@ -37,36 +36,31 @@ class MapVersionService
         }
 
         return DB::transaction(function () use ($map, $mapId, $snapshot) {
+            // True rollback: delete links first (FK), then nodes, then
+            // recreate from snapshot preserving original IDs so link
+            // src_node_id/dst_node_id references stay valid.
+            $map->links()->delete();
+            $map->nodes()->delete();
+
             if (isset($snapshot['nodes']) && is_array($snapshot['nodes'])) {
                 foreach ($snapshot['nodes'] as $nodeData) {
-                    if (isset($nodeData['id'])) {
-                        Node::where('id', $nodeData['id'])
-                            ->where('map_id', $mapId)
-                            ->update($nodeData);
-                    } else {
-                        Node::create(array_merge(['map_id' => $mapId], $nodeData));
-                    }
+                    $data = array_merge(['map_id' => $mapId], $nodeData);
+                    // forceCreate bypasses fillable to preserve the original id.
+                    Node::forceCreate($data);
                 }
             }
 
             if (isset($snapshot['links']) && is_array($snapshot['links'])) {
                 foreach ($snapshot['links'] as $linkData) {
-                    if (isset($linkData['id'])) {
-                        Link::where('id', $linkData['id'])
-                            ->where('map_id', $mapId)
-                            ->update($linkData);
-                    } else {
-                        Link::create(array_merge(['map_id' => $mapId], $linkData));
-                    }
+                    $data = array_merge(['map_id' => $mapId], $linkData);
+                    Link::forceCreate($data);
                 }
             }
 
-            $map->update([
-                'title' => $snapshot['map']['title'] ?? null,
-            ]);
-            // width/height/background live in the options JSON column, not as
-            // top-level columns — merge them into options.
-            $options = $map->options ?? [];
+            $map->title = $snapshot['map']['title'] ?? $map->title;
+            $options = $map->options;
+            if (is_string($options)) $options = json_decode($options, true) ?: [];
+            if (!is_array($options)) $options = [];
             if (isset($snapshot['map']['width'])) {
                 $options['width'] = $snapshot['map']['width'];
             }
@@ -83,16 +77,27 @@ class MapVersionService
         });
     }
 
+    public function deleteVersion(MapVersion $version): void
+    {
+        $version->delete();
+    }
+
+    /**
+     * Delete versions older than the given one (lower id = created earlier).
+     * The selected version itself is preserved.
+     */
     public function deleteVersionsOlderThan(MapVersion $version): void
     {
         DB::transaction(function () use ($version) {
-            $this->deleteVersionsOlderThanInternal($version->map_id, $version->id);
+            MapVersion::where('map_id', $version->map_id)
+                ->where('id', '<', $version->id)
+                ->delete();
         });
     }
 
     public function getVersions(Map $map, int $limit = 10): \Illuminate\Support\Collection
     {
-        return MapVersion::versions($map->id, $limit);
+        return MapVersion::with('creator')->versions($map->id, $limit)->get();
     }
 
     public function getVersion(Map $map, int $versionId): ?MapVersion
@@ -107,13 +112,16 @@ class MapVersionService
 
     public function compareVersions(MapVersion $version1, MapVersion $version2): array
     {
+        [$nodesAdded, $nodesRemoved] = $this->getAddedRemovedIds($version1, $version2, 'nodes');
+        [$linksAdded, $linksRemoved] = $this->getAddedRemovedIds($version1, $version2, 'links');
+
         return [
-            'nodes_added' => $this->compareNodes($version1, $version2),
-            'nodes_removed' => $this->compareNodes($version2, $version1),
-            'nodes_modified' => $this->compareNodesModified($version1, $version2),
-            'links_added' => $this->compareLinks($version1, $version2),
-            'links_removed' => $this->compareLinks($version2, $version1),
-            'links_modified' => $this->compareLinksModified($version1, $version2),
+            'nodes_added' => $nodesAdded,
+            'nodes_removed' => $nodesRemoved,
+            'nodes_modified' => $this->getModifiedIds($version1, $version2, 'nodes'),
+            'links_added' => $linksAdded,
+            'links_removed' => $linksRemoved,
+            'links_modified' => $this->getModifiedIds($version1, $version2, 'links'),
         ];
     }
 
@@ -133,7 +141,7 @@ class MapVersionService
                 'label' => $node->label,
                 'x' => $node->x,
                 'y' => $node->y,
-                'device_id' => $node->database_id,
+                'device_id' => $node->device_id,
                 'meta' => $node->meta,
             ])->keyBy('id'),
             'links' => $map->links->map(fn($link) => [
@@ -144,69 +152,55 @@ class MapVersionService
                 'port_id_b' => $link->port_id_b,
                 'bandwidth_bps' => $link->bandwidth_bps,
                 'style' => $link->style,
-                'meta' => $link->meta,
             ])->keyBy('id'),
         ];
     }
 
-    private function compareNodes(MapVersion $version1, MapVersion $version2): array
+    private function getSnapshotNodes(MapVersion $version): \Illuminate\Support\Collection
     {
-        $nodes1 = collect(json_decode($version1->config_snapshot, true)['nodes']);
-        $nodes2 = collect(json_decode($version2->config_snapshot, true)['nodes']);
+        $snapshot = $version->config_snapshot;
+        if (!is_array($snapshot)) {
+            $snapshot = json_decode($snapshot ?? '', true) ?: [];
+        }
+        return collect($snapshot['nodes'] ?? []);
+    }
 
+    private function getSnapshotLinks(MapVersion $version): \Illuminate\Support\Collection
+    {
+        $snapshot = $version->config_snapshot;
+        if (!is_array($snapshot)) {
+            $snapshot = json_decode($snapshot ?? '', true) ?: [];
+        }
+        return collect($snapshot['links'] ?? []);
+    }
+
+    private function getAddedRemovedIds(MapVersion $v1, MapVersion $v2, string $type): array
+    {
+        $items1 = $type === 'nodes' ? $this->getSnapshotNodes($v1) : $this->getSnapshotLinks($v1);
+        $items2 = $type === 'nodes' ? $this->getSnapshotNodes($v2) : $this->getSnapshotLinks($v2);
+        $ids1 = $items1->keys()->all();
+        $ids2 = $items2->keys()->all();
+        // Direction: v1 → v2 transition. Added = in v2 but not v1.
+        // Removed = in v1 but not v2.
         return [
-            'added' => $nodes1->diff($nodes2)->keys()->values()->all(),
-            'removed' => $nodes2->diff($nodes1)->keys()->values()->all(),
+            array_values(array_diff($ids2, $ids1)),
+            array_values(array_diff($ids1, $ids2)),
         ];
     }
 
-    private function compareNodesModified(MapVersion $version1, MapVersion $version2): array
+    private function getModifiedIds(MapVersion $v1, MapVersion $v2, string $type): array
     {
-        $nodes1 = collect(json_decode($version1->config_snapshot, true)['nodes']);
-        $nodes2 = collect(json_decode($version2->config_snapshot, true)['nodes']);
+        $items1 = $type === 'nodes' ? $this->getSnapshotNodes($v1) : $this->getSnapshotLinks($v1);
+        $items2 = $type === 'nodes' ? $this->getSnapshotNodes($v2) : $this->getSnapshotLinks($v2);
 
         $modified = [];
-        foreach ($nodes1 as $id => $node) {
-            $node2 = $nodes2->get($id);
-            if ($node2 && $node != $node2) {
+        foreach ($items1 as $id => $item) {
+            $item2 = $items2->get($id);
+            if ($item2 && $item != $item2) {
                 $modified[] = $id;
             }
         }
 
         return $modified;
-    }
-
-    private function compareLinks(MapVersion $version1, MapVersion $version2): array
-    {
-        $links1 = collect(json_decode($version1->config_snapshot, true)['links']);
-        $links2 = collect(json_decode($version2->config_snapshot, true)['links']);
-
-        return [
-            'added' => $links1->diff($links2)->keys()->values()->all(),
-            'removed' => $links2->diff($links1)->keys()->values()->all(),
-        ];
-    }
-
-    private function compareLinksModified(MapVersion $version1, MapVersion $version2): array
-    {
-        $links1 = collect(json_decode($version1->config_snapshot, true)['links']);
-        $links2 = collect(json_decode($version2->config_snapshot, true)['links']);
-
-        $modified = [];
-        foreach ($links1 as $id => $link) {
-            $link2 = $links2->get($id);
-            if ($link2 && $link != $link2) {
-                $modified[] = $id;
-            }
-        }
-
-        return $modified;
-    }
-
-    private function deleteVersionsOlderThanInternal(int $mapId, int $versionId): void
-    {
-        MapVersion::where('map_id', $mapId)
-            ->where('id', '>', $versionId)
-            ->delete();
     }
 }
