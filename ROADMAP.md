@@ -2,18 +2,18 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-*Last reviewed v1.7.8 (2026-07-08) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+*Last reviewed v1.8.0 (2026-07-08) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.7.8 (Stable)
+## Current Status: v1.8.0 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.8:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.8.0:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
 - Dark/light theme auto-detection to match LibreNMS
 - Real-time traffic visualization using LibreNMS RRD data
 - Flow animations with particle effects
-- Map versioning foundation (storage and services; editor UI removed in v1.7.0; routes not registered)
+- Map versioning with editor UI (save, restore, compare, delete) activated in v1.8.0
 - Server-Sent Events for live updates
 - Embeddable views with navigation bar
 - Demo mode for testing

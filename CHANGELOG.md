@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-07-08
+
 ### Security
 - **Save endpoint validation hardening**: `MapController::save()` now uses `SaveMapRequest` (FormRequest) instead of raw `Request`. Link `style` JSON is allowlisted to `via_style` (straight/angled/curved) and `via_points` (array of `{x,y}` with numeric bounds 0–10000); unknown style keys are rejected at validation time, not sanitized after the fact. `via_points.*` requires both `x` and `y` (no partial/null points). `title` and node labels are `strip_tags`-sanitized; via-point numeric strings cast to float before persistence.
 - **Admin gates on health endpoints**: `HealthController::stats()`, `metrics()`, and `detailed()` now call `requireAdmin()` — previously any authenticated user could read system stats, Prometheus metrics, and detailed health checks. `check()`, `ready()`, and `live()` remain public (basic liveness probes).
@@ -22,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Version backend bugs** (dormant code, never registered): `MapVersionService::compare*()` methods called `json_decode()` on `config_snapshot` which is already cast to `array` on the model (would TypeError in PHP 8) — fixed to use the cast value directly. `captureSnapshot()` used `$node->database_id` (undefined) instead of `$node->device_id`, and included `$link->meta` (Link has no `meta` column) — both fixed. `restoreVersion()` only upserted snapshot rows without deleting absent nodes/links (not a true rollback) — now wipes and recreates with `forceCreate` to preserve original IDs. `destroy()` called `deleteVersionsOlderThan()` which deleted *newer* versions instead of the selected one — added `deleteVersion()` that deletes only the specified version. `show()` and `export()` also had the `json_decode` TypeError. `compareVersions()` returned nested objects instead of flat lists — simplified to flat `nodes_added`/`nodes_removed`/etc.
+- **Toast/loading class name shadowing broke save and all toast feedback** (issue #11): `ui-helpers.js` declared `class WMNGToast` and `class WMNGLoading`, then assigned `window.WMNGToast = new WMNGToast()`. In subsequent `<script>` blocks, bare `WMNGToast.success(...)` resolved to the class constructor (no `.success` method), not the instance — throwing `TypeError: WMNGToast.success is not a function` and crashing the save flow. Renamed to `WMNGToastManager`/`WMNGLoadingManager` so bare references resolve to the `window` instance.
+- **Version list not refreshing after save**: `fetchVersions()` could serve stale cached GET responses, and the optimistic update from the POST response was overwritten by the background re-fetch. Fixed with cache-busting (`?_=Date.now()` + `cache: 'no-store'`) and preserving the just-created version if the GET omits it.
+- **`getVersions()` returned Eloquent Builder instead of Collection**: Missing `->get()` on the query scope. Also added `creator` eager-loading.
+- **`MapVersion::create()` attempted to write `updated_at` column**: Table has no `updated_at` column. Fixed with `const UPDATED_AT = null` (keeps `created_at` auto-managed). Also fixed `creator()` relation to use `user_id` (LibreNMS users PK) instead of `id`.
+- **`restoreVersion()` options offset crash**: `$map->options` could be a string. Added defensive normalization to array before offset writes.
+- **Creator name showed `[object Object]`**: Fixed to use `v.creator.realname || v.creator.username` (LibreNMS User model has no `name` field).
+- **Restore confirm modal showed behind version modal**: Added `z-index: 1060` on `#editorConfirmModal` and backdrop bump via `setTimeout(0)`.
 
 ## [1.7.8] - 2026-07-08
 
