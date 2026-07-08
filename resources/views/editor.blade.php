@@ -128,7 +128,18 @@
 
 /* Minimap */
 #editor-minimap { background: var(--editor-canvas-surface) !important; border-color: var(--editor-sidebar-border) !important; }
-</style>
+
+/* Responsive: stack sidebar below canvas on narrow screens */
+@media (max-width: 768px) {
+    .editor-container { height: auto; min-height: 400px; flex-direction: column; }
+    .editor-toolbox { flex-direction: row; width: 100%; padding: 4px 8px; flex-wrap: wrap; }
+    .editor-toolbox .tool-btn { width: 32px; height: 32px; font-size: 14px; }
+    .editor-toolbox .tool-divider { width: 1px; height: 32px; margin: 0 4px; }
+    .editor-canvas-area { min-height: 300px; }
+    .editor-topbar { padding: 4px 8px; flex-wrap: wrap; gap: 4px; }
+    .editor-topbar .text-muted { font-size: 11px; }
+    .editor-sidebar { width: 100%; max-height: 300px; border-left: none; border-top: 1px solid var(--editor-sidebar-border); }
+}
 @endpush
 
 @section('content')

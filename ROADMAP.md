@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-## Current Status: v1.7.5 (Stable)
+## Current Status: v1.7.6 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.5:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.7.6:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
@@ -52,26 +52,26 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Provide useful fallback text or alternate structured editing affordances for canvas-only workflows.
   - Remove focus outline overrides that make keyboard navigation harder.
 
-- [ ] **Responsive editor layout**
-  - Replace fixed `calc(100vh - 120px)` assumptions with layout that works inside LibreNMS chrome.
-  - Improve sidebar behavior on smaller screens.
-  - Reduce nested scrolling where possible.
-  - Keep topbar actions usable when map names or counts are long.
+- [ ] **Responsive editor layout** *(v1.8.0: CSS media queries added — stacked sidebar below canvas on narrow screens, horizontal toolbox, flex-wrap topbar. Not yet browser-tested at target breakpoints.)*
+  - ~~Replace fixed `calc(100vh - 120px)` assumptions with layout that works inside LibreNMS chrome.~~ *(v1.8.0: CSS added, needs browser verification)*
+  - ~~Improve sidebar behavior on smaller screens.~~ *(v1.8.0: stacks below canvas with max-height scroll — CSS added, needs browser verification)*
+  - Reduce nested scrolling where possible. *(partially addressed by stacking)*
+  - Keep topbar actions usable when map names or counts are long. *(v1.8.0: flex-wrap — needs browser verification)*
 
-- [ ] **Embed view responsive polish**
-  - Make the top navigation and control groups wrap, collapse, or reposition cleanly.
-  - Prevent controls, minimap, legend, and map content from overlapping on smaller embeds.
+- [ ] **Embed view responsive polish** *(v1.7.5: reduced-motion; v1.8.0: CSS flex-wrap nav/controls, responsive offsets, minimap hidden on very small screens. Not yet browser-tested at target breakpoints.)*
+  - ~~Make the top navigation and control groups wrap, collapse, or reposition cleanly.~~ *(v1.8.0: CSS flex-wrap added — needs browser verification)*
+  - Prevent controls, minimap, legend, and map content from overlapping on smaller embeds. *(v1.8.0: responsive offsets added — needs browser verification)*
   - ~~Add reduced-motion handling for flow animations.~~ *(v1.7.5)*
 
-- [ ] **Index and template gallery polish**
-  - Replace decorative map-card preview art with real thumbnails or a compact rendered preview.
-  - Convert clickable `div` cards into proper button/link structures.
-  - Preserve current search, sort, badges, and map metadata.
+- [ ] **Index and template gallery polish** *(v1.8.0: escaped template card innerHTML, delegated listener replaces inline onclick, sanitized category class slug)*
+  - Replace decorative map-card preview art with real thumbnails or a compact rendered preview. *(deferred)*
+  - ~~Convert clickable `div` cards into proper button/link structures.~~ *(v1.8.0: template cards already use `<button>`, replaced inline onclick with delegated listener)*
+  - Preserve current search, sort, badges, and map metadata. *(preserved)*
 
-- [ ] **Theme and UI cleanup** *(v1.7.4: narrowed MutationObserver filters to class/data-bs-theme only, dropping the style attribute which fired detectTheme on any change to the style attribute of `<body>`/`<html>`; no console.log/debug found in theme detection code)*
+- [ ] **Theme and UI cleanup** *(v1.7.4: narrowed MutationObserver filters; v1.8.0: extracted embed.blade.php inline styles to CSS classes)*
   - ~~Reduce noisy theme-detection console logging.~~ *(none found)*
   - ~~Avoid broad mutation observers where a narrower theme hook will work.~~ *(narrowed in v1.7.4)*
-  - Move repeated inline styles toward shared CSS classes. *(deferred — Linear free workspace issue limit reached; tracked in project comment)*
+  - Move repeated inline styles toward shared CSS classes. *(embed.blade.php done in v1.8.0; editor.blade.php and index.blade.php deferred)*
 
 - [x] **LibreNMS hook and legacy view polish**
   - Align hook and compatibility views with LibreNMS Bootstrap button conventions.

@@ -132,24 +132,88 @@
             font-size: 0.875rem;
             background: transparent;
         }
+
+        /* Nav bar */
+        .embed-nav-bar {
+            position: absolute; top: 0; left: 0; right: 0;
+            background: rgba(52,58,64,0.95); color: #fff;
+            padding: 8px 16px; display: flex; justify-content: space-between;
+            align-items: center; z-index: 1001; font-size: 13px;
+        }
+        .embed-nav-left { display: flex; align-items: center; gap: 16px; }
+        .embed-nav-right { display: flex; align-items: center; gap: 12px; }
+        .embed-nav-link { color: #fff; text-decoration: none; display: flex; align-items: center; gap: 6px; }
+        .embed-nav-edit { color: #ffc107; text-decoration: none; display: flex; align-items: center; gap: 6px; }
+        .embed-nav-demo { background: #ffc107; color: #000; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+
+        /* Controls bar */
+        .embed-controls {
+            position: absolute; top: 55px; left: 10px; z-index: 1000;
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        }
+        .embed-viz-menu {
+            position: absolute; top: 100%; left: 0; background: #fff;
+            border: 1px solid #ccc; border-radius: 4px; padding: 10px;
+            min-width: 250px; display: none; margin-top: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .embed-viz-section { font-size: 12px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+        .embed-viz-row { margin-bottom: 8px; }
+        .embed-viz-label { font-size: 11px; display: block; }
+
+        /* Legend */
+        .embed-legend {
+            position: absolute; bottom: 10px; left: 10px;
+            background: rgba(255,255,255,0.9); border: 1px solid #ddd;
+            border-radius: 4px; font-size: 12px; padding: 6px 8px; z-index: 1000;
+        }
+        .embed-legend-title { font-weight: 600; margin-bottom: 4px; }
+
+        /* Tooltip */
+        .embed-tooltip {
+            position: absolute; background: rgba(0,0,0,0.8); color: #fff;
+            padding: 6px 8px; border-radius: 4px; font-size: 12px;
+            display: none; pointer-events: none;
+        }
+
+        /* Minimap */
+        .embed-minimap {
+            position: absolute; top: 55px; right: 10px;
+            background: rgba(255,255,255,0.85); border: 1px solid #ddd; border-radius: 4px;
+        }
+
+        /* Responsive: wrap nav and controls on small screens */
+        @media (max-width: 640px) {
+            .embed-nav-bar { flex-wrap: wrap; padding: 6px 10px; font-size: 12px; }
+            .embed-nav-left { gap: 8px; flex-wrap: wrap; }
+            .embed-nav-right { gap: 8px; }
+            /* Push controls/minimap below the nav, which may wrap to 2 rows (~56px) */
+            .embed-controls { top: 74px; gap: 4px; }
+            .embed-minimap { top: 74px; }
+            .embed-legend { font-size: 11px; padding: 4px 6px; }
+        }
+        @media (max-width: 480px) {
+            .embed-minimap { display: none; }
+            .embed-controls { top: 80px; }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div id="map-container">
-        <div id="nav-bar" style="position:absolute; top:0; left:0; right:0; background:rgba(52,58,64,0.95); color:#fff; padding:8px 16px; display:flex; justify-content:space-between; align-items:center; z-index:1001; font-size:13px;">
-            <div style="display:flex; align-items:center; gap:16px;">
-                <a href="{{ url('plugin/WeathermapNG') }}" style="color:#fff; text-decoration:none; display:flex; align-items:center; gap:6px;">
+        <div id="nav-bar" class="embed-nav-bar">
+            <div class="embed-nav-left">
+                <a href="{{ url('plugin/WeathermapNG') }}" class="embed-nav-link">
                     <i class="fas fa-arrow-left"></i> All Maps
                 </a>
                 <span style="color:#adb5bd;">|</span>
                 <span style="font-weight:500;">{{ $mapData['title'] ?? $mapData['name'] ?? 'Map' }}</span>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
+            <div class="embed-nav-right">
                 @if($demoMode ?? false)
-                <span style="background:#ffc107; color:#000; padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600;">DEMO MODE</span>
+                <span class="embed-nav-demo">DEMO MODE</span>
                 @endif
-                <a href="{{ url('plugin/WeathermapNG/editor/' . $mapId) }}" style="color:#ffc107; text-decoration:none; display:flex; align-items:center; gap:6px;">
+                <a href="{{ url('plugin/WeathermapNG/editor/' . $mapId) }}" class="embed-nav-edit">
                     <i class="fas fa-edit"></i> Edit Map
                 </a>
             </div>
@@ -159,24 +223,24 @@
             <div>Loading map...</div>
         </div>
         <canvas id="map-canvas"></canvas>
-        <canvas id="minimap" width="160" height="120" style="position:absolute; top:55px; right:10px; background:rgba(255,255,255,0.85); border:1px solid #ddd; border-radius:4px;"></canvas>
+        <canvas id="minimap" width="160" height="120" class="embed-minimap"></canvas>
         <div id="status-bar" class="status-bar" style="display: none;">
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
-        <div id="tooltip" style="position:absolute; background: rgba(0,0,0,0.8); color:#fff; padding:6px 8px; border-radius:4px; font-size:12px; display:none; pointer-events:none;"></div>
-        <div id="controls" style="position:absolute; top:55px; left:10px; z-index:1000; display:flex; gap:8px; align-items:center;">
+        <div id="tooltip" class="embed-tooltip"></div>
+        <div id="controls" class="embed-controls">
             <button type="button" id="toggle-transport" class="btn btn-light btn-sm" aria-label="Live update status">Live: loading…</button>
             <button type="button" id="toggle-flow" class="btn btn-primary btn-sm" aria-label="Toggle flow animation" title="Toggle flow animation"><i class="fas fa-water" aria-hidden="true"></i> Flow</button>
             <div style="position:relative;">
                 <button type="button" id="viz-settings" class="btn btn-light btn-sm" aria-label="Visualization settings" title="Visualization settings"><i class="fas fa-cog" aria-hidden="true"></i></button>
-                <div id="viz-menu" style="position:absolute; top:100%; left:0; background:#fff; border:1px solid #ccc; border-radius:4px; padding:10px; min-width:250px; display:none; margin-top:4px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-                    <div style="font-size:12px; font-weight:bold; margin-bottom:8px; border-bottom:1px solid #ddd; padding-bottom:4px;">Flow Animation</div>
-                    <div style="margin-bottom:8px;">
-                        <label style="font-size:11px; display:block;">Particle Density: <span id="density-value">1.0</span></label>
+                <div id="viz-menu" class="embed-viz-menu">
+                    <div class="embed-viz-section">Flow Animation</div>
+                    <div class="embed-viz-row">
+                        <label class="embed-viz-label">Particle Density: <span id="density-value">1.0</span></label>
                         <input type="range" id="particle-density" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
                     </div>
-                    <div style="margin-bottom:8px;">
-                        <label style="font-size:11px; display:block;">Particle Speed: <span id="speed-value">1.0</span></label>
+                    <div class="embed-viz-row">
+                        <label class="embed-viz-label">Particle Speed: <span id="speed-value">1.0</span></label>
                         <input type="range" id="particle-speed" min="0.5" max="2" step="0.1" value="1" style="width:100%;">
                     </div>
                 </div>
@@ -192,8 +256,8 @@
             </label>
             <button type="button" id="export-png" class="btn btn-light btn-sm" aria-label="Export map as PNG" title="Export PNG">Export PNG</button>
         </div>
-        <div id="legend" style="position:absolute; bottom:10px; left:10px; background:rgba(255,255,255,0.9); border:1px solid #ddd; border-radius:4px; font-size:12px; padding:6px 8px; z-index:1000;">
-            <div style="font-weight:600; margin-bottom:4px;">Legend</div>
+        <div id="legend" class="embed-legend">
+            <div class="embed-legend-title">Legend</div>
             <div id="legend-rows"></div>
         </div>
     </div>

@@ -870,6 +870,13 @@ document.addEventListener('click', function(e) {
     deleteMap(btn.dataset.mapId, btn.dataset.mapName);
 });
 
+// Delegated listener for template cards (replaces inline onclick)
+document.addEventListener('click', function(e) {
+    const card = e.target.closest('[data-template-id]');
+    if (!card) return;
+    selectTemplate(card.dataset.templateId);
+});
+
 document.getElementById('confirmDeleteMapBtn')?.addEventListener('click', function() {
     if (!pendingDeleteMapId) return;
 
@@ -985,22 +992,23 @@ function renderTemplates(templates) {
     }
 
     templates.forEach(template => {
-        const categoryClass = 'category-' + (template.category || 'custom');
+        const categorySlug = String(template.category || 'custom').replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'custom';
+        const categoryClass = 'category-' + categorySlug;
         const nodeCount = template.config?.default_nodes?.length || 0;
         const linkCount = template.config?.default_links?.length || 0;
 
         const card = document.createElement('div');
         card.className = 'col-md-6 col-lg-4';
         card.innerHTML = `
-            <button type="button" class="template-card" onclick="selectTemplate(${template.id})" aria-label="Use template ${escapeHtml(template.title || template.name)}">
+            <button type="button" class="template-card" data-template-id="${escapeHtml(String(template.id))}" aria-label="Use template ${escapeHtml(template.title || template.name)}">
                 <span class="template-card-icon">
-                    <i class="${template.icon || 'fas fa-map'}"></i>
+                    <i class="${escapeHtml(template.icon || 'fas fa-map')}"></i>
                 </span>
                 <span class="template-card-title">${escapeHtml(template.title || template.name)}</span>
                 <span class="template-card-desc">${escapeHtml(template.description || '')}</span>
                 <span class="template-card-meta">
-                    <span class="badge badge-secondary">${template.width}x${template.height}</span>
-                    <span class="badge ${categoryClass}">${template.category || 'custom'}</span>
+                    <span class="badge badge-secondary">${escapeHtml(String(template.width))}x${escapeHtml(String(template.height))}</span>
+                    <span class="badge ${categoryClass}">${escapeHtml(template.category || 'custom')}</span>
                     ${nodeCount > 0 ? `<span class="badge badge-light">${nodeCount} nodes</span>` : ''}
                     ${linkCount > 0 ? `<span class="badge badge-light">${linkCount} links</span>` : ''}
                 </span>

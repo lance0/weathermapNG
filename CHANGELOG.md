@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.6] - 2026-07-07
+
+### Added
+- **Responsive editor layout** (LAN-260): On screens ≤768px, the editor switches from a 3-column flex layout to a stacked vertical layout — toolbox becomes horizontal, canvas gets a minimum height, and the properties sidebar stacks below the canvas with max-height scroll. Topbar wraps and shrinks on narrow screens. *(CSS-only responsive media queries; not yet browser-tested at target breakpoints.)*
+- **Responsive embed view** (LAN-268): Embed nav-bar and controls now use `flex-wrap` to reflow on narrow screens. Control and minimap positions offset below the wrapped nav-bar. Minimap hidden on screens ≤480px. Inline styles extracted to shared CSS classes (`.embed-nav-bar`, `.embed-controls`, `.embed-legend`, `.embed-tooltip`, `.embed-minimap`, `.embed-viz-menu`). *(CSS-only responsive media queries; not yet browser-tested at target breakpoints.)*
+
+### Fixed
+- **Template card XSS hardening** (index.blade.php): Template card `innerHTML` had unescaped `template.icon`, `template.category`, `template.width`, and `template.height` interpolated into HTML attributes and text. Category class suffix is now sanitized to `[a-z0-9_-]`, all displayed values escaped via `escapeHtml()`, and inline `onclick="selectTemplate(...)"` replaced with `data-template-id` attribute + delegated listener (matching the delete-button pattern).
+
 ## [1.7.5] - 2026-07-07
 
 ### Added
