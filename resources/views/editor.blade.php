@@ -124,10 +124,30 @@
 }
 
 /* Canvas styling */
-#map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); }
+#map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); display: block; width: 100%; height: auto; }
 
 /* Minimap */
-#editor-minimap { background: var(--editor-canvas-surface) !important; border-color: var(--editor-sidebar-border) !important; }
+#editor-minimap {
+    background: rgba(255,255,255,0.95); border: 1px solid #ccc;
+    border-radius: 4px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    position: absolute; bottom: 20px; right: 20px; z-index: 100;
+}
+.editor-container.dark-theme #editor-minimap { background: var(--editor-canvas-surface); border-color: var(--editor-sidebar-border); }
+
+/* Selected node panel header */
+.panel-header-selected { background: var(--editor-accent); color: #fff; }
+
+/* Scrollable list panels */
+.panel-list-scroll { max-height: 120px; overflow-y: auto; }
+
+/* Toolbox spacer */
+.toolbox-spacer { flex: 1; }
+
+/* Node list item */
+.node-list-item { cursor: pointer; }
+.node-list-item.selected { background: var(--editor-list-selected); border-radius: 3px; }
+.node-list-item .node-dot { font-size: 8px; }
+.node-list-item .node-delete-icon { font-size: 10px; }
 
 /* Responsive: stack sidebar below canvas on narrow screens */
 @media (max-width: 768px) {
@@ -140,6 +160,7 @@
     .editor-topbar .text-muted { font-size: 11px; }
     .editor-sidebar { width: 100%; max-height: 300px; border-left: none; border-top: 1px solid var(--editor-sidebar-border); }
 }
+</style>
 @endpush
 
 @section('content')
@@ -169,7 +190,7 @@
         <button type="button" class="tool-btn" onclick="redo()" title="Redo (Ctrl+Y)" aria-label="Redo">
             <i class="fas fa-redo"></i>
         </button>
-        <div style="flex:1"></div>
+        <div class="toolbox-spacer"></div>
         <button type="button" class="tool-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">
             <i class="fas fa-search-plus"></i>
         </button>
@@ -215,8 +236,7 @@
                     height="{{ $map->height ?? config('weathermapng.default_height', 600) }}">
             </canvas>
             <!-- Minimap -->
-            <canvas id="editor-minimap" width="150" height="100"
-                    style="position: absolute; bottom: 20px; right: 20px; z-index: 100; background: rgba(255,255,255,0.95); border: 1px solid #ccc; border-radius: 4px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+            <canvas id="editor-minimap" width="150" height="100">
             </canvas>
         </div>
     </div>
@@ -247,7 +267,7 @@
 
         <!-- Selected Node -->
         <div class="panel" id="node-properties-card" style="display: none;">
-            <div class="panel-header" style="background: #0d6efd; color: #fff;">
+            <div class="panel-header panel-header-selected">
                 <i class="fas fa-circle mr-1"></i> Selected Node
             </div>
             <div class="panel-body">
@@ -305,7 +325,7 @@
         <!-- Nodes List -->
         <div class="panel">
             <div class="panel-header"><i class="fas fa-sitemap mr-1"></i> Nodes <span class="badge badge-secondary float-right" id="nodes-badge">0</span></div>
-            <div class="panel-body" id="nodes-list" style="max-height: 120px; overflow-y: auto;">
+            <div class="panel-body panel-list-scroll" id="nodes-list">
                 <small class="text-muted">No nodes yet</small>
             </div>
         </div>
@@ -313,7 +333,7 @@
         <!-- Links List -->
         <div class="panel">
             <div class="panel-header"><i class="fas fa-link mr-1"></i> Links <span class="badge badge-secondary float-right" id="links-badge">0</span></div>
-            <div class="panel-body" id="links-list" style="max-height: 120px; overflow-y: auto;">
+            <div class="panel-body panel-list-scroll" id="links-list">
                 <small class="text-muted">No links yet</small>
             </div>
         </div>
@@ -582,11 +602,14 @@
                 updateZoomDisplay();
             }
 
+            /** Convert a mouse event's clientX/Y to canvas-internal pixel coords.
+             *  Needed because CSS may scale the canvas display size ≠ its buffer size. */
             function getCanvasPoint(event) {
                 const rect = canvas.getBoundingClientRect();
-                // Convert screen coords to canvas coords accounting for zoom/pan
-                const screenX = event.clientX - rect.left;
-                const screenY = event.clientY - rect.top;
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const screenX = (event.clientX - rect.left) * scaleX;
+                const screenY = (event.clientY - rect.top) * scaleY;
                 return {
                     x: (screenX - viewOffsetX) / viewScale,
                     y: (screenY - viewOffsetY) / viewScale,
@@ -597,8 +620,10 @@
             function handleWheel(event) {
                 event.preventDefault();
                 const rect = canvas.getBoundingClientRect();
-                const mouseX = event.clientX - rect.left;
-                const mouseY = event.clientY - rect.top;
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const mouseX = (event.clientX - rect.left) * scaleX;
+                const mouseY = (event.clientY - rect.top) * scaleY;
 
                 // Calculate zoom factor
                 const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -657,7 +682,7 @@
                 // Middle-click or right-click for panning
                 if (event.button === 1 || event.button === 2) {
                     isPanning = true;
-                    panStart = { x: event.clientX - viewOffsetX, y: event.clientY - viewOffsetY };
+                    panStart = { clientX: event.clientX, clientY: event.clientY, offsetX: viewOffsetX, offsetY: viewOffsetY };
                     canvas.style.cursor = 'grabbing';
                     return;
                 }
@@ -713,12 +738,14 @@
 
                 renderEditor();
             }
-
             function handleMouseMove(event) {
                 // Handle panning
                 if (isPanning) {
-                    viewOffsetX = event.clientX - panStart.x;
-                    viewOffsetY = event.clientY - panStart.y;
+                    const rect = canvas.getBoundingClientRect();
+                    const scaleX = canvas.width / rect.width;
+                    const scaleY = canvas.height / rect.height;
+                    viewOffsetX = panStart.offsetX + (event.clientX - panStart.clientX) * scaleX;
+                    viewOffsetY = panStart.offsetY + (event.clientY - panStart.clientY) * scaleY;
                     renderEditor();
                     return;
                 }
@@ -1710,19 +1737,48 @@ function deleteSelectedNode() {
 function renderLinksList() {
     const c = document.getElementById('links-list');
     if (!c) return;
-    if (!links.length) { c.innerHTML = '<small class="text-muted">No links yet</small>'; return; }
-    const item = (l, idx) => {
+    c.textContent = '';
+    if (!links.length) {
+        const empty = document.createElement('small');
+        empty.className = 'text-muted';
+        empty.textContent = 'No links yet';
+        c.appendChild(empty);
+        return;
+    }
+    links.forEach((l, idx) => {
         const a = findNodeById(l.srcId); const b = findNodeById(l.dstId);
         const aL = a ? a.label : l.srcId; const bL = b ? b.label : l.dstId;
-        return `<div class=\"d-flex align-items-center justify-content-between mb-2\">
-            <div><i class=\"fas fa-link\"></i> ${escapeHtml(aL)} → ${escapeHtml(bL)}</div>
-            <div class=\"btn-group btn-group-sm\">
-                <button class=\"btn btn-outline-secondary\" onclick=\"openLinkModal(${idx})\"><i class=\"fas fa-edit\"></i></button>
-                <button class=\"btn btn-outline-danger\" onclick=\"deleteLink(${idx})\"><i class=\"fas fa-trash\"></i></button>
-            </div>
-        </div>`
-    };
-    c.innerHTML = links.map((l,i) => item(l,i)).join('');
+
+        const row = document.createElement('div');
+        row.className = 'd-flex align-items-center justify-content-between mb-2';
+
+        const labelDiv = document.createElement('div');
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-link';
+        labelDiv.appendChild(icon);
+        labelDiv.appendChild(document.createTextNode(' ' + aL + ' → ' + bL));
+        row.appendChild(labelDiv);
+
+        const btnGroup = document.createElement('div');
+        btnGroup.className = 'btn-group btn-group-sm';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-outline-secondary';
+        editBtn.addEventListener('click', () => openLinkModal(idx));
+        const editIcon = document.createElement('i');
+        editIcon.className = 'fas fa-edit';
+        editBtn.appendChild(editIcon);
+        btnGroup.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-outline-danger';
+        delBtn.addEventListener('click', () => deleteLink(idx));
+        const delIcon = document.createElement('i');
+        delIcon.className = 'fas fa-trash';
+        delBtn.appendChild(delIcon);
+        btnGroup.appendChild(delBtn);
+        row.appendChild(btnGroup);
+
+        c.appendChild(row);
+    });
 }
 
 // ========== Link Modal Functions ==========
@@ -1865,25 +1921,42 @@ function renderNodesList() {
     const container = document.getElementById('nodes-list');
     if (!container) return;
 
+    container.textContent = '';
+
     if (!nodes.length) {
-        container.innerHTML = '<small class="text-muted">No nodes yet</small>';
+        const empty = document.createElement('small');
+        empty.className = 'text-muted';
+        empty.textContent = 'No nodes yet';
+        container.appendChild(empty);
         return;
     }
 
-    const items = nodes.map((node, idx) => {
+    nodes.forEach((node, idx) => {
         const isSelected = node === selectedNode;
-        return `<div class="d-flex align-items-center justify-content-between py-1" style="cursor: pointer;${isSelected ? ' background: var(--editor-list-selected); border-radius: 3px;' : ''} onclick="selectNodeByIndex(${idx})">
-            <small class="${isSelected ? 'font-weight-bold' : ''}">
-                <i class="fas fa-circle ${isSelected ? 'text-primary' : 'text-success'}" style="font-size: 8px;"></i>
-                ${escapeHtml(node.label || 'Node ' + (idx + 1))}
-            </small>
-            <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="event.stopPropagation(); deleteNodeByIndex(${idx})" title="Delete">
-                <i class="fas fa-times" style="font-size: 10px;"></i>
-            </button>
-        </div>`;
-    });
+        const row = document.createElement('div');
+        row.className = 'd-flex align-items-center justify-content-between py-1 node-list-item' + (isSelected ? ' selected' : '');
+        row.addEventListener('click', () => selectNodeByIndex(idx));
 
-    container.innerHTML = items.join('');
+        const label = document.createElement('small');
+        if (isSelected) label.classList.add('font-weight-bold');
+
+        const dot = document.createElement('i');
+        dot.className = 'fas fa-circle node-dot ' + (isSelected ? 'text-primary' : 'text-success');
+        label.appendChild(dot);
+        label.appendChild(document.createTextNode(' ' + (node.label || 'Node ' + (idx + 1))));
+        row.appendChild(label);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-outline-danger btn-sm py-0 px-1';
+        delBtn.title = 'Delete';
+        delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteNodeByIndex(idx); });
+        const delIcon = document.createElement('i');
+        delIcon.className = 'fas fa-times node-delete-icon';
+        delBtn.appendChild(delIcon);
+        row.appendChild(delBtn);
+
+        container.appendChild(row);
+    });
 }
 
 function selectNodeByIndex(idx) {

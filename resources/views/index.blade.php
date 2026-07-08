@@ -130,6 +130,9 @@
     border-color: var(--idx-input-border);
     color: var(--idx-text);
 }
+.wmng-filters #map-search { width: 280px; }
+.wmng-filters #map-filter { width: 180px; }
+
 
 /* ===== Map Cards ===== */
 .map-card {
@@ -423,8 +426,8 @@
                 </div>
             </div>
             <div class="wmng-filters">
-                <input type="text" class="form-control" id="map-search" placeholder="Search maps..." aria-label="Search maps" style="width: 280px;">
-                <select class="form-control" id="map-filter" style="width: 180px;" aria-label="Sort maps">
+                <input type="text" class="form-control" id="map-search" placeholder="Search maps..." aria-label="Search maps">
+                <select class="form-control" id="map-filter" aria-label="Sort maps">
                     <option value="name-asc">Name (A-Z)</option>
                     <option value="name-desc">Name (Z-A)</option>
                     <option value="nodes-desc">Most nodes</option>
@@ -1037,7 +1040,7 @@ function renderTemplates(templates) {
 }
 
 function selectTemplate(templateId) {
-    const template = templatesData.find(t => t.id === templateId);
+    const template = templatesData.find(t => String(t.id) === String(templateId));
     if (!template) return;
 
     const mapName = prompt(`Create map from "${template.title}".\n\nEnter a unique map name (no spaces):`, '');
@@ -1075,7 +1078,7 @@ function createMapFromTemplate(templateId, mapName) {
         WMNGToast.success('Map created from template!');
         $('#createMapModal').modal('hide');
         // Redirect to editor
-        const mapId = data.id || data.map_id || data.data?.id;
+        const mapId = data.id || data.map?.id || data.map_id || data.data?.id;
         if (mapId) {
             window.location.href = '{{ url("plugin/WeathermapNG/editor") }}/' + mapId;
         } else {

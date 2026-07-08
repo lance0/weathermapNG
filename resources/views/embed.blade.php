@@ -1206,14 +1206,33 @@
             } catch (e) { console.error('Export failed', e); }
         }
 
+        let pollTimer = null;
+        function stopPolling() {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        }
+
         function startAutoUpdate() {
             stopPolling();
             currentTransport = 'poll';
             updateTransportButton();
-            fetchMapData();
+            fetchLiveUpdate();
             pollTimer = setInterval(() => {
-                fetchMapData();
+                fetchLiveUpdate();
             }, intervalSec * 1000);
+        }
+
+        function fetchLiveUpdate() {
+            fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/live`)
+                .then(response => {
+                    if (!response.ok) { console.warn('Live update failed: HTTP ' + response.status); return null; }
+                    return response.json();
+                })
+                .then(live => {
+                    if (live && !live.error) applyLiveUpdate(live);
+                })
+                .catch(error => {
+                    console.error('Error fetching live update:', error);
+                });
         }
 
         function fetchMapData() {

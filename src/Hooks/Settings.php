@@ -21,6 +21,9 @@ class Settings implements SettingsHook
         if (isset($user->level) && $user->level >= 10) {
             return true;
         }
+        if (method_exists($user, 'hasRole') && $user->hasRole('admin')) {
+            return true;
+        }
         return false;
     }
 

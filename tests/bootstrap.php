@@ -28,3 +28,22 @@ if (!function_exists('config')) {
         return $cfg[$key] ?? $default;
     }
 }
+
+// Shim Laravel facade application so Log/Cache facades work in standalone tests
+if (class_exists('Illuminate\Support\Facades\Facade') && class_exists('Illuminate\Container\Container')) {
+    $container = new Illuminate\Container\Container();
+    $logger = new \Psr\Log\NullLogger();
+    $container->instance('log', $logger);
+    $container->instance(\Psr\Log\LoggerInterface::class, $logger);
+    $cacheRepo = new class {
+        private array $store = [];
+        public function remember($key, $ttl, $callback) { return $callback(); }
+        public function get($key) { return $this->store[$key] ?? null; }
+        public function put($key, $value, $ttl = null) { $this->store[$key] = $value; }
+        public function forget($key) { unset($this->store[$key]); }
+        public function flush() { $this->store = []; }
+    };
+    $container->instance('cache', $cacheRepo);
+    $container->instance('cache.store', $cacheRepo);
+    Illuminate\Support\Facades\Facade::setFacadeApplication($container);
+}

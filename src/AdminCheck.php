@@ -29,6 +29,10 @@ trait AdminCheck
             return true;
         }
 
+        if (method_exists($user, 'hasRole') && $user->hasRole('admin')) {
+            return true;
+        }
+
         return false;
     }
 
