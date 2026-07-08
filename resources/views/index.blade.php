@@ -1075,15 +1075,16 @@ function createMapFromTemplate(templateId, mapName) {
         return response.json();
     })
     .then(data => {
-        WMNGToast.success('Map created from template!');
-        $('#createMapModal').modal('hide');
-        // Redirect to editor
+        // Redirect first — non-critical UI cleanup must not block navigation.
         const mapId = data.id || data.map?.id || data.map_id || data.data?.id;
         if (mapId) {
             window.location.href = '{{ url("plugin/WeathermapNG/editor") }}/' + mapId;
-        } else {
-            location.reload();
+            return;
         }
+        // No map ID in response — show toast and reload to see the new map.
+        try { WMNGToast.success('Map created from template!'); } catch(e) { console.log('Map created from template!'); }
+        try { $('#createMapModal').modal('hide'); } catch(e) {}
+        location.reload();
     })
     .catch(err => {
         WMNGToast.error('Error: ' + err.message);
