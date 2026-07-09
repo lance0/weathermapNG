@@ -17,7 +17,7 @@ class SaveMapRequest extends FormRequest
     {
         return [
             'title' => 'nullable|string|max:255',
-            'name' => 'nullable|string|max:255|alpha_dash|regex:/^[a-z0-9_-]+$/i',
+            'name' => 'nullable|string|max:255',
             'options' => 'nullable|array',
             'options.width' => 'nullable|integer|min:100|max:4096',
             'options.height' => 'nullable|integer|min:100|max:4096',
@@ -54,8 +54,10 @@ class SaveMapRequest extends FormRequest
             'links.*.port_b' => 'nullable|integer',
             'links.*.bandwidth_bps' => 'nullable|numeric|min:0',
             'links.*.bandwidth' => 'nullable|numeric|min:0',
-            'links.*.style' => 'nullable|array:via_style,via_points',
+            'links.*.style' => 'nullable|array:via_style,via_points,color,width',
             'links.*.style.via_style' => 'nullable|string|in:straight,angled,curved',
+            'links.*.style.color' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'links.*.style.width' => 'nullable|numeric|min:0.5|max:20',
             'links.*.style.via_points' => 'nullable|array|max:200',
             'links.*.style.via_points.*' => 'array:x,y',
             'links.*.style.via_points.*.x' => 'required|numeric|min:0|max:10000',
@@ -83,8 +85,11 @@ class SaveMapRequest extends FormRequest
             'options.default_link_style.width.min' => 'Default link width must be at least 0.5',
             'options.default_link_style.width.max' => 'Default link width must not exceed 20',
             'options.default_link_style.via_style.in' => 'Default link style must be straight, angled, or curved',
+            'links.*.style.color.regex' => 'Link style color must be a valid hex color',
+            'links.*.style.width.min' => 'Link width must be at least 0.5',
+            'links.*.style.width.max' => 'Link width must not exceed 20',
             'options.tags.*.regex' => 'Tags may only contain letters, numbers, hyphens and underscores',
-            'links.*.style.array' => 'Link style may only contain via_style and via_points',
+            'links.*.style.array' => 'Link style may only contain via_style, via_points, color, or width',
             'links.*.style.via_style.in' => 'Via style must be straight, angled, or curved',
             'links.*.style.via_points.*.x.numeric' => 'Via point x must be numeric',
             'links.*.style.via_points.*.y.numeric' => 'Via point y must be numeric',
@@ -186,8 +191,22 @@ class SaveMapRequest extends FormRequest
                 }
                 $style = $link['style'];
 
-                // Validation allowlists keys; here we cast numeric strings
+                // Validation allowlists keys; here we sanitize and cast numeric strings
                 // so the persisted JSON holds numbers, not stringified coords.
+                $allowedLinkStyleKeys = ['via_style', 'via_points', 'color', 'width'];
+                $style = array_intersect_key($style, array_flip($allowedLinkStyleKeys));
+                if (isset($style['color']) && is_string($style['color'])) {
+                    $style['color'] = strip_tags(trim($style['color']));
+                }
+                if (isset($style['width']) && is_numeric($style['width'])) {
+                    $w = (float) $style['width'];
+                    if ($w >= 0.5 && $w <= 20) {
+                        $style['width'] = $w;
+                    } else {
+                        unset($style['width']);
+                    }
+                }
+                $data['links'][$i]['style'] = $style;
                 if (!empty($style['via_points']) && is_array($style['via_points'])) {
                     foreach ($style['via_points'] as $j => $vp) {
                         if (!is_array($vp)) {
@@ -209,8 +228,10 @@ class SaveMapRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        if ($this->has('title') && is_string($this->input('title'))) {
-            $this->merge(['title' => trim($this->input('title'))]);
+        foreach (['title', 'name'] as $key) {
+            if ($this->has($key) && is_string($this->input($key))) {
+                $this->merge([$key => trim($this->input($key))]);
+            }
         }
     }
 }

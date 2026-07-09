@@ -109,7 +109,8 @@ class SanitizationTest extends TestCase
 
     /**
      * Mirror of SaveMapRequest::sanitize() link style block — casts numeric
-     * strings in via_points to floats so persisted JSON holds numbers.
+     * strings in via_points to floats so persisted JSON holds numbers, and
+     * allowlists/strips link style color/width.
      */
     private function sanitizeLinkStyle(array $data): array
     {
@@ -119,6 +120,21 @@ class SanitizationTest extends TestCase
                     continue;
                 }
                 $style = $link['style'];
+
+                $allowedLinkStyleKeys = ['via_style', 'via_points', 'color', 'width'];
+                $style = array_intersect_key($style, array_flip($allowedLinkStyleKeys));
+                if (isset($style['color']) && is_string($style['color'])) {
+                    $style['color'] = strip_tags(trim($style['color']));
+                }
+                if (isset($style['width']) && is_numeric($style['width'])) {
+                    $w = (float) $style['width'];
+                    if ($w >= 0.5 && $w <= 20) {
+                        $style['width'] = $w;
+                    } else {
+                        unset($style['width']);
+                    }
+                }
+                $data['links'][$i]['style'] = $style;
                 if (!empty($style['via_points']) && is_array($style['via_points'])) {
                     foreach ($style['via_points'] as $j => $vp) {
                         if (!is_array($vp)) {
@@ -190,6 +206,30 @@ class SanitizationTest extends TestCase
     {
         $data = $this->sanitizeLinkStyle(['nodes' => [['label' => 'r1']]]);
         $this->assertArrayNotHasKey('links', $data);
+    }
+
+    public function test_link_style_unknown_keys_are_stripped(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [['style' => ['via_style' => 'curved', 'bogus' => 'x', 'color' => '#ff0000', 'width' => 2.5]]],
+        ]);
+        $this->assertSame(['via_style' => 'curved', 'color' => '#ff0000', 'width' => 2.5], $data['links'][0]['style']);
+    }
+
+    public function test_link_style_color_html_is_stripped(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [['style' => ['color' => '<script>alert(1)</script>#ff0000', 'width' => 2]]],
+        ]);
+        $this->assertSame('alert(1)#ff0000', $data['links'][0]['style']['color']);
+    }
+
+    public function test_link_style_width_out_of_range_is_removed(): void
+    {
+        $data = $this->sanitizeLinkStyle([
+            'links' => [['style' => ['width' => 99.0]]],
+        ]);
+        $this->assertArrayNotHasKey('width', $data['links'][0]['style']);
     }
 
     // --- SaveMapRequest tag sanitization ---

@@ -185,7 +185,7 @@ class MapService
             return null;
         }
 
-        return $nodeIdMap[$clientId] ?? (is_numeric($clientId) ? (int)$clientId : null);
+        return $nodeIdMap[$clientId] ?? null;
     }
 
     public function importMap(Request $request, array $validated): Map

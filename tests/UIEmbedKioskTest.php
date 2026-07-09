@@ -16,10 +16,12 @@ class UIEmbedKioskTest extends TestCase
 
     public function test_embed_passes_kiosk_config_to_js(): void
     {
-        $this->assertStringContainsString("kioskEnabled: {!! json_encode(\$kiosk) !!}", $this->content);
-        $this->assertStringContainsString("cycleSeconds: {!! json_encode(\$cycleSeconds) !!}", $this->content);
-        $this->assertStringContainsString("linkTarget: {!! json_encode(\$target) !!}", $this->content);
-        $this->assertStringContainsString("mapList: {!! json_encode(\$mapList ?? []) !!}", $this->content);
+        $this->assertStringContainsString("kioskEnabled: @json(\$kiosk)", $this->content);
+        $this->assertStringContainsString("cycleSeconds: @json(\$cycleSeconds)", $this->content);
+        $this->assertStringContainsString("linkTarget: @json(\$target)", $this->content);
+        $this->assertStringContainsString("mapList: @json(\$mapList ?? [])", $this->content);
+        $this->assertStringContainsString("mapData = @json(\$mapData ?? [])", $this->content);
+        $this->assertStringContainsString("initialLive = @json(\$liveData ?? [])", $this->content);
     }
 
     public function test_embed_includes_kiosk_mode_styles(): void

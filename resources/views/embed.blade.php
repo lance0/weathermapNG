@@ -315,11 +315,11 @@
         const baseUrl = '{{ url("/") }}';
         const deviceBaseUrl = '{{ url("device") }}';
         const WMNG_CONFIG = {
-            kioskEnabled: {!! json_encode($kiosk) !!},
-            cycleSeconds: {!! json_encode($cycleSeconds) !!},
-            linkTarget: {!! json_encode($target) !!},
-            mapList: {!! json_encode($mapList ?? []) !!},
-            thresholds: {!! json_encode(config('weathermapng.thresholds') ?? [50, 80, 95]) !!},
+            kioskEnabled: @json($kiosk),
+            cycleSeconds: @json($cycleSeconds),
+            linkTarget: @json($target),
+            mapList: @json($mapList ?? []),
+            thresholds: @json(config('weathermapng.thresholds') ?? [50, 80, 95]),
             colors: {
                 link_normal: '{{ config('weathermapng.colors.link_normal', '#28a745') }}',
                 link_warning: '{{ config('weathermapng.colors.link_warning', '#ffc107') }}',
@@ -328,12 +328,12 @@
                 node_down: '{{ config('weathermapng.colors.node_down', '#dc3545') }}',
                 node_unknown: '{{ config('weathermapng.colors.node_unknown', '#6c757d') }}'
             },
-            enable_sse: {!! json_encode(config('weathermapng.enable_sse') ?? true) !!},
-            client_refresh: {!! json_encode(config('weathermapng.client_refresh') ?? 60) !!},
-            scale: {!! json_encode(config('weathermapng.scale') ?? 'bits') !!},
+            enable_sse: @json(config('weathermapng.enable_sse') ?? true),
+            client_refresh: @json(config('weathermapng.client_refresh') ?? 60),
+            scale: @json(config('weathermapng.scale') ?? 'bits'),
             link_style: '{{ config('weathermapng.link_style', 'straight') }}',
-            show_bandwidth: {!! json_encode(config('weathermapng.show_bandwidth', true)) !!},
-            show_percentages: {!! json_encode(config('weathermapng.show_percentages', true)) !!}
+            show_bandwidth: @json(config('weathermapng.show_bandwidth', true)),
+            show_percentages: @json(config('weathermapng.show_percentages', true))
         };
         const urlParams = new URLSearchParams(window.location.search);
         const param = (k, d) => urlParams.has(k) ? urlParams.get(k) : d;
@@ -350,9 +350,9 @@
         let lastDataUpdate = null;
         let mapData = {};
         try {
-            mapData = {!! json_encode($mapData ?? []) !!};
+            mapData = @json($mapData ?? []);
             // Apply initial live data if provided
-            const initialLive = {!! json_encode($liveData ?? []) !!};
+            const initialLive = @json($liveData ?? []);
             if (initialLive && initialLive.links && Array.isArray(mapData.links)) {
                 mapData.links.forEach(l => {
                     const id = l.id ?? l.link_id ?? null;
@@ -445,7 +445,7 @@
             if (bgImg) {
                 ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
             } else {
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = mapData.background || '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
