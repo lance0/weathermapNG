@@ -35,6 +35,16 @@ class Map extends Model
         return data_get($this->options, 'background', '#ffffff');
     }
 
+    public function getTagsAttribute()
+    {
+        $tags = data_get($this->options, 'tags', []);
+        if (!is_array($tags)) {
+            return [];
+        }
+        $normalized = array_map(fn($t) => is_string($t) ? strtolower(trim($t)) : '', $tags);
+        return array_values(array_unique(array_filter($normalized, fn($t) => $t !== '')));
+    }
+
     public function toJsonModel()
     {
         // Prime batch caches so accessor-backed fields (device_name, status,

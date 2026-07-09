@@ -101,6 +101,18 @@
 }
 .editor-sidebar .panel-body { padding: 10px 12px; }
 .editor-sidebar .form-label { font-size: 11px; margin-bottom: 2px; color: var(--editor-text-muted); }
+.editor-tag {
+    display: inline-block;
+    font-size: 11px;
+    background: var(--editor-panel-header-bg);
+    color: var(--editor-text-muted);
+    border: 1px solid var(--editor-sidebar-border);
+    border-radius: 12px;
+    padding: 2px 8px;
+    margin: 0 4px 4px 0;
+    text-transform: lowercase;
+}
+.map-tags-preview { margin-top: 6px; }
 .editor-sidebar .form-control-sm {
     font-size: 12px; background: var(--editor-input-bg); border-color: var(--editor-input-border);
     color: var(--editor-input-text);
@@ -326,6 +338,13 @@
                         <input type="number" class="form-control form-control-sm" id="map-height"
                                value="{{ $map->height ?? config('weathermapng.default_height', 600) }}" min="100" max="4096">
                     </div>
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="map-tags">Tags</label>
+                    <input type="text" class="form-control form-control-sm" id="map-tags"
+                           value="{{ implode(', ', $map->tags ?? []) }}" placeholder="e.g. core, wan, datacenter">
+                    <small class="text-muted">Comma-separated letters, numbers, hyphens, underscores</small>
+                    <div id="map-tags-preview" class="map-tags-preview"></div>
                 </div>
             </div>
         </div>
@@ -582,6 +601,28 @@
 
             // Escape user-controlled strings before interpolating into innerHTML (XSS hardening).
             function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+            function parseMapTags(raw) {
+                if (typeof raw !== 'string' || !raw.trim()) return [];
+                const tags = raw.split(',')
+                    .map(t => t.trim().toLowerCase())
+                    .filter(t => /^[a-z0-9_-]+$/.test(t));
+                return Array.from(new Set(tags));
+            }
+
+            function renderMapTagsPreview(tags) {
+                const el = document.getElementById('map-tags-preview');
+                if (!el) return;
+                if (!Array.isArray(tags) || tags.length === 0) {
+                    el.innerHTML = '';
+                    return;
+                }
+                el.innerHTML = tags.map(t => `<span class="editor-tag">${escapeHtml(t)}</span>`).join(' ');
+            }
+
+            document.getElementById('map-tags')?.addEventListener('input', (e) => {
+                renderMapTagsPreview(parseMapTags(e.target.value));
+            });
 
             function initCanvas() {
                 canvas = document.getElementById('map-canvas');
@@ -1281,6 +1322,12 @@
                     if (mapWidth && data.width) mapWidth.value = data.width;
                     if (mapHeight && data.height) mapHeight.value = data.height;
 
+                    const mapTags = document.getElementById('map-tags');
+                    if (mapTags && Array.isArray(data.options?.tags)) {
+                        mapTags.value = data.options.tags.join(', ');
+                        renderMapTagsPreview(data.options.tags);
+                    }
+
                     if (data.width && canvas) canvas.width = data.width;
                     if (data.height && canvas) canvas.height = data.height;
 
@@ -1503,6 +1550,7 @@
                     options: {
                         width: mapWidth,
                         height: mapHeight,
+                        tags: parseMapTags(document.getElementById('map-tags')?.value),
                     },
                     nodes: nodes.map(n => ({
                         id: n.id,

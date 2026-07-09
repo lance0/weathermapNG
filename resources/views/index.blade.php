@@ -132,6 +132,32 @@
 }
 .wmng-filters #map-search { width: 280px; }
 .wmng-filters #map-filter { width: 180px; }
+.wmng-filters #map-tag-filter { width: 180px; }
+
+.map-tags {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+.map-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--idx-text-muted);
+    background: var(--idx-stat-bg);
+    border: 1px solid var(--idx-stat-border);
+    border-radius: 12px;
+    padding: 0.2rem 0.6rem;
+    text-transform: lowercase;
+}
+.map-tag.active {
+    background: #667eea;
+    color: #fff;
+    border-color: #667eea;
+}
 
 
 /* ===== Map Cards ===== */
@@ -278,8 +304,14 @@
     margin-bottom: 0.5rem;
 }
 .wmng-empty p {
-    max-width: 400px;
+    max-width: 500px;
     margin: 0 auto 1.5rem;
+}
+.wmng-onboarding-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
 /* ===== Alerts ===== */
@@ -434,6 +466,14 @@
                     <option value="links-desc">Most links</option>
                     <option value="size-desc">Largest</option>
                 </select>
+                <select class="form-control" id="map-tag-filter" aria-label="Filter by tag">
+                    <option value="">All tags</option>
+                    @foreach(collect($maps)->flatMap(fn($m) => $m->tags)->unique()->sort()->values() as $tag)
+                        @if($tag !== '')
+                            <option value="{{ $tag }}">{{ $tag }}</option>
+                        @endif
+                    @endforeach
+                </select>
             </div>
         </div>
 
@@ -459,7 +499,8 @@
                      data-title="{{ strtolower($map->title ?? $map->name) }}"
                      data-nodes="{{ $map->nodes_count ?? $map->nodes()->count() }}"
                      data-links="{{ $map->links_count ?? $map->links()->count() }}"
-                     data-size="{{ ($map->width ?? 0) * ($map->height ?? 0) }}">
+                     data-size="{{ ($map->width ?? 0) * ($map->height ?? 0) }}"
+                     data-tags="{{ json_encode($map->tags) }}">
                     <div class="map-card">
                         <div class="map-card-preview">
                             <div class="map-card-dimensions">
@@ -482,6 +523,13 @@
                                     {{ $map->links_count ?? $map->links()->count() }} links
                                 </span>
                             </div>
+                            @if(count($map->tags) > 0)
+                                <div class="map-tags" aria-label="Map tags">
+                                    @foreach($map->tags as $tag)
+                                        <span class="map-tag" data-tag="{{ $tag }}">{{ $tag }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
                             <div class="map-card-meta">
                                 <i class="fas fa-clock" aria-hidden="true"></i>
                                 Updated {{ $map->updated_at ? $map->updated_at->diffForHumans() : 'recently' }}
@@ -519,11 +567,29 @@
                             <i class="fas fa-map-marked-alt" aria-hidden="true"></i>
                         </div>
                         <h3>No maps yet</h3>
-                        <p>Create your first network map to visualize your infrastructure with real-time traffic data.</p>
-                        <button type="button" class="btn btn-success btn-lg" data-toggle="modal" data-target="#createMapModal"
-                                aria-label="Create your first map">
-                            <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create Your First Map
-                        </button>
+                        <p>Get started by creating a map from a template, importing an existing map, or building a custom topology. If the plugin is fresh, run the diagnostics page first.</p>
+                        <div class="wmng-onboarding-actions">
+                            <a href="{{ url('plugin/WeathermapNG/templates') }}" class="btn btn-success btn-lg"
+                               aria-label="Browse map templates">
+                                <i class="fas fa-th-large mr-2" aria-hidden="true"></i>Browse Templates
+                            </a>
+                            <button type="button" class="btn btn-outline-secondary btn-lg" data-toggle="modal" data-target="#createMapModal"
+                                    aria-label="Create your first map">
+                                <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create Custom Map
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-lg" data-toggle="modal" data-target="#importMapModal"
+                                    aria-label="Import an existing map">
+                                <i class="fas fa-file-import mr-2" aria-hidden="true"></i>Import Map
+                            </button>
+                            <a href="{{ url('plugin/WeathermapNG/diagnostics') }}" class="btn btn-outline-info btn-lg"
+                               aria-label="Open diagnostics">
+                                <i class="fas fa-stethoscope mr-2" aria-hidden="true"></i>Diagnostics
+                            </a>
+                            <a href="https://github.com/lance0/weathermapNG/blob/main/docs/EMBED.md" class="btn btn-outline-primary btn-lg" target="_blank" rel="noopener noreferrer"
+                               aria-label="Read embed documentation">
+                                <i class="fas fa-book mr-2" aria-hidden="true"></i>Docs
+                            </a>
+                        </div>
                     </div>
                 </div>
             @endforelse
@@ -869,11 +935,20 @@ document.getElementById('confirmDeleteMapBtn')?.addEventListener('click', functi
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('map-search');
     const filterSelect = document.getElementById('map-filter');
+    const tagFilter = document.getElementById('map-tag-filter');
     const container = document.getElementById('maps-container');
     if (!searchInput || !filterSelect || !container) return;
 
     const cards = Array.from(container.querySelectorAll('.map-card-col'));
     const total = cards.length;
+
+    function getCardTags(card) {
+        try {
+            return JSON.parse(card.dataset.tags || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
 
     function sortCards(mode) {
         const sorted = [...cards].sort((a, b) => {
@@ -900,11 +975,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyFilter() {
         const query = searchInput.value.trim().toLowerCase();
+        const selectedTag = tagFilter ? tagFilter.value.trim().toLowerCase() : '';
         let visible = 0;
 
         cards.forEach(card => {
             const text = `${card.dataset.name} ${card.dataset.title}`;
-            const isMatch = text.includes(query);
+            const textMatch = text.includes(query);
+            const tagMatch = !selectedTag || getCardTags(card).includes(selectedTag);
+            const isMatch = textMatch && tagMatch;
             card.style.display = isMatch ? '' : 'none';
             if (isMatch) visible += 1;
         });
@@ -919,6 +997,9 @@ document.addEventListener('DOMContentLoaded', function() {
     filterSelect.addEventListener('change', function() {
         sortCards(this.value);
     });
+    if (tagFilter) {
+        tagFilter.addEventListener('change', applyFilter);
+    }
 
     sortCards(filterSelect.value);
     applyFilter();

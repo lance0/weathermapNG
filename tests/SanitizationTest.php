@@ -191,4 +191,38 @@ class SanitizationTest extends TestCase
         $data = $this->sanitizeLinkStyle(['nodes' => [['label' => 'r1']]]);
         $this->assertArrayNotHasKey('links', $data);
     }
+
+    // --- SaveMapRequest tag sanitization ---
+
+    private function sanitizeTags(array $data): array
+    {
+        if (!empty($data['options']['tags']) && is_array($data['options']['tags'])) {
+            $tags = array_map(fn($t) => is_string($t) ? strtolower(strip_tags(trim($t))) : '', $data['options']['tags']);
+            $tags = array_values(array_unique(array_filter($tags, fn($t) => $t !== '')));
+            $data['options']['tags'] = $tags;
+        }
+        return $data;
+    }
+
+    public function test_tags_stripped_trimmed_lowercased_and_deduplicated(): void
+    {
+        $data = $this->sanitizeTags([
+            'options' => ['tags' => [' core ', 'WAN', '', '<b>alert</b>', '  ', 'wan']],
+        ]);
+        $this->assertSame(['core', 'wan', 'alert'], $data['options']['tags']);
+    }
+
+    public function test_tags_rejects_non_strings_but_preserves_valid(): void
+    {
+        $data = $this->sanitizeTags([
+            'options' => ['tags' => ['valid', 123, null, 'also-valid']],
+        ]);
+        $this->assertSame(['valid', 'also-valid'], $data['options']['tags']);
+    }
+
+    public function test_missing_tags_left_unchanged(): void
+    {
+        $data = $this->sanitizeTags(['options' => ['width' => 800]]);
+        $this->assertArrayNotHasKey('tags', $data['options']);
+    }
 }

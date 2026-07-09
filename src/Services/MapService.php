@@ -29,15 +29,13 @@ class MapService
 
     public function updateMap(Map $map, array $data): Map
     {
-        $options = array_merge($map->options ?? [], array_filter([
+        $incomingOptions = array_filter([
             'width' => $data['width'] ?? null,
             'height' => $data['height'] ?? null,
             'background' => $data['background'] ?? null,
-        ], fn($value) => $value !== null));
+        ], fn($value) => $value !== null);
 
-        // Ensure width/height always have defaults
-        $options['width'] = $options['width'] ?? 800;
-        $options['height'] = $options['height'] ?? 600;
+        $options = $this->mergeMapOptions($map->options ?? [], $incomingOptions);
 
         $update = ['options' => $options];
         if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
