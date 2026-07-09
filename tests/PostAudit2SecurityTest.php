@@ -226,6 +226,36 @@ class PostAudit2SecurityTest extends TestCase
         );
     }
 
+    public function test_sse_clamps_interval(): void
+    {
+        $content = file_get_contents($this->base . '/src/Http/Controllers/RenderController.php');
+        $this->assertStringContainsString(
+            'min(60, max(1,',
+            $content,
+            'SSE endpoint must clamp interval to [1, 60] seconds'
+        );
+        $this->assertStringNotContainsString(
+            "\$interval = max(1, (int) \$request->get('interval', 5));",
+            $content,
+            'SSE endpoint must not accept unbounded interval parameter'
+        );
+    }
+
+    public function test_stream_loop_sleeps_in_bounded_chunks(): void
+    {
+        $content = file_get_contents($this->base . '/src/Services/NodeDataService.php');
+        $this->assertStringContainsString(
+            "\$remaining = \$maxSeconds - (time() - \$start)",
+            $content,
+            'streamLoop must compute remaining time before sleeping'
+        );
+        $this->assertStringContainsString(
+            'min($interval, max(1, $remaining))',
+            $content,
+            'streamLoop must sleep at most min(interval, remaining) seconds'
+        );
+    }
+
     // ── Node model: null guard + restricted columns ─────────────────────
 
     public function test_convert_status_to_string_guards_null(): void

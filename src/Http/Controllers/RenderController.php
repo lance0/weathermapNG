@@ -129,7 +129,7 @@ class RenderController
     {
         $map->load(['nodes', 'links']);
         $this->nodeDataService->preloadForMap($map);
-        $interval = max(1, (int) $request->get('interval', 5));
+        $interval = min(60, max(1, (int) $request->get('interval', 5)));
         $maxSeconds = min(600, max(5, (int) $request->get('max', 300)));
 
         return $this->nodeDataService->stream($map, $interval, $maxSeconds);
