@@ -4,7 +4,7 @@ This document outlines the development roadmap for WeathermapNG, a network visua
 
 *Last reviewed v1.9.0 (2026-07-09) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.9.0 (Stable)
+## Current Status: v1.9.1 (Stable)
 
 The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.9.0:
 
