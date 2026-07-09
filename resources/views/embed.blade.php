@@ -701,7 +701,7 @@
             }
 
             // Node label
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = defaultNodeStyle.label_color || '#000';
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
             const labelY = (nodeType === 'server') ? y - 18 : y - 16;
@@ -737,7 +737,7 @@
 
         function buildLinkPath(link, x1, y1, x2, y2) {
             const viaPoints = (link.style && link.style.via_points) || [];
-            const viaStyle = (link.style && link.style.via_style) || WMNG_CONFIG.link_style || 'straight';
+            const viaStyle = (link.style && link.style.via_style) || defaultLinkStyle.via_style || WMNG_CONFIG.link_style || 'straight';
             const points = [{x: x1, y: y1}];
             for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
             points.push({x: x2, y: y2});
@@ -850,8 +850,9 @@
             traceLinkPath(ctx, points, viaStyle);
             const metric = getLinkMetric(link);
             const pct = getLinkPct(link, metric);
-            ctx.strokeStyle = getLinkColor(pct);
-            const width = Math.max(1, (link.width || 2));
+            const linkStyle = link.style || {};
+            ctx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
+            const width = Math.max(0.5, linkStyle.width || link.width || defaultLinkStyle.width || 2);
             ctx.lineWidth = width;
             
             // Use solid line if flow animation is enabled
@@ -1006,17 +1007,22 @@
             ctx.restore();
         }
 
+        const defaultNodeStyle = mapData.options?.default_node_style || {};
+        const defaultLinkStyle = mapData.options?.default_link_style || {};
+
         function getNodeColor(node) {
-            const status = node.status || 'unknown';
             const colors = WMNG_CONFIG.colors || {};
+            if (node?.meta?.color) return node.meta.color;
+
+            const status = node.status || 'unknown';
             if (status === 'down') return colors.node_down || '#dc3545';
             // If up but CPU or MEM high, warn
             const cpu = node.metrics?.cpu;
             const mem = node.metrics?.mem;
             const warn = (v) => typeof v === 'number' && v >= ((WMNG_CONFIG.thresholds && WMNG_CONFIG.thresholds[1]) || 80);
             if (status === 'up' && (warn(cpu) || warn(mem))) return colors.node_warning || '#ffc107';
-            if (status === 'up') return colors.node_up || '#28a745';
-            return colors.node_unknown || '#6c757d';
+            if (status === 'up') return defaultNodeStyle.color || colors.node_up || '#28a745';
+            return defaultNodeStyle.color || colors.node_unknown || '#6c757d';
         }
 
         function getLinkMetric(link) {
@@ -1049,7 +1055,7 @@
         }
 
         function getLinkColor(pct) {
-            if (pct === null) return WMNG_CONFIG.colors.link_normal || '#28a745';
+            if (pct === null) return defaultLinkStyle.color || WMNG_CONFIG.colors.link_normal || '#28a745';
             const [t1, t2, t3] = WMNG_CONFIG.thresholds || [50, 80, 95];
             if (pct >= t2) return WMNG_CONFIG.colors.link_critical || '#dc3545';
             if (pct >= t1) return WMNG_CONFIG.colors.link_warning || '#ffc107';

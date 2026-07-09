@@ -23,9 +23,16 @@ class SaveMapRequest extends FormRequest
             'options.background' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
             'options.tags' => 'nullable|array|max:50',
             'options.tags.*' => 'nullable|string|max:50|regex:/^[a-z0-9_-]+$/i',
+            'options.default_node_style' => 'nullable|array:color,label_color',
+            'options.default_node_style.color' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'options.default_node_style.label_color' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'options.default_link_style' => 'nullable|array:color,width,via_style',
+            'options.default_link_style.color' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'options.default_link_style.width' => 'nullable|numeric|min:0.5|max:20',
+            'options.default_link_style.via_style' => 'nullable|string|in:straight,angled,curved',
 
             // Keys must be present (empty arrays are intentional clears).
-            'nodes' => 'required|array|max:2000',
+            'nodes' => 'present|array|max:2000',
             'nodes.*.id' => 'nullable',
             'nodes.*.label' => 'nullable|string|max:255',
             'nodes.*.x' => 'nullable|numeric|min:0|max:10000',
@@ -33,7 +40,7 @@ class SaveMapRequest extends FormRequest
             'nodes.*.device_id' => 'nullable|integer',
             'nodes.*.meta' => 'nullable|array',
 
-            'links' => 'required|array|max:2000',
+            'links' => 'present|array|max:2000',
             'links.*.src_node_id' => 'nullable',
             'links.*.dst_node_id' => 'nullable',
             'links.*.source' => 'nullable',
@@ -58,8 +65,8 @@ class SaveMapRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nodes.required' => 'Save payload must include a "nodes" array',
-            'links.required' => 'Save payload must include a "links" array',
+            'nodes.present' => 'Save payload must include a "nodes" array',
+            'links.present' => 'Save payload must include a "links" array',
             'nodes.max' => 'A map cannot have more than 2000 nodes',
             'links.max' => 'A map cannot have more than 2000 links',
             'options.width.min' => 'Width must be at least 100 pixels',
@@ -69,6 +76,12 @@ class SaveMapRequest extends FormRequest
             'options.background.regex' => 'Background must be a valid hex color (e.g., #ffffff)',
             'options.tags.max' => 'A map cannot have more than 50 tags',
             'options.tags.*.max' => 'Each tag must not exceed 50 characters',
+            'options.default_node_style.color.regex' => 'Default node color must be a valid hex color (e.g., #28a745)',
+            'options.default_node_style.label_color.regex' => 'Default node label color must be a valid hex color',
+            'options.default_link_style.color.regex' => 'Default link color must be a valid hex color',
+            'options.default_link_style.width.min' => 'Default link width must be at least 0.5',
+            'options.default_link_style.width.max' => 'Default link width must not exceed 20',
+            'options.default_link_style.via_style.in' => 'Default link style must be straight, angled, or curved',
             'options.tags.*.regex' => 'Tags may only contain letters, numbers, hyphens and underscores',
             'links.*.style.array' => 'Link style may only contain via_style and via_points',
             'links.*.style.via_style.in' => 'Via style must be straight, angled, or curved',
@@ -128,6 +141,28 @@ class SaveMapRequest extends FormRequest
             $tags = array_map(fn($t) => is_string($t) ? strtolower(strip_tags(trim($t))) : '', $data['options']['tags']);
             $tags = array_values(array_unique(array_filter($tags, fn($t) => $t !== '')));
             $data['options']['tags'] = $tags;
+        }
+
+        $allowedNodeStyleKeys = ['color', 'label_color'];
+        if (!empty($data['options']['default_node_style']) && is_array($data['options']['default_node_style'])) {
+            $style = array_intersect_key($data['options']['default_node_style'], array_flip($allowedNodeStyleKeys));
+            $style = array_map(fn($v) => is_string($v) ? strip_tags(trim($v)) : $v, $style);
+            $data['options']['default_node_style'] = array_filter($style, fn($v) => $v !== null && $v !== '');
+        }
+
+        $allowedLinkStyleKeys = ['color', 'width', 'via_style'];
+        if (!empty($data['options']['default_link_style']) && is_array($data['options']['default_link_style'])) {
+            $style = array_intersect_key($data['options']['default_link_style'], array_flip($allowedLinkStyleKeys));
+            $style = array_map(fn($v) => is_string($v) ? strip_tags(trim($v)) : $v, $style);
+            if (isset($style['width']) && is_numeric($style['width'])) {
+                $width = (float) $style['width'];
+                if ($width >= 0.5 && $width <= 20) {
+                    $style['width'] = $width;
+                } else {
+                    unset($style['width']);
+                }
+            }
+            $data['options']['default_link_style'] = array_filter($style, fn($v) => $v !== null && $v !== '');
         }
 
         if (!empty($data['nodes']) && is_array($data['nodes'])) {

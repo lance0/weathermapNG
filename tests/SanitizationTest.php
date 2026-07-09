@@ -225,4 +225,5 @@ class SanitizationTest extends TestCase
         $data = $this->sanitizeTags(['options' => ['width' => 800]]);
         $this->assertArrayNotHasKey('tags', $data['options']);
     }
+
 }
