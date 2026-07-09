@@ -9,7 +9,12 @@ class Node extends Model
 {
     protected $table = 'wmng_nodes';
     protected $fillable = ['map_id', 'label', 'x', 'y', 'device_id', 'meta'];
-    protected $casts = ['meta' => 'array'];
+    protected $casts = [
+        'meta' => 'array',
+        'device_id' => 'integer',
+        'x' => 'float',
+        'y' => 'float',
+    ];
 
     /** @var array<int, array<string,mixed>|null> Batch-prefetch cache for device lookups. */
     private static array $deviceCache = [];

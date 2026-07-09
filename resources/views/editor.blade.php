@@ -430,8 +430,20 @@
                     <select id="link-dst-port" class="form-control"></select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Bandwidth (bps)</label>
-                    <input type="number" id="link-bandwidth" class="form-control" min="0" placeholder="e.g. 1000000000 for 1Gbps">
+                    <label class="form-label">Bandwidth</label>
+                    <div class="input-group">
+                        <input type="number" id="link-bandwidth-value" class="form-control" min="0" step="any" placeholder="e.g. 1">
+                        <select id="link-bandwidth-unit" class="form-control" style="max-width: 120px;">
+                            <option value="bps">bps</option>
+                            <option value="Kbps">Kbps</option>
+                            <option value="Mbps">Mbps</option>
+                            <option value="Gbps">Gbps</option>
+                            <option value="KBps">KBps</option>
+                            <option value="MBps">MBps</option>
+                            <option value="GBps">GBps</option>
+                        </select>
+                    </div>
+                    <small class="form-text text-muted">Stored internally as bits per second.</small>
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Via Style</label>
@@ -633,6 +645,44 @@
 
             // Escape user-controlled strings before interpolating into innerHTML (XSS hardening).
             function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+            const BANDWIDTH_UNITS = {
+                bps: 1,
+                Kbps: 1000,
+                Mbps: 1000 * 1000,
+                Gbps: 1000 * 1000 * 1000,
+                KBps: 8 * 1000,
+                MBps: 8 * 1000 * 1000,
+                GBps: 8 * 1000 * 1000 * 1000,
+            };
+
+            function bandwidthInputsToBps(value, unit) {
+                const num = parseFloat(value);
+                if (isNaN(num) || num < 0) return null;
+                const factor = BANDWIDTH_UNITS[unit] || 1;
+                return Math.round(num * factor);
+            }
+
+            function setBandwidthInputsFromBps(bps, valueInput, unitSelect) {
+                if (!valueInput || !unitSelect) return;
+                if (!bps || isNaN(bps) || bps <= 0) {
+                    valueInput.value = '';
+                    unitSelect.value = 'bps';
+                    return;
+                }
+                const unitsBySize = ['GBps', 'Gbps', 'MBps', 'Mbps', 'KBps', 'Kbps', 'bps'];
+                for (const unit of unitsBySize) {
+                    const factor = BANDWIDTH_UNITS[unit];
+                    const val = bps / factor;
+                    if (Math.abs(val - Math.round(val)) < 0.0001 && val >= 1) {
+                        valueInput.value = Number.isInteger(val) ? val : parseFloat(val.toFixed(3));
+                        unitSelect.value = unit;
+                        return;
+                    }
+                }
+                valueInput.value = bps;
+                unitSelect.value = 'bps';
+            }
 
             function parseMapTags(raw) {
                 if (typeof raw !== 'string' || !raw.trim()) return [];
@@ -1129,6 +1179,68 @@
             // Initialize minimap on page load
             document.addEventListener('DOMContentLoaded', initMinimap);
 
+            // ========== Default Styles Live Preview ==========
+            function initDefaultStyleListeners() {
+                const nodeColor = document.getElementById('default-node-color');
+                const nodeLabelColor = document.getElementById('default-node-label-color');
+                const linkColor = document.getElementById('default-link-color');
+                const linkWidth = document.getElementById('default-link-width');
+                const linkViaStyle = document.getElementById('default-link-via-style');
+                const mapTitle = document.getElementById('map-title');
+                const mapTags = document.getElementById('map-tags');
+
+                const hexRegex = /^#[0-9a-fA-F]{6}$/;
+
+                if (nodeColor) {
+                    nodeColor.addEventListener('input', function() {
+                        if (hexRegex.test(this.value)) { renderEditor(); renderNodesList(); }
+                        markUnsaved();
+                    });
+                }
+                if (nodeLabelColor) {
+                    nodeLabelColor.addEventListener('input', function() {
+                        if (hexRegex.test(this.value)) { renderEditor(); renderNodesList(); }
+                        markUnsaved();
+                    });
+                }
+                if (linkColor) {
+                    linkColor.addEventListener('input', function() {
+                        if (hexRegex.test(this.value)) { renderEditor(); renderLinksList(); }
+                        markUnsaved();
+                    });
+                }
+                if (linkWidth) {
+                    linkWidth.addEventListener('input', function() {
+                        const w = parseFloat(this.value);
+                        if (!isNaN(w) && w >= 0.5 && w <= 20) { renderEditor(); renderLinksList(); }
+                        markUnsaved();
+                    });
+                }
+                if (linkViaStyle) {
+                    linkViaStyle.addEventListener('change', function() {
+                        renderEditor();
+                        renderLinksList();
+                        markUnsaved();
+                    });
+                }
+                if (mapTitle) {
+                    mapTitle.addEventListener('input', function() {
+                        markUnsaved();
+                    });
+                }
+                const mapName = document.getElementById('map-name');
+                if (mapName) {
+                    mapName.addEventListener('input', function() {
+                        markUnsaved();
+                    });
+                }
+                if (mapTags) {
+                    mapTags.addEventListener('input', function() {
+                        markUnsaved();
+                    });
+                }
+            }
+
             // ========== Canvas Resize Validation ==========
             function initCanvasResizeValidation() {
                 const widthInput = document.getElementById('map-width');
@@ -1141,6 +1253,9 @@
                             validateAndApplyCanvasResize(newWidth, canvas.height);
                         }
                     });
+                    widthInput.addEventListener('input', function() {
+                        markUnsaved();
+                    });
                 }
 
                 if (heightInput) {
@@ -1149,6 +1264,9 @@
                         if (newHeight && newHeight >= 100) {
                             validateAndApplyCanvasResize(canvas.width, newHeight);
                         }
+                    });
+                    heightInput.addEventListener('input', function() {
+                        markUnsaved();
                     });
                 }
             }
@@ -1193,6 +1311,7 @@
             }
 
             document.addEventListener('DOMContentLoaded', initCanvasResizeValidation);
+            document.addEventListener('DOMContentLoaded', initDefaultStyleListeners);
 
             // ========== Keyboard Shortcuts ==========
             function initKeyboardShortcuts() {
@@ -1644,6 +1763,7 @@
                     default_link_style: defaultLinkStyle,
                 };
                 const payload = {
+                    name: mapName,
                     title: mapTitle,
                     options,
                     nodes: nodes.map(n => ({
@@ -1757,7 +1877,15 @@ function populateNodeProperties(node) {
     if (card) card.style.display = 'block';
 
     // Populate label
-    if (label) label.value = node.label || '';
+    if (label) {
+        label.value = node.label || '';
+        label.oninput = function() {
+            node.label = this.value;
+            renderEditor();
+            renderNodesList();
+            markUnsaved();
+        };
+    }
 
     // Populate device dropdown from cache
     if (devSel) {
@@ -1773,6 +1901,10 @@ function populateNodeProperties(node) {
         // Update interface when device changes
         devSel.onchange = function() {
             node.deviceId = this.value ? parseInt(this.value, 10) : null;
+            node.interfaceId = null;
+            renderEditor();
+            renderNodesList();
+            markUnsaved();
             loadInterfacesForNode(node);
         };
     }
@@ -1786,6 +1918,12 @@ function loadInterfacesForNode(node) {
     if (!intSel) return;
 
     intSel.innerHTML = '<option value="">No interface</option>';
+    intSel.onchange = function() {
+        node.interfaceId = this.value ? parseInt(this.value, 10) : null;
+        renderEditor();
+        renderNodesList();
+        markUnsaved();
+    };
     if (!node.deviceId) return;
 
     fetch('{{ url('plugin/WeathermapNG/api/device') }}/' + node.deviceId + '/ports')
@@ -1939,14 +2077,15 @@ function openLinkModal(linkIndex) {
     const dstNode = findNodeById(link.dstId);
     const srcPortSelect = document.getElementById('link-src-port');
     const dstPortSelect = document.getElementById('link-dst-port');
-    const bandwidthInput = document.getElementById('link-bandwidth');
+    const bandwidthValue = document.getElementById('link-bandwidth-value');
+    const bandwidthUnit = document.getElementById('link-bandwidth-unit');
     const deleteBtn = document.getElementById('delete-link-btn');
     const viaStyleSelect = document.getElementById('link-via-style');
 
     // Reset dropdowns
     srcPortSelect.innerHTML = '<option value="">Select port...</option>';
     dstPortSelect.innerHTML = '<option value="">Select port...</option>';
-    bandwidthInput.value = link.bw || '';
+    setBandwidthInputsFromBps(link.bw, bandwidthValue, bandwidthUnit);
     viaStyleSelect.value = (link.style && link.style.via_style) || 'straight';
     deleteBtn.style.display = 'inline-block';
 
@@ -1996,13 +2135,18 @@ function saveLink() {
 
     link.portA = document.getElementById('link-src-port').value || null;
     link.portB = document.getElementById('link-dst-port').value || null;
-    link.bw = parseInt(document.getElementById('link-bandwidth').value, 10) || null;
+    link.bw = bandwidthInputsToBps(
+        document.getElementById('link-bandwidth-value').value,
+        document.getElementById('link-bandwidth-unit').value
+    );
     const viaStyle = document.getElementById('link-via-style').value || 'straight';
     if (!link.style) link.style = {};
     link.style.via_style = viaStyle;
 
     $('#linkModal').modal('hide');
     currentLinkIndex = null;
+    markUnsaved();
+    renderEditor();
     renderLinksList();
     WMNGToast.success('Link updated!', { duration: 2000 });
 }
