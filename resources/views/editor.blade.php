@@ -1757,7 +1757,14 @@ function populateNodeProperties(node) {
     if (card) card.style.display = 'block';
 
     // Populate label
-    if (label) label.value = node.label || '';
+    if (label) {
+        label.value = node.label || '';
+        label.oninput = function() {
+            node.label = this.value;
+            renderEditor();
+            renderNodesList();
+        };
+    }
 
     // Populate device dropdown from cache
     if (devSel) {
@@ -1773,6 +1780,9 @@ function populateNodeProperties(node) {
         // Update interface when device changes
         devSel.onchange = function() {
             node.deviceId = this.value ? parseInt(this.value, 10) : null;
+            node.interfaceId = null;
+            renderEditor();
+            renderNodesList();
             loadInterfacesForNode(node);
         };
     }
@@ -1786,6 +1796,11 @@ function loadInterfacesForNode(node) {
     if (!intSel) return;
 
     intSel.innerHTML = '<option value="">No interface</option>';
+    intSel.onchange = function() {
+        node.interfaceId = this.value ? parseInt(this.value, 10) : null;
+        renderEditor();
+        renderNodesList();
+    };
     if (!node.deviceId) return;
 
     fetch('{{ url('plugin/WeathermapNG/api/device') }}/' + node.deviceId + '/ports')
