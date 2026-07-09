@@ -1,28 +1,37 @@
-Fixes correctness and security regressions found in a follow-up audit after #22.
+# Post-Audit Round 2: Security Hardening & Service Correctness
 
-## What #22 fixed
-- Node label live-preview, link bandwidth units, and map dimension inputs now wire `markUnsaved()`.
-- Existing-map saves include and persist `name`.
-- SaveMapRequest sanitizes `name`/`title` and trims node labels; MapService persists `name` when present.
-- Node/link numeric casts updated upstream.
+## Summary
 
-## Findings from this audit + fixes in this PR
+Follow-up fixes from the second round of read-only agent reviews. Addresses IDOR, information disclosure, service correctness, and model safety bugs discovered after PR #22/#23.
 
-| Severity | Issue | Fix |
-|---|---|---|
-| High | `embed.blade.php` injected `json_encode()` raw into a `<script>` block; user-controlled map/node/link strings (e.g. a node label containing `<!--`) could break JS parsing or open XSS. | Replaced all `{!! json_encode(...) !!}` in the embed script block with `@json(...)`, which uses Laravel's HTML/hex escaping. |
-| Medium | `SaveMapRequest` `name` rule required ASCII-only slugs, so existing legacy maps with dots/Unicode names could no longer be saved. | Relaxed to `nullable|string|max:255`; create-time restrictions remain on `CreateMapRequest`. Trailing whitespace is still trimmed in `prepareForValidation()`. |
-| Medium | `SaveMapRequest` only allow-listed `via_style`/`via_points` inside `links.*.style`; existing rows that store `color`/`width` failed validation on load-then-save. | Allow-listed and validated `color`/`width`, with matching sanitization. Updated the error message. |
-| Medium | `MapService::resolveNodeId()` fell back to the raw numeric client ID when the new node map missed it, allowing cross-map/orphan links. | Removed the numeric fallback; unresolved IDs become `null`. |
-| Medium | Embed canvas always fell back to hard-coded `#ffffff`, ignoring configured map background color. | Uses `mapData.background` as fallback fill. |
+## Changes
 
-## Tests
-- `MapRequestRulesTest`: updated name-rule assertion; added assertions for link-style `color`/`width` rules and the resolved-node-id removal.
-- `SanitizationTest`: updated the link-style sanitizer mirror to strip unknown keys and sanitize `color`/`width`; added coverage for out-of-range width removal and HTML-stripped color.
-- `UIEmbedKioskTest`: updated to expect `@json(...)` directives.
-- Full PHPUnit suite: **263 tests, 876 assertions, 0 failures** (1 skipped).
-- Container smoke: login → editor load → map JSON fetch → embed render → save with legacy Unicode/dot name and `<!--` label node succeeds; dev fixture restored from the latest map version afterwards.
+### Auth & IDOR
+- **MapVersionController**: Added `requireAdmin()` to `index()` and `show()` — all version endpoints are now admin-gated (restore/destroy/compare/export already had it)
+- **MapVersionController::show**: Nullsafe creator access (`$version->creator?->name`) to prevent null errors
+- **HealthController::live**: Removed `getmypid()` from response — public endpoint was leaking process ID
+- **HealthController::ready**: Genericized error message in JSON response (raw exception still logged server-side)
+- **HealthController::checkDatabase**: Genericized error message — public `/health` endpoint no longer leaks DB connection errors
+- **HealthController::checkConfiguration**: Genericized message — no longer reveals whether API token is configured
+- **RenderController::sse**: Clamped `max` parameter to `[5, 600]` seconds — prevents clients from holding connections open indefinitely
 
-## Not addressed here
-- 0-bandwidth semantics remain as-is pending product decision.
-- Low-priority embed/kiosk URL regex/routing cleanups and map-tags duplicate listeners were scoped out to keep this PR clean.
+### Service Correctness
+- **MapVersionService::getVersion**: Scoped by `map_id` to prevent cross-map version access
+- **MapVersionService::restoreVersion**: Whitelisted snapshot fields via `array_intersect_key` for both nodes and links — prevents mass-assignment of unexpected fields through `forceCreate`
+- **MapService::createNodes**: Guard `meta` with `is_array()` check — prevents non-array values from breaking JSON cast
+- **MapService::updateMapProperties**: Guard `title` and `name` with `is_string()` + `trim()` check — rejects null, non-string, and whitespace-only values; added `name` to early-return condition so name-only updates aren't skipped
+- **MapService::mergeMapOptions**: Replaced `array_merge` with recursive merge — nested option arrays (`default_node_style`/`default_link_style`) are now merged instead of replaced wholesale
+- **MapService::createLinks**: Log dropped links with `Log::warning` when node references can't be resolved — previously silently discarded
+
+### Model Safety
+- **Node::convertStatusToString**: Guard against null `$status` (returns `'unknown'`) and cast to string before `strtolower` — prevents TypeError on null/non-string status
+- **Node::fetchDevice**: Restricted Eloquent query to `['device_id', 'hostname', 'status']` columns; use `->toArray()` instead of `(array)` cast (which exposes protected properties, not attributes)
+- **Node::preloadDevices**: Use `->toArray()` for Eloquent model conversion
+
+### Tests
+- Added `PostAudit2SecurityTest` with 21 regression tests covering all fixes
+- Updated `MapRequestRulesTest` to match new trimmed name guard pattern
+
+## Test Results
+- 289 tests, 913 assertions, 1 skipped — all passing
+- Container smoke: `/live` (no PID), `/ready` (generic error), `/health` (no API token leak), version index (admin-gated)

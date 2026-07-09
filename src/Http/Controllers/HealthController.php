@@ -155,7 +155,7 @@ class HealthController
 
             return response()->json([
                 'ready' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Readiness check failed',
                 'timestamp' => now()->toISOString()
             ], 503);
         }
@@ -169,8 +169,7 @@ class HealthController
     {
         return response()->json([
             'alive' => true,
-            'timestamp' => now()->toISOString(),
-            'pid' => getmypid()
+            'timestamp' => now()->toISOString()
         ]);
     }
 
@@ -362,7 +361,7 @@ class HealthController
             $this->getLogger()->error('Health check database failure', ['error' => $exception->getMessage()]);
             return [
                 'status' => 'unhealthy',
-                'message' => 'Database connection failed: ' . $exception->getMessage()
+                'message' => 'Database connection failed'
             ];
         }
     }
@@ -442,7 +441,7 @@ class HealthController
         // API token check
         $apiToken = config('weathermapng.api_token');
         if (!$apiToken) {
-            $issues[] = 'API token not configured (API fallback may not work)';
+            $issues[] = 'Configuration incomplete (API fallback may not work)';
         }
 
         if (empty($issues)) {

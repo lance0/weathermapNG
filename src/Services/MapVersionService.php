@@ -43,16 +43,20 @@ class MapVersionService
             $map->nodes()->delete();
 
             if (isset($snapshot['nodes']) && is_array($snapshot['nodes'])) {
+                $allowedNode = array_flip(['id', 'label', 'x', 'y', 'device_id', 'meta']);
                 foreach ($snapshot['nodes'] as $nodeData) {
-                    $data = array_merge(['map_id' => $mapId], $nodeData);
+                    if (!is_array($nodeData)) continue;
+                    $data = array_merge(['map_id' => $mapId], array_intersect_key($nodeData, $allowedNode));
                     // forceCreate bypasses fillable to preserve the original id.
                     Node::forceCreate($data);
                 }
             }
 
             if (isset($snapshot['links']) && is_array($snapshot['links'])) {
+                $allowedLink = array_flip(['id', 'src_node_id', 'dst_node_id', 'port_id_a', 'port_id_b', 'bandwidth_bps', 'style']);
                 foreach ($snapshot['links'] as $linkData) {
-                    $data = array_merge(['map_id' => $mapId], $linkData);
+                    if (!is_array($linkData)) continue;
+                    $data = array_merge(['map_id' => $mapId], array_intersect_key($linkData, $allowedLink));
                     Link::forceCreate($data);
                 }
             }
@@ -102,7 +106,7 @@ class MapVersionService
 
     public function getVersion(Map $map, int $versionId): ?MapVersion
     {
-        return MapVersion::find($versionId);
+        return MapVersion::where('map_id', $map->id)->find($versionId);
     }
 
     public function getLatestVersion(Map $map): ?MapVersion

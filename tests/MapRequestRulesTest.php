@@ -22,7 +22,7 @@ class MapRequestRulesTest extends TestCase
     public function test_map_service_updates_name_when_present(): void
     {
         $content = file_get_contents(__DIR__ . '/../src/Services/MapService.php');
-        $this->assertStringContainsString("array_key_exists('name', \$data) && \$data['name'] !== null && \$data['name'] !== ''", $content);
+        $this->assertStringContainsString("array_key_exists('name', \$data) && is_string(\$data['name']) && trim(\$data['name']) !== ''", $content);
     }
 
     public function test_save_map_request_allows_partial_default_styles(): void

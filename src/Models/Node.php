@@ -64,7 +64,7 @@ class Node extends Model
                 ->get(['device_id', 'hostname', 'status'])
                 ->keyBy('device_id');
             foreach ($devices as $deviceId => $device) {
-                self::$deviceCache[$deviceId] = (array) $device;
+                self::$deviceCache[$deviceId] = $device->toArray();
             }
         } else {
             $devices = DB::table('devices')
@@ -116,8 +116,9 @@ class Node extends Model
     private function fetchDevice(int $deviceId): ?array
     {
         if (class_exists('App\\Models\\Device')) {
-            $device = \App\Models\Device::find($deviceId);
-            return $device ? (array) $device : null;
+            $device = \App\Models\Device::where('device_id', $deviceId)
+                ->first(['device_id', 'hostname', 'status']);
+            return $device ? $device->toArray() : null;
         }
 
         $row = dbFetchRow("SELECT hostname, status FROM devices WHERE device_id = ?", [$deviceId]);
@@ -137,11 +138,14 @@ class Node extends Model
 
     private function convertStatusToString($status): string
     {
+        if ($status === null) {
+            return 'unknown';
+        }
         if (is_numeric($status)) {
             return (int) $status === 1 ? 'up' : 'down';
         }
 
-        $statusLower = strtolower($status);
+        $statusLower = strtolower((string) $status);
         return $statusLower === 'up' ? 'up' : 'down';
     }
 
