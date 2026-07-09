@@ -21,6 +21,8 @@ class SaveMapRequest extends FormRequest
             'options.width' => 'nullable|integer|min:100|max:4096',
             'options.height' => 'nullable|integer|min:100|max:4096',
             'options.background' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'options.tags' => 'nullable|array|max:50',
+            'options.tags.*' => 'nullable|string|max:50|regex:/^[a-z0-9_-]+$/i',
 
             // Keys must be present (empty arrays are intentional clears).
             'nodes' => 'required|array|max:2000',
@@ -65,6 +67,9 @@ class SaveMapRequest extends FormRequest
             'options.height.min' => 'Height must be at least 100 pixels',
             'options.height.max' => 'Height must not exceed 4096 pixels',
             'options.background.regex' => 'Background must be a valid hex color (e.g., #ffffff)',
+            'options.tags.max' => 'A map cannot have more than 50 tags',
+            'options.tags.*.max' => 'Each tag must not exceed 50 characters',
+            'options.tags.*.regex' => 'Tags may only contain letters, numbers, hyphens and underscores',
             'links.*.style.array' => 'Link style may only contain via_style and via_points',
             'links.*.style.via_style.in' => 'Via style must be straight, angled, or curved',
             'links.*.style.via_points.*.x.numeric' => 'Via point x must be numeric',
@@ -117,6 +122,12 @@ class SaveMapRequest extends FormRequest
     {
         if (isset($data['title']) && is_string($data['title'])) {
             $data['title'] = strip_tags($data['title']);
+        }
+
+        if (!empty($data['options']['tags']) && is_array($data['options']['tags'])) {
+            $tags = array_map(fn($t) => is_string($t) ? strtolower(strip_tags(trim($t))) : '', $data['options']['tags']);
+            $tags = array_values(array_unique(array_filter($tags, fn($t) => $t !== '')));
+            $data['options']['tags'] = $tags;
         }
 
         if (!empty($data['nodes']) && is_array($data['nodes'])) {

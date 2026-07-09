@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Map tags and filtering**: assign lowercase tags to maps from the editor; tags are stored in `wmng_maps.options`. The index view shows tag chips on each card and a tag filter dropdown. Tags are normalized, trimmed, and deduplicated on save.
+- **First-run onboarding**: when no maps exist, the index view now shows links to Templates, Create Custom Map, Import Map, Diagnostics, and Docs instead of only a create button.
 - **Operational diagnostics page** for administrators: `/plugin/WeathermapNG/diagnostics` shows overall health, map/node/link counts, per-check status (database, filesystem, dependencies, configuration, performance), route registration, and writable-path checks. Linked from **Network Maps → Diagnostics** for admin users.
 - **NOC wall / kiosk mode** for embed view: add `?kiosk=1` to hide all chrome (nav, controls, legend, minimap, status bar), auto-hide the cursor, and reveal UI briefly on mouse/key activity. Press `Esc` to toggle chrome; click **Exit Kiosk** to return to the normal embed view.
 - **Map auto-cycling** in kiosk mode: add `?cycle=N` (minimum 5 seconds) to rotate through maps alphabetically. Cycle URLs preserve kiosk state and target settings.
