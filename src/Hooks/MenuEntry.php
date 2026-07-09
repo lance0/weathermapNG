@@ -27,12 +27,27 @@ class MenuEntry implements MenuEntryHook
             // Tables might not exist yet
         }
 
+        // Determine admin status using the same fallbacks as AdminCheck
+        $user = auth()->user();
+        $isAdmin = false;
+        if ($user) {
+            if ((method_exists($user, 'hasGlobalAdmin') && $user->hasGlobalAdmin())
+                || (method_exists($user, 'isAdmin') && $user->isAdmin())
+                || (isset($user->level) && $user->level >= 10)
+                || (method_exists($user, 'hasRole') && $user->hasRole('admin'))
+            ) {
+                $isAdmin = true;
+            }
+        }
+
         // Return view name with plugin namespace and data
         return ["{$pluginName}::menu", [
             'title' => 'Network Maps',
             'url' => url('plugin/WeathermapNG'),
             'icon' => 'fa-network-wired',
-            'badge' => $mapCount > 0 ? $mapCount : null,
+            'map_count' => $mapCount > 0 ? $mapCount : null,
+            'is_admin' => $isAdmin,
+            'diagnostics_url' => url('plugin/WeathermapNG/diagnostics'),
         ]];
     }
 }

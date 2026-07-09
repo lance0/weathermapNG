@@ -357,9 +357,22 @@ php artisan view:clear
 
 **Rollback.** To roll back to a previous version, `git checkout <tag>` in the plugin directory and re-run `composer install --no-dev && php artisan package:discover && php artisan optimize:clear`. Database tables from the newer version remain but are harmless — no down migrations are needed.
 
+## Diagnostics Page
+
+Administrators can open **Network Maps → Diagnostics** (or visit `/plugin/WeathermapNG/diagnostics`) to see a consolidated operational status panel:
+
+- Overall health status and plugin version
+- Map/node/link counts and estimated DB size
+- Per-check results for database, filesystem, dependencies, configuration, and performance
+- Registered-route status
+- Writable-path checks
+
+Use the diagnostics page as the first stop when something feels broken. If a route is shown as **Missing**, run `php artisan package:discover` and `php artisan route:clear`. If the database check fails, re-run `database/setup.php`. If a path is not writable, check that the plugin directory and `output/maps/` are owned by the LibreNMS runtime user.
+
 ## Verifying Installation
 
 1. Check the menu for "Network Maps" entry
 2. Visit `/plugin/WeathermapNG`
-3. Run `php artisan route:list | grep -iE 'weathermap|wmng'`
-4. Try creating a test map
+3. As an admin, visit **Network Maps → Diagnostics** and confirm all checks are healthy
+4. Run `php artisan route:list | grep -iE 'weathermap|wmng'`
+5. Try creating a test map
