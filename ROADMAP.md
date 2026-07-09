@@ -2,27 +2,30 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-*Last reviewed v1.8.0 (2026-07-08) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+*Last reviewed v1.9.0 (2026-07-09) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.8.0 (Stable)
+## Current Status: v1.9.0 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, and editor workflows in place, plus waves of performance, authorization, correctness, and install hardening landed in v1.7.0–v1.8.0:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.9.0:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
 - Dark/light theme auto-detection to match LibreNMS
 - Real-time traffic visualization using LibreNMS RRD data
 - Flow animations with particle effects
-- Map versioning with editor UI (save, restore, compare, delete) activated in v1.8.0
+- Map versioning with editor UI (save, restore, compare, delete)
 - Server-Sent Events for live updates
-- Embeddable views with navigation bar
+- Embeddable views with navigation bar and NOC wall / kiosk mode with map cycling
+- Operational diagnostics page for administrators
+- Map tags, filtering, and first-run onboarding
+- Per-map default styles for nodes and links
 - Demo mode for testing
 - Device-type node icons: router, switch, server, firewall
 - Composer path package install flow for LibreNMS
 - Weekly/manual install CI coverage against LibreNMS
 - Idempotent LibreNMS plugin registration cleanup during reinstall
 
-The next phase should focus on polish, reliability, and maintainability before large new features. The project already has enough capability to be useful; the main opportunity is making the existing workflows feel dependable and finished.
+The next phase should close the biggest operator gaps vs legacy weathermap tools: click-through navigation to LibreNMS device pages and RRD graph hover popups.
 
 ---
 
