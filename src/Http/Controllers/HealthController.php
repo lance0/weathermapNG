@@ -9,6 +9,7 @@ use LibreNMS\Plugins\WeathermapNG\Services\DevicePortLookup;
 use LibreNMS\Plugins\WeathermapNG\Services\Logger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 
 class HealthController
 {
@@ -177,6 +178,89 @@ class HealthController
      * Prometheus metrics endpoint
      * GET /plugin/WeathermapNG/metrics
      */
+    public function diagnostics(): \Illuminate\View\View
+    {
+        $this->requireAdmin();
+
+        $health = $this->check()->getData(true);
+
+        $stats = [
+            'maps' => 0,
+            'nodes' => 0,
+            'links' => 0,
+            'database_size' => 'Unknown',
+        ];
+        try {
+            $stats['maps'] = Map::count();
+            $stats['nodes'] = DB::table('wmng_nodes')->count();
+            $stats['links'] = DB::table('wmng_links')->count();
+            $stats['database_size'] = $this->getDatabaseSize();
+        } catch (\Exception $e) {
+            $stats['error'] = 'Unable to query statistics: ' . $e->getMessage();
+        }
+
+        $checks = [
+            'database' => $this->checkDatabase(),
+            'filesystem' => $this->checkFilesystem(),
+            'dependencies' => $this->checkDependencies(),
+            'configuration' => $this->checkConfiguration(),
+            'performance' => $this->getPerformanceMetrics(),
+        ];
+
+        $routes = [
+            ['name' => 'Index', 'route' => 'weathermapng.index', 'method' => 'GET', 'url' => route('weathermapng.index')],
+            ['name' => 'Embed', 'route' => 'weathermapng.embed', 'method' => 'GET'],
+            ['name' => 'Map JSON', 'route' => 'weathermapng.json', 'method' => 'GET'],
+            ['name' => 'Live data', 'route' => 'weathermapng.live', 'method' => 'GET'],
+            ['name' => 'Save map', 'route' => 'weathermapng.map.save', 'method' => 'POST'],
+            ['name' => 'Health check', 'route' => 'weathermapng.health', 'method' => 'GET', 'url' => route('weathermapng.health')],
+            ['name' => 'Health detailed', 'route' => 'weathermapng.health.detailed', 'method' => 'GET', 'url' => route('weathermapng.health.detailed')],
+            ['name' => 'Health stats', 'route' => 'weathermapng.health.stats', 'method' => 'GET', 'url' => route('weathermapng.health.stats')],
+            ['name' => 'Metrics', 'route' => 'weathermapng.metrics', 'method' => 'GET', 'url' => route('weathermapng.metrics')],
+            ['name' => 'Diagnostics', 'route' => 'weathermapng.diagnostics', 'method' => 'GET', 'url' => route('weathermapng.diagnostics')],
+        ];
+
+        $routeStatus = array_map(function ($r) {
+            if (!Route::has($r['route'])) {
+                $r['url'] = '#';
+                $r['status'] = 'missing';
+                return $r;
+            }
+            // Parameterized routes are registered; don't try to synthesize a URL.
+            if (!isset($r['url'])) {
+                $r['url'] = '#';
+            }
+            $r['status'] = 'ok';
+            return $r;
+        }, $routes);
+
+        $writablePaths = [
+            'output/maps' => config('weathermapng.output_dir', __DIR__ . '/../../../output/maps/'),
+            'resources/output' => __DIR__ . '/../../../resources/output/',
+            'storage' => __DIR__ . '/../../../storage/',
+        ];
+
+        $pathStatus = [];
+        foreach ($writablePaths as $label => $path) {
+            $resolved = realpath($path) ?: $path;
+            $pathStatus[$label] = [
+                'path' => $resolved,
+                'exists' => is_dir($resolved),
+                'writable' => is_writable($resolved),
+            ];
+        }
+
+        return view('WeathermapNG::diagnostics', [
+            'version' => $this->getVersion(),
+            'overallStatus' => $health['status'] ?? 'unknown',
+            'checks' => $checks,
+            'stats' => $stats,
+            'routes' => $routeStatus,
+            'paths' => $pathStatus,
+            'librenmsVersion' => config('librenms.version', 'unknown'),
+        ]);
+    }
+
     public function metrics(): \Illuminate\Http\Response
     {
         $this->requireAdmin();

@@ -63,6 +63,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('plugin/WeathermapNG/health/detailed', [HealthController::class, 'detailed'])->name('weathermapng.health.detailed');
     Route::get('plugin/WeathermapNG/health/stats', [HealthController::class, 'stats'])->name('weathermapng.health.stats');
     Route::get('plugin/WeathermapNG/metrics', [HealthController::class, 'metrics'])->name('weathermapng.metrics');
+    Route::get('plugin/WeathermapNG/diagnostics', [HealthController::class, 'diagnostics'])->name('weathermapng.diagnostics');
 });
 
 Route::prefix('plugin/WeathermapNG')->group(function () {
