@@ -27,6 +27,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies
 - **Map Tags & Filtering**: Organize maps with tags from the editor and filter the index gallery by tag
+- **Per-Map Default Styles**: Configure default node/link colors and link width/via style per map; stored in map options and applied at render time without mutating node/link data
 - **Operational Diagnostics**: Admin page with health checks, route registration, writable paths, and resource counts
 - **Map Versioning**: Snapshot storage, history, restore, compare, and delete workflows
 
@@ -64,7 +65,7 @@ See [INSTALL.md](INSTALL.md) for details and sample topologies.
 
 1. **Open the plugin** at `https://your-librenms/plugin/WeathermapNG`
 2. **Create a map** — click "Create New Map", pick a template, or import an existing map
-3. **Configure** the name, title, dimensions, and tags
+3. **Configure** the name, title, dimensions, tags, and default node/link styles
 4. **Design** in the canvas editor: add devices from the right sidebar, drag to position, draw links between nodes
 5. **Save** — your map is live with real-time traffic data
 6. **Troubleshoot** via the admin **Diagnostics** page if anything looks off

@@ -14,11 +14,16 @@ class MapService
 {
     public function createMap(array $data): Map
     {
-        $options = [
+        $allowedOptionKeys = ['background', 'tags', 'default_node_style', 'default_link_style'];
+        $incomingOptions = !empty($data['options']) && is_array($data['options'])
+            ? array_intersect_key($data['options'], array_flip($allowedOptionKeys))
+            : [];
+
+        $options = array_merge([
             'width' => $data['width'] ?? 800,
             'height' => $data['height'] ?? 600,
             'background' => '#ffffff',
-        ];
+        ], $incomingOptions);
 
         return Map::create([
             'name' => $data['name'],

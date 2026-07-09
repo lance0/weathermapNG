@@ -45,6 +45,18 @@ class Map extends Model
         return array_values(array_unique(array_filter($normalized, fn($t) => $t !== '')));
     }
 
+    public function getDefaultNodeStyleAttribute(): array
+    {
+        $style = data_get($this->options, 'default_node_style', []);
+        return is_array($style) ? $style : [];
+    }
+
+    public function getDefaultLinkStyleAttribute(): array
+    {
+        $style = data_get($this->options, 'default_link_style', []);
+        return is_array($style) ? $style : [];
+    }
+
     public function toJsonModel()
     {
         // Prime batch caches so accessor-backed fields (device_name, status,

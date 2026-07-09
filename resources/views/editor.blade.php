@@ -349,6 +349,38 @@
             </div>
         </div>
 
+        <!-- Default Styles -->
+        <div class="panel">
+            <div class="panel-header"><i class="fas fa-paint-brush mr-1"></i> Default Styles</div>
+            <div class="panel-body">
+                <div class="form-group mb-2">
+                    <label class="form-label" for="default-node-color">Node Color</label>
+                    <input type="text" class="form-control form-control-sm" id="default-node-color" placeholder="#28a745" aria-label="Default node color">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="default-node-label-color">Node Label Color</label>
+                    <input type="text" class="form-control form-control-sm" id="default-node-label-color" placeholder="#212529" aria-label="Default node label color">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="default-link-color">Link Color</label>
+                    <input type="text" class="form-control form-control-sm" id="default-link-color" placeholder="#6c757d" aria-label="Default link color">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="default-link-width">Link Width</label>
+                    <input type="number" class="form-control form-control-sm" id="default-link-width" min="0.5" max="20" step="0.5" placeholder="2" aria-label="Default link width">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="default-link-via-style">Link Style</label>
+                    <select class="form-control form-control-sm" id="default-link-via-style" aria-label="Default link via style">
+                        <option value="">Use site default</option>
+                        <option value="straight">Straight</option>
+                        <option value="angled">Angled</option>
+                        <option value="curved">Curved</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <!-- Nodes List -->
         <div class="panel">
             <div class="panel-header"><i class="fas fa-sitemap mr-1"></i> Nodes <span class="badge badge-secondary float-right" id="nodes-badge">0</span></div>
@@ -624,6 +656,54 @@
                 renderMapTagsPreview(parseMapTags(e.target.value));
             });
 
+            function getDefaultNodeStyle() {
+                const colorInput = document.getElementById('default-node-color');
+                const labelColorInput = document.getElementById('default-node-label-color');
+                const style = {};
+                if (colorInput && /^#[0-9a-fA-F]{6}$/.test(colorInput.value)) {
+                    style.color = colorInput.value.trim().toLowerCase();
+                }
+                if (labelColorInput && /^#[0-9a-fA-F]{6}$/.test(labelColorInput.value)) {
+                    style.label_color = labelColorInput.value.trim().toLowerCase();
+                }
+                return style;
+            }
+
+            function getDefaultLinkStyle() {
+                const colorInput = document.getElementById('default-link-color');
+                const widthInput = document.getElementById('default-link-width');
+                const viaStyleSelect = document.getElementById('default-link-via-style');
+                const style = {};
+                if (colorInput && /^#[0-9a-fA-F]{6}$/.test(colorInput.value)) {
+                    style.color = colorInput.value.trim().toLowerCase();
+                }
+                if (widthInput && widthInput.value !== '') {
+                    const width = parseFloat(widthInput.value);
+                    if (!isNaN(width) && width >= 0.5 && width <= 20) {
+                        style.width = width;
+                    }
+                }
+                if (viaStyleSelect && viaStyleSelect.value) {
+                    style.via_style = viaStyleSelect.value;
+                }
+                return style;
+            }
+
+            function populateDefaultStyles(options = {}) {
+                const dns = options.default_node_style || {};
+                const dls = options.default_link_style || {};
+                const nodeColor = document.getElementById('default-node-color');
+                if (nodeColor) nodeColor.value = dns.color || '';
+                const nodeLabelColor = document.getElementById('default-node-label-color');
+                if (nodeLabelColor) nodeLabelColor.value = dns.label_color || '';
+                const linkColor = document.getElementById('default-link-color');
+                if (linkColor) linkColor.value = dls.color || '';
+                const linkWidth = document.getElementById('default-link-width');
+                if (linkWidth) linkWidth.value = (dls.width !== undefined && dls.width !== null) ? dls.width : '';
+                const linkViaStyle = document.getElementById('default-link-via-style');
+                if (linkViaStyle) linkViaStyle.value = dls.via_style || '';
+            }
+
             function initCanvas() {
                 canvas = document.getElementById('map-canvas');
                 if (!canvas) return;
@@ -845,16 +925,17 @@
 
             function drawNode(node) {
                 const radius = 12;
+                const defaultNodeStyle = getDefaultNodeStyle();
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
 
-                // Color based on state: link start (orange), selected (blue), normal (green)
+                // Color based on state: link start (orange), selected (blue), normal (default or green)
                 if (linkMode && linkStart === node) {
                     ctx.fillStyle = '#fd7e14'; // Orange for link start
                 } else if (node === selectedNode) {
                     ctx.fillStyle = '#0d6efd'; // Blue for selected
                 } else {
-                    ctx.fillStyle = '#28a745'; // Green for normal
+                    ctx.fillStyle = defaultNodeStyle.color || '#28a745';
                 }
                 ctx.fill();
 
@@ -881,7 +962,7 @@
                 ctx.lineWidth = 3;
                 ctx.strokeText(node.label || 'Node', node.x, node.y - 18);
 
-                ctx.fillStyle = isDarkTheme ? '#f8f9fa' : '#212529';
+                ctx.fillStyle = defaultNodeStyle.label_color || (isDarkTheme ? '#f8f9fa' : '#212529');
                 ctx.fillText(node.label || 'Node', node.x, node.y - 18);
             }
 
@@ -890,8 +971,9 @@
                 const dst = findNodeById(link.dstId);
                 if (!src || !dst) return;
 
+                const defaultLinkStyle = getDefaultLinkStyle();
                 const viaPoints = (link.style && link.style.via_points) || [];
-                const viaStyle = (link.style && link.style.via_style) || editorConfig.link_style;
+                const viaStyle = (link.style && link.style.via_style) || defaultLinkStyle.via_style || editorConfig.link_style;
                 const points = [{x: src.x, y: src.y}];
                 for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
                 points.push({x: dst.x, y: dst.y});
@@ -919,8 +1001,8 @@
                     }
                 }
 
-                ctx.strokeStyle = '#6c757d';
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = (link.style && link.style.color) ? link.style.color : (defaultLinkStyle.color || '#6c757d');
+                ctx.lineWidth = (link.style && link.style.width) ? link.style.width : (defaultLinkStyle.width || 2);
                 ctx.stroke();
 
                 // Store segments for hit-testing
@@ -1328,6 +1410,8 @@
                         renderMapTagsPreview(data.options.tags);
                     }
 
+                    populateDefaultStyles(data.options);
+
                     if (data.width && canvas) canvas.width = data.width;
                     if (data.height && canvas) canvas.height = data.height;
 
@@ -1509,7 +1593,12 @@
 
                 if (!mapId) {
                     WMNGLoading.show('Creating map...');
-                    const payload = { name: mapName, title: mapTitle, width: mapWidth, height: mapHeight };
+                    const createOptions = {
+                        tags: parseMapTags(document.getElementById('map-tags')?.value),
+                        default_node_style: getDefaultNodeStyle(),
+                        default_link_style: getDefaultLinkStyle(),
+                    };
+                    const payload = { name: mapName, title: mapTitle, width: mapWidth, height: mapHeight, options: createOptions };
                     fetch('{{ url("plugin/WeathermapNG/map") }}', {
                         method: 'POST',
                         headers: baseHeaders,
@@ -1545,13 +1634,18 @@
                 }
 
                 WMNGLoading.show('Saving map...');
+                const defaultNodeStyle = getDefaultNodeStyle();
+                const defaultLinkStyle = getDefaultLinkStyle();
+                const options = {
+                    width: mapWidth,
+                    height: mapHeight,
+                    tags: parseMapTags(document.getElementById('map-tags')?.value),
+                    default_node_style: defaultNodeStyle,
+                    default_link_style: defaultLinkStyle,
+                };
                 const payload = {
                     title: mapTitle,
-                    options: {
-                        width: mapWidth,
-                        height: mapHeight,
-                        tags: parseMapTags(document.getElementById('map-tags')?.value),
-                    },
+                    options,
                     nodes: nodes.map(n => ({
                         id: n.id,
                         label: n.label,
@@ -1605,12 +1699,19 @@ function exportJson() {
     const mapWidth = parseInt(document.getElementById('map-width').value, 10) || 800;
     const mapHeight = parseInt(document.getElementById('map-height').value, 10) || 600;
 
+    const defaultNodeStyle = getDefaultNodeStyle();
+    const defaultLinkStyle = getDefaultLinkStyle();
     const exportData = {
         name: mapName,
         title: mapTitle,
         width: mapWidth,
         height: mapHeight,
-        options: { width: mapWidth, height: mapHeight },
+        options: {
+            width: mapWidth,
+            height: mapHeight,
+            default_node_style: defaultNodeStyle,
+            default_link_style: defaultLinkStyle,
+        },
         nodes: nodes.map(n => ({
             id: n.id,
             label: n.label,
