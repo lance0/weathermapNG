@@ -1179,6 +1179,68 @@
             // Initialize minimap on page load
             document.addEventListener('DOMContentLoaded', initMinimap);
 
+            // ========== Default Styles Live Preview ==========
+            function initDefaultStyleListeners() {
+                const nodeColor = document.getElementById('default-node-color');
+                const nodeLabelColor = document.getElementById('default-node-label-color');
+                const linkColor = document.getElementById('default-link-color');
+                const linkWidth = document.getElementById('default-link-width');
+                const linkViaStyle = document.getElementById('default-link-via-style');
+                const mapTitle = document.getElementById('map-title');
+                const mapTags = document.getElementById('map-tags');
+
+                const hexRegex = /^#[0-9a-fA-F]{6}$/;
+
+                if (nodeColor) {
+                    nodeColor.addEventListener('input', function() {
+                        if (hexRegex.test(this.value)) { renderEditor(); renderNodesList(); }
+                        markUnsaved();
+                    });
+                }
+                if (nodeLabelColor) {
+                    nodeLabelColor.addEventListener('input', function() {
+                        if (hexRegex.test(this.value)) { renderEditor(); renderNodesList(); }
+                        markUnsaved();
+                    });
+                }
+                if (linkColor) {
+                    linkColor.addEventListener('input', function() {
+                        if (hexRegex.test(this.value)) { renderEditor(); renderLinksList(); }
+                        markUnsaved();
+                    });
+                }
+                if (linkWidth) {
+                    linkWidth.addEventListener('input', function() {
+                        const w = parseFloat(this.value);
+                        if (!isNaN(w) && w >= 0.5 && w <= 20) { renderEditor(); renderLinksList(); }
+                        markUnsaved();
+                    });
+                }
+                if (linkViaStyle) {
+                    linkViaStyle.addEventListener('change', function() {
+                        renderEditor();
+                        renderLinksList();
+                        markUnsaved();
+                    });
+                }
+                if (mapTitle) {
+                    mapTitle.addEventListener('input', function() {
+                        markUnsaved();
+                    });
+                }
+                const mapName = document.getElementById('map-name');
+                if (mapName) {
+                    mapName.addEventListener('input', function() {
+                        markUnsaved();
+                    });
+                }
+                if (mapTags) {
+                    mapTags.addEventListener('input', function() {
+                        markUnsaved();
+                    });
+                }
+            }
+
             // ========== Canvas Resize Validation ==========
             function initCanvasResizeValidation() {
                 const widthInput = document.getElementById('map-width');
@@ -1191,6 +1253,9 @@
                             validateAndApplyCanvasResize(newWidth, canvas.height);
                         }
                     });
+                    widthInput.addEventListener('input', function() {
+                        markUnsaved();
+                    });
                 }
 
                 if (heightInput) {
@@ -1199,6 +1264,9 @@
                         if (newHeight && newHeight >= 100) {
                             validateAndApplyCanvasResize(canvas.width, newHeight);
                         }
+                    });
+                    heightInput.addEventListener('input', function() {
+                        markUnsaved();
                     });
                 }
             }
@@ -1243,6 +1311,7 @@
             }
 
             document.addEventListener('DOMContentLoaded', initCanvasResizeValidation);
+            document.addEventListener('DOMContentLoaded', initDefaultStyleListeners);
 
             // ========== Keyboard Shortcuts ==========
             function initKeyboardShortcuts() {
@@ -1694,6 +1763,7 @@
                     default_link_style: defaultLinkStyle,
                 };
                 const payload = {
+                    name: mapName,
                     title: mapTitle,
                     options,
                     nodes: nodes.map(n => ({
@@ -1813,6 +1883,7 @@ function populateNodeProperties(node) {
             node.label = this.value;
             renderEditor();
             renderNodesList();
+            markUnsaved();
         };
     }
 
@@ -1833,6 +1904,7 @@ function populateNodeProperties(node) {
             node.interfaceId = null;
             renderEditor();
             renderNodesList();
+            markUnsaved();
             loadInterfacesForNode(node);
         };
     }
@@ -1850,6 +1922,7 @@ function loadInterfacesForNode(node) {
         node.interfaceId = this.value ? parseInt(this.value, 10) : null;
         renderEditor();
         renderNodesList();
+        markUnsaved();
     };
     if (!node.deviceId) return;
 
@@ -2072,6 +2145,7 @@ function saveLink() {
 
     $('#linkModal').modal('hide');
     currentLinkIndex = null;
+    markUnsaved();
     renderEditor();
     renderLinksList();
     WMNGToast.success('Link updated!', { duration: 2000 });

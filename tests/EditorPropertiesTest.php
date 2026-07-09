@@ -42,4 +42,41 @@ class EditorPropertiesTest extends TestCase
         $this->assertStringContainsString('renderEditor()', $saveBlock);
         $this->assertStringContainsString('renderLinksList()', $saveBlock);
     }
+
+    public function test_node_property_inputs_mark_unsaved(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $labelBlock = substr($content, strpos($content, 'label.oninput = function'), 250);
+        $this->assertStringContainsString('markUnsaved()', $labelBlock);
+
+        $devBlock = substr($content, strpos($content, 'devSel.onchange = function'), 250);
+        $this->assertStringContainsString('markUnsaved()', $devBlock);
+    }
+
+    public function test_save_existing_map_payload_includes_name(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $existingBlockStart = strpos($content, "WMNGLoading.show('Saving map...')");
+        $this->assertNotFalse($existingBlockStart);
+        $saveBlock = substr($content, $existingBlockStart, 900);
+        $this->assertStringContainsString('name: mapName', $saveBlock);
+    }
+
+    public function test_default_style_panel_wires_live_preview(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $this->assertStringContainsString('function initDefaultStyleListeners()', $content);
+        $this->assertStringContainsString("nodeColor.addEventListener('input'", $content);
+        $this->assertStringContainsString("linkWidth.addEventListener('input'", $content);
+        $this->assertStringContainsString("mapName.addEventListener('input'", $content);
+    }
+
+    public function test_map_dimensions_mark_unsaved_on_input(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $resizeBlock = substr($content, strpos($content, 'function initCanvasResizeValidation()'), 1500);
+        $this->assertStringContainsString("widthInput.addEventListener('input'", $resizeBlock);
+        $this->assertStringContainsString("heightInput.addEventListener('input'", $resizeBlock);
+        $this->assertStringContainsString('markUnsaved()', $resizeBlock);
+    }
 }

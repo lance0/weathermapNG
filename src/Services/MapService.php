@@ -107,6 +107,9 @@ class MapService
         if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
             $updates['title'] = $data['title'];
         }
+        if (array_key_exists('name', $data) && $data['name'] !== null && $data['name'] !== '' && Schema::hasColumn('wmng_maps', 'name')) {
+            $updates['name'] = $data['name'];
+        }
 
         if (!empty($updates)) {
             $map->fill($updates)->save();
@@ -142,9 +145,9 @@ class MapService
             $node = Node::create([
                 'map_id' => $map->id,
                 'label' => $nodeData['label'] ?? 'Node',
-                'x' => $nodeData['x'] ?? 0,
-                'y' => $nodeData['y'] ?? 0,
-                'device_id' => $nodeData['device_id'] ?? null,
+                'x' => isset($nodeData['x']) && is_numeric($nodeData['x']) ? (float) $nodeData['x'] : 0,
+                'y' => isset($nodeData['y']) && is_numeric($nodeData['y']) ? (float) $nodeData['y'] : 0,
+                'device_id' => isset($nodeData['device_id']) && is_numeric($nodeData['device_id']) ? (int) $nodeData['device_id'] : null,
                 'meta' => $nodeData['meta'] ?? [],
             ]);
 
@@ -168,9 +171,9 @@ class MapService
                 'map_id' => $map->id,
                 'src_node_id' => $sourceId,
                 'dst_node_id' => $targetId,
-                'port_id_a' => $linkData['port_id_a'] ?? $linkData['port_a'] ?? null,
-                'port_id_b' => $linkData['port_id_b'] ?? $linkData['port_b'] ?? null,
-                'bandwidth_bps' => $linkData['bandwidth_bps'] ?? $linkData['bandwidth'] ?? null,
+                'port_id_a' => isset($linkData['port_id_a']) && is_numeric($linkData['port_id_a']) ? (int) $linkData['port_id_a'] : (isset($linkData['port_a']) && is_numeric($linkData['port_a']) ? (int) $linkData['port_a'] : null),
+                'port_id_b' => isset($linkData['port_id_b']) && is_numeric($linkData['port_id_b']) ? (int) $linkData['port_id_b'] : (isset($linkData['port_b']) && is_numeric($linkData['port_b']) ? (int) $linkData['port_b'] : null),
+                'bandwidth_bps' => isset($linkData['bandwidth_bps']) && is_numeric($linkData['bandwidth_bps']) ? (int) $linkData['bandwidth_bps'] : (isset($linkData['bandwidth']) && is_numeric($linkData['bandwidth']) ? (int) $linkData['bandwidth'] : null),
                 'style' => $linkData['style'] ?? [],
             ]);
         }

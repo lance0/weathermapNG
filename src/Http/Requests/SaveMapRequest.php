@@ -17,6 +17,7 @@ class SaveMapRequest extends FormRequest
     {
         return [
             'title' => 'nullable|string|max:255',
+            'name' => 'nullable|string|max:255|alpha_dash|regex:/^[a-z0-9_-]+$/i',
             'options' => 'nullable|array',
             'options.width' => 'nullable|integer|min:100|max:4096',
             'options.height' => 'nullable|integer|min:100|max:4096',
@@ -133,8 +134,10 @@ class SaveMapRequest extends FormRequest
 
     public function sanitize(array $data): array
     {
-        if (isset($data['title']) && is_string($data['title'])) {
-            $data['title'] = strip_tags($data['title']);
+        foreach (['title', 'name'] as $key) {
+            if (isset($data[$key]) && is_string($data[$key])) {
+                $data[$key] = strip_tags(trim($data[$key]));
+            }
         }
 
         if (!empty($data['options']['tags']) && is_array($data['options']['tags'])) {
@@ -171,7 +174,7 @@ class SaveMapRequest extends FormRequest
                     continue;
                 }
                 if (isset($node['label']) && is_string($node['label'])) {
-                    $data['nodes'][$i]['label'] = strip_tags($node['label']);
+                    $data['nodes'][$i]['label'] = strip_tags(trim($node['label']));
                 }
             }
         }

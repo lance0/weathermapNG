@@ -17,7 +17,14 @@ class Link extends Model
         'bandwidth_bps',
         'style'
     ];
-    protected $casts = ['style' => 'array'];
+    protected $casts = [
+        'style' => 'array',
+        'src_node_id' => 'integer',
+        'dst_node_id' => 'integer',
+        'port_id_a' => 'integer',
+        'port_id_b' => 'integer',
+        'bandwidth_bps' => 'integer',
+    ];
 
     /** @var array<int,?string> Batch-prefetch cache for port ifName lookups. */
     private static array $portNameCache = [];
