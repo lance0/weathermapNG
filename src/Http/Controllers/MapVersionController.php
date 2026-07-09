@@ -27,7 +27,9 @@ class MapVersionController extends Controller
 
     public function index(int $mapId): JsonResponse
     {
+        $this->requireAdmin();
         $map = Map::findOrFail($mapId);
+
 
         $versions = $this->mapVersionService->getVersions($map, 20);
 
@@ -66,15 +68,16 @@ class MapVersionController extends Controller
 
     public function show(int $versionId): JsonResponse
     {
+        $this->requireAdmin();
         $version = MapVersion::findOrFail($versionId);
 
         return response()->json([
             'success' => true,
             'version' => $version,
             'snapshot' => $version->config_snapshot,
-            'created_at' => $version->created_at->toIso8601String(),
+            'created_at' => $version->created_at?->toIso8601String(),
             'created_at_human' => $version->created_at_human,
-            'created_by' => $version->creator->name ?? 'Unknown',
+            'created_by' => $version->creator?->name ?? 'Unknown',
         ]);
     }
 
@@ -190,50 +193,6 @@ class MapVersionController extends Controller
                     'exported_by' => auth()->user()?->name ?? 'Unknown',
                 ],
             ],
-        ]);
-    }
-
-    public function settings(): JsonResponse
-    {
-        $defaultSettings = [
-            'auto_save_enabled' => true,
-            'auto_save_interval' => '5',
-            'max_versions' => 20,
-            'retention_policy' => 'oldest_20',
-            'backup_enabled' => true,
-            'compression_enabled' => false,
-            'storage_format' => 'database',
-            'export_format' => 'json',
-            'conflict_detection' => true,
-            'merge_strategy' => 'replace',
-            'version_comparison_ui' => true,
-            'search_filter' => true,
-            'sort_order' => 'newest_first',
-            'pagination' => true,
-            'max_name_length' => 100,
-            'max_description_length' => 1000,
-            'manual_cleanup' => 'on_demand',
-            'auto_cleanup' => 'after_20',
-            'can_rollback' => true,
-            'can_delete_versions' => true,
-            'can_compare' => true,
-            'version_export' => true,
-            'version_rollback' => true,
-        ];
-
-        return response()->json([
-            'success' => true,
-            'settings' => $defaultSettings,
-        ]);
-    }
-
-    public function updateSettings(\Illuminate\Http\Request $request): JsonResponse
-    {
-        $this->requireAdmin();
-        return response()->json([
-            'success' => true,
-            'message' => 'Settings updated successfully',
-            'settings' => $request->all(),
         ]);
     }
 

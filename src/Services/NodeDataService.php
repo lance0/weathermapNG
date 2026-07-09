@@ -200,7 +200,10 @@ class NodeDataService
                 break;
             }
 
-            sleep($interval);
+            // Sleep in bounded chunks so a large interval can't overshoot maxSeconds.
+            $remaining = $maxSeconds - (time() - $start);
+            $sleep = min($interval, max(1, $remaining));
+            sleep($sleep);
         }
     }
 

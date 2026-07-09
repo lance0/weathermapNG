@@ -90,8 +90,12 @@ class RenderController
 
         if ($format === 'json') {
             $map->load(['nodes', 'links']);
+            // Strip CR/LF, quotes, backslashes, and path separators so the
+            // map name cannot inject response headers or traverse paths.
+            $safeName = preg_replace('/[\r\n"\0\\\\\/]+/', '_', $map->name ?? 'map');
+            $safeName = trim($safeName, " \t._-") ?: 'map';
             return response()->json($map->toJsonModel())
-                           ->header('Content-Disposition', 'attachment; filename="' . $map->name . '.json"');
+                           ->header('Content-Disposition', 'attachment; filename="' . $safeName . '.json"');
         }
 
         return response()->json(['error' => 'Unsupported format'], 400);
@@ -125,8 +129,8 @@ class RenderController
     {
         $map->load(['nodes', 'links']);
         $this->nodeDataService->preloadForMap($map);
-        $interval = max(1, (int) $request->get('interval', 5));
-        $maxSeconds = (int) $request->get('max', 300);  // 5 minutes default
+        $interval = min(60, max(1, (int) $request->get('interval', 5)));
+        $maxSeconds = min(600, max(5, (int) $request->get('max', 300)));
 
         return $this->nodeDataService->stream($map, $interval, $maxSeconds);
     }

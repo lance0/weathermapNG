@@ -95,7 +95,7 @@ class MapService
 
     private function updateMapProperties(Map $map, array $data): void
     {
-        if (empty($data['options']) && !array_key_exists('title', $data)) {
+        if (empty($data['options']) && !array_key_exists('title', $data) && !array_key_exists('name', $data)) {
             return;
         }
 
@@ -104,10 +104,10 @@ class MapService
         if (!empty($data['options'])) {
             $updates['options'] = $this->mergeMapOptions($map->options ?? [], $data['options']);
         }
-        if (array_key_exists('title', $data) && Schema::hasColumn('wmng_maps', 'title')) {
+        if (array_key_exists('title', $data) && is_string($data['title']) && trim($data['title']) !== '' && Schema::hasColumn('wmng_maps', 'title')) {
             $updates['title'] = $data['title'];
         }
-        if (array_key_exists('name', $data) && $data['name'] !== null && $data['name'] !== '' && Schema::hasColumn('wmng_maps', 'name')) {
+        if (array_key_exists('name', $data) && is_string($data['name']) && trim($data['name']) !== '' && Schema::hasColumn('wmng_maps', 'name')) {
             $updates['name'] = $data['name'];
         }
 
@@ -118,7 +118,16 @@ class MapService
 
     private function mergeMapOptions(array $currentOptions, array $newOptions): array
     {
-        $merged = array_merge($currentOptions, $newOptions);
+        // Recursive merge: nested arrays like default_node_style/default_link_style
+        // should be merged, not replaced wholesale by array_merge.
+        $merged = $currentOptions;
+        foreach ($newOptions as $key => $value) {
+            if (is_array($value) && isset($merged[$key]) && is_array($merged[$key])) {
+                $merged[$key] = array_merge($merged[$key], $value);
+            } else {
+                $merged[$key] = $value;
+            }
+        }
 
         // Ensure width/height/background always have defaults
         $merged['width'] = $merged['width'] ?? 800;
@@ -148,7 +157,7 @@ class MapService
                 'x' => isset($nodeData['x']) && is_numeric($nodeData['x']) ? (float) $nodeData['x'] : 0,
                 'y' => isset($nodeData['y']) && is_numeric($nodeData['y']) ? (float) $nodeData['y'] : 0,
                 'device_id' => isset($nodeData['device_id']) && is_numeric($nodeData['device_id']) ? (int) $nodeData['device_id'] : null,
-                'meta' => $nodeData['meta'] ?? [],
+                'meta' => is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : [],
             ]);
 
             $clientKey = $nodeData['id'] ?? $nodeData['node_id'] ?? $nodeData['_id'] ?? (string)$index;
@@ -164,6 +173,11 @@ class MapService
             $sourceId = $this->resolveNodeId($linkData['src_node_id'] ?? $linkData['source'] ?? $linkData['src'] ?? null, $nodeIdMap);
             $targetId = $this->resolveNodeId($linkData['dst_node_id'] ?? $linkData['target'] ?? $linkData['dst'] ?? null, $nodeIdMap);
             if (!$sourceId || !$targetId) {
+                Log::warning('WeathermapNG: dropped link with unresolvable node reference', [
+                    'map_id' => $map->id,
+                    'src' => $linkData['src_node_id'] ?? $linkData['source'] ?? $linkData['src'] ?? null,
+                    'dst' => $linkData['dst_node_id'] ?? $linkData['target'] ?? $linkData['dst'] ?? null,
+                ]);
                 continue;
             }
 
