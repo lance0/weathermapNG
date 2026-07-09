@@ -196,6 +196,52 @@
             .embed-minimap { display: none; }
             .embed-controls { top: 80px; }
         }
+        /* Kiosk / NOC wall mode */
+        body.kiosk-mode .embed-nav-bar,
+        body.kiosk-mode .embed-controls,
+        body.kiosk-mode .embed-legend,
+        body.kiosk-mode .embed-minimap,
+        body.kiosk-mode .status-bar,
+        body.kiosk-mode #loading {
+            display: none !important;
+        }
+        body.kiosk-mode {
+            cursor: none;
+        }
+        body.kiosk-mode.show-chrome {
+            cursor: auto;
+        }
+        body.kiosk-mode.show-chrome .embed-nav-bar,
+        body.kiosk-mode.show-chrome .embed-controls,
+        body.kiosk-mode.show-chrome .embed-legend,
+        body.kiosk-mode.show-chrome .embed-minimap,
+        body.kiosk-mode.show-chrome .status-bar {
+            display: flex !important;
+        }
+        body.kiosk-mode.show-chrome .embed-legend,
+        body.kiosk-mode.show-chrome #loading {
+            display: block !important;
+        }
+        .kiosk-exit {
+            position: fixed;
+            bottom: 48px;
+            right: 10px;
+            z-index: 1002;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: 0;
+            border-radius: 4px;
+            padding: 8px 12px;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        body.kiosk-mode .kiosk-exit,
+        body.kiosk-mode.show-chrome .kiosk-exit {
+            opacity: 1;
+            pointer-events: auto;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -260,6 +306,7 @@
             <div class="embed-legend-title">Legend</div>
             <div id="legend-rows"></div>
         </div>
+        <button type="button" id="kiosk-exit" class="kiosk-exit" aria-label="Exit kiosk mode">Exit Kiosk</button>
     </div>
 
     <script>
@@ -268,6 +315,10 @@
         const baseUrl = '{{ url("/") }}';
         const deviceBaseUrl = '{{ url("device") }}';
         const WMNG_CONFIG = {
+            kioskEnabled: {!! json_encode($kiosk) !!},
+            cycleSeconds: {!! json_encode($cycleSeconds) !!},
+            linkTarget: {!! json_encode($target) !!},
+            mapList: {!! json_encode($mapList ?? []) !!},
             thresholds: {!! json_encode(config('weathermapng.thresholds') ?? [50, 80, 95]) !!},
             colors: {
                 link_normal: '{{ config('weathermapng.colors.link_normal', '#28a745') }}',
@@ -339,6 +390,7 @@
         
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
+            initKioskMode();
             // Sync flow toggle button with prefers-reduced-motion default
             const _flowBtn = document.getElementById('toggle-flow');
             if (_flowBtn && !flowAnimationEnabled) {
@@ -436,6 +488,57 @@
             // Update status and overlays
             updateStatus();
             drawMinimap();
+        }
+
+        function initKioskMode() {
+            if (!WMNG_CONFIG.kioskEnabled) return;
+
+            const body = document.body;
+            body.classList.add('kiosk-mode');
+            body.classList.add('show-chrome');
+
+            let activityTimer = null;
+            const hideChrome = () => body.classList.remove('show-chrome');
+            const showChrome = () => {
+                body.classList.add('show-chrome');
+                window.clearTimeout(activityTimer);
+                activityTimer = window.setTimeout(hideChrome, 3500);
+            };
+
+            document.addEventListener('mousemove', showChrome);
+            document.addEventListener('click', showChrome);
+            document.addEventListener('touchstart', showChrome);
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    window.clearTimeout(activityTimer);
+                    body.classList.toggle('show-chrome');
+                    return;
+                }
+                showChrome();
+            });
+
+            const exitBtn = document.getElementById('kiosk-exit');
+            if (exitBtn) {
+                exitBtn.addEventListener('click', () => {
+                    window.location.href = window.location.pathname;
+                });
+            }
+
+            // Cycle to next map on a timer if requested.
+            const cycleSeconds = WMNG_CONFIG.cycleSeconds;
+            const mapList = WMNG_CONFIG.mapList || [];
+            if (cycleSeconds && mapList.length > 1) {
+                const currentId = String(mapId);
+                const idx = mapList.findIndex(m => String(m.id) === currentId);
+                const next = mapList[(idx + 1) % mapList.length];
+                if (next) {
+                    const nextUrl = new URL(window.location.pathname.replace(/\d+$/, String(next.id)) + window.location.search, window.location.origin);
+                    nextUrl.searchParams.set('kiosk', '1');
+                    nextUrl.searchParams.set('cycle', String(cycleSeconds));
+                    nextUrl.searchParams.set('target', WMNG_CONFIG.linkTarget === '_self' ? '_self' : '_blank');
+                    window.setTimeout(() => { window.location.assign(nextUrl.toString()); }, cycleSeconds * 1000);
+                }
+            }
         }
 
         function initNavControls() {
@@ -1399,7 +1502,7 @@
                     const did = n.device_id || n.deviceId || n.deviceid;
                     if (did) {
                         const url = deviceBaseUrl + '/' + did;
-                        window.open(url, '_blank');
+                        window.open(url, WMNG_CONFIG.linkTarget || '_blank');
                         return;
                     }
                 }
@@ -1432,7 +1535,7 @@
                     if (!portId) return;
                     const graphBaseUrl = '{{ url("graph") }}';
                     const url = graphBaseUrl + '?type=port_bits&id=' + portId + '&from=' + from + '&to=' + now;
-                    window.open(url, '_blank');
+                    window.open(url, WMNG_CONFIG.linkTarget || '_blank');
                 };
                 if (pA) openGraph(pA);
                 if (pB) openGraph(pB);
