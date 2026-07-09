@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-07-09
+
+### Security
+- **Admin-gate version endpoints**: `MapVersionController` `index` and `show` now require admin; all version operations (list/show/restore/destroy/compare/export) are admin-only.
+- **Remove PID from public `/live` endpoint**: the liveness probe no longer leaks the server process ID.
+- **Genericize public health endpoint errors**: `/health`, `/ready`, and health config checks no longer expose raw exception messages or reveal whether an API token is configured.
+- **SSE connection duration clamps**: `interval` clamped to `[1, 60]`s and `max` to `[5, 600]`s; `streamLoop` sleeps in bounded chunks so a large interval can't overshoot `maxSeconds`.
+
+### Fixed
+- **Name-only map updates**: `updateMapProperties` early-return condition now includes `name`, so a request sending only `name` no longer skips the name update.
+- **Recursive map option merge**: `mergeMapOptions` now recursively merges nested arrays (`default_node_style`/`default_link_style`) instead of replacing them wholesale via `array_merge`.
+- **Version restore field whitelisting**: `restoreVersion` whitelists node/link snapshot fields via `array_intersect_key` to prevent mass-assignment of unexpected columns through `forceCreate`.
+- **`MapVersionService::getVersion` scoped by `map_id`**: prevents cross-map version access.
+- **`Node::convertStatusToString` null guard**: returns `'unknown'` for null status and casts to string before `strtolower`, preventing `TypeError`.
+- **`Node::fetchDevice` column restriction**: Eloquent query limited to `device_id`, `hostname`, `status`; uses `->toArray()` instead of `(array)` cast.
+- **`createNodes` meta guard**: `is_array` check prevents non-array `meta` from breaking JSON cast.
+- **`createLinks` logs dropped links**: unresolvable node references are now logged via `Log::warning` instead of silently discarded.
+- **`title`/`name` blank guards**: `updateMapProperties` rejects null, non-string, and whitespace-only values for both fields.
+
 ## [1.9.0] - 2026-07-09
 
 ### Added
