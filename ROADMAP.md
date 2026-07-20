@@ -156,7 +156,7 @@ This release should make existing authoring workflows faster and less error-pron
 - [x] **Version Comparison** *(activated dormant backend v1.8.0)*
   - Registered version routes in `routes/web.php` and built editor UI: save-version button, version list modal, restore confirmation, compare diff view.
   - Fixed dormant backend bugs: `json_decode()` TypeError on cast array in compare/show/export, `captureSnapshot()` wrong field names (`database_id` → `device_id`, removed nonexistent `link.meta`), `restoreVersion()` now does true rollback with `forceCreate` preserving original IDs, `destroy()` now deletes only the selected version, `compareVersions()` returns flat lists.
-  - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store/autoSave.
+  - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store.
   - *Highest ROI v1.8.0 item — major feature with minimal new backend work.*
 
 - [ ] **Bulk Operations**

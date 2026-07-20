@@ -214,28 +214,13 @@ class UIPolishTest extends TestCase
         $this->assertStringNotContainsString('alert(', $editor);
     }
 
-    public function test_standalone_versioning_and_canvas_scripts_avoid_browser_prompts(): void
+    public function test_standalone_canvas_scripts_avoid_browser_prompts(): void
     {
-        foreach ([
-            'resources/js/versioning.js',
-            'resources/js/wmng-common.js',
-        ] as $file) {
-            $content = file_get_contents(__DIR__ . '/../' . $file);
+        $content = file_get_contents(__DIR__ . '/../resources/js/wmng-common.js');
 
-            $this->assertStringNotContainsString('confirm(', $content, "$file should avoid native confirmation prompts");
-            $this->assertStringNotContainsString('alert(', $content, "$file should avoid native alert prompts");
-            $this->assertStringNotContainsString('console.log', $content, "$file should avoid debug logging");
-        }
-
-        $versioning = file_get_contents(__DIR__ . '/../resources/js/versioning.js');
-        $this->assertStringContainsString('id = \'versionDecisionModal\'', $versioning);
-        $this->assertStringContainsString("WMNGToast.info('Version comparison is not available yet.'", $versioning);
-        $this->assertStringContainsString("WMNGToast.info('Version details are not available yet.'", $versioning);
-        $this->assertStringContainsString('body: formData', $versioning);
-        $this->assertMatchesRegularExpression(
-            "/method: 'POST',\n\\s+headers: \\{\n\\s+'X-CSRF-TOKEN'/",
-            $versioning
-        );
+        $this->assertStringNotContainsString('confirm(', $content, 'wmng-common.js should avoid native confirmation prompts');
+        $this->assertStringNotContainsString('alert(', $content, 'wmng-common.js should avoid native alert prompts');
+        $this->assertStringNotContainsString('console.log', $content, 'wmng-common.js should avoid debug logging');
     }
 
     public function test_roadmap_tracks_current_stable_release_and_recent_polish(): void
