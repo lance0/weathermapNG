@@ -135,8 +135,6 @@ class WeathermapNG
             'editor' => [
                 'grid_size' => 20,
                 'snap_to_grid' => true,
-                'auto_save' => true,
-                'auto_save_interval' => 30,
             ],
         ];
     }

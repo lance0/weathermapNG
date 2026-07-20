@@ -16,7 +16,6 @@ class SaveMapVersionRequest extends FormRequest
         return [
             'name' => 'required|string|max:100',
             'description' => 'nullable|string|max:1000',
-            'auto_save' => 'sometimes|boolean',
         ];
     }
 
@@ -26,7 +25,6 @@ class SaveMapVersionRequest extends FormRequest
             'name.required' => 'Version name is required',
             'name.max' => 'Version name must not exceed 100 characters',
             'description.max' => 'Description must not exceed 1000 characters',
-            'auto_save' => 'Auto-save must be a boolean value',
         ];
     }
 }

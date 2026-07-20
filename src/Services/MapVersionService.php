@@ -10,7 +10,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
 
 class MapVersionService
 {
-    public function createVersion(Map $map, string $name, ?string $description = null, bool $autoSave = false, ?int $userId = null): MapVersion
+    public function createVersion(Map $map, string $name, ?string $description = null, ?int $userId = null): MapVersion
     {
         return MapVersion::create([
             'map_id' => $map->id,

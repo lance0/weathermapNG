@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Dead auto-save code**: auto-save was removed from the editor in v1.5.0 (dead code referencing non-existent elements), but the trigger path lingered. Removed: `resources/js/versioning.js` (14KB, orphaned — not loaded by any view; the version-history UI was rebuilt inline in `editor.blade.php` for v1.8.0), the unreachable `MapVersionController::autoSave()` method (no route registered), the `auto_save`/`auto_save_interval` config keys in `config/config.php`, `config/weathermapng.docker.php`, and `src/WeathermapNG.php` defaults, the `auto_save` validation field in `SaveMapVersionRequest`, the `auto_save_enabled`/`auto_save_interval` keys from the version `index()` metadata response, and the unused `$autoSave` parameter from `MapVersionService::createVersion()` (it was never persisted — no `auto_save` column on the model). The `store()` callsite and `tests/integration_version_test.php` callsites updated to the new signature. Tests that asserted `versioning.js` content removed/updated.
+
 ### Fixed
 - **Ambiguous node rate label** (issue #11): the embed canvas printed a bare `113.1M` under each node with no unit, leaving the basis (bits vs bytes) unclear. Now uses the same `humanBits()` formatter as the link label and tooltip (`113.10 Mb/s`, or `MB/s` in bytes-scale mode) and prefixes the canvas label with `Σ` to indicate it's the aggregate `in_bps + out_bps` across attached links. The node tooltip's sum line now reads "Total (In + Out)". Removed the now-dead `formatValue()` helper.
 - **Stale bandwidth cap message**: `CreateLinkRequest` validated `bandwidth_bps` against `max:10000000000000` (10 Tbps) but the rejection message said "10 Gbps" — misleading operators into thinking 400G links were rejected when they never were. Message corrected to "10 Tbps".

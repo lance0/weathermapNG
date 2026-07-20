@@ -142,7 +142,7 @@ class MapVersionTest extends TestCase
     {
         $content = file_get_contents(__DIR__ . '/../src/Http/Controllers/MapVersionController.php');
 
-        foreach (['store', 'restore', 'destroy', 'compare', 'export', 'autoSave'] as $method) {
+        foreach (['store', 'restore', 'destroy', 'compare', 'export'] as $method) {
             $start = strpos($content, "public function {$method}");
             $this->assertNotFalse($start, "Method {$method} not found");
             $end = strpos($content, '}', $start + 50);
@@ -156,7 +156,7 @@ class MapVersionTest extends TestCase
     }
 
     /**
-     * Verify store and autoSave use SaveMapVersionRequest (not raw Request).
+     * Verify store uses SaveMapVersionRequest (not raw Request).
      */
     public function testStoreAndAutoSaveUseFormRequest(): void
     {
@@ -166,7 +166,7 @@ class MapVersionTest extends TestCase
     }
 
     /**
-     * Verify store and autoSave sanitize version name with strip_tags.
+     * Verify store sanitizes version name with strip_tags.
      */
     public function testStoreAndAutoSaveSanitizeName(): void
     {
@@ -186,17 +186,7 @@ class MapVersionTest extends TestCase
         $this->assertStringNotContainsString('json_decode($version->config_snapshot', $content);
     }
 
-    /**
-     * Verify versioning.js avoids browser prompts and debug logging.
-     */
-    public function testVersioningJsAvoidsBrowserPrompts(): void
-    {
-        $content = file_get_contents(__DIR__ . '/../resources/js/versioning.js');
 
-        $this->assertStringNotContainsString('confirm(', $content, 'versioning.js should avoid native confirmation prompts');
-        $this->assertStringNotContainsString('alert(', $content, 'versioning.js should avoid native alert prompts');
-        $this->assertStringNotContainsString('console.log', $content, 'versioning.js should avoid debug logging');
-    }
     /**
      * Regression: getVersions() must call ->get() to execute the query,
      * otherwise it returns an Eloquent Builder instead of a Collection.

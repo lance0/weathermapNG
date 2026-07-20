@@ -38,7 +38,6 @@ class MapVersionController extends Controller
             'versions' => $versions,
             'latest_version' => $this->mapVersionService->getLatestVersion($map),
             'total_versions' => count($versions),
-            'auto_save_enabled' => true,
             'max_versions' => 20,
             'retention_policy' => 'oldest 20',
             'backup_enabled' => true,
@@ -48,7 +47,6 @@ class MapVersionController extends Controller
             'version_diff_support' => true,
             'version_export' => true,
             'version_rollback' => true,
-            'auto_save_interval' => '5 minutes',
             'max_name_length' => 100,
             'max_description_length' => 1000,
             'compression_enabled' => true,
@@ -91,7 +89,6 @@ class MapVersionController extends Controller
             $map,
             strip_tags($request->validated('name')),
             $request->validated('description') ? strip_tags($request->validated('description')) : null,
-            false,
             $userId
         );
 
@@ -196,23 +193,4 @@ class MapVersionController extends Controller
         ]);
     }
 
-    public function autoSave(SaveMapVersionRequest $request, int $mapId): JsonResponse
-    {
-        $this->requireAdmin();
-        $map = Map::findOrFail($mapId);
-
-        $version = $this->mapVersionService->createVersion(
-            $map,
-            strip_tags($request->validated('name')),
-            null,
-            true,
-            auth()->id()
-        );
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Auto-save completed',
-            'version' => $version,
-        ]);
-    }
 }
