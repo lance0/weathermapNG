@@ -9,7 +9,14 @@ class Settings implements SettingsHook
 {
     public function authorize(User $user): bool
     {
-        // Only admins can access plugin settings
+        // Only admins can access plugin settings.
+        // app()->call() injects a fresh User from the container (not the
+        // authenticated user), so resolve the actual session user here.
+        $user = auth()->user() ?? $user;
+        if (!$user) {
+            return false;
+        }
+
         // Check various admin methods that may exist in LibreNMS User model
         if (method_exists($user, 'hasGlobalAdmin') && $user->hasGlobalAdmin()) {
             return true;

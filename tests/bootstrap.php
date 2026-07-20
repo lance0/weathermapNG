@@ -29,6 +29,33 @@ if (!function_exists('config')) {
     }
 }
 
+// Shim Laravel's auth() helper used by Settings::authorize()
+// auth() returns a Guard; auth()->user() returns the authenticated User (or null).
+if (!function_exists('auth')) {
+    function auth(?string $guard = null): ?object {
+        $user = $GLOBALS['__test_auth_resolver'] ? ($GLOBALS['__test_auth_resolver'])() : null;
+        return new class($user) {
+            private $user;
+            public function __construct($user) { $this->user = $user; }
+            public function user() { return $this->user; }
+        };
+    }
+}
+
+// Stub Illuminate\Foundation\Auth\User so the type-hint in Settings::authorize()
+// resolves in standalone PHPUnit (real class only exists in the LibreNMS container).
+if (!class_exists('Illuminate\Foundation\Auth\User')) {
+    class SettingsTestStubUser
+    {
+        private array $attrs;
+        public function __construct(array $attrs = []) { $this->attrs = $attrs; }
+        public function hasRole(string $role): bool { return ($this->attrs['role'] ?? null) === $role; }
+        public function hasGlobalAdmin(): bool { return ($this->attrs['role'] ?? null) === 'admin'; }
+        public function isAdmin(): bool { return ($this->attrs['role'] ?? null) === 'admin'; }
+    }
+    class_alias(SettingsTestStubUser::class, 'Illuminate\Foundation\Auth\User');
+}
+
 // Shim Laravel facade application so Log/Cache facades work in standalone tests
 if (class_exists('Illuminate\Support\Facades\Facade') && class_exists('Illuminate\Container\Container')) {
     $container = new Illuminate\Container\Container();

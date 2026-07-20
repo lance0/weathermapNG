@@ -29,7 +29,7 @@ $settings = array_merge([
             <div class="form-group">
                 <label class="col-sm-3 control-label">Poll Interval (seconds)</label>
                 <div class="col-sm-9">
-                    <input type="number" name="poll_interval" class="form-control" 
+                    <input type="number" name="settings[poll_interval]" class="form-control" 
                            value="{{ $settings['poll_interval'] }}" min="60" max="3600">
                     <span class="help-block">How often to update map data (60-3600 seconds)</span>
                 </div>
@@ -38,7 +38,7 @@ $settings = array_merge([
             <div class="form-group">
                 <label class="col-sm-3 control-label">Default Map Width</label>
                 <div class="col-sm-9">
-                    <input type="number" name="default_width" class="form-control" 
+                    <input type="number" name="settings[default_width]" class="form-control" 
                            value="{{ $settings['default_width'] }}" min="400" max="2000">
                 </div>
             </div>
@@ -46,7 +46,7 @@ $settings = array_merge([
             <div class="form-group">
                 <label class="col-sm-3 control-label">Default Map Height</label>
                 <div class="col-sm-9">
-                    <input type="number" name="default_height" class="form-control" 
+                    <input type="number" name="settings[default_height]" class="form-control" 
                            value="{{ $settings['default_height'] }}" min="300" max="1500">
                 </div>
             </div>
@@ -54,7 +54,7 @@ $settings = array_merge([
             <div class="form-group">
                 <label class="col-sm-3 control-label">RRD Base Path</label>
                 <div class="col-sm-9">
-                    <input type="text" name="rrd_base" class="form-control" 
+                    <input type="text" name="settings[rrd_base]" class="form-control" 
                            value="{{ $settings['rrd_base'] }}">
                     <span class="help-block">Path to LibreNMS RRD files</span>
                 </div>
@@ -63,7 +63,7 @@ $settings = array_merge([
             <div class="form-group">
                 <label class="col-sm-3 control-label">Cache TTL (seconds)</label>
                 <div class="col-sm-9">
-                    <input type="number" name="cache_ttl" class="form-control" 
+                    <input type="number" name="settings[cache_ttl]" class="form-control" 
                            value="{{ $settings['cache_ttl'] }}" min="0" max="3600">
                     <span class="help-block">How long to cache map data (0 to disable)</span>
                 </div>
@@ -74,24 +74,24 @@ $settings = array_merge([
                 <div class="col-sm-9">
                     <div class="checkbox">
                         <label>
-                            <input type="hidden" name="enable_api_fallback" value="0">
-                            <input type="checkbox" name="enable_api_fallback" value="1" 
+                            <input type="hidden" name="settings[enable_api_fallback]" value="0">
+                            <input type="checkbox" name="settings[enable_api_fallback]" value="1" 
                                    @if($settings['enable_api_fallback']) checked @endif>
                             Enable API fallback when RRD files are not available
                         </label>
                     </div>
                     <div class="checkbox">
                         <label>
-                            <input type="hidden" name="allow_embed" value="0">
-                            <input type="checkbox" name="allow_embed" value="1" 
+                            <input type="hidden" name="settings[allow_embed]" value="0">
+                            <input type="checkbox" name="settings[allow_embed]" value="1" 
                                    @if($settings['allow_embed']) checked @endif>
                             Allow embedding maps in external sites
                         </label>
                     </div>
                     <div class="checkbox">
                         <label>
-                            <input type="hidden" name="debug" value="0">
-                            <input type="checkbox" name="debug" value="1" 
+                            <input type="hidden" name="settings[debug]" value="0">
+                            <input type="checkbox" name="settings[debug]" value="1" 
                                    @if($settings['debug']) checked @endif>
                             Enable debug logging
                         </label>

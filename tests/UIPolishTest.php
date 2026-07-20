@@ -177,10 +177,25 @@ class UIPolishTest extends TestCase
         // CSRF token present
         $this->assertStringContainsString('@csrf', $content);
 
-        // Checkbox hidden fallbacks (unchecked boxes submit 0)
-        $this->assertStringContainsString('type="hidden" name="enable_api_fallback" value="0"', $content);
-        $this->assertStringContainsString('type="hidden" name="allow_embed" value="0"', $content);
-        $this->assertStringContainsString('type="hidden" name="debug" value="0"', $content);
+        // All inputs must use settings[...] array notation so the controller
+        // (PluginSettingsController::update validates 'settings' => 'array') receives them.
+        // Flat names are silently dropped by the controller.
+        $this->assertStringContainsString('name="settings[poll_interval]"', $content);
+        $this->assertStringContainsString('name="settings[default_width]"', $content);
+        $this->assertStringContainsString('name="settings[default_height]"', $content);
+        $this->assertStringContainsString('name="settings[rrd_base]"', $content);
+        $this->assertStringContainsString('name="settings[cache_ttl]"', $content);
+        $this->assertStringContainsString('name="settings[enable_api_fallback]"', $content);
+        $this->assertStringContainsString('name="settings[allow_embed]"', $content);
+        $this->assertStringContainsString('name="settings[debug]"', $content);
+        $this->assertStringNotContainsString('name="poll_interval"', $content);
+        $this->assertStringNotContainsString('name="default_width"', $content);
+        $this->assertStringNotContainsString('name="default_height"', $content);
+        $this->assertStringNotContainsString('name="rrd_base"', $content);
+        $this->assertStringNotContainsString('name="cache_ttl"', $content);
+        $this->assertStringNotContainsString('name="enable_api_fallback"', $content);
+        $this->assertStringNotContainsString('name="allow_embed"', $content);
+        $this->assertStringNotContainsString('name="debug"', $content);
     }
 
     public function test_active_index_and_editor_use_bootstrap_confirmation_modals(): void
