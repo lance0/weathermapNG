@@ -113,7 +113,7 @@ These improvements shipped in v1.7.0. The bulk of the work was reliability, safe
 - [x] **N+1 query elimination (Wave 1 + Wave 2)**
   - Eager-load map, node, link, and version relations instead of lazy loading.
   - Batch per-row caches (node data, device metadata, port names) so a 50-node map goes from ~400 queries down to ~10.
-  - Covers MapCacheService eager loads, NodeDevice batch loading, and LinkPortName batch resolution.
+  - Covers the (now-removed) MapCacheService eager loads, NodeDevice batch loading, and LinkPortName batch resolution. MapCacheService was later deleted as dead code (zero callers); the eager-load pattern lives on in the controllers and `RrdDataService` request-local caches.
 
 - [x] **Admin-only authorization**
   - All 24 mutation endpoints require an admin via the `AdminCheck` trait (`requireAdmin()`).

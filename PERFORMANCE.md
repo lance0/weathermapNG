@@ -27,19 +27,17 @@ v1.7.0 removes the per-node and per-link query loops that dominated live, embed,
 
 **Measured effect:** on a 50-node / 50-link map, the live/embed/sse paths dropped from ~400 queries to ~10 queries. Gains scale with map size; the previous N+1 pattern issued roughly one query per node plus one per link plus accessory lookups, while the batched path issues a small constant number regardless of node/link count.
 
-## Cache Service
+## Caching
 
-`src/Services/MapCacheService.php` provides cache helpers for map data. Cache keys are intentionally scoped by map/resource so writes can invalidate the relevant map data without relying on unsafe wildcard cache clearing.
+There is no dedicated cache service. Caching is inline `Cache::remember` in the
+services that fetch data, each with a `weathermapng.*` key scoped by resource id
+so writes invalidate the relevant data without wildcard cache clearing:
 
-Representative cache areas:
+- `PortUtilService` — per-port traffic (`weathermapng.port.traffic.{id}`) and per-device aggregate (`weathermapng.device.{id}.aggregate`).
+- `DevicePortLookup` — device ports, device search, device metadata, port metadata, and the all-devices list.
+- `RrdDataService` — request-local (non-persistent) caches for port/device RRD file metadata.
 
-- Map list
-- Single map detail
-- Map nodes
-- Map links
-- Editor map data
-- Device lookup data
-- Port metadata and traffic data
+Cache TTL follows `weathermapng.cache_ttl` (default 300s). `RrdDataService` caches are request-local only — they reset per request to avoid stale RRD reads across polls.
 
 When changing map, node, link, device lookup, or live traffic behavior, verify that cache keys do not collide and that updates invalidate the data users expect to change.
 
