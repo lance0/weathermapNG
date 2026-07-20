@@ -45,6 +45,7 @@ return [
     'link_style' => 'straight',         // Default via_style: straight | angled | curved
     'show_bandwidth' => true,           // Show bandwidth labels on embed viewer
     'show_percentages' => true,         // Show percentage labels on embed viewer
+    'debug' => env('WEATHERMAPNG_DEBUG', false), // Log per-endpoint traffic counters to the application log for diagnosing link utilization
     'security' => [
         'allow_embed' => true,
         'embed_domains' => ['localhost', '*.yourdomain.com'],

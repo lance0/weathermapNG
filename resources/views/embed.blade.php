@@ -707,13 +707,16 @@
             const labelY = (nodeType === 'server') ? y - 18 : y - 16;
             ctx.fillText(node.label || node.id, x, labelY);
 
-            // Status indicator
+            // Aggregate traffic indicator: node.current_value is sum_bps
+            // (in_bps + out_bps across attached links). The "Σ " prefix
+            // signals it's a total, not a single direction; the tooltip
+            // breaks down In/Out/Sum and shows the source.
             if (node.current_value !== null && node.current_value !== undefined) {
                 ctx.font = '10px Arial';
                 ctx.fillStyle = '#666';
-                const value = formatValue(node.current_value);
+                const value = humanBits(node.current_value);
                 if (value) {
-                    ctx.fillText(value, x, y + radius + 15);
+                    ctx.fillText('Σ ' + value, x, y + radius + 15);
                 }
             }
 
@@ -1240,23 +1243,6 @@
             renderMap();
         }
 
-        function formatValue(value) {
-            if (value === null || value === undefined) {
-                return '';
-            }
-            if (typeof value !== 'number') {
-                return String(value);
-            }
-            if (value >= 1000000000) {
-                return (value / 1000000000).toFixed(1) + 'G';
-            } else if (value >= 1000000) {
-                return (value / 1000000).toFixed(1) + 'M';
-            } else if (value >= 1000) {
-                return (value / 1000).toFixed(1) + 'K';
-            }
-            return value.toFixed(0);
-        }
-
         function updateStatus() {
             const statusBar = document.getElementById('status-bar');
             const lastUpdated = document.getElementById('last-updated');
@@ -1479,7 +1465,7 @@
                 tooltip.innerHTML = `${escapeHtml(n.label || n.id)}<br>` +
                   `In: ${humanBits(t.in_bps ?? 0)}<br>` +
                   `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
-                  `Sum: ${humanBits(sum ?? 0)}<br>` +
+                  `Total (In + Out): ${humanBits(sum ?? 0)}<br>` +
                   `<span style="opacity:0.75;">Source: ${src}</span>`;
             } else if (best) {
                 tooltip.style.display = 'block';

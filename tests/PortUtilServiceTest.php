@@ -147,4 +147,61 @@ class PortUtilServiceTest extends TestCase
         $this->assertEquals(0, $result['out_bps']);
         $this->assertEquals(0.0, $result['pct']);
     }
+
+    /**
+     * The four raw per-endpoint counters behind max(A.in, B.out) /
+     * max(A.out, B.in) must be emitted to the server log ONLY when
+     * weathermapng.debug is on — never in the live/SSE payload. This is the
+     * diagnostic path for the issue-#11 "95G/77G vs 15G" symptom: the
+     * displayed in_bps/out_bps are max() of those four counters, and an
+     * inflated value can only be traced via the server log on the affected
+     * install. Source-inspection matches the existing convention
+     * (PostAudit2SecurityTest asserts Log::warning the same way).
+     */
+    public function test_link_util_bits_debug_log_is_gated_by_config(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../src/Services/PortUtilService.php');
+
+        // Gated behind weathermapng.debug — not unconditional.
+        $this->assertStringContainsString(
+            "if (config('weathermapng.debug', false))",
+            $content,
+            'per-endpoint counter logging must be gated behind weathermapng.debug'
+        );
+
+        // Emits all four counters plus the selected directional values.
+        $this->assertStringContainsString("Log::debug('WeathermapNG linkUtilBits'", $content);
+        foreach (['a_in', 'a_out', 'b_in', 'b_out', 'in_bps', 'out_bps'] as $key) {
+            $this->assertStringContainsString("'{$key}'", $content, "debug log must include '{$key}' counter");
+        }
+        // The public payload contract is unchanged: $result holds only the
+        // four contract keys (in_bps, out_bps, pct, err). The debug log's
+        // port_a/port_b context keys are server-side only, never returned.
+        $this->assertStringContainsString("\$result = [", $content);
+        $this->assertStringContainsString("'err' => null,", $content);
+    }
+
+    /**
+     * Regression for issue-#11: a 400 Gbps link (the reporter's real config)
+     * must validate and produce a sane utilization. Guards against the
+     * previous stale "10 Gbps" cap message which misled operators into
+     * thinking 400G was rejected (it never was — max is 10 Tbps).
+     */
+    public function test_400gbps_link_utilization_is_sane(): void
+    {
+        $service = $this->createServiceWithMockRrd([
+            101 => ['in' => 15000000000, 'out' => 15000000000], // 15 Gb/s each way
+        ]);
+
+        $result = $service->linkUtilBits([
+            'port_id_a' => 101,
+            'port_id_b' => null,
+            'bandwidth_bps' => 400000000000, // 400 Gbps
+        ]);
+
+        // 15G / 400G = 3.75%
+        $this->assertEquals(15000000000, $result['in_bps']);
+        $this->assertEquals(15000000000, $result['out_bps']);
+        $this->assertEquals(3.75, $result['pct']);
+    }
 }

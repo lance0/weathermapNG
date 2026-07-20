@@ -34,7 +34,7 @@ class CreateLinkRequest extends FormRequest
             'port_id_b.exists' => 'Destination port does not exist',
             'port_id_b.different' => 'Source and destination ports must be different',
             'bandwidth_bps.min' => 'Bandwidth must be at least 1 bps',
-            'bandwidth_bps.max' => 'Bandwidth cannot exceed 10 Gbps',
+            'bandwidth_bps.max' => 'Bandwidth cannot exceed 10 Tbps',
         ];
     }
 

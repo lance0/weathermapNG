@@ -52,12 +52,32 @@ class PortUtilService
             $utilization = round(max($inBps, $outBps) / $bandwidth * 100, 2);
         }
 
-        return [
+        $result = [
             'in_bps' => $inBps,
             'out_bps' => $outBps,
             'pct' => $utilization,
             'err' => null,
         ];
+
+        // Debug-gated server log only (never the live/SSE payload): the four
+        // raw per-endpoint counters behind max(A.in, B.out) / max(A.out, B.in).
+        // Lets an operator trace an inflated in_bps/out_bps back to one
+        // counter — e.g. a mismatched endpoint or a wrong RRD unit — without
+        // exposing raw port IDs/counters to every embed/SSE consumer.
+        if (config('weathermapng.debug', false)) {
+            Log::debug('WeathermapNG linkUtilBits', [
+                'port_a' => $portA,
+                'port_b' => $portB,
+                'a_in' => (int) $dataA['in'],
+                'a_out' => (int) $dataA['out'],
+                'b_in' => (int) $dataB['in'],
+                'b_out' => (int) $dataB['out'],
+                'in_bps' => $inBps,
+                'out_bps' => $outBps,
+            ]);
+        }
+
+        return $result;
     }
 
     public function getPortData(int $portId): array

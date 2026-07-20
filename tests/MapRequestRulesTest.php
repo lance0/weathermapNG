@@ -47,4 +47,14 @@ class MapRequestRulesTest extends TestCase
         $this->assertStringNotContainsString('is_numeric($clientId)', $content);
         $this->assertStringContainsString('return $nodeIdMap[$clientId] ?? null;', $content);
     }
+
+    public function test_create_link_request_max_message_is_not_stale(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../src/Http/Requests/CreateLinkRequest.php');
+        // The max rule is 10 Tbps (10_000_000_000_000). The message previously
+        // lied "10 Gbps", misleading operators into thinking 400G links were
+        // rejected — they never were. Guard against the stale text returning.
+        $this->assertStringNotContainsString('Bandwidth cannot exceed 10 Gbps', $content);
+        $this->assertStringContainsString('Bandwidth cannot exceed 10 Tbps', $content);
+    }
 }
