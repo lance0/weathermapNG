@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Ambiguous node rate label** (issue #11): the embed canvas printed a bare `113.1M` under each node with no unit, leaving the basis (bits vs bytes) unclear. Now uses the same `humanBits()` formatter as the link label and tooltip (`113.10 Mb/s`, or `MB/s` in bytes-scale mode) and prefixes the canvas label with `Σ` to indicate it's the aggregate `in_bps + out_bps` across attached links. The node tooltip's sum line now reads "Total (In + Out)". Removed the now-dead `formatValue()` helper.
+- **Stale bandwidth cap message**: `CreateLinkRequest` validated `bandwidth_bps` against `max:10000000000000` (10 Tbps) but the rejection message said "10 Gbps" — misleading operators into thinking 400G links were rejected when they never were. Message corrected to "10 Tbps".
+
+### Added
+- **Debug-gated per-endpoint traffic logging**: with `WEATHERMAPNG_DEBUG=true`, `PortUtilService::linkUtilBits` logs the four raw per-endpoint counters (`a_in`, `a_out`, `b_in`, `b_out`) and the selected `in_bps`/`out_bps` to the application log (via the Laravel `Log` facade — destination follows the host's log config). Server-side only — the live/SSE payload contract is unchanged. This is the diagnostic path for the issue-#11 "95G/77G vs 15G" symptom: the displayed in/out values are `max(A.in, B.out)` / `max(A.out, B.in)`, and an inflated value can only be traced back to one counter via these logs on the affected install.
+
 ## [1.9.1] - 2026-07-09
 
 ### Security
