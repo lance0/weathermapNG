@@ -14,7 +14,7 @@ class NodeService
     {
         return Node::create([
             'map_id' => $map->id,
-            'label' => $data['label'] ?? 'New Node',
+            'label' => NodeLabelNormalizer::normalizeOrThrow($data['label'] ?? 'New Node'),
             'x' => $data['x'] ?? 0,
             'y' => $data['y'] ?? 0,
             'device_id' => $data['device_id'] ?? null,
@@ -26,11 +26,16 @@ class NodeService
     {
         $this->validateNodeOwnership($map, $node);
 
+        if (array_key_exists('label', $data)) {
+            $data['label'] = NodeLabelNormalizer::normalizeOrThrow($data['label']);
+        }
+
         $node->fill($data);
         $node->save();
 
         return $node->refresh();
     }
+
 
     public function deleteNode(Map $map, Node $node): void
     {
@@ -66,7 +71,7 @@ class NodeService
                 foreach ($nodesData as $nodeData) {
                     Node::create([
                         'map_id' => $map->id,
-                        'label' => $nodeData['label'] ?? 'Node',
+                        'label' => NodeLabelNormalizer::normalizeOrThrow($nodeData['label'] ?? 'Node'),
                         'x' => $nodeData['x'] ?? 0,
                         'y' => $nodeData['y'] ?? 0,
                         'device_id' => $nodeData['device_id'] ?? null,

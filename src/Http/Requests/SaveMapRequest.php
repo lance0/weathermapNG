@@ -4,6 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
+use LibreNMS\Plugins\WeathermapNG\Services\NodeLabelNormalizer;
 
 class SaveMapRequest extends FormRequest
 {
@@ -179,7 +180,7 @@ class SaveMapRequest extends FormRequest
                     continue;
                 }
                 if (isset($node['label']) && is_string($node['label'])) {
-                    $data['nodes'][$i]['label'] = strip_tags(trim($node['label']));
+                    $data['nodes'][$i]['label'] = NodeLabelNormalizer::normalizeOrThrow($node['label']);
                 }
             }
         }

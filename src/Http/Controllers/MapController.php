@@ -74,9 +74,13 @@ class MapController
     public function save(SaveMapRequest $request, Map $map): \Illuminate\Http\JsonResponse
     {
         $this->requireAdmin();
-        $validatedData = $request->sanitize($request->validated());
 
         try {
+            // sanitize() runs after validated() and uses normalizeOrThrow()
+            // on node labels, so it can throw InvalidArgumentException on
+            // an empty-after-strip label (e.g. "<b></b>"). Keep it inside
+            // the try so that surfaces as 422, not a 500.
+            $validatedData = $request->sanitize($request->validated());
             $this->mapService->saveMap($map, $validatedData);
             return response()->json([
                 'success' => true,
@@ -86,7 +90,7 @@ class MapController
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-            ], 400);
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

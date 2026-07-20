@@ -32,9 +32,12 @@ class MapNodeController
             'nodes.*.device_id' => 'nullable|integer',
         ]);
 
-        $this->nodeService->storeNodes($map, $validated['nodes']);
-
-        return response()->json(['success' => true]);
+        try {
+            $this->nodeService->storeNodes($map, $validated['nodes']);
+            return response()->json(['success' => true]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     public function create(Request $request, Map $map): JsonResponse
@@ -49,9 +52,12 @@ class MapNodeController
             'meta' => 'array',
         ]);
 
-        $node = $this->nodeService->createNode($map, $data);
-
-        return response()->json(['success' => true, 'node' => $node]);
+        try {
+            $node = $this->nodeService->createNode($map, $data);
+            return response()->json(['success' => true, 'node' => $node]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        }
     }
 
     public function update(Request $request, Map $map, Node $node): JsonResponse
@@ -69,6 +75,8 @@ class MapNodeController
         try {
             $node = $this->nodeService->updateNode($map, $node, $data);
             return response()->json(['success' => true, 'node' => $node]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
         }
