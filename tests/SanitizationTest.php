@@ -5,9 +5,12 @@ namespace LibreNMS\Plugins\WeathermapNG\Tests;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Tests for FormRequest sanitize() methods.
- * These are tested as standalone functions since FormRequest
- * requires Laravel, but the sanitize logic is pure.
+ * Mirrors the production sanitization logic in the FormRequest classes
+ * (CreateMapRequest, UpdateMapRequest, SaveMapRequest). FormRequest
+ * requires a booted Laravel app, so each helper below is a faithful
+ * standalone reimplementation of the corresponding sanitize() block,
+ * not a call into the live class. Keep these in sync with the real
+ * sanitize() methods — they assert the contract operators rely on.
  */
 class SanitizationTest extends TestCase
 {
@@ -48,12 +51,16 @@ class SanitizationTest extends TestCase
         $this->assertArrayNotHasKey('title', $data);
     }
 
-    // --- CreateNodeRequest-style sanitization ---
+    // --- SaveMapRequest node-label sanitization (strip_tags + trim) ---
+    // Mirrors SaveMapRequest::sanitize() nodes.*.label block. Production does
+    // NOT htmlspecialchars-encode labels (the embed/editor views escape at
+    // render time via escapeHtml/textContent), so this helper does not either.
 
     private function sanitizeNodeData(array $data): array
     {
-        $data['label'] = strip_tags($data['label']);
-        $data['label'] = htmlspecialchars($data['label'], ENT_QUOTES, 'UTF-8');
+        if (isset($data['label']) && is_string($data['label'])) {
+            $data['label'] = strip_tags(trim($data['label']));
+        }
         return $data;
     }
 
@@ -63,11 +70,12 @@ class SanitizationTest extends TestCase
         $this->assertEquals('Router-1', $data['label']);
     }
 
-    public function test_node_label_escapes_special_chars(): void
+    public function test_node_label_strips_tags_keeps_special_chars(): void
     {
         $data = $this->sanitizeNodeData(['label' => 'Router "Core" & <Main>']);
-        // strip_tags removes <Main>, then htmlspecialchars encodes quotes and ampersand
-        $this->assertEquals('Router &quot;Core&quot; &amp; ', $data['label']);
+        // strip_tags removes <Main>; quotes/ampersand are left raw because
+        // production escapes at render time (escapeHtml/textContent), not here.
+        $this->assertEquals('Router "Core" & ', $data['label']);
     }
 
     public function test_node_label_preserves_normal_text(): void
