@@ -50,45 +50,13 @@ class SanitizationTest extends TestCase
         $this->assertEquals('test-map', $data['name']);
         $this->assertArrayNotHasKey('title', $data);
     }
+    // --- SaveMapRequest node-label sanitization ---
+    // Node-label normalization is now unit-tested directly against the
+    // shared NodeLabelNormalizer in NodeLabelNormalizerTest (no mirrored
+    // helper needed — that was drift risk PR #27 acknowledged). The
+    // SanitizationTest keeps only the map/link helpers below, which mirror
+    // sanitize() logic that still lives inline in the FormRequest classes.
 
-    // --- SaveMapRequest node-label sanitization (strip_tags + trim) ---
-    // Mirrors SaveMapRequest::sanitize() nodes.*.label block. Production does
-    // NOT htmlspecialchars-encode labels (the embed/editor views escape at
-    // render time via escapeHtml/textContent), so this helper does not either.
-
-    private function sanitizeNodeData(array $data): array
-    {
-        if (isset($data['label']) && is_string($data['label'])) {
-            $data['label'] = strip_tags(trim($data['label']));
-        }
-        return $data;
-    }
-
-    public function test_node_label_strips_html(): void
-    {
-        $data = $this->sanitizeNodeData(['label' => '<img src=x onerror=alert(1)>Router-1']);
-        $this->assertEquals('Router-1', $data['label']);
-    }
-
-    public function test_node_label_strips_tags_keeps_special_chars(): void
-    {
-        $data = $this->sanitizeNodeData(['label' => 'Router "Core" & <Main>']);
-        // strip_tags removes <Main>; quotes/ampersand are left raw because
-        // production escapes at render time (escapeHtml/textContent), not here.
-        $this->assertEquals('Router "Core" & ', $data['label']);
-    }
-
-    public function test_node_label_preserves_normal_text(): void
-    {
-        $data = $this->sanitizeNodeData(['label' => 'Core-Router-01']);
-        $this->assertEquals('Core-Router-01', $data['label']);
-    }
-
-    public function test_node_label_handles_unicode(): void
-    {
-        $data = $this->sanitizeNodeData(['label' => 'Routeur-Réseau']);
-        $this->assertEquals('Routeur-Réseau', $data['label']);
-    }
 
     // --- Edge cases ---
 
@@ -96,10 +64,10 @@ class SanitizationTest extends TestCase
     {
         $map = $this->sanitizeMapData(['name' => '']);
         $this->assertEquals('', $map['name']);
-
-        $node = $this->sanitizeNodeData(['label' => '']);
-        $this->assertEquals('', $node['label']);
     }
+
+    // Node-label empty-string and script-injection cases are covered by
+    // NodeLabelNormalizerTest (real class, no mirror).
 
     public function test_nested_tags_fully_stripped(): void
     {
@@ -107,11 +75,9 @@ class SanitizationTest extends TestCase
         $this->assertEquals('clean', $data['name']);
     }
 
-    public function test_script_injection_fully_stripped(): void
-    {
-        $data = $this->sanitizeNodeData(['label' => '<script>document.cookie</script>Node']);
-        $this->assertEquals('document.cookieNode', $data['label']);
-    }
+    // test_script_injection_fully_stripped removed — covered by
+    // NodeLabelNormalizerTest::test_normalize_strips_script_tags.
+
 
     // --- SaveMapRequest link style sanitization ---
 
