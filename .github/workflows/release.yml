@@ -60,23 +60,22 @@ jobs:
       - name: Generate changelog for release
         id: changelog
         run: |
+          # GITHUB_REF is refs/tags/v1.10.0 — strip the prefix and the leading v
+          # so VERSION matches the CHANGELOG.md heading ## [1.10.0].
           VERSION="${GITHUB_REF#refs/tags/}"
+          VERSION="${VERSION#v}"
           # Extract the matching CHANGELOG.md section for this version.
           # Format: ## [1.10.0] - 2026-07-20 ... up to the next ## heading.
-          # RELEASE.md requires release notes to use the CHANGELOG section.
+          # RELEASE.md requires release notes to use the CHANGELOG section;
+          # no fallback — a missing section is a release-blocking error.
           CHANGES=$(awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { found=1; next }
             found && $0 ~ "^## " { exit }
             found { print }
           ' CHANGELOG.md)
           if [ -z "$CHANGES" ]; then
-            echo "::warning::No CHANGELOG.md section found for $VERSION. Falling back to commit subjects."
-            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-            if [ -z "$PREV_TAG" ]; then
-              CHANGES=$(git log --pretty=format:"- %s" HEAD)
-            else
-              CHANGES=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
-            fi
+            echo "::error::No CHANGELOG.md section found for $VERSION. Add a '## [$VERSION]' section before tagging."
+            exit 1
           fi
           {
             echo "CHANGES<<EOF"
@@ -97,7 +96,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          name: WeathermapNG ${{ steps.version.outputs.VERSION }}
+          name: ${{ steps.version.outputs.VERSION }}
           body: |
             ## WeathermapNG ${{ steps.version.outputs.VERSION }}
 
