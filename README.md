@@ -4,7 +4,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
-![Version 1.9.0](https://img.shields.io/badge/version-1.9.0-0078D4)
+![Version 1.10.0](https://img.shields.io/badge/version-1.10.0-0078D4)
 
 ![WeathermapNG Live View](wmng.png)
 
@@ -22,7 +22,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **Grid Snapping**: Toggle snap-to-grid for precise node alignment
 - **RRD-based Traffic Data**: Real-time bandwidth from LibreNMS RRD files
 - **Server-Sent Events**: Live updates without polling (streamed inline from the render controller)
-- **Admin-Only Authorization**: All 24 mutation endpoints require admin (`hasGlobalAdmin()`, `isAdmin()`, or level ≥ 10); read endpoints are open to every authenticated user
+- **Admin-Only Authorization**: All 24 mutation endpoints require admin (`hasGlobalAdmin()`, `isAdmin()`, `level ≥ 10`, or `hasRole('admin')`); read endpoints are open to every authenticated user
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies

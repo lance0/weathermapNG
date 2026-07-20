@@ -60,12 +60,23 @@ jobs:
       - name: Generate changelog for release
         id: changelog
         run: |
-          # Get commits since last tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            CHANGES=$(git log --pretty=format:"- %s" HEAD)
-          else
-            CHANGES=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
+          VERSION="${GITHUB_REF#refs/tags/}"
+          # Extract the matching CHANGELOG.md section for this version.
+          # Format: ## [1.10.0] - 2026-07-20 ... up to the next ## heading.
+          # RELEASE.md requires release notes to use the CHANGELOG section.
+          CHANGES=$(awk -v v="$VERSION" '
+            $0 ~ "^## \\[" v "\\]" { found=1; next }
+            found && $0 ~ "^## " { exit }
+            found { print }
+          ' CHANGELOG.md)
+          if [ -z "$CHANGES" ]; then
+            echo "::warning::No CHANGELOG.md section found for $VERSION. Falling back to commit subjects."
+            PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+            if [ -z "$PREV_TAG" ]; then
+              CHANGES=$(git log --pretty=format:"- %s" HEAD)
+            else
+              CHANGES=$(git log --pretty=format:"- %s" "${PREV_TAG}..HEAD")
+            fi
           fi
           {
             echo "CHANGES<<EOF"

@@ -323,7 +323,7 @@ All WeathermapNG routes sit under LibreNMS `web` + `auth` middleware except the 
 Within the authenticated surface, two tiers apply:
 
 - **Read endpoints** — open to any authenticated LibreNMS user: viewing maps, the editor view, embed, JSON/export, live data, SSE stream, device/port lookups, template listings, and health/metrics detail.
-- **Mutation endpoints** — require an admin user (`hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`): creating, updating, or deleting maps, nodes, and links; saving a map; importing a map; auto-discovery; creating, updating, or deleting templates; creating a map from a template; and running the install controller.
+- **Mutation endpoints** — require an admin user (`hasGlobalAdmin()`, `isAdmin()`, `level >= 10`, or `hasRole('admin')`): creating, updating, or deleting maps, nodes, and links; saving a map; importing a map; auto-discovery; creating, updating, or deleting templates; creating a map from a template; and running the install controller.
 
 This replaces the older per-map policy model. The `MapPolicy` and `NodePolicy` classes were removed in v1.7.0; authorization is now enforced at the controller level using LibreNMS's global admin check. There is no per-map ownership configuration to maintain.
 
@@ -333,6 +333,7 @@ This replaces the older per-map policy model. The `MapPolicy` and `NodePolicy` c
 cd /opt/librenms/html/plugins/WeathermapNG
 git pull
 composer install --no-dev
+php database/setup.php
 cd /opt/librenms
 FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
