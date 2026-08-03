@@ -122,6 +122,26 @@
     color: var(--editor-input-text); box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.25);
 }
 
+/* Device autocomplete */
+.ac-wrap { position: relative; }
+.ac-input { font-size: 12px; background: var(--editor-input-bg); border: 1px solid var(--editor-input-border);
+    color: var(--editor-input-text); padding: 4px 8px; border-radius: 4px; width: 100%; box-sizing: border-box; }
+.ac-input:focus { outline: none; border-color: var(--editor-accent); box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.25); }
+.ac-dropdown { position: absolute; left: 0; right: 0; top: 100%; max-height: 220px; overflow-y: auto;
+    background: var(--editor-sidebar-bg); border: 1px solid var(--editor-input-border); border-radius: 4px;
+    z-index: 1200; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+.ac-dropdown.show { display: block; }
+.ac-item { padding: 6px 10px; font-size: 12px; color: var(--editor-text); cursor: pointer; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+.ac-item:hover, .ac-item.active { background: var(--editor-list-hover); }
+.ac-empty { padding: 8px 10px; font-size: 11px; color: var(--editor-text-muted); font-style: italic; }
+.ac-loading { padding: 8px 10px; font-size: 11px; color: var(--editor-text-muted); }
+.ac-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.ac-device-name { font-size: 12px; color: var(--editor-text); flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 8px; }
+.ac-change-btn { font-size: 11px; padding: 2px 6px; margin-left: 4px; cursor: pointer; flex-shrink: 0; }
+.ac-selected-row { display: flex; align-items: center; gap: 4px; }
+
 /* Node/link list items */
 #nodes-list > div:hover, #links-list > div:hover {
     background-color: var(--editor-list-hover); border-radius: 3px;
@@ -269,9 +289,13 @@
             <div class="panel-body">
                 <div class="form-group mb-2">
                     <label class="form-label">Device</label>
-                    <select class="form-control form-control-sm" id="device-select">
-                        <option value="">Select device...</option>
-                    </select>
+                    <div class="ac-wrap" id="device-ac-wrap">
+                        <input type="text" class="ac-input" id="device-search"
+                            placeholder="Search devices..." autocomplete="off" role="combobox"
+                            aria-expanded="false" aria-autocomplete="list" aria-controls="device-ac-results">
+                        <input type="hidden" id="device-select" value="">
+                        <div class="ac-dropdown" id="device-ac-results" role="listbox"></div>
+                    </div>
                 </div>
                 <div class="form-group mb-2" id="interface-container" style="display: none;">
                     <label class="form-label">Interface</label>
@@ -297,9 +321,18 @@
                 </div>
                 <div class="form-group mb-2">
                     <label class="form-label">Device</label>
-                    <select class="form-control form-control-sm" id="node-prop-device">
-                        <option value="">No device</option>
-                    </select>
+                    <div class="ac-selected-row">
+                        <span class="ac-device-name" id="node-prop-device-name">No device</span>
+                        <input type="hidden" id="node-prop-device" value="">
+                        <button type="button" class="btn btn-sm btn-outline-secondary ac-change-btn"
+                            id="node-prop-device-change" onclick="openNodeDeviceAutocomplete()">Change</button>
+                    </div>
+                    <div class="ac-wrap" id="node-device-ac-wrap" style="display:none;">
+                        <input type="text" class="ac-input" id="node-device-search"
+                            placeholder="Search devices..." autocomplete="off" role="combobox"
+                            aria-expanded="false" aria-autocomplete="list" aria-controls="node-device-ac-results">
+                        <div class="ac-dropdown" id="node-device-ac-results" role="listbox"></div>
+                    </div>
                 </div>
                 <div class="form-group mb-2">
                     <label class="form-label">Interface</label>
@@ -977,6 +1010,13 @@
                 return nodes.find(node => node.id === id || node.dbId === id);
             }
 
+            function getNodeColor(node) {
+                const status = node.status || 'unknown';
+                if (status === 'down') return '#dc3545';
+                if (status === 'up') return '#28a745';
+                return '#6c757d';  // unknown
+            }
+
             function drawNode(node) {
                 const radius = 12;
                 const defaultNodeStyle = getDefaultNodeStyle();
@@ -989,7 +1029,7 @@
                 } else if (node === selectedNode) {
                     ctx.fillStyle = '#0d6efd'; // Blue for selected
                 } else {
-                    ctx.fillStyle = defaultNodeStyle.color || '#28a745';
+                    ctx.fillStyle = node.status ? getNodeColor(node) : (defaultNodeStyle.color || '#28a745');
                 }
                 ctx.fill();
 
@@ -1004,6 +1044,17 @@
                     ctx.strokeStyle = 'rgba(253, 126, 20, 0.5)';
                     ctx.lineWidth = 2;
                     ctx.stroke();
+                }
+
+                // Draw red dashed ring for down nodes
+                if (node.status === 'down') {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(220, 53, 69, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([3, 2]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
                 }
 
                 // Use theme-aware text color for labels with shadow for readability
@@ -1506,6 +1557,8 @@
                         x: node.x,
                         y: node.y,
                         deviceId: node.device_id,
+                        deviceName: node.device_name || null,
+                        status: node.status || null,
                         interfaceId: node.meta?.interface_id || null,
                     }));
 
@@ -1552,50 +1605,168 @@
                 });
             }
 
+            // --- Device autocomplete ---
+            let acSelectedDevice = null;   // currently selected device from the add-node search
+
+            function deviceName(device) {
+                return device.hostname || device.sysName || `Device ${device.device_id}`;
+            }
+
+            function deviceStatusColor(device) {
+                const st = device.status || 'unknown';
+                if (st === 'down') return '#dc3545';
+                if (st === 'up') return '#28a745';
+                return '#6c757d';
+            }
+
             function loadDevices() {
-                const deviceSelect = document.getElementById('device-select');
+                initDeviceAutocomplete('device-search', 'device-ac-results', function(device) {
+                    acSelectedDevice = device;
+                    devicesCache = [device];
+                    document.getElementById('device-select').value = device.device_id;
+                    loadDeviceInterfaces(device.device_id);
+                });
+            }
+
+            function loadDeviceInterfaces(deviceId) {
                 const interfaceSelect = document.getElementById('interface-select');
                 const interfaceContainer = document.getElementById('interface-container');
-                if (!deviceSelect || !interfaceSelect) return;
-
-                deviceSelect.innerHTML = '<option value="">Choose a device...</option>';
-                fetch('{{ url('plugin/WeathermapNG/api/devices') }}')
+                interfaceSelect.innerHTML = '<option value="">Select interface...</option>';
+                if (!deviceId) {
+                    if (interfaceContainer) interfaceContainer.style.display = 'none';
+                    return;
+                }
+                if (interfaceContainer) interfaceContainer.style.display = 'block';
+                fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports`)
                     .then(r => {
-                        if (!r.ok) { console.warn('Failed to load devices: HTTP ' + r.status); return []; }
+                        if (!r.ok) { console.warn('Failed to load ports: HTTP ' + r.status); return { ports: [] }; }
                         return r.json();
                     })
                     .then(data => {
-                        const devices = Array.isArray(data) ? data : (data.devices || []);
-                        devicesCache = devices;
-                        devices.forEach(device => {
+                        (data.ports || []).forEach(port => {
                             const option = document.createElement('option');
-                            option.value = device.device_id;
-                            option.textContent = device.hostname || device.sysName || `Device ${device.device_id}`;
-                            deviceSelect.appendChild(option);
+                            option.value = port.port_id;
+                            option.textContent = port.ifName || port.ifIndex || `Port ${port.port_id}`;
+                            interfaceSelect.appendChild(option);
                         });
                     });
+            }
 
-                deviceSelect.addEventListener('change', function() {
-                    const deviceId = this.value;
-                    interfaceSelect.innerHTML = '<option value="">Choose an interface...</option>';
-                    if (!deviceId) {
-                        if (interfaceContainer) interfaceContainer.style.display = 'none';
+            function initDeviceAutocomplete(searchId, resultsId, onSelect) {
+                const search = document.getElementById(searchId);
+                const dropdown = document.getElementById(resultsId);
+                if (!search || !dropdown) return;
+
+                let localResults = [];
+                let localActive = -1;
+                let localTimer = null;
+
+                function setItems(devices) {
+                    localResults = devices;
+                    devicesCache = devices;
+                    localActive = -1;
+                    dropdown.innerHTML = '';
+                    if (!devices.length) {
+                        const empty = document.createElement('div');
+                        empty.className = 'ac-empty';
+                        empty.textContent = 'No devices found';
+                        dropdown.appendChild(empty);
+                    } else {
+                        devices.forEach((dev, i) => {
+                            const item = document.createElement('div');
+                            item.className = 'ac-item' + (i === localActive ? ' active' : '');
+                            item.setAttribute('role', 'option');
+                            const dot = document.createElement('span');
+                            dot.className = 'ac-status-dot';
+                            dot.style.background = deviceStatusColor(dev);
+                            item.appendChild(dot);
+                            item.appendChild(document.createTextNode(deviceName(dev)));
+                            item.addEventListener('mousedown', function(e) {
+                                e.preventDefault();
+                                selectItem(i);
+                            });
+                            dropdown.appendChild(item);
+                        });
+                    }
+                    dropdown.classList.add('show');
+                    search.setAttribute('aria-expanded', 'true');
+                }
+
+                function hide() {
+                    dropdown.classList.remove('show');
+                    search.setAttribute('aria-expanded', 'false');
+                }
+
+                function updateActive() {
+                    const items = dropdown.querySelectorAll('.ac-item');
+                    items.forEach((el, i) => el.classList.toggle('active', i === localActive));
+                    if (localActive >= 0 && items[localActive]) {
+                        items[localActive].scrollIntoView({ block: 'nearest' });
+                    }
+                }
+
+                function selectItem(idx) {
+                    const dev = localResults[idx];
+                    if (!dev) return;
+                    search.value = deviceName(dev);
+                    hide();
+                    onSelect(dev);
+                }
+
+                search.addEventListener('input', function() {
+                    const q = this.value.trim();
+                    clearTimeout(localTimer);
+                    if (q.length < 2) {
+                        hide();
                         return;
                     }
-                    if (interfaceContainer) interfaceContainer.style.display = 'block';
-                    fetch(`{{ url('plugin/WeathermapNG/api/device') }}/${deviceId}/ports`)
-                        .then(r => {
-                            if (!r.ok) { console.warn('Failed to load ports: HTTP ' + r.status); return { ports: [] }; }
-                            return r.json();
-                        })
-                        .then(data => {
-                            (data.ports || []).forEach(port => {
-                                const option = document.createElement('option');
-                                option.value = port.port_id;
-                                option.textContent = port.ifName || port.ifIndex || `Port ${port.port_id}`;
-                                interfaceSelect.appendChild(option);
-                            });
-                        });
+                    localTimer = setTimeout(function() {
+                        dropdown.innerHTML = '<div class="ac-loading">Searching...</div>';
+                        dropdown.classList.add('show');
+                        fetch('{{ url('plugin/WeathermapNG/api/devices') }}?q=' + encodeURIComponent(q))
+                            .then(r => {
+                                if (!r.ok) return [];
+                                return r.json();
+                            })
+                            .then(data => {
+                                const devices = Array.isArray(data) ? data : (data.devices || []);
+                                setItems(devices);
+                            })
+                            .catch(function() { hide(); });
+                    }, 200);
+                });
+
+                search.addEventListener('keydown', function(e) {
+                    if (!dropdown.classList.contains('show')) {
+                        if (e.key === 'ArrowDown' && this.value.trim().length >= 2) {
+                            e.preventDefault();
+                            this.dispatchEvent(new Event('input'));
+                        }
+                        return;
+                    }
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        localActive = Math.min(localActive + 1, localResults.length - 1);
+                        updateActive();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        localActive = Math.max(localActive - 1, 0);
+                        updateActive();
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (localActive >= 0) {
+                            selectItem(localActive);
+                        } else if (localResults.length === 1) {
+                            selectItem(0);
+                        }
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        hide();
+                    }
+                });
+
+                search.addEventListener('blur', function() {
+                    setTimeout(hide, 150);
                 });
             }
 
@@ -1607,7 +1778,7 @@
                 const interfaceSelect = document.getElementById('interface-select');
                 const deviceId = deviceSelect?.value ? parseInt(deviceSelect.value, 10) : null;
                 const interfaceId = interfaceSelect?.value ? parseInt(interfaceSelect.value, 10) : null;
-                const device = devicesCache.find(d => d.device_id === deviceId);
+                const device = acSelectedDevice || devicesCache.find(d => d.device_id === deviceId);
                 const label = device?.hostname || device?.sysName || `Node ${nodes.length + 1}`;
 
                 // Smart placement: spiral outward from center to avoid overlap
@@ -1630,6 +1801,8 @@
                     x: x,
                     y: y,
                     deviceId: deviceId,
+                    deviceName: device ? deviceName(device) : null,
+                    status: device ? (device.status || null) : null,
                     interfaceId: interfaceId,
                 };
 
@@ -1869,8 +2042,6 @@ function exportJson() {
 function populateNodeProperties(node) {
     const card = document.getElementById('node-properties-card');
     const label = document.getElementById('node-prop-label');
-    const devSel = document.getElementById('node-prop-device');
-    const intSel = document.getElementById('node-prop-interface');
 
     if (!node) {
         if (card) card.style.display = 'none';
@@ -1891,33 +2062,50 @@ function populateNodeProperties(node) {
         };
     }
 
-    // Populate device dropdown from cache
-    if (devSel) {
-        devSel.innerHTML = '<option value="">No device</option>';
-        devicesCache.forEach(device => {
-            const opt = document.createElement('option');
-            opt.value = device.device_id;
-            opt.textContent = device.hostname || device.sysName || `Device ${device.device_id}`;
-            if (node.deviceId == device.device_id) opt.selected = true;
-            devSel.appendChild(opt);
-        });
-
-        // Update interface when device changes
-        devSel.onchange = function() {
-            node.deviceId = this.value ? parseInt(this.value, 10) : null;
-            node.interfaceId = null;
-            renderEditor();
-            renderNodesList();
-            markUnsaved();
-            loadInterfacesForNode(node);
-            const _vbtn = document.getElementById('node-view-device-btn');
-            if (_vbtn) _vbtn.style.display = node.deviceId ? 'inline-block' : 'none';
-        };
+    // Populate device display + Change button
+    const devName = document.getElementById('node-prop-device-name');
+    const devHidden = document.getElementById('node-prop-device');
+    const devWrap = document.getElementById('node-device-ac-wrap');
+    if (devHidden) {
+        devHidden.value = node.deviceId || '';
+        if (devName) devName.textContent = node.deviceName || (node.deviceId ? `Device ${node.deviceId}` : 'No device');
+        // Hide any open autocomplete from a previous node
+        if (devWrap) devWrap.style.display = 'none';
     }
 
     // Show/hide View Device button based on current selection
     const viewBtn = document.getElementById('node-view-device-btn');
     if (viewBtn) viewBtn.style.display = node.deviceId ? 'inline-block' : 'none';
+}
+
+function openNodeDeviceAutocomplete() {
+    if (!selectedNode) return;
+    const wrap = document.getElementById('node-device-ac-wrap');
+    const search = document.getElementById('node-device-search');
+    if (!wrap || !search) return;
+    wrap.style.display = 'block';
+    search.value = '';
+    search.focus();
+    // Lazy-init the autocomplete once
+    if (!search.dataset.acReady) {
+        search.dataset.acReady = '1';
+        initDeviceAutocomplete('node-device-search', 'node-device-ac-results', function(device) {
+            selectedNode.deviceId = device.device_id;
+            selectedNode.deviceName = deviceName(device);
+            selectedNode.status = device.status || null;
+            selectedNode.interfaceId = null;
+            const devHidden = document.getElementById('node-prop-device');
+            const devName = document.getElementById('node-prop-device-name');
+            if (devHidden) devHidden.value = device.device_id;
+            if (devName) devName.textContent = deviceName(device);
+            renderEditor();
+            renderNodesList();
+            markUnsaved();
+            loadInterfacesForNode(selectedNode);
+            const _vbtn = document.getElementById('node-view-device-btn');
+            if (_vbtn) _vbtn.style.display = 'inline-block';
+        });
+    }
 }
 
 function loadInterfacesForNode(node) {
