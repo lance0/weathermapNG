@@ -433,7 +433,9 @@
             console.error('Failed to parse map data:', e);
             mapData = { error: 'Invalid map data' };
         }
-        // Build the node lookup map from the initial parsed mapData.
+        // nodeById lookup map — rebuilt whenever mapData.nodes changes,
+        // eliminates O(L*N) Array.find() per render frame in drawLink.
+        let nodeById = new Map();
         rebuildNodeIndex();
         let canvas, ctx, overlayCanvas, overlayCtx, minimap;
         let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
@@ -462,9 +464,6 @@
         // loop starts animating immediately when the page loads with traffic.
         hasActiveTraffic = Array.isArray(mapData.links) &&
             mapData.links.some(l => (l.live?.in_bps > 0 || l.live?.out_bps > 0));
-        // nodeById lookup map — rebuilt whenever mapData.nodes changes,
-        // eliminates O(L*N) Array.find() per render frame in drawLink.
-        let nodeById = new Map();
         function rebuildNodeIndex() {
             nodeById = new Map();
             if (Array.isArray(mapData.nodes)) {
