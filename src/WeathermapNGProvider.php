@@ -6,11 +6,28 @@ use Illuminate\Support\ServiceProvider;
 use LibreNMS\Interfaces\Plugins\Hooks\MenuEntryHook;
 use LibreNMS\Interfaces\Plugins\Hooks\SettingsHook;
 use LibreNMS\Interfaces\Plugins\PluginManagerInterface;
+use LibreNMS\Plugins\WeathermapNG\Console\Commands\CreateMapCommand;
+use LibreNMS\Plugins\WeathermapNG\Console\Commands\DiscoverCommand;
+use LibreNMS\Plugins\WeathermapNG\Console\Commands\ExportMapCommand;
+use LibreNMS\Plugins\WeathermapNG\Console\Commands\ListMapsCommand;
 use LibreNMS\Plugins\WeathermapNG\Hooks\MenuEntry;
 use LibreNMS\Plugins\WeathermapNG\Hooks\Settings;
 
 class WeathermapNGProvider extends ServiceProvider
 {
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        $this->commands([
+            CreateMapCommand::class,
+            ListMapsCommand::class,
+            ExportMapCommand::class,
+            DiscoverCommand::class,
+        ]);
+    }
+
     /**
      * Bootstrap any package services.
      */
