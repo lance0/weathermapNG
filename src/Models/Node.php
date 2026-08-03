@@ -81,7 +81,7 @@ class Node extends Model
      *
      * @return array<string,mixed>|null
      */
-    private function resolveDevice(?int $deviceId): ?array
+    public function resolveDevice(?int $deviceId): ?array
     {
         if ($deviceId === null || $deviceId === 0) {
             return null;

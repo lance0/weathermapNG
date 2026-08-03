@@ -64,13 +64,16 @@ class RenderController
         $target = in_array($request->input('target'), ['self', '_self'], true) ? '_self' : '_blank';
 
         // Ordered list of maps so kiosk mode can cycle without an extra API call.
-        $mapList = Map::query()
-            ->select(['id', 'name', 'title'])
-            ->orderBy('name')
-            ->get()
-            ->map(fn($m) => ['id' => $m->id, 'name' => $m->name, 'title' => $m->title])
-            ->values()
-            ->toArray();
+        // Only build it when kiosk cycling is actually active.
+        $mapList = ($kiosk === true && $cycleSeconds !== null)
+            ? Map::query()
+                ->select(['id', 'name', 'title'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn($m) => ['id' => $m->id, 'name' => $m->name, 'title' => $m->title])
+                ->values()
+                ->toArray()
+            : [];
 
         return view('WeathermapNG::embed', compact(
             'mapData',

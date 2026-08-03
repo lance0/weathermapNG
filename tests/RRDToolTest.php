@@ -27,6 +27,7 @@ class RRDToolTest extends TestCase
         $this->assertTrue(method_exists($this->rrdTool, 'fetch'));
         $this->assertTrue(method_exists($this->rrdTool, 'getLastValue'));
         $this->assertTrue(method_exists($this->rrdTool, 'getAverageValue'));
+        $this->assertTrue(method_exists($this->rrdTool, 'getLastValues'));
     }
 
     /** @test */
@@ -49,6 +50,32 @@ class RRDToolTest extends TestCase
     {
         $result = $this->rrdTool->getAverageValue('/nonexistent/file.rrd', 'traffic_in');
         $this->assertNull($result);
+    }
+
+    /** @test */
+    public function getLastValues_returns_empty_array_for_nonexistent_file()
+    {
+        $result = $this->rrdTool->getLastValues('/nonexistent/file.rrd');
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    /** @test */
+    public function getLastValues_returns_both_traffic_metrics_from_single_invocation()
+    {
+        // Simulate rrdtool fetch output with both traffic_in and traffic_out columns.
+        // Uses Reflection to test the private parseLastRow parser directly.
+        $output = "traffic_in traffic_out\n" .
+                  "1700000000: 1000 2000\n" .
+                  "1700000300: 1500 2500\n";
+
+        $ref = new \ReflectionMethod($this->rrdTool, 'parseLastRow');
+        $ref->setAccessible(true);
+        $row = $ref->invoke($this->rrdTool, $output);
+
+        $this->assertIsArray($row);
+        $this->assertEquals('1500', $row['traffic_in']);
+        $this->assertEquals('2500', $row['traffic_out']);
     }
 
     // Note: Full RRD testing requires actual RRD files and rrdtool binary

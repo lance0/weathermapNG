@@ -157,12 +157,11 @@ class RrdDataService
     private function fetchTrafficFromRrd(string $rrdPath): array
     {
         try {
-            $inBps = $this->rrdTool->getLastValue($rrdPath, 'traffic_in');
-            $outBps = $this->rrdTool->getLastValue($rrdPath, 'traffic_out');
+            $values = $this->rrdTool->getLastValues($rrdPath);
 
             return [
-                'in' => (int) ($inBps ?? 0),
-                'out' => (int) ($outBps ?? 0),
+                'in' => (int) ($values['traffic_in'] ?? 0),
+                'out' => (int) ($values['traffic_out'] ?? 0),
             ];
         } catch (\Exception $e) {
             Log::error("Failed to fetch traffic from RRD {$rrdPath}: " . $e->getMessage());
