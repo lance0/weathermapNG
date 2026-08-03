@@ -33,6 +33,59 @@ class AlertService
         return $this->buildAlertsByPort($alerts, $portIds);
     }
 
+    /**
+     * Fetch recent alert history for the given devices (all states, newest first).
+     *
+     * @param  array<int>  $deviceIds
+     * @param  int  $limit  Maximum number of rows to return.
+     * @return array<int, array{id: int, device_id: int, state: int, severity: mixed, timestamp: mixed}> Alert rows ordered by timestamp DESC.
+     */
+    public function deviceAlertHistory(array $deviceIds, int $limit = 10): array
+    {
+        if (empty($deviceIds)) {
+            return [];
+        }
+
+        try {
+            return DB::table('alerts')
+                ->select('id', 'device_id', 'state', 'severity', 'timestamp')
+                ->whereIn('device_id', $deviceIds)
+                ->orderBy('timestamp', 'desc')
+                ->limit($limit)
+                ->get()
+                ->toArray();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Fetch recent alert history for the given ports (all states, newest first).
+     *
+     * @param  array<int>  $portIds
+     * @param  int  $limit  Maximum number of rows to return.
+     * @return array<int, array{id: int, port_id: int, state: int, severity: mixed, timestamp: mixed}> Alert rows ordered by timestamp DESC.
+     */
+    public function portAlertHistory(array $portIds, int $limit = 10): array
+    {
+        if (empty($portIds)) {
+            return [];
+        }
+
+        try {
+            return DB::table('alerts')
+                ->select('id', 'entity_id as port_id', 'state', 'severity', 'timestamp')
+                ->where('entity_type', 'port')
+                ->whereIn('entity_id', $portIds)
+                ->orderBy('timestamp', 'desc')
+                ->limit($limit)
+                ->get()
+                ->toArray();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     private function fetchDeviceAlerts(array $deviceIds): array
     {
         $alerts = $this->fetchDeviceAlertsFromTable($deviceIds);
@@ -48,7 +101,7 @@ class AlertService
     {
         try {
             return DB::table('alerts')
-                ->select('device_id', 'state', 'severity')
+                ->select('id', 'device_id', 'state', 'severity', 'timestamp')
                 ->whereIn('device_id', $deviceIds)
                 ->where('state', '!=', 0)
                 ->get()
@@ -62,7 +115,7 @@ class AlertService
     {
         try {
             return DB::table('alerts')
-                ->select('entity_id as device_id', 'state', 'severity')
+                ->select('id', 'entity_id as device_id', 'state', 'severity', 'timestamp')
                 ->where('entity_type', 'device')
                 ->whereIn('entity_id', $deviceIds)
                 ->where('state', '!=', 0)
@@ -112,7 +165,7 @@ class AlertService
     {
         try {
             return DB::table('alerts')
-                ->select('entity_id as port_id', 'state', 'severity')
+                ->select('id', 'entity_id as port_id', 'state', 'severity', 'timestamp')
                 ->where('entity_type', 'port')
                 ->whereIn('entity_id', $portIds)
                 ->where('state', '!=', 0)
