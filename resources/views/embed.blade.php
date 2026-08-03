@@ -27,6 +27,11 @@
             display: block;
         }
 
+        #overlay-canvas {
+            position: absolute;
+            pointer-events: none;
+        }
+
         .loading {
             display: flex;
             flex-direction: column;
@@ -295,6 +300,7 @@
             <div>Loading map...</div>
         </div>
         <canvas id="map-canvas"></canvas>
+        <canvas id="overlay-canvas"></canvas>
         <canvas id="minimap" width="160" height="120" class="embed-minimap"></canvas>
         <div id="status-bar" class="status-bar" style="display: none;">
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
@@ -395,8 +401,10 @@
         }
         // Build the node lookup map from the initial parsed mapData.
         rebuildNodeIndex();
-        let canvas, ctx, minimap;
+        let canvas, ctx, overlayCanvas, overlayCtx, minimap;
         let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
+        let staticDirty = true;
+        let hasActiveTraffic = false;
         let animationId;
         let lastUpdate = Date.now();
         let animTick = 0;
@@ -416,6 +424,10 @@
         let flowAnimationEnabled = !reducedMotion;
         let particleDensity = 1.0; // 0.5 to 2.0
         let particleSpeed = 1.0; // 0.5 to 2.0
+        // Compute initial traffic state from any inline live data so the RAF
+        // loop starts animating immediately when the page loads with traffic.
+        hasActiveTraffic = Array.isArray(mapData.links) &&
+            mapData.links.some(l => (l.live?.in_bps > 0 || l.live?.out_bps > 0));
         // nodeById lookup map — rebuilt whenever mapData.nodes changes,
         // eliminates O(L*N) Array.find() per render frame in drawLink.
         let nodeById = new Map();
@@ -442,7 +454,7 @@
                 startLiveUpdates();
                 renderLegend();
                 const ms = document.getElementById('metric-select');
-                if (ms) { ms.value = currentMetric; ms.addEventListener('change', () => { currentMetric = ms.value; renderLegend(); renderMap(); }); }
+                if (ms) { ms.value = currentMetric; ms.addEventListener('change', () => { currentMetric = ms.value; renderLegend(); staticDirty = true; renderMap(); }); }
                 const ex = document.getElementById('export-png');
                 if (ex) ex.addEventListener('click', exportPNG);
                 if (navEnabled) initNavControls();
@@ -451,14 +463,29 @@
             }
         });
 
+        function syncOverlayCanvas() {
+            // Position and size the overlay canvas to exactly match the main canvas.
+            // The main canvas is flex-centered inside #map-container, so we mirror
+            // its rendered offset rather than assuming top-left alignment.
+            const rect = canvas.getBoundingClientRect();
+            const containerRect = canvas.parentElement.getBoundingClientRect();
+            overlayCanvas.style.left = (rect.left - containerRect.left) + 'px';
+            overlayCanvas.style.top = (rect.top - containerRect.top) + 'px';
+            overlayCanvas.width = canvas.width;
+            overlayCanvas.height = canvas.height;
+        }
+
         function initCanvas() {
             canvas = document.getElementById('map-canvas');
             ctx = canvas.getContext('2d');
+            overlayCanvas = document.getElementById('overlay-canvas');
+            overlayCtx = overlayCanvas.getContext('2d');
 
             // Set canvas size
             const container = document.getElementById('map-container');
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
+            syncOverlayCanvas();
             minimap = document.getElementById('minimap');
 
             // Hide loading
@@ -466,7 +493,7 @@
             const bgUrl = mapData.options?.background_image;
             if (bgUrl) {
                 bgImg = new Image();
-                bgImg.onload = () => { renderMap(); };
+                bgImg.onload = () => { staticDirty = true; renderMap(); };
                 bgImg.src = bgUrl;
             }
         }
@@ -478,7 +505,7 @@
             nodeGeoms.length = 0;
             linkGeoms.length = 0;
 
-            // Clear canvas
+            // Clear main canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // Draw background
@@ -509,7 +536,7 @@
             ctx.translate(viewOffsetX, viewOffsetY);
             ctx.scale(viewScale, viewScale);
 
-            // Draw links first (behind nodes)
+            // Draw static link parts (line stroke, color, width, labels, badges)
             if (Array.isArray(mapData.links)) {
                 mapData.links.forEach(link => {
                     drawLink(link);
@@ -525,9 +552,32 @@
 
             ctx.restore();
 
+            // Static layer is now current; only the overlay needs per-frame work.
+            staticDirty = false;
+
+            // Draw dynamic overlay (particles / dash animation) immediately so a
+            // single renderMap() call (e.g. from pan/zoom) shows a complete frame.
+            renderOverlay();
+
             // Update status and overlays
             updateStatus();
             if (!skipMinimap) drawMinimap();
+        }
+
+        // Draw only the dynamic layer (particles / animated dashes) onto the
+        // overlay canvas. Runs every RAF tick; the main canvas is untouched.
+        function renderOverlay() {
+            if (!mapData || !mapData.links) return;
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayCtx.save();
+            overlayCtx.translate(viewOffsetX, viewOffsetY);
+            overlayCtx.scale(viewScale, viewScale);
+            if (Array.isArray(mapData.links)) {
+                mapData.links.forEach(link => {
+                    drawLinkDynamic(link, overlayCtx);
+                });
+            }
+            overlayCtx.restore();
         }
 
         function initKioskMode() {
@@ -625,6 +675,7 @@
                 const dx = e.clientX - panLastX; const dy = e.clientY - panLastY;
                 panLastX = e.clientX; panLastY = e.clientY;
                 userOffsetX += dx; userOffsetY += dy;
+                staticDirty = true;
                 renderMap();
             });
             window.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; canvas.style.cursor = 'default'; } });
@@ -650,10 +701,11 @@
             const vy = wy * (baseScale * userScale) + baseOffsetY;
             userOffsetX = cx - vx;
             userOffsetY = cy - vy;
+            staticDirty = true;
             renderMap();
         }
 
-        function resetView() { userScale = 1; userOffsetX = 0; userOffsetY = 0; renderMap(); }
+        function resetView() { userScale = 1; userOffsetX = 0; userOffsetY = 0; staticDirty = true; renderMap(); }
         function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
         const nodeGeoms = [];
@@ -888,35 +940,21 @@
             const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
 
             const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
-
-            // Draw link line
-            traceLinkPath(ctx, points, viaStyle);
             const metric = getLinkMetric(link);
             const pct = getLinkPct(link, metric);
             const linkStyle = link.style || {};
-            ctx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
             const width = Math.max(0.5, linkStyle.width || link.width || defaultLinkStyle.width || 2);
-            ctx.lineWidth = width;
-            
-            // Use solid line if flow animation is enabled
-            if (!flowAnimationEnabled) {
-                const dash = Math.max(6, width * 3);
-                ctx.setLineDash([dash, dash]);
-                // Animate dash offset only when motion is not reduced;
-                // otherwise keep the dashed line static for prefers-reduced-motion.
-                if (!reducedMotion) {
-                    const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
-                    ctx.lineDashOffset = -(animTick * speed);
-                }
-            }
-            ctx.stroke();
-            ctx.setLineDash([]);
-            
-            // Draw flow particles if enabled
-            if (flowAnimationEnabled) {
-                drawFlowParticles(link, x1, y1, x2, y2, pct, points);
-            }
 
+            // Draw link line (static). In flow mode the line is solid; in dash
+            // mode the line stroke is delegated to the overlay (drawLinkDynamic)
+            // so the animated dash offset doesn't force a main-canvas redraw.
+            if (flowAnimationEnabled) {
+                traceLinkPath(ctx, points, viaStyle);
+                ctx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
+                ctx.lineWidth = width;
+                ctx.stroke();
+            }
+            // Dash-mode line and particles are drawn on the overlay by drawLinkDynamic.
             // Link utilization label
             if (metric !== null && metric !== undefined) {
                 const showLabel = (currentMetric === 'percent')
@@ -954,8 +992,47 @@
             // store geometry for hover
             storeLinkGeom(link, x1, y1, x2, y2, pct, points);
         }
+
+        // Draw the dynamic parts of a link onto the overlay canvas:
+        // - flow mode: particles via drawFlowParticles
+        // - dash mode: dashed line stroke with animated lineDashOffset
+        function drawLinkDynamic(link, octx) {
+            const srcId = link.source ?? link.src ?? link.source_id;
+            const dstId = link.target ?? link.dst ?? link.destination_id;
+            const sourceNode = nodeById.get(srcId);
+            const targetNode = nodeById.get(dstId);
+            if (!sourceNode || !targetNode) return;
+
+            const x1 = (sourceNode.position?.x ?? sourceNode.x) || 0;
+            const y1 = (sourceNode.position?.y ?? sourceNode.y) || 0;
+            const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
+            const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
+
+            const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+            const metric = getLinkMetric(link);
+            const pct = getLinkPct(link, metric);
+            const linkStyle = link.style || {};
+            const width = Math.max(0.5, linkStyle.width || link.width || defaultLinkStyle.width || 2);
+
+            if (flowAnimationEnabled) {
+                drawFlowParticles(link, x1, y1, x2, y2, pct, points, octx);
+            } else {
+                // Dash-mode: draw the dashed line with animated offset.
+                traceLinkPath(octx, points, viaStyle);
+                octx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
+                octx.lineWidth = width;
+                const dash = Math.max(6, width * 3);
+                octx.setLineDash([dash, dash]);
+                if (!reducedMotion) {
+                    const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
+                    octx.lineDashOffset = -(animTick * speed);
+                }
+                octx.stroke();
+                octx.setLineDash([]);
+            }
+        }
         
-        function drawFlowParticles(link, x1, y1, x2, y2, pct, pathPoints) {
+        function drawFlowParticles(link, x1, y1, x2, y2, pct, pathPoints, drawCtx) {
             const live = link.live || {};
             const inBps = live.in_bps || 0;
             const outBps = live.out_bps || 0;
@@ -1005,7 +1082,7 @@
             
             const linkParticles = particles[linkId];
             
-            ctx.save();
+            drawCtx.save();
             if (linkParticles.forward && Array.isArray(linkParticles.forward)) {
                 linkParticles.forward.forEach(particle => {
                 particle.progress += (particle.speed * 0.005);
@@ -1013,17 +1090,16 @@
                 
                 const pos = getPointOnPath(points, particle.progress);
                 
-                ctx.globalAlpha = particle.opacity * 0.3;
-                ctx.fillStyle = '#00ff00';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.globalAlpha = particle.opacity;
-                ctx.fillStyle = '#40ff40';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
-                ctx.fill();
+                drawCtx.globalAlpha = particle.opacity * 0.3;
+                drawCtx.fillStyle = '#00ff00';
+                drawCtx.beginPath();
+                drawCtx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
+                drawCtx.fill();
+                drawCtx.globalAlpha = particle.opacity;
+                drawCtx.fillStyle = '#40ff40';
+                drawCtx.beginPath();
+                drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
+                drawCtx.fill();
                 });
             }
             
@@ -1034,20 +1110,19 @@
                 
                 const pos = getPointOnPath(points, 1 - particle.progress);
                 
-                ctx.globalAlpha = particle.opacity * 0.3;
-                ctx.fillStyle = '#0080ff';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
-                ctx.fill();
-                
-                ctx.globalAlpha = particle.opacity;
-                ctx.fillStyle = '#40a0ff';
-                ctx.beginPath();
-                ctx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
-                ctx.fill();
+                drawCtx.globalAlpha = particle.opacity * 0.3;
+                drawCtx.fillStyle = '#0080ff';
+                drawCtx.beginPath();
+                drawCtx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
+                drawCtx.fill();
+                drawCtx.globalAlpha = particle.opacity;
+                drawCtx.fillStyle = '#40a0ff';
+                drawCtx.beginPath();
+                drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
+                drawCtx.fill();
                 });
             }
-            ctx.restore();
+            drawCtx.restore();
         }
 
         const defaultNodeStyle = mapData.options?.default_node_style || {};
@@ -1105,15 +1180,22 @@
             return WMNG_CONFIG.colors.link_normal || '#28a745';
         }
 
-        // Single RAF loop helper. When reduced-motion is preferred and flow
-        // animation is disabled, the loop renders once then stops (animationId
-        // nulled) so we don't burn continuous animation work. Toggling flow
-        // back on calls this again to restart the loop.
+        // Single RAF loop helper. The loop redraws the overlay every frame
+        // but only redraws the static (main canvas) layer when staticDirty.
+        // When there is no active traffic (hasActiveTraffic === false) the
+        // loop stops entirely to avoid burning a 60fps redraw cycle for a
+        // static map. applyLiveUpdate() restarts the loop when traffic
+        // reappears. When reduced-motion is preferred and flow animation is
+        // disabled, the loop also stops (animationId nulled).
         function startAnimationLoop() {
             function tick() {
                 animTick += 1;
-                renderMap(true);
-                if (flowAnimationEnabled || !reducedMotion) {
+                if (staticDirty) {
+                    renderMap(true);
+                } else {
+                    renderOverlay();
+                }
+                if (hasActiveTraffic && (flowAnimationEnabled || !reducedMotion)) {
                     animationId = requestAnimationFrame(tick);
                 } else {
                     animationId = null;
@@ -1151,14 +1233,17 @@
                 if (flowAnimationEnabled) {
                     btn.classList.remove('btn-secondary');
                     btn.classList.add('btn-primary');
-                    // Restart RAF loop if it was stopped by the reduced-motion gate
-                    if (!animationId) {
-                        startAnimationLoop();
-                    }
                 } else {
                     btn.classList.remove('btn-primary');
                     btn.classList.add('btn-secondary');
                     particles = []; // Clear particles when disabled
+                }
+                // The static layer changes (solid line ↔ no line), so force a
+                // full redraw. Then restart the RAF loop if appropriate.
+                staticDirty = true;
+                renderMap();
+                if (!animationId && (hasActiveTraffic && (flowAnimationEnabled || !reducedMotion))) {
+                    startAnimationLoop();
                 }
             });
 
@@ -1283,7 +1368,16 @@
             // Nodes may have been added/removed by the live update; keep the
             // lookup map in sync before re-rendering.
             rebuildNodeIndex();
+            staticDirty = true;
+            // Compute whether any link has active traffic so the RAF loop
+            // can pause when the map is idle (zero bps on every link).
+            hasActiveTraffic = Array.isArray(mapData.links) &&
+                mapData.links.some(l => (l.live?.in_bps > 0 || l.live?.out_bps > 0));
             renderMap();
+            // Restart the animation loop if traffic appeared while it was paused.
+            if (hasActiveTraffic && !animationId) {
+                startAnimationLoop();
+            }
         }
 
         function updateStatus() {
@@ -1336,7 +1430,9 @@
                 const out = document.createElement('canvas');
                 out.width = canvas.width; out.height = canvas.height;
                 const octx = out.getContext('2d');
+                // Composite the static main canvas then the dynamic overlay.
                 octx.drawImage(canvas, 0, 0);
+                octx.drawImage(overlayCanvas, 0, 0);
                 const a = document.createElement('a');
                 a.href = out.toDataURL('image/png');
                 a.download = `weathermap-${mapId}.png`;
@@ -1384,6 +1480,7 @@
                         mapData = data;
                         rebuildNodeIndex();
                         lastDataUpdate = Date.now();
+                        staticDirty = true;
                         renderMap();
                     }
                 })
@@ -1407,6 +1504,8 @@
                 const container = document.getElementById('map-container');
                 canvas.width = container.clientWidth;
                 canvas.height = container.clientHeight;
+                syncOverlayCanvas();
+                staticDirty = true;
                 renderMap();
             }
         });

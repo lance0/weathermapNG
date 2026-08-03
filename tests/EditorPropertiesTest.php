@@ -49,7 +49,8 @@ class EditorPropertiesTest extends TestCase
         $labelBlock = substr($content, strpos($content, 'label.oninput = function'), 250);
         $this->assertStringContainsString('markUnsaved()', $labelBlock);
 
-        $devBlock = substr($content, strpos($content, 'devSel.onchange = function'), 250);
+        // Device selection via autocomplete now triggers markUnsaved in the select callback
+        $devBlock = substr($content, strpos($content, 'if (devHidden) devHidden.value = device.device_id'), 300);
         $this->assertStringContainsString('markUnsaved()', $devBlock);
     }
 
