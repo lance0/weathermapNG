@@ -165,34 +165,33 @@ This release should make existing authoring workflows faster and less error-pron
   - Bulk style changes (apply to all selected).
   - Preserve undo/redo support for bulk edits.
 
-- [ ] **Operational diagnostics** *(backend already exists)*
-  - `HealthController` already has health/ready/live/detailed/stats/metrics endpoints. The diagnostics screen is a UI layer on top.
-  - Add admin-facing diagnostics Blade view: install status, route registration, writable paths, version metadata, LibreNMS compatibility checks.
-  - Surface stale data, missing RRD files, and broken port associations.
-  - Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.
+- [x] **Operational diagnostics** *(v1.9.0: diagnostics.blade.php + route + HealthController — install status, route registration, writable paths, version metadata, LibreNMS compatibility)*
+  - ~~`HealthController` already has health/ready/live/detailed/stats/metrics endpoints. The diagnostics screen is a UI layer on top.~~
+  - ~~Add admin-facing diagnostics Blade view: install status, route registration, writable paths, version metadata, LibreNMS compatibility checks.~~
+  - Surface stale data, missing RRD files, and broken port associations. *(not yet done)*
+  - ~~Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.~~
 
-- [ ] **First-run onboarding**
-  - Add a lightweight first-run state that helps users create or import their first useful map.
-  - Offer demo/sample map creation only when it will not touch production data unexpectedly.
-  - Link directly to install checks, docs, and troubleshooting from empty/error states.
+- [x] **First-run onboarding** *(v1.9.0: index.blade.php empty state with links to Templates, Create Map, Import, Diagnostics, Docs)*
+  - ~~Add a lightweight first-run state that helps users create or import their first useful map.~~
+  - ~~Offer demo/sample map creation only when it will not touch production data unexpectedly.~~
+  - ~~Link directly to install checks, docs, and troubleshooting from empty/error states.~~
 
-- [ ] **Map Organization** *(tags only this cycle)*
-  - Tags and filtering — store in existing `wmng_maps.options` JSON column, no migration needed.
-  - Basic grouping for users with many maps.
-  - *Defer favorites (requires user_id mapping table) to v1.9.0.*
+- [x] **Map Organization** *(v1.9.0: tags stored in options JSON, normalized/deduped, index tag filter dropdown, editor tag input with validation)*
+  - ~~Tags and filtering — store in existing `wmng_maps.options` JSON column, no migration needed.~~
+  - ~~Basic grouping for users with many maps.~~
+  - *Defer favorites (requires user_id mapping table) to v1.9.0.* *(still deferred — see v1.9.0 favorites)*
 
-- [ ] **Per-map default styling** *(NODE DEFAULT / LINK DEFAULT inheritance)*
-  - Map-level default style that propagates to all nodes/links. Change one default, restyle the entire map.
-  - Store as `default_node_style` / `default_link_style` in the map's `options` JSON column.
-  - Merge defaults at render time (existing `mergeMapOptions` pattern).
+- [x] **Per-map default styling** *(v1.9.0: editor Default Styles panel, model accessors, render-time merge, validation with allowlisted keys + hex regex)*
+  - ~~Map-level default style that propagates to all nodes/links. Change one default, restyle the entire map.~~
+  - ~~Store as `default_node_style` / `default_link_style` in the map's `options` JSON column.~~
+  - ~~Merge defaults at render time (existing `mergeMapOptions` pattern).~~
   - *Addresses a feature operators miss from legacy weathermap tools (ranked #4 in competitive research).*
 
-- [ ] **NOC wall / kiosk mode**
-  - Fullscreen toggle with all UI chrome hidden.
-  - Auto-cycling between maps on a timer.
-  - The embed view is the foundation — add cycling and fullscreen.
-
-- [ ] **Frontend modularization** *(maintainability prerequisite)*
+- [x] **NOC wall / kiosk mode** *(v1.9.0: ?kiosk=1 hides chrome + auto-hide cursor, ?cycle=N map cycling, Esc toggle, Exit Kiosk button)*
+  - ~~Fullscreen toggle with all UI chrome hidden.~~
+  - ~~Auto-cycling between maps on a timer.~~
+  - ~~The embed view is the foundation — add cycling and fullscreen.~~
+- [ ] **Frontend modularization** *(v1.8.0: wmng-common.js + ui-helpers.js extracted; editor.blade.php now 2733 lines, embed.blade.php 1710 lines — main view JS extraction remains)*
   - Extract `editor.blade.php` (2047 lines) and `embed.blade.php` (1501 lines) inline JS into separate JS modules.
   - Split canvas rendering, interaction handling, live-update logic, and planned version-comparison/bulk-ops UI into modules.
   - Plain ES modules or IIFE namespaces — no build step required.
