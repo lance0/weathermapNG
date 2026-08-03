@@ -54,20 +54,20 @@ class NodeDataService
     public function buildNodeData(Map $map): array
     {
         $metricsMap = $this->deviceDataService->getNodeMetricsBatch($map->nodes->all());
-        $links = $map->links;
+        $nodeLinksIndex = $this->buildNodeLinksIndex($map->links);
 
         $nodeData = [];
         foreach ($map->nodes as $node) {
             $nodeData[$node->id] = $this->buildNodeWithMetrics(
                 $node,
                 $metricsMap[$node->id] ?? ['cpu' => null, 'mem' => null],
-                $links
+                $nodeLinksIndex[$node->id] ?? []
             );
         }
         return $nodeData;
     }
 
-    private function buildNodeWithMetrics(Node $node, array $metrics, $links): array
+    private function buildNodeWithMetrics(Node $node, array $metrics, array $links): array
     {
         $status = $this->deviceDataService->getNodeStatus($node);
         $trafficData = $this->aggregateNodeTraffic($node, $links);
@@ -229,7 +229,7 @@ class NodeDataService
         return connection_aborted() || (time() - $startTime) >= $maxSeconds;
     }
 
-    private function aggregateNodeTraffic(Node $node, $links): array
+    private function aggregateNodeTraffic(Node $node, array $links): array
     {
         $demoMode = config('weathermapng.demo_mode', false);
 
@@ -301,7 +301,7 @@ class NodeDataService
         ];
     }
 
-    private function sumPortTraffic(Node $node, $links): array
+    private function sumPortTraffic(Node $node, array $links): array
     {
         $inSum = 0;
         $outSum = 0;
@@ -325,5 +325,19 @@ class NodeDataService
             'sum_bps' => $inSum + $outSum,
             'source' => ($inSum + $outSum) > 0 ? 'ports' : 'none',
         ];
+    }
+
+    /**
+     * Build a nodeId → Link[] index so each node's traffic aggregation
+     * only iterates its own links (O(L) total) instead of all links (O(N×L)).
+     */
+    private function buildNodeLinksIndex($links): array
+    {
+        $index = [];
+        foreach ($links as $link) {
+            $index[$link->src_node_id][] = $link;
+            $index[$link->dst_node_id][] = $link;
+        }
+        return $index;
     }
 }
