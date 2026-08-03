@@ -54,6 +54,7 @@ class RenderController
         $liveData = [
             'links' => $this->nodeDataService->buildLinkData($map),
             'nodes' => $this->nodeDataService->buildNodeData($map),
+            'alerts' => $this->nodeDataService->buildAlertData($map),
         ];
 
         $demoMode = config('weathermapng.demo_mode', false);
