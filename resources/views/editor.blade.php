@@ -310,6 +310,7 @@
                 <div class="btn-group btn-group-sm d-flex">
                     <button type="button" class="btn btn-primary" onclick="saveSelectedNode()" aria-label="Apply node changes"><i class="fas fa-check"></i> Apply</button>
                     <button type="button" class="btn btn-secondary" onclick="duplicateSelectedNode()" title="Duplicate" aria-label="Duplicate selected node"><i class="fas fa-copy"></i></button>
+                    <button type="button" class="btn btn-info" id="node-view-device-btn" onclick="viewSelectedNodeDevice()" title="Open device in LibreNMS" aria-label="Open device in LibreNMS" style="display:none;"><i class="fas fa-external-link-alt"></i></button>
                     <button type="button" class="btn btn-danger" onclick="deleteSelectedNode()" title="Delete" aria-label="Delete selected node"><i class="fas fa-trash"></i></button>
                 </div>
             </div>
@@ -455,6 +456,9 @@
                 </div>
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-info" id="view-port-btn" style="display:none;" onclick="viewLinkPort()">
+                    <i class="fas fa-external-link-alt"></i> View Port
+                </button>
                 <button type="button" class="btn btn-danger" id="delete-link-btn" style="display:none;">
                     <i class="fas fa-trash"></i> Delete
                 </button>
@@ -1906,11 +1910,14 @@ function populateNodeProperties(node) {
             renderNodesList();
             markUnsaved();
             loadInterfacesForNode(node);
+            const _vbtn = document.getElementById('node-view-device-btn');
+            if (_vbtn) _vbtn.style.display = node.deviceId ? 'inline-block' : 'none';
         };
     }
 
-    // Load interfaces
-    loadInterfacesForNode(node);
+    // Show/hide View Device button based on current selection
+    const viewBtn = document.getElementById('node-view-device-btn');
+    if (viewBtn) viewBtn.style.display = node.deviceId ? 'inline-block' : 'none';
 }
 
 function loadInterfacesForNode(node) {
@@ -1964,9 +1971,23 @@ function saveSelectedNode() {
         } else {
             WMNGToast.error('Failed to save node: ' + (d.message || 'Unknown error'), { duration: 3000 });
         }
-    }).catch(error => {
-        WMNGToast.error('Failed to save node: ' + error.message, { duration: 3000 });
     });
+}
+
+function viewSelectedNodeDevice() {
+    if (!selectedNode || !selectedNode.deviceId) return;
+    window.open('{{ url("device") }}/' + selectedNode.deviceId, '_blank');
+}
+
+function viewLinkPort() {
+    if (currentLinkIndex === null) return;
+    const link = links[currentLinkIndex];
+    if (!link) return;
+    const portId = document.getElementById('link-src-port').value || document.getElementById('link-dst-port').value || null;
+    if (!portId) return;
+    const now = Math.floor(Date.now() / 1000);
+    const from = now - 86400;
+    window.open('{{ url("graph") }}?type=port_bits&id=' + portId + '&from=' + from + '&to=' + now, '_blank');
 }
 
 function deleteSelectedNode() {
@@ -2089,6 +2110,14 @@ function openLinkModal(linkIndex) {
     viaStyleSelect.value = (link.style && link.style.via_style) || 'straight';
     deleteBtn.style.display = 'inline-block';
 
+    // Update View Port button when port selects change
+    const updateViewPortBtn = () => {
+        const vpBtn = document.getElementById('view-port-btn');
+        if (vpBtn) vpBtn.style.display = (srcPortSelect.value || dstPortSelect.value) ? 'inline-block' : 'none';
+    };
+    srcPortSelect.onchange = updateViewPortBtn;
+    dstPortSelect.onchange = updateViewPortBtn;
+
     // Load source node ports
     if (srcNode && srcNode.deviceId) {
         fetch('{{ url('plugin/WeathermapNG/api/device') }}/' + srcNode.deviceId + '/ports')
@@ -2124,6 +2153,10 @@ function openLinkModal(linkIndex) {
                 });
             });
     }
+
+    // Show View Port button if either port is already selected
+    const viewPortBtn = document.getElementById('view-port-btn');
+    if (viewPortBtn) viewPortBtn.style.display = (link.portA || link.portB) ? 'inline-block' : 'none';
 
     $('#linkModal').modal('show');
 }

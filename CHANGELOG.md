@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **RRD graph hover popups in embed view**: Hover a node or link for 300ms to see an inline LibreNMS RRD time-series graph image — device traffic (`type=device_bits`) for nodes, port traffic (`type=port_bits`) for links. The text tooltip continues to show immediately; the graph popup appears after the delay alongside it. Add `?graphs=0` to disable; auto-disabled in kiosk mode. Uses LibreNMS's existing `/graph` image endpoint — no backend changes required.
+- **Editor click-through**: "View Device" button in the node properties sidebar opens the LibreNMS device page (`/device/{id}`) when a device is assigned. "View Port" button in the link configuration modal opens the LibreNMS port graph (`/graph?type=port_bits&id={port_id}`) when a port is selected. Both open in a new tab.
+
+### Changed
+- **Roadmap reconciliation**: Marked click-through navigation and RRD graph hover popups as complete in `ROADMAP.md` (click-through shipped in v1.9.0 embed view; RRD hover and editor click-through are new). Updated `docs/EMBED.md` with the `graphs` query parameter.
+
 ## [1.10.0] - 2026-07-20
 
 ### Removed
