@@ -17,6 +17,7 @@
 - **Flow particles**: Animated traffic particles follow waypoint paths
 - **Pan & zoom**: Mouse-wheel zoom, drag-to-pan, +/-/Reset buttons, double-click zoom
 - **Hover tooltips**: Node In/Out/Sum traffic; link utilization, bandwidth
+- **RRD graph hover**: Hover a node or link for 300ms to show an inline LibreNMS RRD time-series graph image (device traffic for nodes, port traffic for links). Disabled in kiosk mode; use `?graphs=0` to disable.
 - **Click navigation**: Click a node to open its device page; click a link to open port graphs
 - **Kiosk / NOC wall mode**: Hide all chrome, auto-cycle maps, and control click-through target (see below)
 
@@ -34,6 +35,7 @@
 | `maxz` | `4` | Maximum zoom level |
 | `kiosk` | `0` | Enable NOC wall mode: hide nav, controls, legend, minimap, and status bar |
 | `cycle` | *(none)* | When `kiosk=1`, rotate to the next map every N seconds (minimum 5) |
+| `graphs` | `1` | Show RRD graph hover popups (`0` to disable; auto-disabled in kiosk mode) |
 | `target` | `_blank` | Where node/link click-through opens: `_blank` (new tab) or `self` (same tab) |
 
 ## Live Data

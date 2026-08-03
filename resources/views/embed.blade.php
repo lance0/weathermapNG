@@ -176,6 +176,31 @@
             display: none; pointer-events: none;
         }
 
+        /* Graph hover popup (RRD time-series image) */
+        .embed-graph-popup {
+            position: absolute; background: rgba(255,255,255,0.97);
+            border: 1px solid #ccc; border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            padding: 8px; display: none; pointer-events: none;
+            z-index: 1002; max-width: 420px;
+        }
+        .embed-graph-popup img {
+            display: block; max-width: 400px; max-height: 180px;
+            border-radius: 3px;
+        }
+        .embed-graph-popup .graph-loading {
+            width: 300px; height: 120px; display: flex;
+            align-items: center; justify-content: center;
+            color: #6c757d; font-size: 13px;
+        }
+        .embed-graph-popup .graph-caption {
+            margin-top: 4px; font-size: 11px; color: #333; text-align: center;
+        }
+        .embed-graph-popup .graph-text-fallback {
+            background: rgba(0,0,0,0.8); color: #fff; padding: 6px 8px;
+            border-radius: 4px; font-size: 12px;
+        }
+
         /* Minimap */
         .embed-minimap {
             position: absolute; top: 55px; right: 10px;
@@ -202,6 +227,7 @@
         body.kiosk-mode .embed-legend,
         body.kiosk-mode .embed-minimap,
         body.kiosk-mode .status-bar,
+        body.kiosk-mode .embed-graph-popup,
         body.kiosk-mode #loading {
             display: none !important;
         }
@@ -274,6 +300,7 @@
             <i class="fas fa-clock"></i> Updated: <span id="last-updated">Never</span>
         </div>
         <div id="tooltip" class="embed-tooltip"></div>
+        <div id="graph-popup" class="embed-graph-popup"></div>
         <div id="controls" class="embed-controls">
             <button type="button" id="toggle-transport" class="btn btn-light btn-sm" aria-label="Live update status">Live: loading…</button>
             <button type="button" id="toggle-flow" class="btn btn-primary btn-sm" aria-label="Toggle flow animation" title="Toggle flow animation"><i class="fas fa-water" aria-hidden="true"></i> Flow</button>
@@ -342,7 +369,7 @@
         let intervalSec = parseInt(param('interval', WMNG_CONFIG.client_refresh), 10) || WMNG_CONFIG.client_refresh;
         let sseEnabled = param('sse', WMNG_CONFIG.enable_sse ? '1' : '0') !== '0' && !!window.EventSource;
         let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
-        let currentTransport = 'init';
+        let graphsEnabled = param('graphs', '1') !== '0' && !WMNG_CONFIG.kioskEnabled;
         let eventSourceRef = null;
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
@@ -1420,6 +1447,72 @@
             }
         }
 
+        // --- Graph hover popup state ---
+        let graphHoverTimer = null;
+        let graphHoverTarget = null; // { type: 'node'|'link', id, data }
+        const graphBaseUrl = '{{ url("graph") }}';
+        const graphPopup = document.getElementById('graph-popup');
+
+        function hideGraphPopup() {
+            if (graphHoverTimer) { clearTimeout(graphHoverTimer); graphHoverTimer = null; }
+            graphHoverTarget = null;
+            if (graphPopup) graphPopup.style.display = 'none';
+        }
+
+        function showGraphPopup(target, pageX, pageY) {
+            if (!graphsEnabled || !target || !graphPopup) return;
+
+            const now = Math.floor(Date.now() / 1000);
+            const from = now - 3600; // last 1 hour
+            let imgSrc = null;
+            let caption = '';
+
+            if (target.type === 'node' && target.data.device_id) {
+                imgSrc = `${graphBaseUrl}?type=device_bits&id=${target.data.device_id}&from=${from}&to=${now}`;
+                caption = escapeHtml(target.data.label || target.data.device_name || 'Device ' + target.data.device_id);
+            } else if (target.type === 'link') {
+                const link = target.data;
+                const portId = link.port_id_a || link.port_id_b || null;
+                if (portId) {
+                    imgSrc = `${graphBaseUrl}?type=port_bits&id=${portId}&from=${from}&to=${now}`;
+                    const portName = link.source_port_name || link.destination_port_name || '';
+                    caption = escapeHtml(portName ? 'Port: ' + portName : 'Port ' + portId);
+                }
+            }
+
+            if (!imgSrc) return;
+
+            // Position popup, clamping to viewport
+            const popupW = 420, popupH = 220;
+            let px = pageX + 14;
+            let py = pageY + 14;
+            if (px + popupW > window.innerWidth) px = pageX - popupW - 14;
+            if (py + popupH > window.innerHeight) py = pageY - popupH - 14;
+            if (px < 4) px = 4;
+            if (py < 4) py = 4;
+
+            graphPopup.style.left = px + 'px';
+            graphPopup.style.top = py + 'px';
+            graphPopup.innerHTML = `<div class="graph-loading"><i class="fas fa-spinner fa-spin"></i> Loading graph…</div>`;
+            graphPopup.style.display = 'block';
+
+            const img = new Image();
+            img.onload = () => {
+                // Only update if this popup is still for the same target
+                if (graphHoverTarget !== target) return;
+                graphPopup.innerHTML = '';
+                graphPopup.appendChild(img);
+                if (caption) {
+                    const cap = document.createElement('div');
+                    cap.className = 'graph-caption';
+                    cap.textContent = caption;
+                    graphPopup.appendChild(cap);
+                }
+            };
+            img.onerror = () => { hideGraphPopup(); };
+            img.src = imgSrc;
+        }
+
         document.getElementById('map-canvas').addEventListener('mousemove', (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
@@ -1453,6 +1546,8 @@
                 }
             }
             const tooltip = document.getElementById('tooltip');
+            // Determine new hover target for graph popup
+            let newTarget = null;
             if (nbest) {
                 const n = nbest.node;
                 const t = n.traffic || {};
@@ -1467,6 +1562,7 @@
                   `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
                   `Total (In + Out): ${humanBits(sum ?? 0)}<br>` +
                   `<span style="opacity:0.75;">Source: ${src}</span>`;
+                if (n.device_id) newTarget = { type: 'node', id: n.id, data: n };
             } else if (best) {
                 tooltip.style.display = 'block';
                 tooltip.style.left = (e.pageX + 10) + 'px';
@@ -1476,10 +1572,29 @@
                 tooltip.innerHTML = `<b>Utilization: ${pctVal}</b><br>` +
                     `<span style="color:#40ff40;">▼</span> In: ${humanBits(best.inBps)}<br>` +
                     `<span style="color:#40a0ff;">▲</span> Out: ${humanBits(best.outBps)}` + bwLine;
+                const link = best.link;
+                if (link && (link.port_id_a || link.port_id_b)) newTarget = { type: 'link', id: link.id, data: link };
             } else {
                 tooltip.style.display = 'none';
             }
+            // Graph popup: schedule or cancel based on hover target
+            if (newTarget) {
+                const targetKey = newTarget.type + ':' + newTarget.id;
+                const prevKey = graphHoverTarget ? graphHoverTarget.type + ':' + graphHoverTarget.id : null;
+                if (targetKey !== prevKey) {
+                    hideGraphPopup();
+                    graphHoverTarget = newTarget;
+                    const px = e.pageX, py = e.pageY;
+                    graphHoverTimer = setTimeout(() => {
+                        if (graphHoverTarget === newTarget) showGraphPopup(newTarget, px, py);
+                    }, 300);
+                }
+            } else {
+                hideGraphPopup();
+            }
         });
+        // Hide graph popup when leaving the canvas
+        document.getElementById('map-canvas').addEventListener('mouseleave', hideGraphPopup);
         // Click: node → device page; else link → port graphs
         document.getElementById('map-canvas').addEventListener('click', (e) => {
             const rect = canvas.getBoundingClientRect();
@@ -1525,7 +1640,6 @@
                 const from = now - 86400;
                 const openGraph = (portId) => {
                     if (!portId) return;
-                    const graphBaseUrl = '{{ url("graph") }}';
                     const url = graphBaseUrl + '?type=port_bits&id=' + portId + '&from=' + from + '&to=' + now;
                     window.open(url, WMNG_CONFIG.linkTarget || '_blank');
                 };
@@ -1533,7 +1647,6 @@
                 if (pB) openGraph(pB);
             }
         });
-
         function drawMinimap() {
             if (!minimap || !Array.isArray(mapData.nodes) || mapData.nodes.length === 0) return;
 

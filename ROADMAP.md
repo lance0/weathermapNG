@@ -214,13 +214,13 @@ This release should make existing authoring workflows faster and less error-pron
 
 This release closes the biggest gaps vs legacy weathermap tools and native LibreNMS maps: click-through navigation, RRD graph hover, nested maps, and LLDP/CDP auto-discovery.
 
-- [ ] **Click-through navigation** *(CRITICAL — #1 feature gap vs legacy tools)*
+- [x] **Click-through navigation** *(v1.9.0: embed view; v1.11.0: editor sidebar + RRD hover graphs)*
   - Click a node to open the LibreNMS device page (`/device/{id}`). Nodes already store `device_id`.
   - Click a link to open the LibreNMS interface/port page (`/device/{id}/port/{port_id}`). Links already store port data.
   - Configurable: open in same tab, new tab, or hover tooltip with link.
   - *Every major competitor (legacy LibreNMS weathermap, PHP Weathermap, Zabbix, NagVis) has this. LOW effort — LibreNMS routes are stable, data already stored.*
 
-- [ ] **RRD graph hover popups** *(HIGH impact — defining weathermap UX feature)*
+- [x] **RRD graph hover popups** *(v1.11.0: embed view — hover a node/link for 300ms to show a LibreNMS RRD time-series graph image; `?graphs=0` to disable)*
   - Hover over a node/link to see an embedded RRD time-series graph, not just a text tooltip.
   - LibreNMS exposes graph image endpoints. Use a modern CSS/JS tooltip with embedded `<img>` or `<iframe>`.
   - *The most beloved feature of the classic PHP Weathermap (OverLib graphs). WeathermapNG's text-only tooltips are a step back.*
@@ -277,7 +277,16 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - Per-user favorites (requires user_id mapping table or column).
   - Saved views per user.
 
-### v1.10.0 - Historical Views & Export
+### v1.10.0 - Maintenance & Dead Code Removal (shipped)
+
+- [x] **Dead auto-save code removal**: removed orphaned `resources/js/versioning.js`, unreachable `MapVersionController::autoSave()`, `auto_save` config keys, and unused `SaveMapVersionRequest` auto-save validation field.
+- [x] **Dead FormRequest and cache class removal**: removed `CreateLinkRequest`, `CreateNodeRequest`, and `MapCacheService` (zero callers).
+- [x] **Node label normalization consistency**: shared `NodeLabelNormalizer` called from both `NodeService` and `SaveMapRequest` so all write paths strip tags identically.
+- [x] **Ambiguous node rate label** (issue #11): node canvas label now uses `humanBits()` formatter with `Σ` prefix and "Total (In + Out)" tooltip text.
+- [x] **Plugin settings page fix**: `Settings::authorize()` now resolves `auth()->user()`; settings form uses `settings[...]` array notation so saves persist.
+- [x] **Debug-gated per-endpoint traffic logging**: `WEATHERMAPNG_DEBUG=true` logs raw per-endpoint counters for issue #11 diagnosis.
+
+### Future - Historical Views & Export
 
 - [ ] **Historical Playback**
   - Timeline scrubber.
