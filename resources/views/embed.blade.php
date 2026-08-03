@@ -381,7 +381,7 @@
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         const reconnectDelay = 2000; // 2 seconds
-        let lastDataUpdate = null;
+        let currentTransport = 'none';
         let mapData = {};
         try {
             mapData = @json($mapData ?? []);
