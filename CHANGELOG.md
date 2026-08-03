@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+- **CLI commands for map management**: Four new `lnms` commands — `weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`. Registered via Artisan through the plugin's ServiceProvider. Reuses existing `MapService::createMap()` and `Map::toJsonModel()` — no backend refactoring needed.
+- **Editor device autocomplete**: Device selection in the editor now uses a debounced search input with live dropdown results from the existing `/api/devices?q=` endpoint (LIMIT 20, cached 300s). Replaces the full device list `<select>` that loaded every device into the DOM. Also applies to the node properties "Change" device flow.
+- **Editor status-aware node colors**: Editor nodes now reflect device status — green (up), red (down), gray (unknown) — using the `status` field already present in the JSON payload but previously discarded. Down nodes get a red dashed ring.
 - **RRD graph hover popups in embed view**: Hover a node or link for 300ms to see an inline LibreNMS RRD time-series graph image — device traffic (`type=device_bits`) for nodes, port traffic (`type=port_bits`) for links. The text tooltip continues to show immediately; the graph popup appears after the delay alongside it. Add `?graphs=0` to disable; auto-disabled in kiosk mode. Uses LibreNMS's existing `/graph` image endpoint — no backend changes required.
 - **Editor click-through**: "View Device" button in the node properties sidebar opens the LibreNMS device page (`/device/{id}`) when a device is assigned. "View Port" button in the link configuration modal opens the LibreNMS port graph (`/graph?type=port_bits&id={port_id}`) when a port is selected. Both open in a new tab.
 
@@ -27,7 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`bin/map-poller.php` file locking**: Added `LOCK_EX` to cache-file `file_put_contents`.
 
 ### Performance
-- **`nodeById` Map lookup in embed view**: `drawLink()` now uses a prebuilt `Map` instead of `Array.find()` — eliminates O(L×N) per-frame lookups at 60fps.
+- **Canvas layer separation in embed view**: Static content (background, links, nodes, labels) now renders on the main canvas while dynamic content (particles, dash animations) renders on a separate overlay canvas. The animation loop only redraws the overlay when static content hasn't changed — eliminates 60fps full-canvas redraws.
+- **RAF pause on zero traffic**: The animation loop pauses entirely when no link has active traffic, eliminating unnecessary CPU usage. Restarts automatically when traffic appears in a live update.
+- **O(N×L)→O(L) node→links index in `NodeDataService`**: `sumPortTraffic()` now uses a pre-built `nodeId → Link[]` index instead of iterating all links per node. For a 200-node, 300-link map: 60,000 iterations → ~600.
+- **Batch link validation in `LinkService::storeLinks`**: Pre-fetches all referenced nodes and ports in 2 queries instead of 2L+P per-link queries. Validation does array lookups against the pre-fetched maps.
 - **Decoupled minimap from animation loop**: `renderMap(skipMinimap)` — the 60fps animation tick no longer redraws the minimap. Minimap updates only on state changes (live updates, pan/zoom, resize).
 
 ## [1.10.0] - 2026-07-20
