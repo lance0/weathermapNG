@@ -86,19 +86,6 @@ class MapVersionService
         $version->delete();
     }
 
-    /**
-     * Delete versions older than the given one (lower id = created earlier).
-     * The selected version itself is preserved.
-     */
-    public function deleteVersionsOlderThan(MapVersion $version): void
-    {
-        DB::transaction(function () use ($version) {
-            MapVersion::where('map_id', $version->map_id)
-                ->where('id', '<', $version->id)
-                ->delete();
-        });
-    }
-
     public function getVersions(Map $map, int $limit = 10): \Illuminate\Support\Collection
     {
         return MapVersion::with('creator')->versions($map->id, $limit)->get();

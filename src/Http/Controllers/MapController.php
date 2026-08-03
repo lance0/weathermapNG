@@ -25,25 +25,6 @@ class MapController
         $this->autoDiscoveryService = $autoDiscoveryService;
     }
 
-    public function index(): \Illuminate\View\View
-    {
-        $maps = Map::withCount(['nodes', 'links'])->get();
-        return view('WeathermapNG::index', compact('maps'));
-    }
-
-    public function show(Map $map): \Illuminate\Http\RedirectResponse
-    {
-        return redirect()->route('weathermapng.embed', $map);
-    }
-
-    public function editor(Map $map): \Illuminate\View\View
-    {
-        $map->load(['nodes', 'links']);
-        $devices = $this->getDevicesForEditor();
-
-        return view('WeathermapNG::editor', compact('map', 'devices'));
-    }
-
     public function create(CreateMapRequest $request): mixed
     {
         $this->requireAdmin();
@@ -119,30 +100,6 @@ class MapController
                 'success' => false,
                 'message' => 'Auto-discovery failed: ' . $e->getMessage(),
             ], 500);
-        }
-    }
-
-    private function getDevicesForEditor(): \Illuminate\Support\Collection
-    {
-        try {
-            if (class_exists('\App\Models\Device')) {
-                return \App\Models\Device::select('device_id', 'hostname', 'sysName')
-                    ->where('disabled', 0)
-                    ->where('ignore', 0)
-                    ->orderBy('hostname')
-                    ->get();
-            }
-
-            $devices = dbFetchRows(
-                "SELECT device_id, hostname, sysName\n" .
-                "FROM devices\n" .
-                "WHERE disabled = 0 AND ignore = 0\n" .
-                "ORDER BY hostname"
-            );
-
-            return collect($devices)->map(fn($device) => (object) $device);
-        } catch (\Exception $e) {
-            return collect([]);
         }
     }
 

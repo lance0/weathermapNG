@@ -30,18 +30,4 @@ class MapTemplate extends Model
         'updated_at',
     ];
 
-    public function scopeBuiltIn($query)
-    {
-        return $query->where('is_built_in', true);
-    }
-
-    public function scopeCustom($query)
-    {
-        return $query->where('is_built_in', false);
-    }
-
-    public function scopeByCategory($query, $category)
-    {
-        return $query->where('category', $category);
-    }
 }

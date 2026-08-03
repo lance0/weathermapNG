@@ -24,24 +24,6 @@ class Node extends Model
         return $this->belongsTo(Map::class);
     }
 
-    public function outgoingLinks()
-    {
-        return $this->hasMany(Link::class, 'src_node_id');
-    }
-
-    public function incomingLinks()
-    {
-        return $this->hasMany(Link::class, 'dst_node_id');
-    }
-
-    /**
-     * Flush the static device prefetch cache.
-     */
-    public static function flushDeviceCache(): void
-    {
-        self::$deviceCache = [];
-    }
-
     /**
      * Prefetch a set of devices in a single query and cache their array forms.
      *

@@ -167,7 +167,7 @@ $hook_based_files = [
 ];
 
 $traditional_files = [
-    'WeathermapNG.php',
+    'src/WeathermapNG.php',
     'composer.json',
     'routes/web.php',
     'src/Http/Controllers/MapController.php'
@@ -382,7 +382,7 @@ check_and_fix('LibreNMS Integration', function() use ($plugin_path, $architectur
         return "Missing hooks: " . implode(', ', $missing);
     } else {
         // Check traditional plugin file
-        if (file_exists($plugin_path . '/WeathermapNG.php')) {
+        if (file_exists($plugin_path . '/src/WeathermapNG.php')) {
             return true;
         }
         return "Traditional plugin file missing";

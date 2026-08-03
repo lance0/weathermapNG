@@ -34,16 +34,6 @@ class Link extends Model
         return $this->belongsTo(Map::class);
     }
 
-    public function sourceNode()
-    {
-        return $this->belongsTo(Node::class, 'src_node_id');
-    }
-
-    public function destinationNode()
-    {
-        return $this->belongsTo(Node::class, 'dst_node_id');
-    }
-
     public function getSourcePortNameAttribute()
     {
         return $this->resolvePortName($this->port_id_a ?: null);
@@ -112,14 +102,6 @@ class Link extends Model
         foreach ($mapping as $id => $ifName) {
             self::$portNameCache[(int) $id] = $ifName;
         }
-    }
-
-    /**
-     * Clear the port-name cache.
-     */
-    public static function flushPortNameCache(): void
-    {
-        self::$portNameCache = [];
     }
 
     public function getBandwidthFormattedAttribute()

@@ -60,12 +60,6 @@ class RrdDataService
         }
     }
 
-    public function flushRequestCache(): void
-    {
-        $this->portInfoCache = [];
-        $this->deviceInfoCache = [];
-    }
-
     public function getPortTraffic(int $portId): ?array
     {
         $port = $this->getPortInfo($portId);

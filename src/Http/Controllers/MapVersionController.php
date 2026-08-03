@@ -7,7 +7,6 @@ use Illuminate\Http\JsonResponse;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
 use LibreNMS\Plugins\WeathermapNG\Services\MapVersionService;
-use LibreNMS\Plugins\WeathermapNG\Services\MapService;
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Http\Requests\SaveMapVersionRequest;
 
@@ -15,14 +14,10 @@ class MapVersionController extends Controller
 {
     use AdminCheck;
     private $mapVersionService;
-    private $mapService;
 
-    public function __construct(
-        MapVersionService $mapVersionService,
-        MapService $mapService
-    ) {
+    public function __construct(MapVersionService $mapVersionService)
+    {
         $this->mapVersionService = $mapVersionService;
-        $this->mapService = $mapService;
     }
 
     public function index(int $mapId): JsonResponse

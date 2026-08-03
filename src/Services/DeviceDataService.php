@@ -32,15 +32,6 @@ class DeviceDataService
         }
     }
 
-    public function getNodeMetrics(Node $node): array
-    {
-        if (!$node->device_id) {
-            return ['cpu' => null, 'mem' => null];
-        }
-
-        return $this->deviceMetrics->getDeviceMetrics((int) $node->device_id);
-    }
-
     /**
      * Fetch metrics for many nodes in two queries total.
      *

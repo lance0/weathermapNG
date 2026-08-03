@@ -4,10 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
-use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
-use LibreNMS\Plugins\WeathermapNG\Services\DevicePortLookup;
 use LibreNMS\Plugins\WeathermapNG\Services\Logger;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
