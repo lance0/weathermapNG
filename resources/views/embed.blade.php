@@ -359,6 +359,7 @@
                 link_critical: '{{ config('weathermapng.colors.link_critical', '#dc3545') }}',
                 node_up: '{{ config('weathermapng.colors.node_up', '#28a745') }}',
                 node_down: '{{ config('weathermapng.colors.node_down', '#dc3545') }}',
+                node_warning: '{{ config('weathermapng.colors.node_warning', '#ffc107') }}',
                 node_unknown: '{{ config('weathermapng.colors.node_unknown', '#6c757d') }}'
             },
             enable_sse: @json(config('weathermapng.enable_sse') ?? true),
@@ -386,13 +387,46 @@
             mapData = @json($mapData ?? []);
             // Apply initial live data if provided
             const initialLive = @json($liveData ?? []);
-            if (initialLive && initialLive.links && Array.isArray(mapData.links)) {
-                mapData.links.forEach(l => {
-                    const id = l.id ?? l.link_id ?? null;
-                    if (id && initialLive.links[id]) {
-                        l.live = initialLive.links[id];
+            if (initialLive) {
+                if (initialLive.links && Array.isArray(mapData.links)) {
+                    mapData.links.forEach(l => {
+                        const id = l.id ?? l.link_id ?? null;
+                        if (id && initialLive.links[id]) {
+                            l.live = initialLive.links[id];
+                        }
+                    });
+                }
+                // Apply initial node status, metrics, and traffic.
+                if (initialLive.nodes && Array.isArray(mapData.nodes)) {
+                    mapData.nodes.forEach(n => {
+                        const id = n.id ?? n.node_id ?? null;
+                        if (id && initialLive.nodes[id]) {
+                            const ln = initialLive.nodes[id];
+                            n.status = ln.status || n.status;
+                            if (ln.metrics) n.metrics = ln.metrics;
+                            if (ln.traffic) {
+                                n.traffic = ln.traffic;
+                                const sum = Number(ln.traffic.sum_bps || 0);
+                                n.current_value = isFinite(sum) ? sum : null;
+                            }
+                        }
+                    });
+                }
+                // Apply initial alert overlays.
+                if (initialLive.alerts) {
+                    if (initialLive.alerts.nodes && Array.isArray(mapData.nodes)) {
+                        mapData.nodes.forEach(n => {
+                            const id = n.id ?? n.node_id ?? null;
+                            n.alerts = (id && initialLive.alerts.nodes[id]) ? initialLive.alerts.nodes[id] : { count: 0, severity: 'ok' };
+                        });
                     }
-                });
+                    if (initialLive.alerts.links && Array.isArray(mapData.links)) {
+                        mapData.links.forEach(l => {
+                            const id = l.id ?? l.link_id ?? null;
+                            l.alerts = (id && initialLive.alerts.links[id]) ? initialLive.alerts.links[id] : { count: 0, severity: 'ok' };
+                        });
+                    }
+                }
                 lastDataUpdate = Date.now();
             }
         } catch (e) {
@@ -577,7 +611,14 @@
                     drawLinkDynamic(link, overlayCtx);
                 });
             }
-            overlayCtx.restore();
+            // Down-node pulse rings (dynamic, drawn on overlay canvas).
+            if (Array.isArray(mapData.nodes)) {
+                mapData.nodes.forEach(node => {
+                    if ((node.status || 'unknown') === 'down') {
+                        drawNodePulse(node, overlayCtx);
+                    }
+                });
+            }
         }
 
         function initKioskMode() {
@@ -725,6 +766,7 @@
             const nodeType = getNodeType(node);
             const color = getNodeColor(node);
             const radius = 10; // Base radius for hit testing and badges
+            const status = node.status || 'unknown';
 
             ctx.fillStyle = color;
             ctx.strokeStyle = '#000';
@@ -791,6 +833,27 @@
                 ctx.fill();
                 ctx.stroke();
             }
+            // Static status-based rings (drawn on main canvas).
+            // Warning nodes (up but CPU/MEM high): yellow dashed ring.
+            if (isWarningNode(node)) {
+                ctx.beginPath();
+                ctx.arc(x, y, radius + 5, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(255, 193, 7, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            // Unknown nodes: subtle gray dashed outline.
+            else if (status === 'unknown') {
+                ctx.beginPath();
+                ctx.arc(x, y, radius + 4, 0, 2 * Math.PI);
+                ctx.strokeStyle = 'rgba(108, 117, 125, 0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([2, 2]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
 
             // Node label
             ctx.fillStyle = defaultNodeStyle.label_color || '#000';
@@ -828,6 +891,21 @@
 
             // store geometry for hover
             nodeGeoms.push({ x, y, r: radius, node });
+        }
+
+        // Draw a pulsing red ring around down nodes on the overlay canvas.
+        // Uses animTick for the animation phase so it syncs with the RAF loop.
+        function drawNodePulse(node, octx) {
+            const x = (node.position?.x ?? node.x) || 0;
+            const y = (node.position?.y ?? node.y) || 0;
+            const radius = 10;
+            const phase = reducedMotion ? 0 : animTick * 0.1;
+            const pulseRadius = radius + 4 + 3 * Math.sin(phase);
+            octx.beginPath();
+            octx.arc(x, y, pulseRadius, 0, 2 * Math.PI);
+            octx.strokeStyle = 'rgba(220, 53, 69, ' + (0.4 + 0.3 * Math.sin(phase)) + ')';
+            octx.lineWidth = 3;
+            octx.stroke();
         }
 
         function buildLinkPath(link, x1, y1, x2, y2) {
@@ -1128,17 +1206,24 @@
         const defaultNodeStyle = mapData.options?.default_node_style || {};
         const defaultLinkStyle = mapData.options?.default_link_style || {};
 
+        // Reusable threshold check: returns true if a CPU/MEM value exceeds
+        // the warning threshold (second element of WMNG_CONFIG.thresholds).
+        function warnThreshold(v) {
+            return typeof v === 'number' && v >= ((WMNG_CONFIG.thresholds && WMNG_CONFIG.thresholds[1]) || 80);
+        }
+
+        function isWarningNode(node) {
+            const status = node.status || 'unknown';
+            return status === 'up' && (warnThreshold(node.metrics?.cpu) || warnThreshold(node.metrics?.mem));
+        }
+
         function getNodeColor(node) {
             const colors = WMNG_CONFIG.colors || {};
             if (node?.meta?.color) return node.meta.color;
 
             const status = node.status || 'unknown';
             if (status === 'down') return colors.node_down || '#dc3545';
-            // If up but CPU or MEM high, warn
-            const cpu = node.metrics?.cpu;
-            const mem = node.metrics?.mem;
-            const warn = (v) => typeof v === 'number' && v >= ((WMNG_CONFIG.thresholds && WMNG_CONFIG.thresholds[1]) || 80);
-            if (status === 'up' && (warn(cpu) || warn(mem))) return colors.node_warning || '#ffc107';
+            if (isWarningNode(node)) return colors.node_warning || '#ffc107';
             if (status === 'up') return defaultNodeStyle.color || colors.node_up || '#28a745';
             return defaultNodeStyle.color || colors.node_unknown || '#6c757d';
         }
@@ -1195,7 +1280,10 @@
                 } else {
                     renderOverlay();
                 }
-                if (hasActiveTraffic && (flowAnimationEnabled || !reducedMotion)) {
+                const hasDownNode = Array.isArray(mapData.nodes) &&
+                    mapData.nodes.some(n => (n.status || 'unknown') === 'down');
+                if ((hasActiveTraffic && (flowAnimationEnabled || !reducedMotion)) ||
+                    (hasDownNode && !reducedMotion)) {
                     animationId = requestAnimationFrame(tick);
                 } else {
                     animationId = null;
@@ -1341,6 +1429,7 @@
                     const id = n.id ?? n.node_id ?? null;
                     if (id && live.nodes[id]) {
                         n.status = live.nodes[id].status || n.status;
+                        if (live.nodes[id].metrics) n.metrics = live.nodes[id].metrics;
                         // Attach aggregated traffic and expose a simple value for label
                         if (live.nodes[id].traffic) {
                             n.traffic = live.nodes[id].traffic;
@@ -1374,8 +1463,11 @@
             hasActiveTraffic = Array.isArray(mapData.links) &&
                 mapData.links.some(l => (l.live?.in_bps > 0 || l.live?.out_bps > 0));
             renderMap();
-            // Restart the animation loop if traffic appeared while it was paused.
-            if (hasActiveTraffic && !animationId) {
+            // Restart the animation loop if traffic appeared or a down-node
+            // pulse is needed while it was paused.
+            const hasDownNode = Array.isArray(mapData.nodes) &&
+                mapData.nodes.some(n => (n.status || 'unknown') === 'down');
+            if ((hasActiveTraffic || hasDownNode) && !animationId) {
                 startAnimationLoop();
             }
         }
@@ -1677,7 +1769,10 @@
                   `In: ${humanBits(t.in_bps ?? 0)}<br>` +
                   `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
                   `Total (In + Out): ${humanBits(sum ?? 0)}<br>` +
-                  `<span style="opacity:0.75;">Source: ${src}</span>`;
+                  `<span style="opacity:0.75;">Source: ${src}</span>` +
+                  (n.alerts && n.alerts.count > 0
+                    ? `<br><span style="color:#ffc107;">⚠ ${n.alerts.count} alert${n.alerts.count > 1 ? 's' : ''} (${n.alerts.severity || 'warning'})</span>`
+                    : '');
                 if (n.device_id) newTarget = { type: 'node', id: n.id, data: n };
             } else if (best) {
                 tooltip.style.display = 'block';
@@ -1687,7 +1782,10 @@
                 const bwLine = best.bandwidth ? `<br><span style="opacity:0.75;">Capacity: ${humanBits(best.bandwidth)}</span>` : '';
                 tooltip.innerHTML = `<b>Utilization: ${pctVal}</b><br>` +
                     `<span style="color:#40ff40;">▼</span> In: ${humanBits(best.inBps)}<br>` +
-                    `<span style="color:#40a0ff;">▲</span> Out: ${humanBits(best.outBps)}` + bwLine;
+                    `<span style="color:#40a0ff;">▲</span> Out: ${humanBits(best.outBps)}` + bwLine +
+                    (best.link && best.link.alerts && best.link.alerts.count > 0
+                      ? `<br><span style="color:#ffc107;">⚠ ${best.link.alerts.count} alert${best.link.alerts.count > 1 ? 's' : ''} (${best.link.alerts.severity || 'warning'})</span>`
+                      : '');
                 const link = best.link;
                 if (link && (link.port_id_a || link.port_id_b)) newTarget = { type: 'link', id: link.id, data: link };
             } else {
@@ -1718,7 +1816,39 @@
             const y = e.clientY - rect.top;
             const mx = (x - viewOffsetX) / Math.max(0.0001, viewScale);
             const my = (y - viewOffsetY) / Math.max(0.0001, viewScale);
-            // Node first
+            // Alert badge hit detection (before node/link) — opens device alerts.
+            for (const g of nodeGeoms) {
+                const n = g.node;
+                if (n.alerts && n.alerts.count > 0) {
+                    const bx = g.x + g.r - 3;
+                    const by = g.y - g.r + 3;
+                    if (Math.hypot(mx - bx, my - by) < 10) {
+                        const did = n.device_id || n.deviceId || n.deviceid;
+                        if (did) {
+                            window.open(deviceBaseUrl + '/' + did + '/tab=alerts/', WMNG_CONFIG.linkTarget || '_blank');
+                        }
+                        return;
+                    }
+                }
+            }
+            // Link alert badge hit detection (diamond at midpoint offset).
+            for (const g of linkGeoms) {
+                const link = g.link;
+                if (link && link.alerts && link.alerts.count > 0) {
+                    const mid = getPathMidpoint(g.points);
+                    const bx = mid.x + 10;
+                    const by = mid.y - 10;
+                    if (Math.hypot(mx - bx, my - by) < 12) {
+                        const srcId = link.source ?? link.src ?? link.source_id;
+                        const srcNode = nodeById.get(srcId);
+                        const did = srcNode && (srcNode.device_id || srcNode.deviceId || srcNode.deviceid);
+                        if (did) {
+                            window.open(deviceBaseUrl + '/' + did + '/tab=alerts/', WMNG_CONFIG.linkTarget || '_blank');
+                        }
+                        return;
+                    }
+                }
+            }
             for (const g of nodeGeoms) {
                 if (Math.hypot(mx - g.x, my - g.y) <= g.r + 4) {
                     const n = g.node;
