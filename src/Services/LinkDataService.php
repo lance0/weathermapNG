@@ -14,15 +14,6 @@ class LinkDataService
         $this->alertService = $alertService;
     }
 
-    public function buildLinkData(Map $map): array
-    {
-        $linkData = [];
-        foreach ($map->links as $link) {
-            $linkData[$link->id] = $this->buildLinkAlerts($link);
-        }
-        return $linkData;
-    }
-
     public function buildLinkAlerts(Map $map): array
     {
         // Collect all port IDs across all links in one pass, fetch alerts

@@ -159,34 +159,6 @@ class Logger
         $this->logger->error($message, $this->sanitizeContext($context));
     }
 
-    public function critical(string $message, array $context = []): void
-    {
-        $this->logger->critical($message, $this->sanitizeContext($context));
-    }
-
-    // Performance logging
-    public function logPerformance(string $operation, float $duration, array $context = []): void
-    {
-        $context['duration_ms'] = round($duration * 1000, 2);
-        $context['operation'] = $operation;
-
-        if ($context['duration_ms'] > ($this->config['performance']['slow_query_threshold'] ?? 1000)) {
-            $this->warning("Slow operation detected: $operation", $context);
-        } else {
-            $this->debug("Performance: $operation", $context);
-        }
-    }
-
-    // Security logging
-    public function logSecurity(string $event, array $context = []): void
-    {
-        $context['security_event'] = $event;
-        $context['ip_address'] = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $context['user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
-
-        $this->warning("Security event: $event", $context);
-    }
-
     // Sanitize sensitive data from context
     private function sanitizeContext(array $context): array
     {
@@ -208,23 +180,4 @@ class Logger
         return $context;
     }
 
-    // Helper for timing operations
-    public function timeOperation(callable $operation, string $name, array $context = []): mixed
-    {
-        $start = microtime(true);
-
-        try {
-            $result = $operation();
-            $duration = microtime(true) - $start;
-            $this->logPerformance($name, $duration, array_merge($context, ['status' => 'success']));
-            return $result;
-        } catch (\Exception $e) {
-            $duration = microtime(true) - $start;
-            $this->logPerformance($name, $duration, array_merge($context, [
-                'status' => 'error',
-                'error' => $e->getMessage()
-            ]));
-            throw $e;
-        }
-    }
 }

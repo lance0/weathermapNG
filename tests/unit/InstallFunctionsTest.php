@@ -230,7 +230,7 @@ PHP;
     public function testRequiredFilesExistence()
     {
         $requiredFiles = [
-            'WeathermapNG.php',
+            'src/WeathermapNG.php',
             'routes/web.php',
             'composer.json',
             'src/WeathermapNGProvider.php'

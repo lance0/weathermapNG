@@ -393,6 +393,8 @@
             console.error('Failed to parse map data:', e);
             mapData = { error: 'Invalid map data' };
         }
+        // Build the node lookup map from the initial parsed mapData.
+        rebuildNodeIndex();
         let canvas, ctx, minimap;
         let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
         let animationId;
@@ -414,6 +416,17 @@
         let flowAnimationEnabled = !reducedMotion;
         let particleDensity = 1.0; // 0.5 to 2.0
         let particleSpeed = 1.0; // 0.5 to 2.0
+        // nodeById lookup map — rebuilt whenever mapData.nodes changes,
+        // eliminates O(L*N) Array.find() per render frame in drawLink.
+        let nodeById = new Map();
+        function rebuildNodeIndex() {
+            nodeById = new Map();
+            if (Array.isArray(mapData.nodes)) {
+                for (const n of mapData.nodes) {
+                    nodeById.set(n.id ?? n.src_node_id, n);
+                }
+            }
+        }
         
         document.addEventListener('DOMContentLoaded', function() {
             initCanvas();
@@ -458,7 +471,7 @@
             }
         }
 
-        function renderMap() {
+        function renderMap(skipMinimap = false) {
             if (!mapData || !mapData.nodes) return;
 
             // Clear geometry arrays for hover/click detection
@@ -514,7 +527,7 @@
 
             // Update status and overlays
             updateStatus();
-            drawMinimap();
+            if (!skipMinimap) drawMinimap();
         }
 
         function initKioskMode() {
@@ -864,8 +877,8 @@
         function drawLink(link) {
             const srcId = link.source ?? link.src ?? link.source_id;
             const dstId = link.target ?? link.dst ?? link.destination_id;
-            const sourceNode = mapData.nodes.find(n => (n.id ?? n.src_node_id) === srcId);
-            const targetNode = mapData.nodes.find(n => (n.id ?? n.dst_node_id) === dstId);
+            const sourceNode = nodeById.get(srcId);
+            const targetNode = nodeById.get(dstId);
 
             if (!sourceNode || !targetNode) return;
 
@@ -1099,7 +1112,7 @@
         function startAnimationLoop() {
             function tick() {
                 animTick += 1;
-                renderMap();
+                renderMap(true);
                 if (flowAnimationEnabled || !reducedMotion) {
                     animationId = requestAnimationFrame(tick);
                 } else {
@@ -1267,6 +1280,9 @@
                     });
                 }
             }
+            // Nodes may have been added/removed by the live update; keep the
+            // lookup map in sync before re-rendering.
+            rebuildNodeIndex();
             renderMap();
         }
 
@@ -1366,6 +1382,7 @@
                 .then(data => {
                     if (data && !data.error) {
                         mapData = data;
+                        rebuildNodeIndex();
                         lastDataUpdate = Date.now();
                         renderMap();
                     }

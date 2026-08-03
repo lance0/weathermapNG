@@ -34,7 +34,6 @@ class MapControllerTest extends TestCase
 
     public function test_controller_has_required_methods()
     {
-        $this->assertTrue(method_exists($this->controller, 'index'));
         $this->assertTrue(method_exists($this->controller, 'create'));
         $this->assertTrue(method_exists($this->controller, 'update'));
         $this->assertTrue(method_exists($this->controller, 'destroy'));

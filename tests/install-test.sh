@@ -205,7 +205,7 @@ test_file_integrity() {
     
     # When run from project root, files should be here
     local required_files=(
-        "WeathermapNG.php"
+        "src/WeathermapNG.php"
         "composer.json"
         "routes/web.php"
         "quick-install.sh"

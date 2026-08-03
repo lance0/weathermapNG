@@ -59,17 +59,6 @@ class PageController extends Controller
     }
 
     /**
-     * Display settings page
-     */
-    public function settings(): View
-    {
-        return view('WeathermapNG::settings', [
-            'title' => 'WeathermapNG Settings',
-            'settings' => config('weathermapng'),
-        ]);
-    }
-
-    /**
      * Check if plugin is installed (database tables exist)
      */
     private function isInstalled(): bool

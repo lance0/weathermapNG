@@ -55,9 +55,4 @@ class MapVersion extends Model
             ->limit($limit);
     }
 
-    public function scopeByVersionNumber($query, $mapId, $versionNumber)
-    {
-        return $query->where('map_id', $mapId)
-            ->latest();
-    }
 }

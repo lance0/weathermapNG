@@ -87,55 +87,6 @@ class DevicePortLookup
     }
 
     /**
-     * Get device details by ID
-     */
-    public function getDevice(int $deviceId): ?array
-    {
-        $cacheKey = "weathermapng.device.{$deviceId}";
-        $cacheTtl = config('weathermapng.cache_ttl', 300);
-
-        return Cache::remember($cacheKey, $cacheTtl, function () use ($deviceId) {
-            try {
-                if (class_exists('\App\Models\Device')) {
-                    $device = \App\Models\Device::find($deviceId);
-                    return $device ? $device->toArray() : null;
-                }
-
-                // Fallback
-                $device = dbFetchRow("SELECT * FROM devices WHERE device_id = ?", [$deviceId]);
-                return $device ?: null;
-            } catch (\Exception $e) {
-                return null;
-            }
-        });
-    }
-
-    /**
-     * Get port details by ID
-     */
-    public function getPort(int $portId): ?array
-    {
-        // Use distinct cache key to avoid collision with PortUtilService traffic data
-        $cacheKey = "weathermapng.port.meta.{$portId}";
-        $cacheTtl = config('weathermapng.cache_ttl', 300);
-
-        return Cache::remember($cacheKey, $cacheTtl, function () use ($portId) {
-            try {
-                if (class_exists('\App\Models\Port')) {
-                    $port = \App\Models\Port::find($portId);
-                    return $port ? $port->toArray() : null;
-                }
-
-                // Fallback
-                $port = dbFetchRow("SELECT * FROM ports WHERE port_id = ?", [$portId]);
-                return $port ?: null;
-            } catch (\Exception $e) {
-                return null;
-            }
-        });
-    }
-
-    /**
      * Get all devices (for admin/editor use)
      */
     public function getAllDevices(): array
@@ -167,58 +118,5 @@ class DevicePortLookup
                 return [];
             }
         });
-    }
-
-    /**
-     * Get device count
-     */
-    public function getDeviceCount(): int
-    {
-        try {
-            if (class_exists('\App\Models\Device')) {
-                return \App\Models\Device::where('disabled', 0)
-                    ->where('ignore', 0)
-                    ->count();
-            }
-
-            // Fallback
-            $count = dbFetchCell("SELECT COUNT(*) FROM devices WHERE disabled = 0 AND ignore = 0");
-            return (int) $count;
-        } catch (\Exception $e) {
-            return 0;
-        }
-    }
-
-    /**
-     * Get port count for a device
-     */
-    public function getPortCount(int $deviceId): int
-    {
-        try {
-            if (class_exists('\App\Models\Port')) {
-                return \App\Models\Port::where('device_id', $deviceId)
-                    ->where('deleted', 0)
-                    ->count();
-            }
-
-            // Fallback
-            $count = dbFetchCell("SELECT COUNT(*) FROM ports WHERE device_id = ? AND deleted = 0", [$deviceId]);
-            return (int) $count;
-        } catch (\Exception $e) {
-            return 0;
-        }
-    }
-
-    /**
-     * Clear all caches
-     *
-     * Note: Cache::forget() does not support wildcards. We only clear the
-     * global all_devices cache here. Per-entity caches (device, port) will
-     * expire naturally via TTL (5 minutes default).
-     */
-    public function clearCaches(): void
-    {
-        // Only clear the global cache - per-entity caches expire via TTL
-        Cache::forget('weathermapng.all_devices');
     }
 }
