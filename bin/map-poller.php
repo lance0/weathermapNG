@@ -52,18 +52,26 @@ if (!$bootstrapLoaded) {
 }
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
+use LibreNMS\Plugins\WeathermapNG\Models\Node;
+use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use LibreNMS\Plugins\WeathermapNG\Services\PortUtilService;
-use LibreNMS\Plugins\WeathermapNG\Services\DevicePortLookup;
+use LibreNMS\Plugins\WeathermapNG\Services\RrdDataService;
+use LibreNMS\Plugins\WeathermapNG\RRD\RRDTool;
 
 class MapPoller
 {
     private $processed = 0;
     private $errors = 0;
     private $startTime;
+    private PortUtilService $portUtil;
 
     public function __construct()
     {
         $this->startTime = microtime(true);
+        // A single shared PortUtilService (and its RrdDataService) is reused
+        // across every map so the request-local RRD port/device caches benefit
+        // from cross-map port and device overlap.
+        $this->portUtil = new PortUtilService(new RrdDataService(new RRDTool()));
     }
 
     public function run()
@@ -96,14 +104,10 @@ class MapPoller
         try {
             $this->log("Processing map: {$map->name}");
 
-            // Warm up caches by fetching live data
-            $svc = new PortUtilService();
-            $liveData = $this->getLiveData($map, $svc);
+            $liveData = $this->getLiveData($map);
 
-            // Cache the live data (optional - could be stored in Redis/file)
             $this->cacheLiveData($map, $liveData);
 
-            // Generate any static assets if needed
             $this->generateStaticAssets($map);
 
             $this->processed++;
@@ -115,15 +119,31 @@ class MapPoller
         }
     }
 
-    private function getLiveData(Map $map, PortUtilService $svc): array
+    private function getLiveData(Map $map): array
     {
+        // Prime the caches in bulk before the per-link loop so linkUtilBits()
+        // does not trigger one cache miss (and per-port DB query) per port.
+        // Mirrors NodeDataService::preloadForMap(), threading the map's own
+        // nodes/links through the same batch-prefetch helpers the render path
+        // uses.
+        $deviceIds = $map->nodes->pluck('device_id')->filter()->unique()->values()->all();
+        $portIds = $map->links->flatMap(fn($l) => [$l->port_id_a, $l->port_id_b])
+            ->filter(fn($id) => $id !== null && $id !== 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        Node::preloadDevices($deviceIds);
+        Link::preloadPortNames($portIds);
+        $this->portUtil->preloadForPorts($portIds, $deviceIds);
+
         $liveData = [
             'ts' => time(),
             'links' => []
         ];
 
         foreach ($map->links as $link) {
-            $liveData['links'][$link->id] = $svc->linkUtilBits([
+            $liveData['links'][$link->id] = $this->portUtil->linkUtilBits([
                 'port_id_a' => $link->port_id_a,
                 'port_id_b' => $link->port_id_b,
                 'bandwidth_bps' => $link->bandwidth_bps,
@@ -145,45 +165,7 @@ class MapPoller
         $cacheFile = __DIR__ . "/../output/cache/{$map->name}.json";
         $this->ensureDirectory(dirname($cacheFile));
 
-        file_put_contents($cacheFile, json_encode($liveData, JSON_PRETTY_PRINT));
-
-        // Calculate and cache 95th percentile for last day if possible
-        try {
-            $summary = $this->summarizeMap($map);
-            if (!empty($summary)) {
-                \Illuminate\Support\Facades\Cache::put("weathermapng.summary.{$map->id}", $summary, 3600);
-            }
-        } catch (\Exception $e) {
-            // ignore
-        }
-    }
-
-    private function summarizeMap(Map $map): array
-    {
-        $svc = new PortUtilService();
-        $sum = ['links' => []];
-        foreach ($map->links as $link) {
-            $a = $link->port_id_a; $b = $link->port_id_b;
-            if (!$a && !$b) continue;
-            $histIn = $svc->getPortHistory($a ?: $b, 'traffic_in', '24h');
-            $histOut = $svc->getPortHistory($a ?: $b, 'traffic_out', '24h');
-            $p95In = $this->percentile($histIn, 95);
-            $p95Out = $this->percentile($histOut, 95);
-            $sum['links'][$link->id] = [
-                'p95_in_bps' => (int) round($p95In * 8),
-                'p95_out_bps' => (int) round($p95Out * 8),
-            ];
-        }
-        return $sum;
-    }
-
-    private function percentile(array $data, $pct)
-    {
-        if (empty($data)) return 0;
-        $vals = array_map(function($d){ return $d['value'] ?? 0; }, $data);
-        sort($vals);
-        $rank = max(0, min(count($vals)-1, (int) round(($pct/100) * (count($vals)-1))));
-        return $vals[$rank];
+        file_put_contents($cacheFile, json_encode($liveData, JSON_PRETTY_PRINT), LOCK_EX);
     }
 
     private function generateStaticAssets(Map $map)
