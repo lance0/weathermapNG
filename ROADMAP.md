@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-*Last reviewed v1.10.0 (2026-07-20) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+*Last reviewed v1.11.0 (2026-08-03) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.10.0 (Stable)
+## Current Status: v1.11.0 (Stable)
 
 The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.9.0:
 
@@ -236,11 +236,10 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - Replace unreliable ifIndex-based matching.
   - Keep auto-discovery optional and reviewable before creating maps.
   - `AutoDiscoveryService` class already referenced in `MapController` constructor.
-
-- [ ] **Device status-based node icons**
-  - Node icons reflect device up/down/warning state (green/red/pulse), not just bandwidth on links.
-  - LibreNMS device status is available. WeathermapNG nodes already store `device_id`.
-  - *Partially covered by alerts integration, but the node icon itself should change, not just an overlay badge.*
+- [x] **Device status-based node icons** *(v1.11.0: embed view draws pulsing red ring for down nodes, yellow dashed ring for warning (CPU/MEM ≥ threshold), gray dashed for unknown; editor uses status-aware colors green/red/gray + dashed ring for down; `node_warning` color is admin-configurable; metrics merge from SSE fixed)*
+  - ~~Node icons reflect device up/down/warning state (green/red/pulse), not just bandwidth on links.~~ *(v1.11.0)*
+  - ~~LibreNMS device status is available. WeathermapNG nodes already store `device_id`.~~ *(v1.11.0)*
+  - ~~Partially covered by alerts integration, but the node icon itself should change, not just an overlay badge.~~ *(v1.11.0: status rings layer on top of device-type shapes)*
 
 - [ ] **Custom Metrics**
   - CPU and memory utilization on nodes (via LibreNMS `/health/processor` and `/health/mempool` endpoints).
@@ -249,23 +248,23 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - Custom SNMP OID support if it can be implemented without reintroducing unreliable polling behavior.
   - *All data sources confirmed feasible via LibreNMS API research.*
 
-- [ ] **Advanced Alerts Integration** *(backend substantially implemented)*
+- [x] **Advanced Alerts Integration** *(v1.11.0: complete)*
   - ~~LibreNMS alert overlay~~ *(done: `AlertService` fetches device+port alerts, embed view renders alert badges with severity coloring)*
   - ~~Alert severity indicators~~ *(done: critical=red, warning=yellow)*
-  - Click-through to alert details — link to LibreNMS alert detail page using device_id and alert id.
-  - Alert history on hover — query alerts without state filter, sort by timestamp.
+  - ~~Click-through to alert details~~ *(v1.11.0: alert badges clickable → `/device/{id}/tab=alerts/`; badge hit detection takes priority over node/link clicks)*
+  - ~~Alert history on hover~~ *(v1.11.0: `AlertService::deviceAlertHistory()` and `portAlertHistory()` query without state filter, select id/timestamp, ordered DESC; alert count+severity in hover tooltip; alerts included in initial page load)*
   - *The roadmap previously underestimated how much alert work was already done.*
 
-- [ ] **Large map performance**
-  - Set practical performance budgets for node/link counts.
-  - Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.
-  - Graceful degradation controls: viewport culling (only draw visible nodes/links), minimap redraw throttling (max once per 100ms during pan), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold.
+- [ ] **Large map performance** *(v1.11.0: canvas layer separation, RAF pause on zero traffic, minimap decoupled from animation loop, nodeById O(1) lookup, O(N×L)→O(L) node→links index, batch link validation — viewport culling still TODO)*
+  - ~~Set practical performance budgets for node/link counts.~~ *(v1.11.0: performance optimizations shipped)*
+  - ~~Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.~~ *(v1.11.0: canvas layer separation eliminates 60fps full-canvas redraws; RAF pauses on zero traffic; minimap decoupled from animation loop)*
+  - Graceful degradation controls: viewport culling (only draw visible nodes/links), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold. *(viewport culling still TODO)*
   - *Canvas 2D is appropriate for 1-300 nodes with these optimizations. No engine migration needed until v2.0.0.*
 
-- [ ] **CLI tools for map management**
-  - `lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`.
-  - Follow `bin/map-poller.php` bootstrap pattern for LibreNMS environment loading.
-  - Enables automation and headless map management.
+- [x] **CLI tools for map management** *(v1.11.0: 4 Artisan commands registered via ServiceProvider — `lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`; verified live in Docker)*
+  - ~~`lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`.~~ *(v1.11.0)*
+  - ~~Follow `bin/map-poller.php` bootstrap pattern for LibreNMS environment loading.~~ *(v1.11.0: uses Artisan via ServiceProvider auto-discovery — no bootstrap boilerplate needed)*
+  - ~~Enables automation and headless map management.~~ *(v1.11.0)*
 
 - [ ] **External embedding API documentation**
   - Document the existing `/api/maps/{map}/json` and `/api/maps/{map}/live` endpoints as a public embedding API.
@@ -285,6 +284,26 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
 - [x] **Plugin settings page fix**: `Settings::authorize()` now resolves `auth()->user()`; settings form uses `settings[...]` array notation so saves persist.
 - [x] **Debug-gated per-endpoint traffic logging**: `WEATHERMAPNG_DEBUG=true` logs raw per-endpoint counters for issue #11 diagnosis.
 
+
+### v1.11.0 - RRD Hover, Click-Through, CLI, Status Icons, Alerts, Performance (shipped)
+
+- [x] **RRD graph hover popups**: Hover a node or link for 300ms to see an inline LibreNMS RRD time-series graph image. `?graphs=0` to disable; auto-disabled in kiosk mode.
+- [x] **Editor click-through**: "View Device" button in node sidebar and "View Port" button in link modal open LibreNMS pages in a new tab.
+- [x] **Dead code cleanup** (−406 lines): 25+ dead methods removed across 14 source files. Deleted root-level `WeathermapNG.php` stub.
+- [x] **Backend performance**: `DeviceDataService` N+1 fixed (preloaded `Node::$deviceCache`), `rrdtool fetch` calls halved (`getLastValues()`), kiosk query skipped when not in kiosk mode.
+- [x] **Frontend performance**: `nodeById` O(1) lookup Map, minimap decoupled from animation loop, canvas layer separation (overlay canvas for particles/dashes), RAF pause on zero traffic.
+- [x] **Map-poller bug fixes**: Broken constructor, non-existent method, missing batch preloads, file locking (`LOCK_EX`).
+- [x] **CLI commands**: 4 Artisan commands — `weathermapng:create-map`, `list-maps`, `export`, `discover`.
+- [x] **Editor device autocomplete**: Debounced search input replaces full device `<select>`. Zero backend changes — existing `/api/devices?q=` endpoint reused.
+- [x] **Editor status-aware node colors**: Green (up), red (down), gray (unknown) + dashed ring for down nodes.
+- [x] **Embed status-based node visuals**: Pulsing red ring for down nodes, yellow dashed ring for warning (CPU/MEM ≥ threshold), gray dashed for unknown. `node_warning` color admin-configurable. Metrics merge from SSE fixed.
+- [x] **Alert badge click-through**: Alert badges clickable → `/device/{id}/tab=alerts/`. Badge hit detection takes priority.
+- [x] **Alert info in tooltip + initial load**: Alert count/severity in hover tooltip. Alerts in initial page load (not just SSE).
+- [x] **AlertService history queries**: `deviceAlertHistory()` and `portAlertHistory()` without state filter, select `id`/`timestamp`, ordered DESC. 14 new tests.
+- [x] **JSON export round-trip**: `_format` version stamp, auto-fill import form from JSON, `Map::createFromJsonData()` extracted.
+- [x] **O(N×L)→O(L) node→links index** in `NodeDataService::sumPortTraffic()`.
+- [x] **Batch link validation**: `LinkService::storeLinks` pre-fetches all nodes/ports in 2 queries instead of 2L+P per-link queries.
+
 ### Future - Historical Views & Export
 
 - [ ] **Historical Playback**
@@ -299,11 +318,11 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - PDF export.
   - Visio/draw.io format if there is enough demand.
 
-- [ ] **Config file import/export** *(portable map definitions)*
-  - Export maps to JSON or legacy `.conf` text format for version control, scripting, and migration.
-  - Import maps from config files (enables migration from legacy PHP Weathermap).
+- [ ] **Config file import/export** *(v1.11.0: JSON export has `_format` version stamp, import form auto-fills name/title from JSON, `Map::createFromJsonData()` extracted for reuse — legacy `.conf` format still TODO)*
+  - ~~Export maps to JSON~~ *(done: server endpoint + client-side + CLI `weathermapng:export`)*
+  - Export maps to legacy `.conf` text format for version control, scripting, and migration. *(still TODO)*
+  - ~~Import maps from config files~~ *(done: JSON import via `/api/import` and CLI; legacy `.conf` import still TODO)*
   - *Not visual export — enables portability and automation.*
-
 - [ ] **Scheduled Reports**
   - Daily/weekly snapshots.
   - Email delivery.

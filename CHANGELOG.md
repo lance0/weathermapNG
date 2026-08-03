@@ -4,6 +4,8 @@ All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [1.11.0] - 2026-08-03
 - **Embed status-based node visuals**: Down nodes now have a pulsing red outer ring on the overlay canvas (animated via `animTick`). Warning nodes (up but CPU/MEM ≥ threshold) get a yellow dashed ring. Unknown nodes get a gray dashed outline. The `node_warning` color is now admin-configurable via `weathermapng.colors.node_warning`.
 - **Alert badge click-through in embed view**: Alert badges on nodes and links are now clickable. Node alert badges open the LibreNMS device alerts page (`/device/{id}/tab=alerts/`). Link alert badges open the alerts page for the source node's device.
 - **Alert info in embed hover tooltip**: The text tooltip now shows alert count and severity for nodes and links with active alerts.
