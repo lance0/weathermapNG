@@ -850,10 +850,51 @@ $('#createMapForm').on('submit', function(e) {
     });
 });
 
-// ===== File Input Label Update =====
+// ===== File Input Label Update + Auto-fill from JSON =====
 $('#import-file').on('change', function() {
     const fileName = this.files[0]?.name || 'Choose file...';
     $(this).next('.custom-file-label').text(fileName);
+
+    const file = this.files[0];
+    if (!file) {
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            let filled = false;
+
+            const nameInput = document.getElementById('import-name');
+            if (nameInput && typeof data.name === 'string' && data.name.trim() !== '') {
+                nameInput.value = data.name.trim();
+                filled = true;
+            }
+
+            const titleInput = document.getElementById('import-title');
+            if (titleInput && typeof data.title === 'string' && data.title.trim() !== '') {
+                titleInput.value = data.title.trim();
+                filled = true;
+            }
+
+            if (filled) {
+                // Show a transient "Auto-filled from file" hint on the name field
+                let hint = document.getElementById('import-autofill-hint');
+                if (!hint) {
+                    hint = document.createElement('small');
+                    hint.id = 'import-autofill-hint';
+                    hint.className = 'form-text text-info';
+                    nameInput.parentNode.appendChild(hint);
+                }
+                hint.textContent = 'Auto-filled from file — edit if needed';
+            }
+        } catch (err) {
+            // Not valid JSON or unexpected shape — leave fields empty for manual entry
+            console.warn('Could not pre-fill import form from file:', err);
+        }
+    };
+    reader.readAsText(file);
 });
 
 // ===== Import Map Form =====
