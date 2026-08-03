@@ -1,12 +1,16 @@
 # Changelog
 
 All notable changes to WeathermapNG will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
+- **Embed status-based node visuals**: Down nodes now have a pulsing red outer ring on the overlay canvas (animated via `animTick`). Warning nodes (up but CPU/MEM ≥ threshold) get a yellow dashed ring. Unknown nodes get a gray dashed outline. The `node_warning` color is now admin-configurable via `weathermapng.colors.node_warning`.
+- **Alert badge click-through in embed view**: Alert badges on nodes and links are now clickable. Node alert badges open the LibreNMS device alerts page (`/device/{id}/tab=alerts/`). Link alert badges open the alerts page for the source node's device.
+- **Alert info in embed hover tooltip**: The text tooltip now shows alert count and severity for nodes and links with active alerts.
+- **Alerts in initial page load**: Alert badges now appear immediately on embed page load instead of waiting for the first SSE/poll event.
+- **Alert history queries in `AlertService`**: New `deviceAlertHistory()` and `portAlertHistory()` methods query alerts without the `state != 0` filter, selecting `id`, `timestamp`, `state`, and `severity`, ordered by timestamp DESC. Existing fetch methods also now select `id` and `timestamp` (backward-compatible).
+- **JSON export round-trip improvements**: `toJsonModel()` now includes a `_format: "weathermapng-map-v1"` version stamp. Import form auto-fills map `name` and `title` from the uploaded JSON file. New `Map::createFromJsonData()` static method extracts the import logic for reuse.
+- **Metrics merge fix in embed SSE**: `applyLiveUpdate()` now merges `metrics` (CPU/MEM) from SSE payloads — previously discarded, making the CPU/MEM warning color branch dead code for live-updated nodes.
 - **CLI commands for map management**: Four new `lnms` commands — `weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`. Registered via Artisan through the plugin's ServiceProvider. Reuses existing `MapService::createMap()` and `Map::toJsonModel()` — no backend refactoring needed.
 - **Editor device autocomplete**: Device selection in the editor now uses a debounced search input with live dropdown results from the existing `/api/devices?q=` endpoint (LIMIT 20, cached 300s). Replaces the full device list `<select>` that loaded every device into the DOM. Also applies to the node properties "Change" device flow.
 - **Editor status-aware node colors**: Editor nodes now reflect device status — green (up), red (down), gray (unknown) — using the `status` field already present in the JSON payload but previously discarded. Down nodes get a red dashed ring.
