@@ -24,7 +24,7 @@ class DeviceDataService
         }
 
         try {
-            $device = $this->fetchDevice((int) $node->device_id);
+            $device = $node->resolveDevice((int) $node->device_id);
             return $this->parseDeviceStatus($device);
         } catch (\Exception $e) {
             Log::debug("Failed to get status for device {$node->device_id}: " . $e->getMessage());
@@ -102,14 +102,6 @@ class DeviceDataService
         return $this->formatTrafficData(0, 0, 'none');
     }
 
-    private function fetchDevice(int $deviceId): mixed
-    {
-        if (class_exists('\\App\\Models\\Device')) {
-            return \App\Models\Device::find($deviceId);
-        }
-
-        return DB::table('devices')->where('device_id', $deviceId)->first();
-    }
 
     private function parseDeviceStatus($device): string
     {
