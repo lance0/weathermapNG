@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Roadmap reconciliation**: Marked click-through navigation and RRD graph hover popups as complete in `ROADMAP.md` (click-through shipped in v1.9.0 embed view; RRD hover and editor click-through are new). Updated `docs/EMBED.md` with the `graphs` query parameter.
 
+### Removed
+- **Dead code cleanup** (−406 lines): 25+ dead methods with zero callers removed across 14 source files. Services: `MapVersionService::deleteVersionsOlderThan`, `DevicePortLookup` (5 of 7 methods), `Logger` (4 of 8 methods), `LinkDataService::buildLinkData` (broken signature), `RrdDataService::flushRequestCache`, `DeviceDataService::getNodeMetrics`. Models: `MapTemplate` scopes, `Node`/`Link` relations and cache flushers, `MapVersion::scopeByVersionNumber`. Controllers: unrouted `MapController::index/show/editor`, `PageController::settings`, dead `MapService` injection in `MapVersionController`, 3 dead imports in `HealthController`. Deleted root-level `WeathermapNG.php` compatibility stub (never imported).
+
+### Fixed
+- **`DeviceDataService::getNodeStatus` N+1 eliminated**: `getNodeStatus()` now uses the preloaded `Node::$deviceCache` instead of running `Device::find()` per node. `Node::resolveDevice()` made public.
+- **Combined `rrdtool fetch` calls**: New `RRDTool::getLastValues()` returns both `traffic_in` and `traffic_out` in one subprocess, halving RRD fetches per port. `RrdDataService::fetchTrafficFromRrd()` updated to use it.
+- **Skip kiosk query when not in kiosk mode**: `RenderController::embed()` no longer runs `Map::query()` for the cycle list when kiosk mode is off.
+- **`bin/map-poller.php` broken constructor**: `PortUtilService` was instantiated without its `RrdDataService` dependency — would fatal. Now properly injected with full dependency chain.
+- **`bin/map-poller.php` non-existent method**: `summarizeMap()` called `$svc->getPortHistory()` which doesn't exist. Removed dead `summarizeMap()` and `percentile()` helper.
+- **`bin/map-poller.php` missing preloads**: Added batch preloading before per-link loop — eliminates per-port DB queries.
+- **`bin/map-poller.php` file locking**: Added `LOCK_EX` to cache-file `file_put_contents`.
+
+### Performance
+- **`nodeById` Map lookup in embed view**: `drawLink()` now uses a prebuilt `Map` instead of `Array.find()` — eliminates O(L×N) per-frame lookups at 60fps.
+- **Decoupled minimap from animation loop**: `renderMap(skipMinimap)` — the 60fps animation tick no longer redraws the minimap. Minimap updates only on state changes (live updates, pan/zoom, resize).
+
 ## [1.10.0] - 2026-07-20
 
 ### Removed
