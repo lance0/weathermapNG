@@ -259,15 +259,21 @@ function handleKeyDown(event) {
         return;
     }
 
-    // Escape: Deselect / Cancel link mode
+    // Escape: Deselect / Cancel link mode / exit multi-select
     if (key === 'escape') {
         if (S.linkMode) {
             toggleLinkMode();
         }
-        if (S.selectedNode) {
+        if (S.selectionMode) {
+            toggleSelectionMode();
+        }
+        if (S.selectedNode || S.selectedNodes.length) {
+            S.selectedNodes = [];
             S.selectedNode = null;
             populateNodeProperties(null);
             renderEditor();
+            renderNodesList();
+            updateToolbarState();
         }
         return;
     }
@@ -350,6 +356,7 @@ function undo() {
     const previousState = JSON.parse(S.undoStack.pop());
     S.nodes = previousState.nodes;
     S.links = previousState.links;
+    S.selectedNodes = [];
     S.selectedNode = null;
     populateNodeProperties(null);
     renderEditor();
@@ -373,6 +380,7 @@ function redo() {
     const redoState = JSON.parse(S.redoStack.pop());
     S.nodes = redoState.nodes;
     S.links = redoState.links;
+    S.selectedNodes = [];
     S.selectedNode = null;
     populateNodeProperties(null);
     renderEditor();
@@ -891,10 +899,105 @@ function markSaved() {
 function updateToolbarState() {
     const duplicateBtn = document.getElementById('duplicate-btn');
     const deleteBtn = document.getElementById('delete-node-btn');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
     const hasSelection = S.selectedNode !== null;
 
     if (duplicateBtn) duplicateBtn.disabled = !hasSelection;
     if (deleteBtn) deleteBtn.disabled = !hasSelection;
+    if (bulkDeleteBtn) bulkDeleteBtn.disabled = S.selectedNodes.length === 0;
+}
+
+// Toggle rubber-band / multi-select mode. In this mode plain canvas clicks
+// add to the selection, empty-click drag draws a marquee, and
+// shift/ctrl-click toggles membership.
+function toggleSelectionMode() {
+    S.selectionMode = !S.selectionMode;
+    if (!S.selectionMode) {
+        S.marquee = null;
+    }
+    const btn = document.getElementById('select-mode-btn');
+    if (btn) {
+        btn.classList.toggle('active', S.selectionMode);
+        btn.title = S.selectionMode ? 'Multi-select (ON) — drag to marquee' : 'Multi-select';
+    }
+    const canvasEl = document.getElementById('map-canvas');
+    if (canvasEl) {
+        canvasEl.style.cursor = S.selectionMode ? 'crosshair' : 'default';
+    }
+    renderEditor();
+}
+
+// Bulk-delete the current multi-selection. Mirrors deleteSelectedNode:
+// undo snapshot, then per-node DELETE when saved (DB cascades attached links)
+// or local splice otherwise. Deletes happen in parallel; failures surface
+// individually and final cleanup runs once all resolve.
+function bulkDeleteSelected() {
+    const toDelete = S.selectedNodes.slice();
+    if (toDelete.length === 0) {
+        WMNGToast.info('Nothing selected to delete', { duration: 2000 });
+        return;
+    }
+
+    showEditorConfirm(
+        'Delete Selected',
+        `Delete ${toDelete.length} node(s) and their attached links? This can be undone with the editor undo history.`,
+        'Delete Selected',
+        'btn-danger',
+        function () {
+            saveState(); // Save for undo
+
+            const confirmCleanup = function () {
+                const ids = new Set(toDelete.map(n => n.id).concat(toDelete.map(n => n.dbId).filter(Boolean)));
+                S.selectedNodes = [];
+                S.selectedNode = null;
+                S.nodes = S.nodes.filter(n => toDelete.indexOf(n) < 0);
+                S.links = S.links.filter(l => !ids.has(l.srcId) && !ids.has(l.dstId));
+                populateNodeProperties(null);
+                renderEditor();
+                renderLinksList();
+                updateToolbarState();
+            };
+
+            const pending = toDelete.filter(n => S.mapId && n.dbId);
+            if (pending.length === 0) {
+                confirmCleanup();
+                return;
+            }
+
+            let remaining = pending.length;
+            let failed = false;
+            pending.forEach(n => {
+                fetch(S.uris.map + '/' + S.mapId + '/node/' + n.dbId, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-TOKEN': getCsrfToken() }
+                })
+                    .then(r => {
+                        if (!r.ok) {
+                            throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+                        }
+                        return r.json().catch(() => ({}));
+                    })
+                    .then(data => {
+                        if (data.success === false) {
+                            throw new Error(data.message || 'Server refused to delete node');
+                        }
+                    })
+                    .catch(err => {
+                        failed = true;
+                        WMNGToast.error('Failed to delete node: ' + err.message, { duration: 3000 });
+                    })
+                    .finally(() => {
+                        remaining -= 1;
+                        if (remaining === 0) {
+                            confirmCleanup();
+                            if (failed) {
+                                WMNGToast.warning('Some nodes could not be deleted. Reload the map to refresh.', { duration: 5000 });
+                            }
+                        }
+                    });
+            });
+        }
+    );
 }
 
 // --- Page bootstrap: init the canvas, load the map and device list ---

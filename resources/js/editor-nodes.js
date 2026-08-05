@@ -247,7 +247,7 @@ function renderNodesList() {
     }
 
     S.nodes.forEach((node, idx) => {
-        const isSelected = node === S.selectedNode;
+        const isSelected = S.selectedNodes.indexOf(node) >= 0;
         const row = document.createElement('div');
         row.className = 'd-flex align-items-center justify-content-between py-1 node-list-item' + (isSelected ? ' selected' : '');
         row.addEventListener('click', () => selectNodeByIndex(idx));
@@ -274,9 +274,21 @@ function renderNodesList() {
     });
 }
 
-function selectNodeByIndex(idx) {
+function selectNodeByIndex(idx, additive) {
     if (idx >= 0 && idx < S.nodes.length) {
-        S.selectedNode = S.nodes[idx];
+        const node = S.nodes[idx];
+        if (additive) {
+            const i = S.selectedNodes.indexOf(node);
+            if (i >= 0) {
+                S.selectedNodes.splice(i, 1);
+            } else {
+                S.selectedNodes.push(node);
+            }
+            S.selectedNode = S.selectedNodes[S.selectedNodes.length - 1] || null;
+        } else {
+            S.selectedNodes = [node];
+            S.selectedNode = node;
+        }
         populateNodeProperties(S.selectedNode);
         updateToolbarState();
         renderEditor();

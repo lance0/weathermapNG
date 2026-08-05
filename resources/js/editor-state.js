@@ -31,6 +31,10 @@ window.WMNG.EditorState = {
     nodes: [],
     links: [],
     selectedNode: null,
+    // Multi-select set (additive via shift/ctrl-click or rubber-band marquee).
+    // `selectedNode` stays the drag/anchor reference; this set drives bulk ops
+    // and render highlighting.
+    selectedNodes: [],
     mapDataLoaded: false,
     mapDataLoadFailed: false,
     devicesCache: [],
@@ -42,6 +46,9 @@ window.WMNG.EditorState = {
     dragOffset: { x: 0, y: 0 },
     linkMode: false,
     linkStart: null,
+    // Rubber-band marquee selection (selectionMode, active marquee rect).
+    selectionMode: false,
+    marquee: null,
 
     // ---- Zoom / pan ----
     viewScale: 1,

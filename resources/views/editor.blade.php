@@ -212,11 +212,18 @@
         <button type="button" class="tool-btn" id="snap-grid-btn" onclick="toggleSnapToGrid()" title="Snap to Grid" aria-label="Toggle snap to grid">
             <i class="fas fa-th"></i>
         </button>
+        <div class="tool-divider"></div>
+        <button type="button" class="tool-btn" id="select-mode-btn" onclick="toggleSelectionMode()" title="Multi-select" aria-label="Toggle multi-select (rubber-band) mode">
+            <i class="fas fa-vector-square"></i>
+        </button>
         <button type="button" class="tool-btn" onclick="duplicateSelectedNode()" title="Duplicate Selected" id="duplicate-btn" aria-label="Duplicate selected node" disabled>
             <i class="fas fa-copy"></i>
         </button>
         <button type="button" class="tool-btn" onclick="deleteSelectedNode()" title="Delete Selected" id="delete-node-btn" aria-label="Delete selected node" disabled>
             <i class="fas fa-trash"></i>
+        </button>
+        <button type="button" class="tool-btn" onclick="bulkDeleteSelected()" title="Delete Selected Nodes" id="bulk-delete-btn" aria-label="Bulk delete selected nodes" disabled>
+            <i class="fas fa-trash-can"></i>
         </button>
         <div class="tool-divider"></div>
         <button type="button" class="tool-btn" onclick="undo()" title="Undo (Ctrl+Z)" aria-label="Undo">
