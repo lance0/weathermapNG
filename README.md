@@ -171,7 +171,8 @@ WeathermapNG follows a modular service-oriented architecture:
 | LinkDataService | Link alerts and port-level aggregation |
 | PortUtilService | RRD-based traffic data for links |
 | MapService | Map CRUD and JSON import/export |
-| MapVersionService | Version snapshot storage (foundation — routes not yet registered) |
+| AutoDiscoveryService | LLDP/CDP topology discovery from the LibreNMS `links` table |
+| MapVersionService | Version snapshot storage, history, restore, compare (routes registered) |
 | RenderController | Live rendering and inline Server-Sent Events streaming |
 
 SSE is handled inline in `RenderController::sse` — there is no separate streaming service.
