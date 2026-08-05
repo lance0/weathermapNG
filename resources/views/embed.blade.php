@@ -383,6 +383,7 @@
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
         const reconnectDelay = 2000; // 2 seconds
+        let sseReconnectTimer = null;
         let currentTransport = 'none';
         let mapData = {};
         try {
@@ -1345,7 +1346,7 @@
         function getLinkPct(link, metricBps) {
             // If we have a pre-calculated pct from live data, use it
             const live = link.live || {};
-            if (typeof live.pct === 'number') return live.pct;
+            if (typeof live.pct === 'number') return Math.max(0, Math.min(100, live.pct));
 
             // Otherwise calculate from bps and bandwidth
             if (typeof metricBps === 'number') {
@@ -1485,8 +1486,8 @@
                     eventSourceRef = null;
                     // Try to reconnect if SSE was enabled
                     if (sseEnabled && sseReconnectAttempts < maxReconnectAttempts) {
-                        sseReconnectAttempts++;
-                        setTimeout(() => {
+                        sseReconnectTimer = setTimeout(() => {
+                            sseReconnectTimer = null;
                             if (sseEnabled) startSSE();
                         }, reconnectDelay);
                     } else {
@@ -1503,8 +1504,8 @@
                 startAutoUpdate();
             }
         }
-
         function stopSSE() {
+            if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null; }
             if (eventSourceRef) {
                 try { eventSourceRef.close(); } catch {}
                 eventSourceRef = null;

@@ -250,8 +250,8 @@ function handleMouseMove(event) {
     // Handle panning
     if (S.isPanning) {
         const rect = S.canvas.getBoundingClientRect();
-        const scaleX = S.canvas.width / rect.width;
-        const scaleY = S.canvas.height / rect.height;
+        const scaleX = S.mapWidth / rect.width;
+        const scaleY = S.mapHeight / rect.height;
         S.viewOffsetX = S.panStart.offsetX + (event.clientX - S.panStart.clientX) * scaleX;
         S.viewOffsetY = S.panStart.offsetY + (event.clientY - S.panStart.clientY) * scaleY;
         renderEditor();
