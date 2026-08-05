@@ -150,14 +150,42 @@ function handleMouseDown(event) {
     }
 
     if (node) {
-        S.selectedNode = node;
+        // Multi-select: shift/ctrl-click toggles membership in the set; a
+        // plain click in selection mode keeps the set (anchoring drag), a
+        // plain click otherwise resets to a single selection.
+        if (event.shiftKey || event.ctrlKey) {
+            const i = S.selectedNodes.indexOf(node);
+            if (i >= 0) {
+                S.selectedNodes.splice(i, 1);
+                if (S.selectedNode === node) {
+                    S.selectedNode = null;
+                }
+            } else {
+                S.selectedNodes.push(node);
+                S.selectedNode = node;
+            }
+        } else if (S.selectionMode) {
+            if (S.selectedNodes.indexOf(node) < 0) {
+                S.selectedNodes.push(node);
+            }
+            S.selectedNode = node;
+        } else {
+            S.selectedNodes = [node];
+            S.selectedNode = node;
+        }
         S.isDragging = true;
         S.dragOffset = { x: x - node.x, y: y - node.y };
-        saveState(); // Save for undo before dragging
-        populateNodeProperties(node);
+        saveState(); // Save for undo
+        populateNodeProperties(S.selectedNode);
         updateToolbarState();
         renderNodesList();
+    } else if (S.selectionMode) {
+        // Selection mode on empty click starts a rubber-band marquee instead
+        // of clearing the selection.
+        S.marquee = { startX: x, startY: y, x: x, y: y };
+        S.isDragging = false;
     } else {
+        S.selectedNodes = [];
         S.selectedNode = null;
         populateNodeProperties(null);
         updateToolbarState();
@@ -175,6 +203,15 @@ function handleMouseMove(event) {
         const scaleY = S.canvas.height / rect.height;
         S.viewOffsetX = S.panStart.offsetX + (event.clientX - S.panStart.clientX) * scaleX;
         S.viewOffsetY = S.panStart.offsetY + (event.clientY - S.panStart.clientY) * scaleY;
+        renderEditor();
+        return;
+    }
+
+    // Rubber-band marquee: track the drag rectangle live.
+    if (S.selectionMode && S.marquee && !S.isDragging) {
+        const pt = getCanvasPoint(event);
+        S.marquee.x = pt.x;
+        S.marquee.y = pt.y;
         renderEditor();
         return;
     }
@@ -213,7 +250,30 @@ function toggleSnapToGrid() {
     renderEditor();
 }
 
-function handleMouseUp() {
+function handleMouseUp(event) {
+    // Finalize a rubber-band marquee: select all nodes inside the rect.
+    if (S.selectionMode && S.marquee) {
+        const m = S.marquee;
+        // Capture the release position as the final corner (in case the
+        // pointer moved after the last mousemove or released without one).
+        const up = getCanvasPoint(event);
+        const left = Math.min(m.startX, up.x);
+        const right = Math.max(m.startX, up.x);
+        const top = Math.min(m.startY, up.y);
+        const bottom = Math.max(m.startY, up.y);
+        S.selectedNodes = S.nodes.filter(n =>
+            n.x >= left && n.x <= right && n.y >= top && n.y <= bottom
+        );
+        if (S.selectedNodes.length > 0) {
+            S.selectedNode = S.selectedNodes[0];
+        }
+        S.marquee = null;
+        populateNodeProperties(S.selectedNode || null);
+        updateToolbarState();
+        renderNodesList();
+        renderEditor();
+        return;
+    }
     S.isDragging = false;
     if (S.isPanning) {
         S.isPanning = false;
@@ -251,7 +311,7 @@ function drawNode(node) {
     // Color based on state: link start (orange), selected (blue), normal (default or green)
     if (S.linkMode && S.linkStart === node) {
         ctx.fillStyle = '#fd7e14'; // Orange for link start
-    } else if (node === S.selectedNode) {
+    } else if (S.selectedNodes.indexOf(node) >= 0 || node === S.selectedNode) {
         ctx.fillStyle = '#0d6efd'; // Blue for selected
     } else {
         ctx.fillStyle = node.status ? getNodeColor(node) : (defaultNodeStyle.color || '#28a745');
@@ -361,6 +421,24 @@ function renderEditor() {
 
     S.links.forEach(drawLink);
     S.nodes.forEach(drawNode);
+
+    // Rubber-band marquee overlay (in transformed canvas coords).
+    if (S.selectionMode && S.marquee) {
+        const m = S.marquee;
+        const rLeft = Math.min(m.startX, m.x);
+        const rTop = Math.min(m.startY, m.y);
+        const rW = Math.abs(m.x - m.startX);
+        const rH = Math.abs(m.y - m.startY);
+        ctx.save();
+        ctx.fillStyle = 'rgba(13, 110, 253, 0.15)';
+        ctx.fillRect(rLeft, rTop, rW, rH);
+        ctx.strokeStyle = '#0d6efd';
+        ctx.lineWidth = 1 / S.viewScale;
+        ctx.setLineDash([4 / S.viewScale, 4 / S.viewScale]);
+        ctx.strokeRect(rLeft, rTop, rW, rH);
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
 
     ctx.restore();
 
