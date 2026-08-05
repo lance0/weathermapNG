@@ -8,7 +8,7 @@ class DefaultStylesFeatureTest extends TestCase
 {
     public function test_editor_view_has_default_styles_panel(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $content = editor_source();
         $this->assertStringContainsString('Default Styles', $content);
         $this->assertStringContainsString('id="default-node-color"', $content);
         $this->assertStringContainsString('id="default-node-label-color"', $content);
@@ -19,7 +19,7 @@ class DefaultStylesFeatureTest extends TestCase
 
     public function test_editor_js_can_populate_and_read_defaults(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $content = editor_source();
         $this->assertStringContainsString('function populateDefaultStyles', $content);
         $this->assertStringContainsString('function getDefaultNodeStyle', $content);
         $this->assertStringContainsString('function getDefaultLinkStyle', $content);
@@ -27,7 +27,7 @@ class DefaultStylesFeatureTest extends TestCase
 
     public function test_editor_save_payload_includes_default_styles(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $content = editor_source();
         $this->assertStringContainsString('default_node_style: defaultNodeStyle', $content);
         $this->assertStringContainsString('default_link_style: defaultLinkStyle', $content);
     }
