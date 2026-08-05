@@ -35,6 +35,11 @@ class DiagnosticsIntegrationTest extends TestCase
             return;
         }
 
+        if (!extension_loaded('pdo_sqlite')) {
+            $this->markTestSkipped('pdo_sqlite extension not available');
+            return;
+        }
+
         // Temp RRD directory; seed a per-device subdir lazily in tests.
         $this->rrdDir = sys_get_temp_dir() . '/wmng_integrity_' . bin2hex(random_bytes(4));
         mkdir($this->rrdDir . '/' . $this->hostname, 0777, true);

@@ -25,6 +25,11 @@ class AutoDiscoveryTest extends TestCase
     {
         parent::setUp();
 
+        if (!extension_loaded('pdo_sqlite')) {
+            $this->markTestSkipped('pdo_sqlite extension not available');
+            return;
+        }
+
         // Fresh, isolated in-memory schema per test. Build the Capsule on the
         // bootstrap container so the DB facade, Eloquent models, and the
         // capsule all resolve the same "db" connection manager.
