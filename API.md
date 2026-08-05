@@ -21,7 +21,7 @@ These sit outside the `auth` group and are intentionally minimal so they can bac
 
 ### Read routes (open to all authenticated users)
 
-`GET` map index/show/editor/view/embed/json/live/sse/export, `GET templates` index/show, `GET /api/devices` and `GET /api/device/{id}/ports` lookups, and `GET /health/detailed`, `/health/stats`, `/metrics`. None of these call `requireAdmin()`.
+`GET` map index/show/editor/view/embed/json/live/sse/export, `GET templates` index/show, and `GET /health/detailed`, `/health/stats`, `/metrics`. None of these call `requireAdmin()`. Device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports`) are admin-only — they expose device IPs and topology data.
 
 ### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`)
 
@@ -74,12 +74,12 @@ Example live payload shape:
 }
 ```
 
-## Lookup Routes
+## Lookup Routes (admin-only)
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `GET` | `/plugin/WeathermapNG/api/devices` | Device lookup for the editor |
-| `GET` | `/plugin/WeathermapNG/api/device/{id}/ports` | Ports for one LibreNMS device |
+| `GET` | `/plugin/WeathermapNG/api/devices` | Device lookup for the editor (admin) |
+| `GET` | `/plugin/WeathermapNG/api/device/{id}/ports` | Ports for one LibreNMS device (admin) |
 
 ## Map Management Routes
 

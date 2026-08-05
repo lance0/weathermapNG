@@ -164,11 +164,11 @@ This release should make existing authoring workflows faster and less error-pron
   - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store.
   - *Highest ROI v1.8.0 item — major feature with minimal new backend work.*
 
-- [ ] **Bulk Operations**
-  - Select multiple nodes/links (rubber-band, shift-click, ctrl-click).
-  - Bulk delete.
-  - Bulk style changes (apply to all selected).
-  - Preserve undo/redo support for bulk edits.
+- [x] **Bulk Operations** *(v1.12.0: multi-select via shift/ctrl-click + rubber-band marquee, bulk delete with undo, group drag, group keyboard nudge)*
+  - ~~Select multiple nodes/links (rubber-band, shift-click, ctrl-click).~~ *(v1.12.0)*
+  - ~~Bulk delete.~~ *(v1.12.0)*
+  - Bulk style changes (apply to all selected). *(deferred)*
+  - ~~Preserve undo/redo support for bulk edits.~~ *(v1.12.0)*
 
 - [x] **Operational diagnostics** *(v1.9.0: diagnostics.blade.php + route + HealthController — install status, route registration, writable paths, version metadata, LibreNMS compatibility)*
   - ~~`HealthController` already has health/ready/live/detailed/stats/metrics endpoints. The diagnostics screen is a UI layer on top.~~
@@ -310,6 +310,20 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
 - [x] **JSON export round-trip**: `_format` version stamp, auto-fill import form from JSON, `Map::createFromJsonData()` extracted.
 - [x] **O(N×L)→O(L) node→links index** in `NodeDataService::sumPortTraffic()`.
 - [x] **Batch link validation**: `LinkService::storeLinks` pre-fetches all nodes/ports in 2 queries instead of 2L+P per-link queries.
+
+### v1.12.0 - Bulk Ops, Auto-Discovery, Culling, Metrics, Editor Hardening (shipped)
+
+- [x] **Editor bulk operations**: Multi-select via shift/ctrl-click or rubber-band marquee. Bulk delete with undo, group drag, group keyboard nudge.
+- [x] **LLDP/CDP auto-discovery**: `AutoDiscoveryService` reads LibreNMS `links` table, dedupes by device pair, creates missing nodes/links. Admin-gated endpoint + editor trigger + Artisan command.
+- [x] **Admin data-integrity diagnostics**: Per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows.
+- [x] **Viewport culling**: Embed `renderMap`/`renderOverlay` and editor `renderEditor` skip off-screen nodes/links via world-rect AABB test. Curved-link bezier control points included in AABB. View rect cached per frame.
+- [x] **Node CPU/memory overlay**: "CPU x%  MEM y%" text line below each node's traffic aggregate. Gated by `show_node_metrics` config + `?metrics=0` URL toggle. Server-side metrics queries skipped when disabled.
+- [x] **Editor canvas fit**: ResizeObserver computes largest box preserving aspect ratio. Canvas buffer matches display × DPR for crisp text on high-DPI.
+- [x] **Editor coordinate system**: `S.mapWidth`/`S.mapHeight` separate world dimensions from buffer size. Pan, zoom, drag, grid, minimap, culling all use world coords.
+- [x] **Selection state consistency**: `addNode`/`duplicateNode`/`deleteNode` properly maintain `selectedNodes` alongside `selectedNode`. Group drag and nudge move all selected nodes. Snap-to-grid recalculates drag offset.
+- [x] **SSE connection management**: DB released before sleep (pool exhaustion fix), heartbeat every 15s (proxy idle-timeout fix), reconnect timer tracked and cleared on stop (phantom connection fix).
+- [x] **Embed lifecycle**: Graph popup Image objects aborted on new hover (leak fix). `visibilitychange` pauses RAF/SSE/polling when tab backgrounded (kiosk resource savings).
+- [x] **Data clamping**: CPU/mem metrics and link percentages clamped to 0–100. `LookupController` admin-gated (IP exposure fix). `linkInView` dstId fallback aligned with `drawLink`.
 
 ### Future - Historical Views & Export
 

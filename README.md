@@ -4,7 +4,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
-![Version 1.10.0](https://img.shields.io/badge/version-1.10.0-0078D4)
+![Version 1.12.0](https://img.shields.io/badge/version-1.12.0-0078D4)
 
 ![WeathermapNG Live View](wmng.png)
 
@@ -30,6 +30,13 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **Per-Map Default Styles**: Configure default node/link colors and link width/via style per map; stored in map options and applied at render time without mutating node/link data
 - **Operational Diagnostics**: Admin page with health checks, route registration, writable paths, and resource counts
 - **Map Versioning**: Snapshot storage, history, restore, compare, and delete workflows
+- **LLDP/CDP Auto-Discovery**: Automatically seed map topology from LibreNMS neighbor data
+- **Editor Bulk Operations**: Multi-select, marquee, bulk delete with undo, group drag and nudge
+- **Viewport Culling**: Large-map pan/zoom performance — off-screen nodes and links are skipped
+- **CPU/Memory Overlay**: Node CPU and memory utilization displayed in the embed view
+- **RRD Graph Hover**: Hover nodes/links for inline LibreNMS time-series graphs
+- **Alert Integration**: Active alert badges with severity coloring and click-through to alert details
+- **Kiosk/NOC Wall Mode**: Fullscreen display with auto-cycling between maps
 
 ## Quick Start
 

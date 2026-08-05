@@ -36,6 +36,7 @@
 | `kiosk` | `0` | Enable NOC wall mode: hide nav, controls, legend, minimap, and status bar |
 | `cycle` | *(none)* | When `kiosk=1`, rotate to the next map every N seconds (minimum 5) |
 | `graphs` | `1` | Show RRD graph hover popups (`0` to disable; auto-disabled in kiosk mode) |
+| `metrics` | `1` | Show CPU/memory utilization overlay on nodes (`0` to disable; controlled by `show_node_metrics` config) |
 | `target` | `_blank` | Where node/link click-through opens: `_blank` (new tab) or `self` (same tab) |
 
 ## Live Data
@@ -52,6 +53,7 @@
 | `weathermapng.link_style` | `straight` | Default via_style for links: `straight`, `angled`, `curved` |
 | `weathermapng.show_bandwidth` | `true` | Show bandwidth labels (Gb/s, Mb/s) |
 | `weathermapng.show_percentages` | `true` | Show utilization percentage labels |
+| `weathermapng.show_node_metrics` | `true` | Show CPU/memory utilization overlay on nodes |
 | `weathermapng.thresholds` | `[50,80,95]` | Utilization thresholds for green/yellow/red coloring |
 
 ## Export
