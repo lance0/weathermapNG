@@ -547,29 +547,57 @@
                 bottom: (canvas.height - viewOffsetY) / viewScale + margin,
             };
         }
-        function nodeInView(n) {
+        function nodeInView(n, v) {
             const x = (n.position?.x ?? n.x) || 0;
             const y = (n.position?.y ?? n.y) || 0;
-            const v = worldViewRect();
             return x >= v.left && x <= v.right && y >= v.top && y <= v.bottom;
         }
-        function linkInView(link) {
+        function linkInView(link, v) {
             const srcId = link.source ?? link.src ?? link.source_id;
             const dstId = link.target ?? link.dst ?? link.target_id;
             const srcNode = nodeById.get(srcId);
             const dstNode = nodeById.get(dstId);
             if (!srcNode && !dstNode) return false;
-            if (!srcNode) return nodeInView(dstNode);
-            if (!dstNode) return nodeInView(srcNode);
+            if (!srcNode) return nodeInView(dstNode, v);
+            if (!dstNode) return nodeInView(srcNode, v);
             // Build the path point list (endpoints + via_points) and test
             // the union AABB against the view rect, so bent links whose path
             // dips into the viewport stay visible even with off-screen ends.
+            const ax = srcNode.position?.x ?? srcNode.x ?? 0;
+            const ay = srcNode.position?.y ?? srcNode.y ?? 0;
+            const bx = dstNode.position?.x ?? dstNode.x ?? 0;
+            const by = dstNode.position?.y ?? dstNode.y ?? 0;
             const viaPoints = (link.style && link.style.via_points) || [];
-            const px = [a, ...viaPoints.map(p => p.x), b];
-            const py = [c, ...viaPoints.map(p => p.y), d];
-            const v = worldViewRect();
-            return Math.max(Math.min(...px), v.left) <= Math.min(Math.max(...px), v.right)
-                && Math.max(Math.min(...py), v.top) <= Math.min(Math.max(...py), v.bottom);
+            const viaStyle = (link.style && link.style.via_style) || defaultLinkStyle.via_style || WMNG_CONFIG.link_style || 'straight';
+            const pts = [{x: ax, y: ay}, ...viaPoints, {x: bx, y: by}];
+            let minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
+            let minY = Math.min(ay, by), maxY = Math.max(ay, by);
+            for (const p of viaPoints) {
+                if (p.x < minX) minX = p.x; else if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y; else if (p.y > maxY) maxY = p.y;
+            }
+            // For curved (Catmull-Rom → cubic bezier) links, the control
+            // points cp1/cp2 can extend beyond the point hull and cause the
+            // rendered curve to bulge outside the AABB. Include them so
+            // on-screen curve segments aren't incorrectly culled.
+            if (viaStyle === 'curved' && pts.length > 2) {
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const p0 = pts[Math.max(0, i - 1)];
+                    const p1 = pts[i];
+                    const p2 = pts[i + 1];
+                    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+                    const cp1x = p1.x + (p2.x - p0.x) / 6;
+                    const cp1y = p1.y + (p2.y - p0.y) / 6;
+                    const cp2x = p2.x - (p3.x - p1.x) / 6;
+                    const cp2y = p2.y - (p3.y - p1.y) / 6;
+                    for (const cp of [{x: cp1x, y: cp1y}, {x: cp2x, y: cp2y}]) {
+                        if (cp.x < minX) minX = cp.x; else if (cp.x > maxX) maxX = cp.x;
+                        if (cp.y < minY) minY = cp.y; else if (cp.y > maxY) maxY = cp.y;
+                    }
+                }
+            }
+            return Math.max(minX, v.left) <= Math.min(maxX, v.right)
+                && Math.max(minY, v.top) <= Math.min(maxY, v.bottom);
         }
 
         function renderMap(skipMinimap = false) {
@@ -609,18 +637,21 @@
             ctx.save();
             ctx.translate(viewOffsetX, viewOffsetY);
             ctx.scale(viewScale, viewScale);
+            // Compute the visible world rect ONCE per frame (avoids
+            // 600+ redundant worldViewRect() calls on large maps).
+            const vr = worldViewRect();
 
             // Draw static link parts (line stroke, color, width, labels, badges)
             if (Array.isArray(mapData.links)) {
                 for (const link of mapData.links) {
-                    if (linkInView(link)) drawLink(link);
+                    if (linkInView(link, vr)) drawLink(link);
                 }
             }
 
             // Draw nodes
             if (Array.isArray(mapData.nodes)) {
                 for (const node of mapData.nodes) {
-                    if (nodeInView(node)) drawNode(node);
+                    if (nodeInView(node, vr)) drawNode(node);
                 }
             }
 
@@ -646,19 +677,21 @@
             overlayCtx.save();
             overlayCtx.translate(viewOffsetX, viewOffsetY);
             overlayCtx.scale(viewScale, viewScale);
+            const vr = worldViewRect();
             if (Array.isArray(mapData.links)) {
                 for (const link of mapData.links) {
-                    if (linkInView(link)) drawLinkDynamic(link, overlayCtx);
+                    if (linkInView(link, vr)) drawLinkDynamic(link, overlayCtx);
                 }
             }
             // Down-node pulse rings (dynamic, drawn on overlay canvas).
             if (Array.isArray(mapData.nodes)) {
                 for (const node of mapData.nodes) {
-                    if ((node.status || 'unknown') === 'down' && nodeInView(node)) {
+                    if ((node.status || 'unknown') === 'down' && nodeInView(node, vr)) {
                         drawNodePulse(node, overlayCtx);
                     }
                 }
             }
+            overlayCtx.restore();
         }
 
         function initKioskMode() {
@@ -920,9 +953,9 @@
                 ctx.font = '9px Arial';
                 ctx.fillStyle = '#888';
                 let metricText = '';
-                if (node.metrics.cpu != null) metricText += 'CPU ' + Math.round(node.metrics.cpu) + '%';
+                if (node.metrics.cpu != null) metricText += 'CPU ' + Math.max(0, Math.min(100, Math.round(node.metrics.cpu))) + '%';
                 if (node.metrics.mem != null) {
-                    metricText += (metricText ? '  ' : '') + 'MEM ' + Math.round(node.metrics.mem) + '%';
+                    metricText += (metricText ? '  ' : '') + 'MEM ' + Math.max(0, Math.min(100, Math.round(node.metrics.mem))) + '%';
                 }
                 if (metricText) ctx.fillText(metricText, x, y + radius + 26);
             }

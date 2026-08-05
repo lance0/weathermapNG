@@ -47,7 +47,11 @@ function initCanvas() {
     S.fitCanvasToWrap = fitCanvasToWrap;
     fitCanvasToWrap();
     if (typeof ResizeObserver !== 'undefined') {
-        new ResizeObserver(fitCanvasToWrap).observe(wrap);
+        let rafId = null;
+        new ResizeObserver(() => {
+            if (rafId) return; // coalesce bursts into one rAF
+            rafId = requestAnimationFrame(() => { rafId = null; fitCanvasToWrap(); });
+        }).observe(wrap);
     }
 
     renderEditor();
@@ -450,19 +454,52 @@ function renderEditor() {
     const vRight = (canvas.width - S.viewOffsetX) / S.viewScale + vMargin;
     const vTop = (0 - S.viewOffsetY) / S.viewScale - vMargin;
     const vBottom = (canvas.height - S.viewOffsetY) / S.viewScale + vMargin;
-    const nodeVisible = (n) => n.x >= vLeft && n.x <= vRight && n.y >= vTop && n.y <= vBottom;
+    // Always render in-flight interaction nodes (dragged/selected/link-source)
+    // even if outside the viewport — otherwise a node vanishes mid-drag when
+    // it crosses the culling boundary.
+    const pinned = new Set();
+    if (S.selectedNodes) S.selectedNodes.forEach(n => pinned.add(n));
+    if (S.linkStart) pinned.add(S.linkStart);
+    const nodeVisible = (n) => pinned.has(n) ||
+        (n.x >= vLeft && n.x <= vRight && n.y >= vTop && n.y <= vBottom);
     const linkVisible = (l) => {
         const a = findNodeById(l.srcId);
         const b = findNodeById(l.dstId);
         if (!a) return !!b && nodeVisible(b);
         if (!b) return nodeVisible(a);
+        // Links touching a pinned (in-flight) node always render.
         // Include via_points in the AABB so bent links crossing the
         // viewport stay visible even with both endpoints off-screen.
         const via = (l.style && l.style.via_points) || [];
-        const px = [a.x, ...via.map(p => p.x), b.x];
-        const py = [a.y, ...via.map(p => p.y), b.y];
-        return Math.max(Math.min(...px), vLeft) <= Math.min(Math.max(...px), vRight)
-            && Math.max(Math.min(...py), vTop) <= Math.min(Math.max(...py), vBottom);
+        const viaStyle = (l.style && l.style.via_style) || defaultLinkStyle.via_style || S.editorConfig.link_style;
+        const pts = [{x: a.x, y: a.y}, ...via, {x: b.x, y: b.y}];
+        let minX = Math.min(a.x, b.x), maxX = Math.max(a.x, b.x);
+        let minY = Math.min(a.y, b.y), maxY = Math.max(a.y, b.y);
+        for (const p of via) {
+            if (p.x < minX) minX = p.x; else if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y; else if (p.y > maxY) maxY = p.y;
+        }
+        // Curved (Catmull-Rom → cubic bezier) control points can extend
+        // beyond the point hull; include them to avoid culling on-screen
+        // curve segments.
+        if (viaStyle === 'curved' && pts.length > 2) {
+            for (let i = 0; i < pts.length - 1; i++) {
+                const p0 = pts[Math.max(0, i - 1)];
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const p3 = pts[Math.min(pts.length - 1, i + 2)];
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                const cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                const cp2y = p2.y - (p3.y - p1.y) / 6;
+                for (const cp of [{x: cp1x, y: cp1y}, {x: cp2x, y: cp2y}]) {
+                    if (cp.x < minX) minX = cp.x; else if (cp.x > maxX) maxX = cp.x;
+                    if (cp.y < minY) minY = cp.y; else if (cp.y > maxY) maxY = cp.y;
+                }
+            }
+        }
+        return Math.max(minX, vLeft) <= Math.min(maxX, vRight)
+            && Math.max(minY, vTop) <= Math.min(maxY, vBottom);
     };
 
     for (const l of S.links) if (linkVisible(l)) drawLink(l);
