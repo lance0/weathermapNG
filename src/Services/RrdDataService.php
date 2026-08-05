@@ -11,10 +11,14 @@ class RrdDataService
     private RRDTool $rrdTool;
     private array $portInfoCache = [];
     private array $deviceInfoCache = [];
+    private ?string $rrdBase;
 
-    public function __construct(RRDTool $rrdTool)
+    public function __construct(RRDTool $rrdTool, ?string $rrdBase = null)
     {
         $this->rrdTool = $rrdTool;
+        // Overridable via constructor injection (used by tests); defaults to the
+        // configured LibreNMS RRD root when not provided.
+        $this->rrdBase = $rrdBase ?? (string) config('weathermapng.rrd_base', '/opt/librenms/rrd');
     }
     public function preloadPortInfo(array $portIds): void
     {
@@ -75,6 +79,22 @@ class RrdDataService
         return $this->fetchTrafficFromRrd($rrdPath);
     }
 
+    /**
+     * Whether the RRD file backing a port exists on disk. Reuses the exact
+     * path resolution used by getPortTraffic() so integrity checks agree with
+     * live traffic reads. Returns false when the port is unknown, the device
+     * is unresolvable, or no matching .rrd file is present.
+     */
+    public function hasRrdFile(int $portId): bool
+    {
+        $port = $this->getPortInfo($portId);
+        if (!$port) {
+            return false;
+        }
+
+        return $this->resolvePortRrdPath($port) !== null;
+    }
+
     private function getPortInfo(int $portId): ?array
     {
         if (array_key_exists($portId, $this->portInfoCache)) {
@@ -97,7 +117,7 @@ class RrdDataService
 
     private function resolvePortRrdPath(array $port): ?string
     {
-        $config = config('weathermapng.rrd_base');
+        $config = $this->rrdBase;
         $device = $this->getDeviceInfo($port['device_id']);
 
         if (!$device) {

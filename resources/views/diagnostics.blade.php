@@ -128,5 +128,93 @@
             </div>
         </div>
     </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">Data Integrity</div>
+                <div class="card-body">
+                    @if(!empty($integrity['error']))
+                        <div class="alert alert-danger mb-0">{{ $integrity['error'] }}</div>
+                    @elseif(empty($integrity['maps']))
+                        <p class="text-muted mb-0">No maps found.</p>
+                    @else
+                        @php
+                            $summary = $integrity['summary'] ?? [];
+                            $problemTotal = ($summary['broken_links'] ?? 0)
+                                + ($summary['missing_rrd'] ?? 0)
+                                + ($summary['orphan_nodes'] ?? 0)
+                                + ($summary['orphan_links'] ?? 0)
+                                + ($summary['dangling_nodes'] ?? 0)
+                                + ($summary['dangling_links'] ?? 0);
+                        @endphp
+                        <div class="alert alert-{{ $problemTotal > 0 ? 'warning' : 'success' }} mb-3">
+                            <strong>{{ $problemTotal > 0 ? $problemTotal . ' issue(s)' : 'All clean' }}</strong>
+                            <span class="text-muted">
+                                across {{ $summary['maps'] ?? 0 }} map(s) &mdash;
+                                {{ $summary['broken_links'] ?? 0 }} broken ports,
+                                {{ $summary['missing_rrd'] ?? 0 }} missing RRD,
+                                {{ $summary['orphan_nodes'] ?? 0 }} orphan nodes,
+                                {{ $summary['orphan_links'] ?? 0 }} orphan links.
+                            </span>
+                            @if(($summary['dangling_nodes'] ?? 0) > 0 || ($summary['dangling_links'] ?? 0) > 0)
+                                <div class="small mt-1">
+                                    Additionally {{ $summary['dangling_nodes'] ?? 0 }} node(s) and {{ $summary['dangling_links'] ?? 0 }} link(s) point at deleted maps.
+                                </div>
+                            @endif
+                        </div>
+
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Map</th>
+                                    <th class="text-end">Nodes</th>
+                                    <th class="text-end">Links</th>
+                                    <th class="text-end">Broken</th>
+                                    <th class="text-end">Missing RRD</th>
+                                    <th class="text-end">Orphan Nodes</th>
+                                    <th class="text-end">Orphan Links</th>
+                                    <th>Findings</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($integrity['maps'] as $map)
+                                    @php
+                                        $issues = ($map['broken_links'] ?? 0)
+                                            + ($map['missing_rrd'] ?? 0)
+                                            + ($map['orphan_nodes'] ?? 0)
+                                            + ($map['orphan_links'] ?? 0);
+                                    @endphp
+                                    <tr>
+                                        <td>{{ $map['name'] }}</td>
+                                        <td class="text-end">{{ $map['nodes'] }}</td>
+                                        <td class="text-end">{{ $map['links'] }}</td>
+                                        <td class="text-end">{{ $map['broken_links'] }}</td>
+                                        <td class="text-end">{{ $map['missing_rrd'] }}</td>
+                                        <td class="text-end">{{ $map['orphan_nodes'] }}</td>
+                                        <td class="text-end">{{ $map['orphan_links'] }}</td>
+                                        <td>
+                                            @if($issues === 0)
+                                                <span class="badge bg-success">No issues</span>
+                                            @else
+                                                <ul class="list-unstyled small mb-0">
+                                                    @foreach($map['findings'] as $finding)
+                                                        <li><span class="badge bg-{{ $finding['type'] === 'missing_rrd' ? 'warning' : 'danger' }}">{{ $finding['type'] }}</span> {{ $finding['message'] }}</li>
+                                                    @endforeach
+                                                    @if($map['total'] > count($map['findings']))
+                                                        <li class="text-muted">+{{ $map['total'] - count($map['findings']) }} more&hellip;</li>
+                                                    @endif
+                                                </ul>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 @endsection

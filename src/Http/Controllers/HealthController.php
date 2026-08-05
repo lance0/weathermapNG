@@ -5,6 +5,8 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\Logger;
+use LibreNMS\Plugins\WeathermapNG\Services\MapService;
+use LibreNMS\Plugins\WeathermapNG\Services\RrdDataService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
@@ -246,6 +248,18 @@ class HealthController
             ];
         }
 
+        // Data-integrity scan: broken ports, missing RRD files, orphaned rows.
+        $integrity = [];
+        try {
+            $integrity = (new MapService())->getDataIntegrityIssues(
+                $this->resolveRrdDataService(),
+                20
+            );
+        } catch (\Exception $e) {
+            $this->getLogger()->error('Data integrity scan failed', ['error' => $e->getMessage()]);
+            $integrity = ['maps' => [], 'summary' => [], 'error' => $e->getMessage()];
+        }
+
         return view('WeathermapNG::diagnostics', [
             'version' => $this->getVersion(),
             'overallStatus' => $health['status'] ?? 'unknown',
@@ -253,6 +267,7 @@ class HealthController
             'stats' => $stats,
             'routes' => $routeStatus,
             'paths' => $pathStatus,
+            'integrity' => $integrity,
             'librenmsVersion' => config('librenms.version', 'unknown'),
         ]);
     }
@@ -483,6 +498,15 @@ class HealthController
         }
 
         return 'healthy';
+    }
+
+    private function resolveRrdDataService(): ?RrdDataService
+    {
+        try {
+            return app(RrdDataService::class);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private function getVersion(): string
