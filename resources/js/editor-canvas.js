@@ -419,8 +419,27 @@ function renderEditor() {
         drawGrid();
     }
 
-    S.links.forEach(drawLink);
-    S.nodes.forEach(drawNode);
+    // Viewport culling: skip nodes/links entirely outside the visible world
+    // rect so pan/zoom on large maps doesn't draw off-screen content.
+    const vMargin = 24 / S.viewScale;
+    const vLeft = (0 - S.viewOffsetX) / S.viewScale - vMargin;
+    const vRight = (canvas.width - S.viewOffsetX) / S.viewScale + vMargin;
+    const vTop = (0 - S.viewOffsetY) / S.viewScale - vMargin;
+    const vBottom = (canvas.height - S.viewOffsetY) / S.viewScale + vMargin;
+    const nodeVisible = (n) => n.x >= vLeft && n.x <= vRight && n.y >= vTop && n.y <= vBottom;
+    const linkVisible = (l) => {
+        const a = findNodeById(l.srcId);
+        const b = findNodeById(l.dstId);
+        if (!a) return !!b && nodeVisible(b);
+        if (!b) return nodeVisible(a);
+        // AABB overlap of the segment vs the view rect (links crossing the
+        // viewport stay visible even with both endpoints off-screen).
+        return Math.max(Math.min(a.x, b.x), vLeft) <= Math.min(Math.max(a.x, b.x), vRight)
+            && Math.max(Math.min(a.y, b.y), vTop) <= Math.min(Math.max(a.y, b.y), vBottom);
+    };
+
+    for (const l of S.links) if (linkVisible(l)) drawLink(l);
+    for (const n of S.nodes) if (nodeVisible(n)) drawNode(n);
 
     // Rubber-band marquee overlay (in transformed canvas coords).
     if (S.selectionMode && S.marquee) {

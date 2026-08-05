@@ -47,7 +47,7 @@ return [
     ],
     'link_style' => 'straight',
     'show_bandwidth' => true,
-    'show_percentages' => true,
+    'show_node_metrics' => true,
 
     // Security settings
     'security' => [

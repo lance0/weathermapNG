@@ -243,8 +243,8 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - ~~LibreNMS device status is available. WeathermapNG nodes already store `device_id`.~~ *(v1.11.0)*
   - ~~Partially covered by alerts integration, but the node icon itself should change, not just an overlay badge.~~ *(v1.11.0: status rings layer on top of device-type shapes)*
 
-- [ ] **Custom Metrics**
-  - CPU and memory utilization on nodes (via LibreNMS `/health/processor` and `/health/mempool` endpoints).
+- [x] **Custom Metrics** *(v1.12.0: CPU and memory utilization — `DeviceMetricsService` batch-queries `processors.processor_usage` and `mempools.mempool_perc` per device, `NodeDataService::buildNodeData()` attaches `metrics: {cpu, mem}` to every node in live/SSE payload; embed `drawNode()` renders a "CPU x%  MEM y%" text line below the traffic aggregate, gated by `show_node_metrics` config + `?metrics=0` URL toggle; latency/packet-loss/custom-OID remain future work)*
+  - ~~CPU and memory utilization on nodes (via LibreNMS `/health/processor` and `/health/mempool` endpoints).~~ *(v1.12.0)*
   - Latency visualization (via LibreNMS services API — service_type=ping).
   - Packet loss indicators (via services API — service_ds with loss datasource).
   - Custom SNMP OID support if it can be implemented without reintroducing unreliable polling behavior.
@@ -257,10 +257,10 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - ~~Alert history on hover~~ *(v1.11.0: `AlertService::deviceAlertHistory()` and `portAlertHistory()` query without state filter, select id/timestamp, ordered DESC; alert count+severity in hover tooltip; alerts included in initial page load)*
   - *The roadmap previously underestimated how much alert work was already done.*
 
-- [ ] **Large map performance** *(v1.11.0: canvas layer separation, RAF pause on zero traffic, minimap decoupled from animation loop, nodeById O(1) lookup, O(N×L)→O(L) node→links index, batch link validation — viewport culling still TODO)*
-  - ~~Set practical performance budgets for node/link counts.~~ *(v1.11.0: performance optimizations shipped)*
+- [x] **Large map performance** *(v1.11.0: canvas layer separation, RAF pause on zero traffic, minimap decoupled from animation loop, nodeById O(1) lookup, O(N×L)→O(L) node→links index, batch link validation; v1.12.0: viewport culling — `renderMap`/`renderOverlay`/`renderEditor` skip nodes outside the visible world rect and links whose segment AABB misses it, with a 24px margin)*
+  - ~~Set practical performance budgets for node/link counts.~~ *(v1.11.0: performance budgets shipped)*
   - ~~Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.~~ *(v1.11.0: canvas layer separation eliminates 60fps full-canvas redraws; RAF pauses on zero traffic; minimap decoupled from animation loop)*
-  - Graceful degradation controls: viewport culling (only draw visible nodes/links), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold. *(viewport culling still TODO)*
+  - ~~Graceful degradation controls: viewport culling (only draw visible nodes/links), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold.~~ *(v1.12.0: viewport culling shipped in embed `renderMap`/`renderOverlay` and editor `renderEditor`)*
   - *Canvas 2D is appropriate for 1-300 nodes with these optimizations. No engine migration needed until v2.0.0.*
 
 - [x] **CLI tools for map management** *(v1.11.0: 4 Artisan commands registered via ServiceProvider — `lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`; verified live in Docker)*
