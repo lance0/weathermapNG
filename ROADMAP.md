@@ -2,11 +2,11 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-*Last reviewed v1.11.0 (2026-08-03) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+*Last reviewed v1.12.0 (2026-08-05) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.11.0 (Stable)
+## Current Status: v1.12.0 (Stable)
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.9.0:
+The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.11.0:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
@@ -16,7 +16,7 @@ The plugin is usable today for production-oriented network map visualization, wi
 - Map versioning with editor UI (save, restore, compare, delete)
 - Server-Sent Events for live updates
 - Embeddable views with navigation bar and NOC wall / kiosk mode with map cycling
-- Operational diagnostics page for administrators
+- Operational diagnostics page for administrators with data-integrity checks
 - Map tags, filtering, and first-run onboarding
 - Per-map default styles for nodes and links
 - Demo mode for testing
@@ -24,8 +24,13 @@ The plugin is usable today for production-oriented network map visualization, wi
 - Composer path package install flow for LibreNMS
 - Weekly/manual install CI coverage against LibreNMS
 - Idempotent LibreNMS plugin registration cleanup during reinstall
+- LLDP/CDP auto-discovery from LibreNMS topology data
+- Editor bulk operations: multi-select, marquee, bulk delete with undo
+- Viewport culling for large-map pan/zoom performance
+- Node CPU/memory utilization overlay in embed view
+- RRD graph hover popups and editor click-through to LibreNMS device/port pages
 
-The next phase should close the biggest operator gaps vs legacy weathermap tools: click-through navigation to LibreNMS device pages and RRD graph hover popups.
+The next phase should focus on map sharing/export workflows, additional visualization options, and continued performance hardening for very large maps.
 
 ---
 

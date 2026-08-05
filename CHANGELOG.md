@@ -3,13 +3,31 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.12.0] - 2026-08-05
 
 ### Added
-- **LLDP/CDP auto-discovery from LibreNMS `links` table**: `AutoDiscoveryService::discoverAndSeedMap()` now reads real topology from the LibreNMS `links` table (protocol `lldp`/`xdp`/`cdp`), dedupes by device pair, and creates missing `wmng` nodes and links — replacing the previous stub that returned an "Automatically disabled" message. Returns plain counts (`nodes_added`, `links_added`). Wired through an admin-gated autodiscover endpoint (`POST plugin/WeathermapNG/map/{map}/autodiscover`), an editor trigger, and a `weathermapng:discover` Artisan command.
-- **Admin data-integrity diagnostics section**: the diagnostics page now reports per-map data-integrity issues — broken port associations, missing RRD files, and orphan `wmng` nodes/links and dangling rows — via `MapService::getDataIntegrityIssues()` and `RrdDataService::hasRrdFile()`.
-- **Viewport culling in embed and editor**: `renderMap`/`renderOverlay` (embed) and `renderEditor` now compute the visible world rect each frame (inverse of the `viewOffsetX/Y` + `viewScale` transform, plus a 24px margin) and skip nodes whose center is outside it. Links use an AABB-overlap test so links crossing the viewport still render even with both endpoints off-screen. Off-screen nodes are also excluded from `nodeGeoms`, so hover/click detection stays correct. Cuts draw work on pan/zoom for large maps.
-- **Node CPU/memory utilization overlay**: The embed view now draws a "CPU x%  MEM y%" text line below each node's traffic aggregate. Metrics come from the existing `DeviceMetricsService` (batch-queries `processors.processor_usage` and `mempools.mempool_perc`) already attached to every node in the live/SSE payload as `node.metrics.{cpu,mem}`. Gated by a new `show_node_metrics` config key (default `true`) and a `?metrics=0` URL toggle, mirroring `show_bandwidth`/`show_percentages`.
+- **Editor bulk operations**: Multi-select via shift/ctrl-click or rubber-band marquee. Bulk delete with undo support, bulk keyboard nudge, and group drag. Toolbar shows selection count and bulk-delete button.
+- **LLDP/CDP auto-discovery from LibreNMS `links` table**: `AutoDiscoveryService::discoverAndSeedMap()` reads real topology from the LibreNMS `links` table (protocol `lldp`/`xdp`/`cdp`), dedupes by device pair, and creates missing nodes and links. Wired through an admin-gated autodiscover endpoint, editor trigger, and `weathermapng:discover` Artisan command.
+- **Admin data-integrity diagnostics**: The diagnostics page reports per-map data-integrity issues — broken port associations, missing RRD files, orphan nodes/links, and dangling rows.
+- **Viewport culling in embed and editor**: `renderMap`/`renderOverlay` (embed) and `renderEditor` compute the visible world rect each frame and skip off-screen nodes/links. Links use an AABB-overlap test including via_points and curved-link bezier control points so bent links crossing the viewport stay visible. Cuts draw work on pan/zoom for large maps.
+- **Node CPU/memory utilization overlay**: The embed view draws a "CPU x%  MEM y%" text line below each node's traffic aggregate. Gated by `show_node_metrics` config (default `true`) and a `?metrics=0` URL toggle. Server-side metrics queries are skipped when the config is disabled.
+
+### Fixed
+- **Editor canvas fits panel preserving aspect ratio**: ResizeObserver computes the largest box with the map's aspect ratio fitting the container, eliminating overflow and distortion at any viewport size.
+- **Crisp text rendering**: Canvas buffer now matches display size × DPR instead of stretching the 800×600 buffer, eliminating bilinear blur on high-DPI displays.
+- **Editor multi-select state consistency**: `addNode`/`duplicateNode` now set `selectedNodes` alongside `selectedNode`; `deleteNode`/`deleteNodeByIndex` clean up stale references in `selectedNodes`. Prevents phantom selection state and spurious bulk-delete calls.
+- **Group drag and keyboard nudge**: Drag and arrow keys now move all selected nodes as a group, not just the anchor. Snap-to-grid recalculates drag offset to prevent cursor drift.
+- **Add node at viewport center**: New nodes are placed at the center of the current viewport (not world center), preventing them from appearing off-screen after panning.
+- **Panning tracks cursor 1:1**: Middle/right-click pan now uses world/display scale instead of buffer/display scale, fixing DPR× overshoot on high-DPI displays.
+- **Nodes disappear after link creation**: `renderEditor`'s culling closure referenced `defaultLinkStyle` from `drawLink`'s scope, throwing `ReferenceError` and killing the render. Fixed by declaring it in `renderEditor` scope.
+- **Embed link culling**: `linkInView` coordinate variables were lost in the via_points refactor, causing `ReferenceError` on every map with a link. Re-added endpoint extraction.
+- **Embed viewport culling perf**: `worldViewRect()` is now computed once per frame and passed to culling helpers instead of per-node/per-link. Spread operator replaced with explicit min/max loop.
+- **SSE connection management**: DB connection released before sleep to avoid pool exhaustion. Heartbeat comment emitted every 15s during idle to prevent proxy idle-timeout disconnects. Reconnect timer tracked and cleared on `stopSSE()` to prevent phantom EventSource while tab is backgrounded.
+- **Graph popup Image leak**: In-flight `Image` objects are now tracked and aborted on new hover, preventing accumulation of HTTP connections during rapid hover.
+- **Tab visibility cleanup**: `visibilitychange` handler pauses RAF, SSE, and polling when the tab is backgrounded, resuming on focus. Saves CPU and backend resources in kiosk mode.
+- **Metrics and percentage clamping**: CPU/mem values and link percentages are clamped to 0–100 to handle negative, over-100, and NaN values from poller counter wraps.
+- **LookupController admin gate**: Device and port lookup endpoints now require admin privileges, preventing IP address exposure to non-admin users.
+- **`linkInView` dstId fallback**: Aligned `destination_id` fallback with `drawLink`, preventing culling/drawing disagreement on external-format imports.
 
 ## [1.11.0] - 2026-08-03
 - **Embed status-based node visuals**: Down nodes now have a pulsing red outer ring on the overlay canvas (animated via `animTick`). Warning nodes (up but CPU/MEM ≥ threshold) get a yellow dashed ring. Unknown nodes get a gray dashed outline. The `node_warning` color is now admin-configurable via `weathermapng.colors.node_warning`.
