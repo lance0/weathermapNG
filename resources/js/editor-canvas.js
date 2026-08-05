@@ -18,6 +18,10 @@ function initCanvas() {
     S.canvas = document.getElementById('map-canvas');
     if (!S.canvas) return;
     S.ctx = S.canvas.getContext('2d');
+    // Capture the original map (world) dimensions before fitCanvasToWrap
+    // changes the canvas buffer to match the display.
+    S.mapWidth = S.canvas.width;
+    S.mapHeight = S.canvas.height;
 
     S.canvas.addEventListener('mousedown', handleMouseDown);
     S.canvas.addEventListener('mousemove', handleMouseMove);
@@ -37,12 +41,20 @@ function initCanvas() {
         const availW = wrap.clientWidth - pad;
         const availH = wrap.clientHeight - pad;
         if (availW <= 0 || availH <= 0) return;
-        const bufRatio = S.canvas.width / S.canvas.height;
+        const bufRatio = S.mapWidth / S.mapHeight;
         let dispW = availW;
         let dispH = dispW / bufRatio;
         if (dispH > availH) { dispH = availH; dispW = dispH * bufRatio; }
-        S.canvas.style.width = Math.round(dispW) + 'px';
-        S.canvas.style.height = Math.round(dispH) + 'px';
+        dispW = Math.round(dispW);
+        dispH = Math.round(dispH);
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        // Set the canvas buffer to display size × DPR for crisp text.
+        // The world coordinate system stays at S.mapWidth × S.mapHeight;
+        // renderEditor scales the context to map world→buffer.
+        S.canvas.width = Math.round(dispW * dpr);
+        S.canvas.height = Math.round(dispH * dpr);
+        S.canvas.style.width = dispW + 'px';
+        S.canvas.style.height = dispH + 'px';
     }
     S.fitCanvasToWrap = fitCanvasToWrap;
     fitCanvasToWrap();
@@ -60,15 +72,21 @@ function initCanvas() {
 
 /** Convert a mouse event's clientX/Y to canvas-internal pixel coords.
  *  Needed because CSS may scale the canvas display size ≠ its buffer size. */
+/** Convert a mouse event's clientX/Y to world coordinates.
+ *  Needed because CSS may scale the canvas display size ≠ its buffer size,
+ *  and the buffer may differ from the map's world dimensions. */
 function getCanvasPoint(event) {
     const rect = S.canvas.getBoundingClientRect();
     const scaleX = S.canvas.width / rect.width;
     const scaleY = S.canvas.height / rect.height;
-    const screenX = (event.clientX - rect.left) * scaleX;
-    const screenY = (event.clientY - rect.top) * scaleY;
+    const bufX = (event.clientX - rect.left) * scaleX;
+    const bufY = (event.clientY - rect.top) * scaleY;
+    // Undo the bufScale applied in renderEditor to get world coords.
+    const bufScaleX = S.canvas.width / S.mapWidth;
+    const bufScaleY = S.canvas.height / S.mapHeight;
     return {
-        x: (screenX - S.viewOffsetX) / S.viewScale,
-        y: (screenY - S.viewOffsetY) / S.viewScale,
+        x: (bufX / bufScaleX - S.viewOffsetX) / S.viewScale,
+        y: (bufY / bufScaleY - S.viewOffsetY) / S.viewScale,
     };
 }
 
@@ -76,10 +94,15 @@ function getCanvasPoint(event) {
 function handleWheel(event) {
     event.preventDefault();
     const rect = S.canvas.getBoundingClientRect();
-    const scaleX = S.canvas.width / rect.width;
-    const scaleY = S.canvas.height / rect.height;
-    const mouseX = (event.clientX - rect.left) * scaleX;
-    const mouseY = (event.clientY - rect.top) * scaleY;
+    const bufScaleX = S.canvas.width / rect.width;
+    const bufScaleY = S.canvas.height / rect.height;
+    const bufX = (event.clientX - rect.left) * bufScaleX;
+    const bufY = (event.clientY - rect.top) * bufScaleY;
+    // Convert buffer coords to world coords for the zoom math.
+    const wScaleX = S.canvas.width / S.mapWidth;
+    const wScaleY = S.canvas.height / S.mapHeight;
+    const mouseX = bufX / wScaleX;
+    const mouseY = bufY / wScaleY;
 
     // Calculate zoom factor
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
@@ -97,8 +120,8 @@ function handleWheel(event) {
 
 function zoomIn() {
     const newScale = Math.min(MAX_ZOOM, S.viewScale * 1.25);
-    const centerX = S.canvas.width / 2;
-    const centerY = S.canvas.height / 2;
+    const centerX = S.mapWidth / 2;
+    const centerY = S.mapHeight / 2;
     const scaleChange = newScale / S.viewScale;
     S.viewOffsetX = centerX - (centerX - S.viewOffsetX) * scaleChange;
     S.viewOffsetY = centerY - (centerY - S.viewOffsetY) * scaleChange;
@@ -109,8 +132,8 @@ function zoomIn() {
 
 function zoomOut() {
     const newScale = Math.max(MIN_ZOOM, S.viewScale / 1.25);
-    const centerX = S.canvas.width / 2;
-    const centerY = S.canvas.height / 2;
+    const centerX = S.mapWidth / 2;
+    const centerY = S.mapHeight / 2;
     const scaleChange = newScale / S.viewScale;
     S.viewOffsetX = centerX - (centerX - S.viewOffsetX) * scaleChange;
     S.viewOffsetY = centerY - (centerY - S.viewOffsetY) * scaleChange;
@@ -261,9 +284,9 @@ function handleMouseMove(event) {
         S.dragOffset.y = y - newY;
     }
 
-    // Constrain anchor to canvas bounds
-    newX = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, newX));
-    newY = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, newY));
+    // Constrain anchor to map bounds
+    newX = Math.max(nodeRadius, Math.min(S.mapWidth - nodeRadius, newX));
+    newY = Math.max(nodeRadius, Math.min(S.mapHeight - nodeRadius, newY));
 
     // Compute delta from the anchor's current position and apply to all
     // selected nodes so group-drag keeps the selection together.
@@ -271,8 +294,8 @@ function handleMouseMove(event) {
     const dy = newY - S.selectedNode.y;
     const group = (S.selectedNodes.length > 0) ? S.selectedNodes : [S.selectedNode];
     for (const n of group) {
-        n.x = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, n.x + dx));
-        n.y = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, n.y + dy));
+        n.x = Math.max(nodeRadius, Math.min(S.mapWidth - nodeRadius, n.x + dx));
+        n.y = Math.max(nodeRadius, Math.min(S.mapHeight - nodeRadius, n.y + dy));
     }
     renderEditor();
 }
@@ -451,8 +474,13 @@ function renderEditor() {
     if (!ctx || !canvas) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Apply zoom and pan transforms
+    // Scale world coordinates to the canvas buffer (which may differ from
+    // the map's world dimensions when fitCanvasToWrap resizes for crisp
+    // text on high-DPI displays).
+    const bufScaleX = canvas.width / S.mapWidth;
+    const bufScaleY = canvas.height / S.mapHeight;
     ctx.save();
+    ctx.scale(bufScaleX, bufScaleY);
     ctx.translate(S.viewOffsetX, S.viewOffsetY);
     ctx.scale(S.viewScale, S.viewScale);
 
@@ -466,9 +494,9 @@ function renderEditor() {
     // rect so pan/zoom on large maps doesn't draw off-screen content.
     const vMargin = 24 / S.viewScale;
     const vLeft = (0 - S.viewOffsetX) / S.viewScale - vMargin;
-    const vRight = (canvas.width - S.viewOffsetX) / S.viewScale + vMargin;
+    const vRight = (S.mapWidth - S.viewOffsetX) / S.viewScale + vMargin;
     const vTop = (0 - S.viewOffsetY) / S.viewScale - vMargin;
-    const vBottom = (canvas.height - S.viewOffsetY) / S.viewScale + vMargin;
+    const vBottom = (S.mapHeight - S.viewOffsetY) / S.viewScale + vMargin;
     // Always render in-flight interaction nodes (dragged/selected/link-source)
     // even if outside the viewport — otherwise a node vanishes mid-drag when
     // it crosses the culling boundary.
@@ -551,16 +579,16 @@ function drawGrid() {
     ctx.strokeStyle = S.snapToGrid ? 'rgba(100, 150, 255, 0.3)' : 'rgba(200, 200, 200, 0.3)';
     ctx.lineWidth = 0.5 / S.viewScale;
 
-    for (let x = 0; x <= S.canvas.width; x += size) {
+    for (let x = 0; x <= S.mapWidth; x += size) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, S.canvas.height);
+        ctx.lineTo(x, S.mapHeight);
         ctx.stroke();
     }
-    for (let y = 0; y <= S.canvas.height; y += size) {
+    for (let y = 0; y <= S.mapHeight; y += size) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(S.canvas.width, y);
+        ctx.lineTo(S.mapWidth, y);
         ctx.stroke();
     }
 }
@@ -582,14 +610,14 @@ function renderMinimap() {
     minimapCtx.clearRect(0, 0, mmW, mmH);
 
     // Calculate scale to fit map in minimap
-    const scaleX = mmW / S.canvas.width;
-    const scaleY = mmH / S.canvas.height;
+    const scaleX = mmW / S.mapWidth;
+    const scaleY = mmH / S.mapHeight;
     const scale = Math.min(scaleX, scaleY);
 
     // Draw map bounds
     minimapCtx.strokeStyle = '#ccc';
     minimapCtx.lineWidth = 1;
-    minimapCtx.strokeRect(0, 0, S.canvas.width * scale, S.canvas.height * scale);
+    minimapCtx.strokeRect(0, 0, S.mapWidth * scale, S.mapHeight * scale);
 
     // Draw nodes as dots
     S.nodes.forEach(node => {
@@ -603,8 +631,8 @@ function renderMinimap() {
     if (S.viewScale !== 1 || S.viewOffsetX !== 0 || S.viewOffsetY !== 0) {
         const vpX = (-S.viewOffsetX / S.viewScale) * scale;
         const vpY = (-S.viewOffsetY / S.viewScale) * scale;
-        const vpW = (S.canvas.width / S.viewScale) * scale;
-        const vpH = (S.canvas.height / S.viewScale) * scale;
+        const vpW = (S.mapWidth / S.viewScale) * scale;
+        const vpH = (S.mapHeight / S.viewScale) * scale;
 
         minimapCtx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
         minimapCtx.lineWidth = 2;
@@ -619,16 +647,16 @@ function handleMinimapClick(event) {
     const clickY = event.clientY - rect.top;
 
     // Convert minimap coords to map coords
-    const scaleX = S.minimapCanvas.width / S.canvas.width;
-    const scaleY = S.minimapCanvas.height / S.canvas.height;
+    const scaleX = S.minimapCanvas.width / S.mapWidth;
+    const scaleY = S.minimapCanvas.height / S.mapHeight;
     const scale = Math.min(scaleX, scaleY);
 
     const mapX = clickX / scale;
     const mapY = clickY / scale;
 
     // Center view on clicked position
-    S.viewOffsetX = S.canvas.width / 2 - mapX * S.viewScale;
-    S.viewOffsetY = S.canvas.height / 2 - mapY * S.viewScale;
+    S.viewOffsetX = S.mapWidth / 2 - mapX * S.viewScale;
+    S.viewOffsetY = S.mapHeight / 2 - mapY * S.viewScale;
 
     renderEditor();
     updateZoomDisplay();

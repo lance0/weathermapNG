@@ -24,8 +24,8 @@ function addNode() {
 
     // Smart placement: spiral outward from viewport center to avoid overlap
     // and ensure the new node is visible (not culled off-screen after pan).
-    const vcx = (S.canvas.width / 2 - S.viewOffsetX) / S.viewScale;
-    const vcy = (S.canvas.height / 2 - S.viewOffsetY) / S.viewScale;
+    const vcx = (S.mapWidth / 2 - S.viewOffsetX) / S.viewScale;
+    const vcy = (S.mapHeight / 2 - S.viewOffsetY) / S.viewScale;
     const existingCount = S.nodes.length;
     const spacing = 60 / S.viewScale; // keep visual spacing consistent
     const angle = existingCount * 0.8; // Golden angle approximation
@@ -33,10 +33,10 @@ function addNode() {
     let x = vcx + Math.cos(angle) * radius;
     let y = vcy + Math.sin(angle) * radius;
 
-    // Constrain to canvas bounds
+    // Constrain to map bounds
     const nodeRadius = 12;
-    x = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, x));
-    y = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, y));
+    x = Math.max(nodeRadius, Math.min(S.mapWidth - nodeRadius, x));
+    y = Math.max(nodeRadius, Math.min(S.mapHeight - nodeRadius, y));
 
     const newNode = {
         id: `node-${Date.now()}`,
@@ -340,8 +340,8 @@ function duplicateSelectedNode() {
         id: `node-${Date.now()}`,
         dbId: null,
         label: S.selectedNode.label + ' (copy)',
-        x: Math.min(S.canvas.width - 12, S.selectedNode.x + 30),
-        y: Math.min(S.canvas.height - 12, S.selectedNode.y + 30),
+        x: Math.min(S.mapWidth - 12, S.selectedNode.x + 30),
+        y: Math.min(S.mapHeight - 12, S.selectedNode.y + 30),
         deviceId: S.selectedNode.deviceId,
         interfaceId: S.selectedNode.interfaceId,
     };

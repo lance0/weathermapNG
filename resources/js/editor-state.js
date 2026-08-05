@@ -30,6 +30,10 @@ window.WMNG.EditorState = {
     uris: {},
     nodes: [],
     links: [],
+    // World dimensions (the canvas buffer size set by the template).
+    // fitCanvasToWrap preserves this aspect ratio when fitting the display.
+    mapWidth: 800,
+    mapHeight: 600,
     selectedNode: null,
     // Multi-select set (additive via shift/ctrl-click or rubber-band marquee).
     // `selectedNode` stays the drag/anchor reference; this set drives bulk ops

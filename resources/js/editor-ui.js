@@ -156,7 +156,7 @@ function initCanvasResizeValidation() {
         widthInput.addEventListener('change', function () {
             const newWidth = parseInt(this.value, 10);
             if (newWidth && newWidth >= 100) {
-                validateAndApplyCanvasResize(newWidth, S.canvas.height);
+                validateAndApplyCanvasResize(newWidth, S.mapHeight);
             }
         });
         widthInput.addEventListener('input', function () {
@@ -168,7 +168,7 @@ function initCanvasResizeValidation() {
         heightInput.addEventListener('change', function () {
             const newHeight = parseInt(this.value, 10);
             if (newHeight && newHeight >= 100) {
-                validateAndApplyCanvasResize(S.canvas.width, newHeight);
+                validateAndApplyCanvasResize(S.mapWidth, newHeight);
             }
         });
         heightInput.addEventListener('input', function () {
@@ -184,16 +184,16 @@ function validateAndApplyCanvasResize(newWidth, newHeight) {
     );
 
     const applyCanvasResize = () => {
-        S.canvas.width = newWidth;
-        S.canvas.height = newHeight;
+        S.mapWidth = newWidth;
+        S.mapHeight = newHeight;
         if (typeof S.fitCanvasToWrap === 'function') S.fitCanvasToWrap();
         renderEditor();
         WMNGToast.info(`Canvas resized to ${newWidth}x${newHeight}`, { duration: 2000 });
     };
 
     const revertCanvasResizeInputs = () => {
-        document.getElementById('map-width').value = S.canvas.width;
-        document.getElementById('map-height').value = S.canvas.height;
+        document.getElementById('map-width').value = S.mapWidth;
+        document.getElementById('map-height').value = S.mapHeight;
     };
 
     if (outOfBounds.length > 0) {
@@ -294,13 +294,13 @@ function handleKeyDown(event) {
                     n.y = Math.max(nodeRadius, n.y - amount);
                     break;
                 case 'arrowdown':
-                    n.y = Math.min(S.canvas.height - nodeRadius, n.y + amount);
+                    n.y = Math.min(S.mapHeight - nodeRadius, n.y + amount);
                     break;
                 case 'arrowleft':
                     n.x = Math.max(nodeRadius, n.x - amount);
                     break;
                 case 'arrowright':
-                    n.x = Math.min(S.canvas.width - nodeRadius, n.x + amount);
+                    n.x = Math.min(S.mapWidth - nodeRadius, n.x + amount);
                     break;
             }
         }
@@ -446,8 +446,8 @@ function loadMapData(id) {
 
             populateDefaultStyles(data.options);
 
-            if (data.width && S.canvas) S.canvas.width = data.width;
-            if (data.height && S.canvas) S.canvas.height = data.height;
+            if (data.width) S.mapWidth = data.width;
+            if (data.height) S.mapHeight = data.height;
             if (typeof S.fitCanvasToWrap === 'function') S.fitCanvasToWrap();
 
             S.mapDataLoaded = true;
