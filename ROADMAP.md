@@ -168,7 +168,7 @@ This release should make existing authoring workflows faster and less error-pron
 - [x] **Operational diagnostics** *(v1.9.0: diagnostics.blade.php + route + HealthController — install status, route registration, writable paths, version metadata, LibreNMS compatibility)*
   - ~~`HealthController` already has health/ready/live/detailed/stats/metrics endpoints. The diagnostics screen is a UI layer on top.~~
   - ~~Add admin-facing diagnostics Blade view: install status, route registration, writable paths, version metadata, LibreNMS compatibility checks.~~
-  - Surface stale data, missing RRD files, and broken port associations. *(not yet done)*
+  - Surface stale data, missing RRD files, and broken port associations. *(v1.12.0: admin data-integrity section in diagnostics — per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows via `MapService::getDataIntegrityIssues()` + `RrdDataService::hasRrdFile()`)*
   - ~~Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.~~
 
 - [x] **First-run onboarding** *(v1.9.0: index.blade.php empty state with links to Templates, Create Map, Import, Diagnostics, Docs)*
@@ -191,11 +191,13 @@ This release should make existing authoring workflows faster and less error-pron
   - ~~Fullscreen toggle with all UI chrome hidden.~~
   - ~~Auto-cycling between maps on a timer.~~
   - ~~The embed view is the foundation — add cycling and fullscreen.~~
-- [ ] **Frontend modularization** *(v1.8.0: wmng-common.js + ui-helpers.js extracted; editor.blade.php now 2733 lines, embed.blade.php 1710 lines — main view JS extraction remains)*
-  - Extract `editor.blade.php` (2047 lines) and `embed.blade.php` (1501 lines) inline JS into separate JS modules.
-  - Split canvas rendering, interaction handling, live-update logic, and planned version-comparison/bulk-ops UI into modules.
-  - Plain ES modules or IIFE namespaces — no build step required.
-  - *Not a user-facing feature but a prerequisite for v1.9.0 and v2.0.0 feature delivery.*
+- [ ] **Frontend modularization** *(v1.8.0: wmng-common.js + ui-helpers.js extracted; editor.blade.php now 2733 lines, embed.blade.php 1710 lines — main view JS extraction remains)* *(v1.12.0: editor.blade.php inline JS extracted into resources/js/editor-state.js, editor-canvas.js, editor-nodes.js, editor-links.js, editor-ui.js, editor-versions.js — `var S = window.WMNG.EditorState` shared state, no build step — editor view down to ~610 lines; CSS extraction and embed view JS modularization remain)*
+  - ~~Extract `editor.blade.php` (~3000 lines / ~87 functions) inline JS into separate JS modules.~~ *(v1.12.0: extracted into resources/js editor-*.js modules)*
+  - Split canvas rendering, interaction handling, live-update logic into modules. *(v1.12.0: done — editor-canvas.js, editor-nodes.js, editor-links.js, editor-ui.js)*
+  - ~~Plain ES modules or IIFE namespaces — no build step required.~~ *(v1.12.0: classic scripts sharing `window.WMNG.EditorState`)*
+  - Extract the inline CSS used by the editor templates into classes/stylesheets. *(CSS extraction still open)*
+  - Modularize `embed.blade.php` inline JS. *(still open)*
+  - *Not a user-facing feature but a prerequisite for feature delivery.*
 
 - [ ] **Map Templates Gallery Refinement** *(stretch goal)*
   - Add or refine common topology templates: data center, WAN/MPLS, campus, branch office.
@@ -230,12 +232,12 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - Breadcrumb navigation showing the map hierarchy.
   - *Zabbix's killer feature for networks with multiple scales. Not previously in the roadmap.*
 
-- [ ] **LLDP/CDP Auto-Discovery**
-  - Query LibreNMS `links` table for actual topology (protocol field: lldp/xdp/cdp, remote_port_id, remote_device_id).
-  - Create accurate node/link mapping from LLDP/CDP data.
-  - Replace unreliable ifIndex-based matching.
-  - Keep auto-discovery optional and reviewable before creating maps.
-  - `AutoDiscoveryService` class already referenced in `MapController` constructor.
+- [x] **LLDP/CDP Auto-Discovery** *(v1.12.0: `AutoDiscoveryService::discoverAndSeedMap()` reads LibreNMS `links` table (protocol lldp/xdp/cdp), dedupes by device pair, creates missing wmng nodes + links; admin-gated autodiscover endpoint + editor trigger + `weathermapng:discover` command)*
+  - ~~Query LibreNMS `links` table for actual topology (protocol field: lldp/xdp/cdp, remote_port_id, remote_device_id).~~
+  - ~~Create accurate node/link mapping from LLDP/CDP data.~~
+  - ~~Replace unreliable ifIndex-based matching.~~
+  - ~~Keep auto-discovery optional and reviewable before creating maps.~~
+  - ~~`AutoDiscoveryService` class already referenced in `MapController` constructor.~~
 - [x] **Device status-based node icons** *(v1.11.0: embed view draws pulsing red ring for down nodes, yellow dashed ring for warning (CPU/MEM ≥ threshold), gray dashed for unknown; editor uses status-aware colors green/red/gray + dashed ring for down; `node_warning` color is admin-configurable; metrics merge from SSE fixed)*
   - ~~Node icons reflect device up/down/warning state (green/red/pulse), not just bandwidth on links.~~ *(v1.11.0)*
   - ~~LibreNMS device status is available. WeathermapNG nodes already store `device_id`.~~ *(v1.11.0)*

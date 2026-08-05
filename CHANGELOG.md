@@ -5,6 +5,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **LLDP/CDP auto-discovery from LibreNMS `links` table**: `AutoDiscoveryService::discoverAndSeedMap()` now reads real topology from the LibreNMS `links` table (protocol `lldp`/`xdp`/`cdp`), dedupes by device pair, and creates missing `wmng` nodes and links — replacing the previous stub that returned an "Automatically disabled" message. Returns plain counts (`nodes_added`, `links_added`). Wired through an admin-gated autodiscover endpoint (`POST plugin/WeathermapNG/map/{map}/autodiscover`), an editor trigger, and a `weathermapng:discover` Artisan command.
+- **Admin data-integrity diagnostics section**: the diagnostics page now reports per-map data-integrity issues — broken port associations, missing RRD files, and orphan `wmng` nodes/links and dangling rows — via `MapService::getDataIntegrityIssues()` and `RrdDataService::hasRrdFile()`.
+- **Editor JS modularization**: extracted the editor's inline JS (previously ~3000 lines / ~87 functions in `editor.blade.php`) into `resources/js/editor-state.js`, `editor-canvas.js`, `editor-nodes.js`, `editor-links.js`, `editor-ui.js`, and `editor-versions.js`, sharing state via `var S = window.WMNG.EditorState`. Plain classic scripts, no build step; no behavior change.
+
 ## [1.11.0] - 2026-08-03
 - **Embed status-based node visuals**: Down nodes now have a pulsing red outer ring on the overlay canvas (animated via `animTick`). Warning nodes (up but CPU/MEM ≥ threshold) get a yellow dashed ring. Unknown nodes get a gray dashed outline. The `node_warning` color is now admin-configurable via `weathermapng.colors.node_warning`.
 - **Alert badge click-through in embed view**: Alert badges on nodes and links are now clickable. Node alert badges open the LibreNMS device alerts page (`/device/{id}/tab=alerts/`). Link alert badges open the alerts page for the source node's device.

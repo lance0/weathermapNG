@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Log;
 
 class AutoDiscoveryService
 {
+    /** LibreNMS topology protocols we trust for neighbor discovery. */
+    private const TOPOLOGY_PROTOCOLS = ['lldp', 'xdp', 'cdp'];
+
     private $gridLayout;
 
     public function __construct()
@@ -18,15 +21,43 @@ class AutoDiscoveryService
     }
 
     /**
-     * Auto-discovery is currently disabled.
+     * Discover the topology around the map's candidate devices and seed
+     * missing wmng nodes + links from LibreNMS LLDP/XDP/CDP data.
      *
-     * The ifIndex-based neighbor matching doesn't work reliably.
-     * Future versions will use LibreNMS LLDP/CDP data from the links table.
+     * Returns a summary array (nodes_added, links_added) for the UI.
      */
     public function discoverAndSeedMap(Map $map, array $params): array
     {
-        Log::warning("WeathermapNG: Auto-discovery is disabled. Use manual node/link creation instead.");
-        return [];
+        $devices = $this->discoverDevices($params);
+        $candidateIds = array_map('intval', array_column($devices, 'device_id'));
+
+        if (empty($candidateIds)) {
+            Log::info("WeathermapNG: Auto-discovery found no candidate devices for map {$map->id}.");
+            return ['nodes_added' => 0, 'links_added' => 0];
+        }
+
+        $existingNodes = $this->getExistingNodeMapping($map);
+        $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
+        $nodesAdded = count($nodeMapping) - count($existingNodes);
+
+        $linkRows = $this->queryTopologyLinks($candidateIds);
+
+        if (empty($linkRows)) {
+            Log::info("WeathermapNG: Auto-discovery found no LibreNMS topology links for map {$map->id}.");
+            return ['nodes_added' => $nodesAdded, 'links_added' => 0];
+        }
+
+        $portsByDevice = $this->getTopologyPorts($candidateIds);
+        $links = $this->buildLinksFromTopology($linkRows, $nodeMapping, $portsByDevice);
+
+        $linksAdded = $this->createDiscoveredLinks($map, $links, $nodeMapping);
+
+        Log::info("WeathermapNG: Auto-discovery for map {$map->id} added {$nodesAdded} nodes and {$linksAdded} links.");
+
+        return [
+            'nodes_added' => $nodesAdded,
+            'links_added' => $linksAdded,
+        ];
     }
 
     public function validateDiscoveryParams(array $params): array
@@ -128,91 +159,136 @@ class AutoDiscoveryService
         return $degrees;
     }
 
-    private function buildConnectivityGraph(array $nodeMapping): array
+    /**
+     * Pull LibreNMS topology links (LLDP/XDP/CDP) that touch any candidate
+     * device, on either end (local or remote).
+     */
+    private function queryTopologyLinks(array $candidateIds): array
     {
-        $deviceIds = array_keys($nodeMapping);
-        if (empty($deviceIds)) {
-            return ['portsByDevice' => [], 'links' => []];
-        }
+        $query = class_exists('\\App\\Models\\Link')
+            ? \App\Models\Link::whereIn('protocol', self::TOPOLOGY_PROTOCOLS)
+            : DB::table('links')->whereIn('protocol', self::TOPOLOGY_PROTOCOLS);
 
-        $ports = $this->getActivePorts($deviceIds);
-        $portsByDevice = $this->groupPortsByDevice($ports);
+        $query->where(function ($q) use ($candidateIds) {
+            $q->whereIn('local_device_id', $candidateIds)
+                ->orWhereIn('remote_device_id', $candidateIds);
+        });
 
-        return [
-            'portsByDevice' => $portsByDevice,
-            'links' => $this->discoverLinks($portsByDevice, $nodeMapping)
-        ];
+        $rows = $query->select(
+            'local_device_id',
+            'local_port_id',
+            'remote_device_id',
+            'remote_port_id',
+            'protocol'
+        )->get()->toArray();
+
+        return array_map(fn($row) => (array) $row, $rows);
     }
 
-    private function getActivePorts(array $deviceIds): array
+    /**
+     * Fetch port_id/ifIndex for all candidate devices so every links-table
+     * port reference (which may be a port_id or an ifIndex) can be resolved.
+     */
+    private function getTopologyPorts(array $candidateIds): array
     {
         $query = class_exists('\\App\\Models\\Port')
-            ? \App\Models\Port::whereIn('device_id', $deviceIds)
-                ->where('ifOperStatus', 'up')
-                ->where('ifAdminStatus', 'up')
-            : DB::table('ports')->whereIn('device_id', $deviceIds)
-                ->where('ifOperStatus', 'up')
-                ->where('ifAdminStatus', 'up');
+            ? \App\Models\Port::whereIn('device_id', $candidateIds)
+            : DB::table('ports')->whereIn('device_id', $candidateIds);
 
-        $ports = $query->select('device_id', 'ifIndex', 'ifDescr')->get()->toArray();
-        return array_map(fn($port) => (array) $port, $ports);
-    }
+        $ports = $query->select('device_id', 'port_id', 'ifIndex')->get()->toArray();
+        $ports = array_map(fn($port) => (array) $port, $ports);
 
-    private function groupPortsByDevice(array $ports): array
-    {
         $grouped = [];
         foreach ($ports as $port) {
             $grouped[$port['device_id']][] = $port;
         }
+
         return $grouped;
     }
 
-    private function discoverLinks(array $portsByDevice, array $nodeMapping): array
+    /**
+     * Map LibreNMS links-table rows to wmng device pairs, deduplicated by the
+     * unordered device pair (createLinkKey) so bidirectional LLDP entries for
+     * the same pair collapse into a single wmng link.
+     */
+    private function buildLinksFromTopology(array $linkRows, array $nodeMapping, array $portsByDevice): array
     {
         $links = [];
 
-        foreach ($portsByDevice as $deviceId => $devicePorts) {
-            foreach ($devicePorts as $port) {
-                $neighbor = $this->findPortNeighbor($port);
+        foreach ($linkRows as $row) {
+            $deviceA = (int) ($row['local_device_id'] ?? 0);
+            $deviceB = (int) ($row['remote_device_id'] ?? 0);
 
-                if ($neighbor && isset($nodeMapping[$neighbor['device_id']])) {
-                    $linkKey = $this->createLinkKey($deviceId, $neighbor['device_id']);
-
-                    if (!isset($links[$linkKey])) {
-                        $links[$linkKey] = [
-                            'device_a' => min($deviceId, $neighbor['device_id']),
-                            'device_b' => max($deviceId, $neighbor['device_id']),
-                            'ports' => []
-                        ];
-                    }
-
-                    $links[$linkKey]['ports'][] = [
-                        'device_id' => $deviceId,
-                        'port_id' => $port['ifIndex'],
-                        'neighbor_device_id' => $neighbor['device_id'],
-                        'neighbor_port_id' => $neighbor['ifIndex'] ?? null,
-                    ];
-                }
+            if (!$deviceA || !$deviceB || $deviceA === $deviceB) {
+                continue;
             }
+
+            // Both ends must correspond to wmng nodes on this map.
+            if (!isset($nodeMapping[$deviceA]) || !isset($nodeMapping[$deviceB])) {
+                continue;
+            }
+
+            $key = $this->createLinkKey($deviceA, $deviceB);
+
+            if (!isset($links[$key])) {
+                $links[$key] = [
+                    'device_a' => min($deviceA, $deviceB),
+                    'device_b' => max($deviceA, $deviceB),
+                    'port_a' => null,
+                    'port_b' => null,
+                ];
+            }
+
+            // Resolve each end independently; a missing port skips only that end.
+            $portA = $this->resolveTopologyPort($deviceA, $row['local_port_id'] ?? null, $portsByDevice);
+            $portB = $this->resolveTopologyPort($deviceB, $row['remote_port_id'] ?? null, $portsByDevice);
+
+            $this->attachPort($links[$key], $deviceA, $portA);
+            $this->attachPort($links[$key], $deviceB, $portB);
         }
 
         return $links;
     }
 
-    private function findPortNeighbor(array $port): ?array
+    /**
+     * Resolve a links-table port reference to a port_id. The reference may
+     * already be a port_id, or it may be an ifIndex that needs resolution
+     * against the same device's ports. Returns null when not found.
+     */
+    private function resolveTopologyPort(int $deviceId, $portRef, array $portsByDevice): ?int
     {
-        try {
-            $query = class_exists('\\App\\Models\\Port')
-                ? \App\Models\Port::where('ifIndex', $port['ifIndex'])
-                    ->where('device_id', '!=', $port['device_id'])
-                : DB::table('ports')->where('ifIndex', $port['ifIndex'])
-                    ->where('device_id', '!=', $port['device_id']);
-
-            $neighbor = $query->select('device_id', 'ifIndex')->first();
-
-            return $neighbor ? (array) $neighbor : null;
-        } catch (\Exception $e) {
+        $portRef = $portRef === null ? null : (int) $portRef;
+        if ($portRef === null || $portRef <= 0) {
             return null;
+        }
+
+        $devicePorts = $portsByDevice[$deviceId] ?? [];
+
+        foreach ($devicePorts as $port) {
+            if ((int) ($port['port_id'] ?? 0) === $portRef) {
+                return (int) $port['port_id'];
+            }
+        }
+
+        foreach ($devicePorts as $port) {
+            if ((int) ($port['ifIndex'] ?? 0) === $portRef) {
+                return (int) $port['port_id'];
+            }
+        }
+
+        return null;
+    }
+
+    private function attachPort(array &$link, int $deviceId, ?int $portId): void
+    {
+        if ($portId === null) {
+            return;
+        }
+
+        if ($deviceId === $link['device_a']) {
+            $link['port_a'] = $portId;
+        } elseif ($deviceId === $link['device_b']) {
+            $link['port_b'] = $portId;
         }
     }
 
@@ -221,61 +297,28 @@ class AutoDiscoveryService
         return min($deviceA, $deviceB) . '-' . max($deviceA, $deviceB);
     }
 
-    private function createDiscoveredLinks(Map $map, array $links, array $nodeMapping): void
+    private function createDiscoveredLinks(Map $map, array $links, array $nodeMapping): int
     {
-        foreach ($links as $linkData) {
-            $nodeAId = $nodeMapping[$linkData['device_a']];
-            $nodeBId = $nodeMapping[$linkData['device_b']];
+        $created = 0;
 
-            $ports = $this->findLinkPorts($linkData['ports']);
+        foreach ($links as $linkData) {
+            $srcNode = $nodeMapping[$linkData['device_a']];
+            $dstNode = $nodeMapping[$linkData['device_b']];
 
             Link::create([
                 'map_id' => $map->id,
-                'src_node_id' => $nodeAId,
-                'dst_node_id' => $nodeBId,
-                'port_id_a' => $ports['port_a'],
-                'port_id_b' => $ports['port_b'],
+                'src_node_id' => $srcNode,
+                'dst_node_id' => $dstNode,
+                'port_id_a' => $linkData['port_a'],
+                'port_id_b' => $linkData['port_b'],
                 'bandwidth_bps' => null,
                 'style' => [],
             ]);
-        }
-    }
 
-    private function findLinkPorts(array $portData): array
-    {
-        $ports = ['port_a' => null, 'port_b' => null];
-
-        if (empty($portData)) {
-            return $ports;
+            $created++;
         }
 
-        foreach ($portData as $portInfo) {
-            $portId = $this->findPortId($portInfo['device_id'], $portInfo['port_id']);
-
-            if ($portInfo['device_id'] === $portData[0]['device_id']) {
-                $ports['port_a'] = $portId;
-            } else {
-                $ports['port_b'] = $portId;
-            }
-        }
-
-        return $ports;
-    }
-
-    private function findPortId(int $deviceId, ?int $ifIndex): ?int
-    {
-        try {
-            $query = class_exists('\\App\\Models\\Port')
-                ? \App\Models\Port::where('device_id', $deviceId)
-                    ->where('ifIndex', $ifIndex)
-                : DB::table('ports')->where('device_id', $deviceId)
-                    ->where('ifIndex', $ifIndex);
-
-            $port = $query->select('port_id')->first();
-            return $port ? $port['port_id'] : null;
-        } catch (\Exception $e) {
-            return null;
-        }
+        return $created;
     }
 
     private function applyLayoutAlgorithm(): void

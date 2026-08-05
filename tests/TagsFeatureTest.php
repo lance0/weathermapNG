@@ -19,7 +19,7 @@ class TagsFeatureTest extends TestCase
         $this->saveRequest = file_get_contents(__DIR__ . '/../src/Http/Requests/SaveMapRequest.php');
         $this->mapService = file_get_contents(__DIR__ . '/../src/Services/MapService.php');
         $this->indexView = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
-        $this->editorView = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $this->editorView = editor_source();
     }
 
     public function test_map_model_has_tags_accessor(): void

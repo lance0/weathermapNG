@@ -8,6 +8,30 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require __DIR__ . '/../../vendor/autoload.php';
 }
 
+/**
+ * Combined editor source for JS-content tests.
+ *
+ * The editor's JS lived inline in resources/views/editor.blade.php and was
+ * modularized (v1.11.0) into resources/js/editor-*.js. Tests that assert
+ * editor behavior (canvas, node/link CRUD, save, default styles, versions)
+ * must load the Blade markup plus all editor modules so both the static
+ * template and the extracted JS resolve.
+ */
+if (!function_exists('editor_source')) {
+    function editor_source(bool $includeIndex = false): string
+    {
+        $base = __DIR__ . '/../';
+        $src = file_get_contents($base . 'resources/views/editor.blade.php');
+        foreach (['editor-state', 'editor-canvas', 'editor-nodes', 'editor-links', 'editor-ui', 'editor-versions'] as $m) {
+            $src .= "\n// ==== editor-$m.js ====\n" . file_get_contents($base . "resources/js/$m.js");
+        }
+        if ($includeIndex) {
+            $src .= "\n" . file_get_contents($base . 'resources/views/index.blade.php');
+        }
+        return $src;
+    }
+}
+
 // Shim Laravel's config() helper used by lib classes
 if (!function_exists('config')) {
     function config($key = null, $default = null) {

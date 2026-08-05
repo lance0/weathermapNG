@@ -85,10 +85,13 @@ class MapController
         $params = $this->autoDiscoveryService->validateDiscoveryParams($request->all());
 
         try {
-            $this->autoDiscoveryService->discoverAndSeedMap($map, $params);
+            $summary = $this->autoDiscoveryService->discoverAndSeedMap($map, $params);
+            $nodesAdded = (int) ($summary['nodes_added'] ?? 0);
+            $linksAdded = (int) ($summary['links_added'] ?? 0);
+
             return response()->json([
                 'success' => true,
-                'message' => 'Auto-discovery completed',
+                'message' => "Auto-discovery completed: {$nodesAdded} nodes, {$linksAdded} links added",
             ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([

@@ -102,35 +102,4 @@ class AutoDiscoveryServiceTest extends TestCase
         $this->assertEquals('7-7', $key);
     }
 
-    public function test_group_ports_by_device(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('groupPortsByDevice');
-        $method->setAccessible(true);
-
-        $ports = [
-            ['device_id' => 1, 'ifIndex' => 1],
-            ['device_id' => 2, 'ifIndex' => 2],
-            ['device_id' => 1, 'ifIndex' => 3],
-            ['device_id' => 3, 'ifIndex' => 4],
-            ['device_id' => 2, 'ifIndex' => 5],
-        ];
-
-        $grouped = $method->invoke($this->service, $ports);
-
-        $this->assertCount(3, $grouped);
-        $this->assertCount(2, $grouped[1]);
-        $this->assertCount(2, $grouped[2]);
-        $this->assertCount(1, $grouped[3]);
     }
-
-    public function test_group_ports_empty_input(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('groupPortsByDevice');
-        $method->setAccessible(true);
-
-        $grouped = $method->invoke($this->service, []);
-        $this->assertEmpty($grouped);
-    }
-}

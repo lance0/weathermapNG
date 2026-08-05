@@ -1,0 +1,491 @@
+/**
+ * WeathermapNG editor — canvas rendering and interaction.
+ *
+ * Renders the map onto the <canvas> (nodes, links, grid, minimap), handles
+ * zoom / pan / snapping, hit-testing, and all mouse input on the canvas,
+ * including starting a link between two nodes in link mode.
+ *
+ * Pure function declarations here are global and callable from the other
+ * editor modules; all shared mutable state is read/written through the
+ * `S` alias for `window.WMNG.EditorState` (defined in editor-state.js, which
+ * must load before this file).
+ */
+var S = window.WMNG.EditorState;
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+
+function initCanvas() {
+    S.canvas = document.getElementById('map-canvas');
+    if (!S.canvas) return;
+    S.ctx = S.canvas.getContext('2d');
+
+    S.canvas.addEventListener('mousedown', handleMouseDown);
+    S.canvas.addEventListener('mousemove', handleMouseMove);
+    S.canvas.addEventListener('mouseup', handleMouseUp);
+    S.canvas.addEventListener('mouseleave', handleMouseUp);
+    S.canvas.addEventListener('wheel', handleWheel, { passive: false });
+    S.canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    renderEditor();
+    updateZoomDisplay();
+}
+
+/** Convert a mouse event's clientX/Y to canvas-internal pixel coords.
+ *  Needed because CSS may scale the canvas display size ≠ its buffer size. */
+function getCanvasPoint(event) {
+    const rect = S.canvas.getBoundingClientRect();
+    const scaleX = S.canvas.width / rect.width;
+    const scaleY = S.canvas.height / rect.height;
+    const screenX = (event.clientX - rect.left) * scaleX;
+    const screenY = (event.clientY - rect.top) * scaleY;
+    return {
+        x: (screenX - S.viewOffsetX) / S.viewScale,
+        y: (screenY - S.viewOffsetY) / S.viewScale,
+    };
+}
+
+// ========== Zoom and Pan Handlers ==========
+function handleWheel(event) {
+    event.preventDefault();
+    const rect = S.canvas.getBoundingClientRect();
+    const scaleX = S.canvas.width / rect.width;
+    const scaleY = S.canvas.height / rect.height;
+    const mouseX = (event.clientX - rect.left) * scaleX;
+    const mouseY = (event.clientY - rect.top) * scaleY;
+
+    // Calculate zoom factor
+    const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, S.viewScale * zoomFactor));
+
+    // Zoom centered on mouse position
+    const scaleChange = newScale / S.viewScale;
+    S.viewOffsetX = mouseX - (mouseX - S.viewOffsetX) * scaleChange;
+    S.viewOffsetY = mouseY - (mouseY - S.viewOffsetY) * scaleChange;
+    S.viewScale = newScale;
+
+    renderEditor();
+    updateZoomDisplay();
+}
+
+function zoomIn() {
+    const newScale = Math.min(MAX_ZOOM, S.viewScale * 1.25);
+    const centerX = S.canvas.width / 2;
+    const centerY = S.canvas.height / 2;
+    const scaleChange = newScale / S.viewScale;
+    S.viewOffsetX = centerX - (centerX - S.viewOffsetX) * scaleChange;
+    S.viewOffsetY = centerY - (centerY - S.viewOffsetY) * scaleChange;
+    S.viewScale = newScale;
+    renderEditor();
+    updateZoomDisplay();
+}
+
+function zoomOut() {
+    const newScale = Math.max(MIN_ZOOM, S.viewScale / 1.25);
+    const centerX = S.canvas.width / 2;
+    const centerY = S.canvas.height / 2;
+    const scaleChange = newScale / S.viewScale;
+    S.viewOffsetX = centerX - (centerX - S.viewOffsetX) * scaleChange;
+    S.viewOffsetY = centerY - (centerY - S.viewOffsetY) * scaleChange;
+    S.viewScale = newScale;
+    renderEditor();
+    updateZoomDisplay();
+}
+
+function resetZoom() {
+    S.viewScale = 1;
+    S.viewOffsetX = 0;
+    S.viewOffsetY = 0;
+    renderEditor();
+    updateZoomDisplay();
+}
+
+function updateZoomDisplay() {
+    const display = document.getElementById('zoom-level');
+    if (display) display.textContent = Math.round(S.viewScale * 100) + '%';
+}
+
+function handleMouseDown(event) {
+    if (!S.canvas) return;
+
+    // Middle-click or right-click for panning
+    if (event.button === 1 || event.button === 2) {
+        S.isPanning = true;
+        S.panStart = { clientX: event.clientX, clientY: event.clientY, offsetX: S.viewOffsetX, offsetY: S.viewOffsetY };
+        S.canvas.style.cursor = 'grabbing';
+        return;
+    }
+
+    const { x, y } = getCanvasPoint(event);
+    const node = getNodeAt(x, y);
+
+    if (S.linkMode) {
+        if (!node) return;
+        if (!S.linkStart) {
+            S.linkStart = node;
+            updateLinkModeUI();
+            renderEditor(); // Highlight the selected node
+            return;
+        }
+
+        if (S.linkStart.id !== node.id) {
+            saveState(); // Save for undo
+            S.links.push({
+                id: `link-${Date.now()}`,
+                dbId: null,
+                srcId: S.linkStart.id,
+                dstId: node.id,
+                portA: null,
+                portB: null,
+                bw: null,
+                style: {},
+            });
+            S.linkStart = null;
+            updateLinkModeUI();
+            renderEditor();
+            renderLinksList();
+            renderNodesList();
+            WMNGToast.success('Link created!', { duration: 1500 });
+        }
+        return;
+    }
+
+    if (node) {
+        S.selectedNode = node;
+        S.isDragging = true;
+        S.dragOffset = { x: x - node.x, y: y - node.y };
+        saveState(); // Save for undo before dragging
+        populateNodeProperties(node);
+        updateToolbarState();
+        renderNodesList();
+    } else {
+        S.selectedNode = null;
+        populateNodeProperties(null);
+        updateToolbarState();
+        renderNodesList();
+    }
+
+    renderEditor();
+}
+
+function handleMouseMove(event) {
+    // Handle panning
+    if (S.isPanning) {
+        const rect = S.canvas.getBoundingClientRect();
+        const scaleX = S.canvas.width / rect.width;
+        const scaleY = S.canvas.height / rect.height;
+        S.viewOffsetX = S.panStart.offsetX + (event.clientX - S.panStart.clientX) * scaleX;
+        S.viewOffsetY = S.panStart.offsetY + (event.clientY - S.panStart.clientY) * scaleY;
+        renderEditor();
+        return;
+    }
+
+    if (!S.isDragging || !S.selectedNode || !S.canvas) return;
+    const { x, y } = getCanvasPoint(event);
+    const nodeRadius = 12;
+    // Calculate new position
+    let newX = x - S.dragOffset.x;
+    let newY = y - S.dragOffset.y;
+
+    // Apply grid snapping if enabled
+    if (S.snapToGrid) {
+        newX = snapPosition(newX);
+        newY = snapPosition(newY);
+    }
+
+    // Constrain node to canvas bounds
+    S.selectedNode.x = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, newX));
+    S.selectedNode.y = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, newY));
+    renderEditor();
+}
+
+function snapPosition(pos) {
+    if (!S.snapToGrid) return pos;
+    return Math.round(pos / S.gridSize) * S.gridSize;
+}
+
+function toggleSnapToGrid() {
+    S.snapToGrid = !S.snapToGrid;
+    const btn = document.getElementById('snap-grid-btn');
+    if (btn) {
+        btn.classList.toggle('active', S.snapToGrid);
+        btn.title = S.snapToGrid ? 'Snap to Grid (ON)' : 'Snap to Grid (OFF)';
+    }
+    renderEditor();
+}
+
+function handleMouseUp() {
+    S.isDragging = false;
+    if (S.isPanning) {
+        S.isPanning = false;
+        S.canvas.style.cursor = 'default';
+    }
+}
+
+function getNodeAt(x, y) {
+    const radius = 12;
+    return S.nodes.find(node => {
+        const dx = x - node.x;
+        const dy = y - node.y;
+        return Math.sqrt(dx * dx + dy * dy) <= radius;
+    });
+}
+
+function findNodeById(id) {
+    return S.nodes.find(node => node.id === id || node.dbId === id);
+}
+
+function getNodeColor(node) {
+    const status = node.status || 'unknown';
+    if (status === 'down') return '#dc3545';
+    if (status === 'up') return '#28a745';
+    return '#6c757d';  // unknown
+}
+
+function drawNode(node) {
+    const ctx = S.ctx;
+    const radius = 12;
+    const defaultNodeStyle = getDefaultNodeStyle();
+    ctx.beginPath();
+    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+
+    // Color based on state: link start (orange), selected (blue), normal (default or green)
+    if (S.linkMode && S.linkStart === node) {
+        ctx.fillStyle = '#fd7e14'; // Orange for link start
+    } else if (node === S.selectedNode) {
+        ctx.fillStyle = '#0d6efd'; // Blue for selected
+    } else {
+        ctx.fillStyle = node.status ? getNodeColor(node) : (defaultNodeStyle.color || '#28a745');
+    }
+    ctx.fill();
+
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw pulsing ring for link start node
+    if (S.linkMode && S.linkStart === node) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(253, 126, 20, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    // Draw red dashed ring for down nodes
+    if (node.status === 'down') {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(220, 53, 69, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 2]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Use theme-aware text color for labels with shadow for readability
+    const isDarkTheme = document.querySelector('.editor-container.dark-theme') !== null;
+    ctx.font = '12px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'center';
+
+    // Add text shadow/outline for better readability
+    ctx.strokeStyle = isDarkTheme ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 3;
+    ctx.strokeText(node.label || 'Node', node.x, node.y - 18);
+
+    ctx.fillStyle = defaultNodeStyle.label_color || (isDarkTheme ? '#f8f9fa' : '#212529');
+    ctx.fillText(node.label || 'Node', node.x, node.y - 18);
+}
+
+function drawLink(link) {
+    const ctx = S.ctx;
+    const src = findNodeById(link.srcId);
+    const dst = findNodeById(link.dstId);
+    if (!src || !dst) return;
+
+    const defaultLinkStyle = getDefaultLinkStyle();
+    const viaPoints = (link.style && link.style.via_points) || [];
+    const viaStyle = (link.style && link.style.via_style) || defaultLinkStyle.via_style || S.editorConfig.link_style;
+    const points = [{ x: src.x, y: src.y }];
+    for (const vp of viaPoints) { points.push({ x: vp.x, y: vp.y }); }
+    points.push({ x: dst.x, y: dst.y });
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+
+    if (points.length === 2) {
+        ctx.lineTo(points[1].x, points[1].y);
+    } else if (viaStyle === 'curved') {
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i - 1)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(points.length - 1, i + 2)];
+            const cp1x = p1.x + (p2.x - p0.x) / 6;
+            const cp1y = p1.y + (p2.y - p0.y) / 6;
+            const cp2x = p2.x - (p3.x - p1.x) / 6;
+            const cp2y = p2.y - (p3.y - p1.y) / 6;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+        }
+    } else {
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+    }
+
+    ctx.strokeStyle = (link.style && link.style.color) ? link.style.color : (defaultLinkStyle.color || '#6c757d');
+    ctx.lineWidth = (link.style && link.style.width) ? link.style.width : (defaultLinkStyle.width || 2);
+    ctx.stroke();
+
+    // Store segments for hit-testing
+    link._segs = [];
+    for (let i = 1; i < points.length; i++) {
+        link._segs.push({ x1: points[i - 1].x, y1: points[i - 1].y, x2: points[i].x, y2: points[i].y });
+    }
+}
+
+function renderEditor() {
+    const ctx = S.ctx;
+    const canvas = S.canvas;
+    if (!ctx || !canvas) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Apply zoom and pan transforms
+    ctx.save();
+    ctx.translate(S.viewOffsetX, S.viewOffsetY);
+    ctx.scale(S.viewScale, S.viewScale);
+
+    // Draw grid when zoomed or snap is enabled
+    if (S.viewScale !== 1 || S.snapToGrid) {
+        drawGrid();
+    }
+
+    S.links.forEach(drawLink);
+    S.nodes.forEach(drawNode);
+
+    ctx.restore();
+
+    // Update minimap and status
+    renderMinimap();
+    updateStatusCounts();
+}
+
+function drawGrid() {
+    const ctx = S.ctx;
+    const size = S.snapToGrid ? S.gridSize : 50;
+    ctx.strokeStyle = S.snapToGrid ? 'rgba(100, 150, 255, 0.3)' : 'rgba(200, 200, 200, 0.3)';
+    ctx.lineWidth = 0.5 / S.viewScale;
+
+    for (let x = 0; x <= S.canvas.width; x += size) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, S.canvas.height);
+        ctx.stroke();
+    }
+    for (let y = 0; y <= S.canvas.height; y += size) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(S.canvas.width, y);
+        ctx.stroke();
+    }
+}
+
+// ========== Editor Minimap ==========
+function initMinimap() {
+    S.minimapCanvas = document.getElementById('editor-minimap');
+    if (!S.minimapCanvas) return;
+    S.minimapCtx = S.minimapCanvas.getContext('2d');
+    S.minimapCanvas.addEventListener('click', handleMinimapClick);
+}
+
+function renderMinimap() {
+    if (!S.minimapCtx || !S.minimapCanvas || !S.canvas) return;
+    const mmW = S.minimapCanvas.width;
+    const mmH = S.minimapCanvas.height;
+    const minimapCtx = S.minimapCtx;
+
+    minimapCtx.clearRect(0, 0, mmW, mmH);
+
+    // Calculate scale to fit map in minimap
+    const scaleX = mmW / S.canvas.width;
+    const scaleY = mmH / S.canvas.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Draw map bounds
+    minimapCtx.strokeStyle = '#ccc';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.strokeRect(0, 0, S.canvas.width * scale, S.canvas.height * scale);
+
+    // Draw nodes as dots
+    S.nodes.forEach(node => {
+        minimapCtx.beginPath();
+        minimapCtx.arc(node.x * scale, node.y * scale, 3, 0, Math.PI * 2);
+        minimapCtx.fillStyle = node === S.selectedNode ? '#0d6efd' : '#28a745';
+        minimapCtx.fill();
+    });
+
+    // Draw viewport rectangle
+    if (S.viewScale !== 1 || S.viewOffsetX !== 0 || S.viewOffsetY !== 0) {
+        const vpX = (-S.viewOffsetX / S.viewScale) * scale;
+        const vpY = (-S.viewOffsetY / S.viewScale) * scale;
+        const vpW = (S.canvas.width / S.viewScale) * scale;
+        const vpH = (S.canvas.height / S.viewScale) * scale;
+
+        minimapCtx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+        minimapCtx.lineWidth = 2;
+        minimapCtx.strokeRect(vpX, vpY, vpW, vpH);
+    }
+}
+
+function handleMinimapClick(event) {
+    if (!S.minimapCanvas || !S.canvas) return;
+    const rect = S.minimapCanvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+
+    // Convert minimap coords to map coords
+    const scaleX = S.minimapCanvas.width / S.canvas.width;
+    const scaleY = S.minimapCanvas.height / S.canvas.height;
+    const scale = Math.min(scaleX, scaleY);
+
+    const mapX = clickX / scale;
+    const mapY = clickY / scale;
+
+    // Center view on clicked position
+    S.viewOffsetX = S.canvas.width / 2 - mapX * S.viewScale;
+    S.viewOffsetY = S.canvas.height / 2 - mapY * S.viewScale;
+
+    renderEditor();
+    updateZoomDisplay();
+}
+
+// ========== Link Mode ==========
+function toggleLinkMode() {
+    S.linkMode = !S.linkMode;
+    S.linkStart = null;
+    updateLinkModeUI();
+}
+
+function updateLinkModeUI() {
+    const btn = document.getElementById('link-mode-btn');
+    if (btn) {
+        // Remove all state classes first
+        btn.classList.remove('active', 'link-active');
+
+        if (S.linkMode && S.linkStart) {
+            btn.classList.add('link-active'); // Orange pulsing - waiting for 2nd node
+            btn.title = 'Click another node to complete link';
+        } else if (S.linkMode) {
+            btn.classList.add('active'); // Blue - link mode on
+            btn.title = 'Click a node to start link';
+        } else {
+            btn.title = 'Link Mode - Click two nodes to connect';
+        }
+    }
+    // Change canvas cursor in link mode
+    if (S.canvas) {
+        S.canvas.style.cursor = S.linkMode ? 'crosshair' : 'default';
+    }
+}
+
+// Initialize minimap on page load
+document.addEventListener('DOMContentLoaded', initMinimap);

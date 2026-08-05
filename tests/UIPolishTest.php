@@ -201,8 +201,7 @@ class UIPolishTest extends TestCase
     public function test_active_index_and_editor_use_bootstrap_confirmation_modals(): void
     {
         $index = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
-        $editor = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
-
+        $editor = editor_source();
         $this->assertStringContainsString('id="deleteMapModal"', $index);
         $this->assertStringContainsString('id="confirmDeleteMapBtn"', $index);
         $this->assertStringContainsString("$('#deleteMapModal').modal('show');", $index);
@@ -252,7 +251,7 @@ class UIPolishTest extends TestCase
 
     public function test_editor_has_wmng_polyfill_and_saveMap_calls_loading(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+        $content = editor_source();
 
         // Polyfill fills missing methods individually
         $this->assertStringContainsString("['show', 'hide', 'toggle']", $content);
