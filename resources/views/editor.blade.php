@@ -225,6 +225,10 @@
         <button type="button" class="tool-btn" onclick="redo()" title="Redo (Ctrl+Y)" aria-label="Redo">
             <i class="fas fa-redo"></i>
         </button>
+        <div class="tool-divider"></div>
+        <button type="button" class="tool-btn" id="autodiscover-btn" onclick="autoDiscoverMap()" title="Auto-discover from LLDP/CDP" aria-label="Auto-discover nodes and links">
+            <i class="fas fa-network-wired"></i>
+        </button>
         <div class="toolbox-spacer"></div>
         <button type="button" class="tool-btn" onclick="zoomIn()" title="Zoom In (+)" aria-label="Zoom in">
             <i class="fas fa-search-plus"></i>

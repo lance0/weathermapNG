@@ -763,6 +763,56 @@ function saveMap() {
         });
 }
 
+// ========== Auto-Discovery ==========
+// Runs LLDP/CDP auto-discovery on the backend for an existing map and
+// reloads the map data so newly discovered nodes/links appear.
+function autoDiscoverMap() {
+    if (!S.mapId) {
+        WMNGToast.warning('Save the map first, then run auto-discovery.', { duration: 4000 });
+        return;
+    }
+    if (!S.mapDataLoaded) {
+        if (S.mapDataLoadFailed) {
+            WMNGToast.error('Cannot run auto-discovery: map data failed to load. Reload the page and try again.', { duration: 5000 });
+        } else {
+            WMNGToast.warning('Map is still loading, please wait a moment and try again.', { duration: 3000 });
+        }
+        return;
+    }
+
+    WMNGLoading.show('Running auto-discovery...');
+    fetch(S.uris.map + '/' + S.mapId + '/autodiscover', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+        },
+    })
+        .then(r => {
+            if (!r.ok) {
+                throw new Error('HTTP ' + r.status + (r.statusText ? ' ' + r.statusText : ''));
+            }
+            return r.json();
+        })
+        .then(data => {
+            WMNGLoading.hide();
+            if (data.success) {
+                WMNGToast.success(data.message, { duration: 5000 });
+                // Reload so the discovered nodes/links render on the canvas.
+                S.mapDataLoaded = false;
+                S.mapDataLoadFailed = false;
+                loadMapData(S.mapId);
+            } else {
+                WMNGToast.error(data.message || 'Auto-discovery failed.', { duration: 5000 });
+            }
+        })
+        .catch(err => {
+            WMNGLoading.hide();
+            WMNGToast.error('Error running auto-discovery: ' + err.message, { duration: 5000 });
+        });
+}
+
 function exportJson() {
     const mapName = document.getElementById('map-name').value.trim() || 'untitled';
     const mapTitle = document.getElementById('map-title').value.trim() || 'Network Map';
