@@ -461,6 +461,7 @@ function renderEditor() {
         drawGrid();
     }
 
+    const defaultLinkStyle = getDefaultLinkStyle();
     // Viewport culling: skip nodes/links entirely outside the visible world
     // rect so pan/zoom on large maps doesn't draw off-screen content.
     const vMargin = 24 / S.viewScale;
