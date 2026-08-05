@@ -186,6 +186,7 @@ function validateAndApplyCanvasResize(newWidth, newHeight) {
     const applyCanvasResize = () => {
         S.canvas.width = newWidth;
         S.canvas.height = newHeight;
+        if (typeof S.fitCanvasToWrap === 'function') S.fitCanvasToWrap();
         renderEditor();
         WMNGToast.info(`Canvas resized to ${newWidth}x${newHeight}`, { duration: 2000 });
     };
@@ -444,6 +445,7 @@ function loadMapData(id) {
 
             if (data.width && S.canvas) S.canvas.width = data.width;
             if (data.height && S.canvas) S.canvas.height = data.height;
+            if (typeof S.fitCanvasToWrap === 'function') S.fitCanvasToWrap();
 
             S.mapDataLoaded = true;
             renderEditor();

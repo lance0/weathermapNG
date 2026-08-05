@@ -26,6 +26,30 @@ function initCanvas() {
     S.canvas.addEventListener('wheel', handleWheel, { passive: false });
     S.canvas.addEventListener('contextmenu', e => e.preventDefault());
 
+    // Fit canvas to its container while preserving the map's aspect ratio.
+    // CSS alone can't do "largest box with aspect ratio X inside container"
+    // for a <canvas> (not a replaced element, ignores object-fit), so a
+    // ResizeObserver sets the display width/height on resize.
+    const wrap = S.canvas.parentElement;
+    function fitCanvasToWrap() {
+        if (!wrap || !S.canvas) return;
+        const pad = 20; // .editor-canvas-wrap padding (10px each side)
+        const availW = wrap.clientWidth - pad;
+        const availH = wrap.clientHeight - pad;
+        if (availW <= 0 || availH <= 0) return;
+        const bufRatio = S.canvas.width / S.canvas.height;
+        let dispW = availW;
+        let dispH = dispW / bufRatio;
+        if (dispH > availH) { dispH = availH; dispW = dispH * bufRatio; }
+        S.canvas.style.width = Math.round(dispW) + 'px';
+        S.canvas.style.height = Math.round(dispH) + 'px';
+    }
+    S.fitCanvasToWrap = fitCanvasToWrap;
+    fitCanvasToWrap();
+    if (typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(fitCanvasToWrap).observe(wrap);
+    }
+
     renderEditor();
     updateZoomDisplay();
 }
@@ -432,10 +456,13 @@ function renderEditor() {
         const b = findNodeById(l.dstId);
         if (!a) return !!b && nodeVisible(b);
         if (!b) return nodeVisible(a);
-        // AABB overlap of the segment vs the view rect (links crossing the
-        // viewport stay visible even with both endpoints off-screen).
-        return Math.max(Math.min(a.x, b.x), vLeft) <= Math.min(Math.max(a.x, b.x), vRight)
-            && Math.max(Math.min(a.y, b.y), vTop) <= Math.min(Math.max(a.y, b.y), vBottom);
+        // Include via_points in the AABB so bent links crossing the
+        // viewport stay visible even with both endpoints off-screen.
+        const via = (l.style && l.style.via_points) || [];
+        const px = [a.x, ...via.map(p => p.x), b.x];
+        const py = [a.y, ...via.map(p => p.y), b.y];
+        return Math.max(Math.min(...px), vLeft) <= Math.min(Math.max(...px), vRight)
+            && Math.max(Math.min(...py), vTop) <= Math.min(Math.max(...py), vBottom);
     };
 
     for (const l of S.links) if (linkVisible(l)) drawLink(l);

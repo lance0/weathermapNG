@@ -126,7 +126,7 @@ class WeathermapNG
             ],
             'link_style' => 'straight',
             'show_bandwidth' => true,
-            'show_percentages' => true,
+            'show_node_metrics' => true,
             'security' => [
                 'allow_embed' => true,
                 'embed_domains' => ['localhost', '*.yourdomain.com'],

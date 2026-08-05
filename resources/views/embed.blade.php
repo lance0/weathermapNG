@@ -561,14 +561,15 @@
             if (!srcNode && !dstNode) return false;
             if (!srcNode) return nodeInView(dstNode);
             if (!dstNode) return nodeInView(srcNode);
-            const a = srcNode.position?.x ?? srcNode.x ?? 0;
-            const c = srcNode.position?.y ?? srcNode.y ?? 0;
-            const b = dstNode.position?.x ?? dstNode.x ?? 0;
-            const d = dstNode.position?.y ?? dstNode.y ?? 0;
+            // Build the path point list (endpoints + via_points) and test
+            // the union AABB against the view rect, so bent links whose path
+            // dips into the viewport stay visible even with off-screen ends.
+            const viaPoints = (link.style && link.style.via_points) || [];
+            const px = [a, ...viaPoints.map(p => p.x), b];
+            const py = [c, ...viaPoints.map(p => p.y), d];
             const v = worldViewRect();
-            // AABB overlap of the segment vs the (margin-expanded) view rect.
-            return Math.max(Math.min(a, b), v.left) <= Math.min(Math.max(a, b), v.right)
-                && Math.max(Math.min(c, d), v.top) <= Math.min(Math.max(c, d), v.bottom);
+            return Math.max(Math.min(...px), v.left) <= Math.min(Math.max(...px), v.right)
+                && Math.max(Math.min(...py), v.top) <= Math.min(Math.max(...py), v.bottom);
         }
 
         function renderMap(skipMinimap = false) {

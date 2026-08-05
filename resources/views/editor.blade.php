@@ -156,7 +156,7 @@
 }
 
 /* Canvas styling */
-#map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); display: block; max-width: 100%; max-height: 100%; width: auto; height: 100%; margin: auto; }
+#map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); display: block; margin: auto; }
 
 /* Minimap */
 #editor-minimap {
