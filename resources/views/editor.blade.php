@@ -87,7 +87,7 @@
     color: var(--editor-text);
 }
 .editor-topbar .text-muted { color: var(--editor-text-muted) !important; }
-.editor-canvas-wrap { flex: 1; overflow: auto; position: relative; padding: 10px; }
+.editor-canvas-wrap { flex: 1; overflow: auto; position: relative; padding: 10px; display: flex; align-items: center; justify-content: center; }
 
 /* Right Sidebar */
 .editor-sidebar {
@@ -156,7 +156,7 @@
 }
 
 /* Canvas styling */
-#map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); display: block; width: 100%; height: auto; }
+#map-canvas { background: var(--editor-canvas-surface); box-shadow: 0 2px 8px var(--editor-canvas-shadow); display: block; max-width: 100%; max-height: 100%; width: auto; height: 100%; margin: auto; }
 
 /* Minimap */
 #editor-minimap {
