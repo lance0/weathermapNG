@@ -367,7 +367,8 @@
             scale: @json(config('weathermapng.scale') ?? 'bits'),
             link_style: '{{ config('weathermapng.link_style', 'straight') }}',
             show_bandwidth: @json(config('weathermapng.show_bandwidth', true)),
-            show_percentages: @json(config('weathermapng.show_percentages', true))
+            show_percentages: @json(config('weathermapng.show_percentages', true)),
+            show_node_metrics: @json(config('weathermapng.show_node_metrics', true)),
         };
         const urlParams = new URLSearchParams(window.location.search);
         const param = (k, d) => urlParams.has(k) ? urlParams.get(k) : d;
@@ -377,6 +378,7 @@
         let sseEnabled = param('sse', WMNG_CONFIG.enable_sse ? '1' : '0') !== '0' && !!window.EventSource;
         let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
         let graphsEnabled = param('graphs', '1') !== '0' && !WMNG_CONFIG.kioskEnabled;
+        let nodeMetricsEnabled = param('metrics', WMNG_CONFIG.show_node_metrics ? '1' : '0') !== '0';
         let eventSourceRef = null;
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
@@ -531,6 +533,44 @@
             }
         }
 
+        // Avoid off-screen O(N+L) work on pan/zoom: compute the visible map
+        // rect (world coords) once per frame and skip nodes/links entirely
+        // outside it. A node is drawn iff its center is inside (plus a margin);
+        // a link is drawn unless its segment bounding-box misses the rect
+        // entirely, so links that cross the viewport still render.
+        function worldViewRect() {
+            const margin = 24 / viewScale; // world units of padding past the edge
+            return {
+                left: (0 - viewOffsetX) / viewScale - margin,
+                right: (canvas.width - viewOffsetX) / viewScale + margin,
+                top: (0 - viewOffsetY) / viewScale - margin,
+                bottom: (canvas.height - viewOffsetY) / viewScale + margin,
+            };
+        }
+        function nodeInView(n) {
+            const x = (n.position?.x ?? n.x) || 0;
+            const y = (n.position?.y ?? n.y) || 0;
+            const v = worldViewRect();
+            return x >= v.left && x <= v.right && y >= v.top && y <= v.bottom;
+        }
+        function linkInView(link) {
+            const srcId = link.source ?? link.src ?? link.source_id;
+            const dstId = link.target ?? link.dst ?? link.target_id;
+            const srcNode = nodeById.get(srcId);
+            const dstNode = nodeById.get(dstId);
+            if (!srcNode && !dstNode) return false;
+            if (!srcNode) return nodeInView(dstNode);
+            if (!dstNode) return nodeInView(srcNode);
+            const a = srcNode.position?.x ?? srcNode.x ?? 0;
+            const c = srcNode.position?.y ?? srcNode.y ?? 0;
+            const b = dstNode.position?.x ?? dstNode.x ?? 0;
+            const d = dstNode.position?.y ?? dstNode.y ?? 0;
+            const v = worldViewRect();
+            // AABB overlap of the segment vs the (margin-expanded) view rect.
+            return Math.max(Math.min(a, b), v.left) <= Math.min(Math.max(a, b), v.right)
+                && Math.max(Math.min(c, d), v.top) <= Math.min(Math.max(c, d), v.bottom);
+        }
+
         function renderMap(skipMinimap = false) {
             if (!mapData || !mapData.nodes) return;
 
@@ -571,16 +611,16 @@
 
             // Draw static link parts (line stroke, color, width, labels, badges)
             if (Array.isArray(mapData.links)) {
-                mapData.links.forEach(link => {
-                    drawLink(link);
-                });
+                for (const link of mapData.links) {
+                    if (linkInView(link)) drawLink(link);
+                }
             }
 
             // Draw nodes
             if (Array.isArray(mapData.nodes)) {
-                mapData.nodes.forEach(node => {
-                    drawNode(node);
-                });
+                for (const node of mapData.nodes) {
+                    if (nodeInView(node)) drawNode(node);
+                }
             }
 
             ctx.restore();
@@ -606,17 +646,17 @@
             overlayCtx.translate(viewOffsetX, viewOffsetY);
             overlayCtx.scale(viewScale, viewScale);
             if (Array.isArray(mapData.links)) {
-                mapData.links.forEach(link => {
-                    drawLinkDynamic(link, overlayCtx);
-                });
+                for (const link of mapData.links) {
+                    if (linkInView(link)) drawLinkDynamic(link, overlayCtx);
+                }
             }
             // Down-node pulse rings (dynamic, drawn on overlay canvas).
             if (Array.isArray(mapData.nodes)) {
-                mapData.nodes.forEach(node => {
-                    if ((node.status || 'unknown') === 'down') {
+                for (const node of mapData.nodes) {
+                    if ((node.status || 'unknown') === 'down' && nodeInView(node)) {
                         drawNodePulse(node, overlayCtx);
                     }
-                });
+                }
             }
         }
 
@@ -872,6 +912,18 @@
                 if (value) {
                     ctx.fillText('Σ ' + value, x, y + radius + 15);
                 }
+            }
+
+            // Node CPU/mem utilization line (when present and enabled).
+            if (nodeMetricsEnabled && node.metrics && (node.metrics.cpu != null || node.metrics.mem != null)) {
+                ctx.font = '9px Arial';
+                ctx.fillStyle = '#888';
+                let metricText = '';
+                if (node.metrics.cpu != null) metricText += 'CPU ' + Math.round(node.metrics.cpu) + '%';
+                if (node.metrics.mem != null) {
+                    metricText += (metricText ? '  ' : '') + 'MEM ' + Math.round(node.metrics.mem) + '%';
+                }
+                if (metricText) ctx.fillText(metricText, x, y + radius + 26);
             }
 
             // Alert badge (if any)
