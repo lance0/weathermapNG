@@ -279,27 +279,30 @@ function handleKeyDown(event) {
         return;
     }
 
-    // Arrow keys: Nudge selected node
-    if (S.selectedNode && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+    // Arrow keys: nudge all selected nodes
+    const nodesToNudge = (S.selectedNodes.length > 0) ? S.selectedNodes : (S.selectedNode ? [S.selectedNode] : []);
+    if (nodesToNudge.length > 0 && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         event.preventDefault();
         const amount = shift ? 10 : 1;
         const nodeRadius = 12;
 
         saveState(); // Save for undo before moving
 
-        switch (key) {
-            case 'arrowup':
-                S.selectedNode.y = Math.max(nodeRadius, S.selectedNode.y - amount);
-                break;
-            case 'arrowdown':
-                S.selectedNode.y = Math.min(S.canvas.height - nodeRadius, S.selectedNode.y + amount);
-                break;
-            case 'arrowleft':
-                S.selectedNode.x = Math.max(nodeRadius, S.selectedNode.x - amount);
-                break;
-            case 'arrowright':
-                S.selectedNode.x = Math.min(S.canvas.width - nodeRadius, S.selectedNode.x + amount);
-                break;
+        for (const n of nodesToNudge) {
+            switch (key) {
+                case 'arrowup':
+                    n.y = Math.max(nodeRadius, n.y - amount);
+                    break;
+                case 'arrowdown':
+                    n.y = Math.min(S.canvas.height - nodeRadius, n.y + amount);
+                    break;
+                case 'arrowleft':
+                    n.x = Math.max(nodeRadius, n.x - amount);
+                    break;
+                case 'arrowright':
+                    n.x = Math.min(S.canvas.width - nodeRadius, n.x + amount);
+                    break;
+            }
         }
         renderEditor();
         return;

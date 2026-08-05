@@ -498,6 +498,20 @@
             }
         });
 
+        // Pause RAF animation and SSE polling when the tab is backgrounded
+        // to save CPU and backend resources in long-lived kiosk operation.
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+                if (typeof stopSSE === 'function' && sseEnabled) stopSSE();
+                if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+            } else if (mapData && !mapData.error) {
+                if (!animationId) startAnimationLoop();
+                if (sseEnabled) startSSE();
+                else if (!pollTimer) startAutoUpdate();
+            }
+        });
+
         function syncOverlayCanvas() {
             // Position and size the overlay canvas to exactly match the main canvas.
             // The main canvas is flex-centered inside #map-container, so we mirror
@@ -554,7 +568,7 @@
         }
         function linkInView(link, v) {
             const srcId = link.source ?? link.src ?? link.source_id;
-            const dstId = link.target ?? link.dst ?? link.target_id;
+            const dstId = link.target ?? link.dst ?? link.destination_id;
             const srcNode = nodeById.get(srcId);
             const dstNode = nodeById.get(dstId);
             if (!srcNode && !dstNode) return false;
@@ -1743,12 +1757,14 @@
         // --- Graph hover popup state ---
         let graphHoverTimer = null;
         let graphHoverTarget = null; // { type: 'node'|'link', id, data }
+        let graphHoverImg = null; // in-flight Image, aborted on new hover
         const graphBaseUrl = '{{ url("graph") }}';
         const graphPopup = document.getElementById('graph-popup');
 
         function hideGraphPopup() {
             if (graphHoverTimer) { clearTimeout(graphHoverTimer); graphHoverTimer = null; }
             graphHoverTarget = null;
+            if (graphHoverImg) { graphHoverImg.src = ''; graphHoverImg = null; }
             if (graphPopup) graphPopup.style.display = 'none';
         }
 
@@ -1789,10 +1805,15 @@
             graphPopup.innerHTML = `<div class="graph-loading"><i class="fas fa-spinner fa-spin"></i> Loading graph…</div>`;
             graphPopup.style.display = 'block';
 
+            // Abort any prior in-flight graph image before starting a new one.
+            if (graphHoverImg) { graphHoverImg.src = ''; graphHoverImg = null; }
+
             const img = new Image();
+            graphHoverImg = img;
             img.onload = () => {
                 // Only update if this popup is still for the same target
-                if (graphHoverTarget !== target) return;
+                if (graphHoverTarget !== target || graphHoverImg !== img) return;
+                graphHoverImg = null;
                 graphPopup.innerHTML = '';
                 graphPopup.appendChild(img);
                 if (caption) {
@@ -1802,7 +1823,7 @@
                     graphPopup.appendChild(cap);
                 }
             };
-            img.onerror = () => { hideGraphPopup(); };
+            img.onerror = () => { if (graphHoverImg === img) graphHoverImg = null; hideGraphPopup(); };
             img.src = imgSrc;
         }
 

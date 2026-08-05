@@ -2,6 +2,7 @@
 
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
+use Illuminate\Support\Facades\DB;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
@@ -53,7 +54,9 @@ class NodeDataService
 
     public function buildNodeData(Map $map): array
     {
-        $metricsMap = $this->deviceDataService->getNodeMetricsBatch($map->nodes->all());
+        $metricsMap = config('weathermapng.show_node_metrics', true)
+            ? $this->deviceDataService->getNodeMetricsBatch($map->nodes->all())
+            : [];
         $nodeLinksIndex = $this->buildNodeLinksIndex($map->links);
 
         $nodeData = [];
@@ -200,10 +203,25 @@ class NodeDataService
                 break;
             }
 
-            // Sleep in bounded chunks so a large interval can't overshoot maxSeconds.
+            // Release the DB connection while sleeping so long-lived SSE
+            // streams don't exhaust the connection pool.
+            DB::disconnect();
+
+            // Sleep in bounded chunks, emitting a heartbeat comment every 15s
+            // so intermediate proxies don't close the connection on idle timeout.
             $remaining = $maxSeconds - (time() - $start);
             $sleep = min($interval, max(1, $remaining));
-            sleep($sleep);
+            $elapsed = 0;
+            while ($elapsed < $sleep) {
+                $chunk = min(15, $sleep - $elapsed);
+                sleep($chunk);
+                $elapsed += $chunk;
+                if ($elapsed < $sleep && !$this->shouldStopStreaming($start, $maxSeconds)) {
+                    echo ": heartbeat\n\n";
+                    @ob_flush();
+                    @flush();
+                }
+            }
         }
     }
 

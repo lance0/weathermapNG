@@ -247,7 +247,7 @@ function handleMouseMove(event) {
     if (!S.isDragging || !S.selectedNode || !S.canvas) return;
     const { x, y } = getCanvasPoint(event);
     const nodeRadius = 12;
-    // Calculate new position
+    // Calculate new position for the anchor (dragged) node
     let newX = x - S.dragOffset.x;
     let newY = y - S.dragOffset.y;
 
@@ -255,11 +255,25 @@ function handleMouseMove(event) {
     if (S.snapToGrid) {
         newX = snapPosition(newX);
         newY = snapPosition(newY);
+        // Recalculate dragOffset from the snapped position so the node
+        // doesn't drift relative to the cursor on subsequent moves.
+        S.dragOffset.x = x - newX;
+        S.dragOffset.y = y - newY;
     }
 
-    // Constrain node to canvas bounds
-    S.selectedNode.x = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, newX));
-    S.selectedNode.y = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, newY));
+    // Constrain anchor to canvas bounds
+    newX = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, newX));
+    newY = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, newY));
+
+    // Compute delta from the anchor's current position and apply to all
+    // selected nodes so group-drag keeps the selection together.
+    const dx = newX - S.selectedNode.x;
+    const dy = newY - S.selectedNode.y;
+    const group = (S.selectedNodes.length > 0) ? S.selectedNodes : [S.selectedNode];
+    for (const n of group) {
+        n.x = Math.max(nodeRadius, Math.min(S.canvas.width - nodeRadius, n.x + dx));
+        n.y = Math.max(nodeRadius, Math.min(S.canvas.height - nodeRadius, n.y + dy));
+    }
     renderEditor();
 }
 

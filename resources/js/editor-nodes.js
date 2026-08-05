@@ -22,13 +22,16 @@ function addNode() {
     const device = S.acSelectedDevice || S.devicesCache.find(d => d.device_id === deviceId);
     const label = device?.hostname || device?.sysName || `Node ${S.nodes.length + 1}`;
 
-    // Smart placement: spiral outward from center to avoid overlap
+    // Smart placement: spiral outward from viewport center to avoid overlap
+    // and ensure the new node is visible (not culled off-screen after pan).
+    const vcx = (S.canvas.width / 2 - S.viewOffsetX) / S.viewScale;
+    const vcy = (S.canvas.height / 2 - S.viewOffsetY) / S.viewScale;
     const existingCount = S.nodes.length;
-    const spacing = 60;
+    const spacing = 60 / S.viewScale; // keep visual spacing consistent
     const angle = existingCount * 0.8; // Golden angle approximation
     const radius = Math.sqrt(existingCount) * spacing;
-    let x = S.canvas.width / 2 + Math.cos(angle) * radius;
-    let y = S.canvas.height / 2 + Math.sin(angle) * radius;
+    let x = vcx + Math.cos(angle) * radius;
+    let y = vcy + Math.sin(angle) * radius;
 
     // Constrain to canvas bounds
     const nodeRadius = 12;
@@ -46,9 +49,9 @@ function addNode() {
         status: device ? (device.status || null) : null,
         interfaceId: interfaceId,
     };
-
     S.nodes.push(newNode);
     S.selectedNode = newNode;
+    S.selectedNodes = [newNode];
     renderEditor();
     renderLinksList();
     populateNodeProperties(newNode);
@@ -200,6 +203,7 @@ function deleteSelectedNode() {
                 S.nodes = S.nodes.filter(n => n !== nodeToDelete);
                 S.links = S.links.filter(l => l.srcId !== nodeId && l.dstId !== nodeId && l.srcId !== nodeToDelete.dbId && l.dstId !== nodeToDelete.dbId);
                 S.selectedNode = null;
+                S.selectedNodes = [];
                 populateNodeProperties(null);
                 renderEditor();
                 renderLinksList();
@@ -310,7 +314,7 @@ function deleteNodeByIndex(idx) {
                 const nodeId = node.id || node.dbId;
                 S.nodes.splice(idx, 1);
                 S.links = S.links.filter(l => l.srcId !== nodeId && l.dstId !== nodeId && l.srcId !== node.dbId && l.dstId !== node.dbId);
-
+                S.selectedNodes = S.selectedNodes.filter(n => n !== node);
                 if (S.selectedNode === node) {
                     S.selectedNode = null;
                     populateNodeProperties(null);
@@ -344,6 +348,7 @@ function duplicateSelectedNode() {
 
     S.nodes.push(newNode);
     S.selectedNode = newNode;
+    S.selectedNodes = [newNode];
 
     markUnsaved();
     renderEditor();
