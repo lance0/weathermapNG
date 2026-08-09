@@ -28,11 +28,8 @@ class RrdDataService
         }
 
         try {
-            $rows = class_exists('\\App\\Models\\Port')
-                ? \App\Models\Port::whereIn('port_id', $ids)
-                    ->get(['device_id', 'ifIndex', 'ifName', 'port_id'])->keyBy('port_id')
-                : DB::table('ports')->whereIn('port_id', $ids)
-                    ->get(['device_id', 'ifIndex', 'ifName', 'port_id'])->keyBy('port_id');
+            $rows = DB::table('ports')->whereIn('port_id', $ids)
+                ->get(['device_id', 'ifIndex', 'ifName', 'port_id'])->keyBy('port_id');
 
             foreach ($ids as $id) {
                 $this->portInfoCache[$id] = $rows->has($id) ? (array) $rows->get($id) : null;
@@ -50,11 +47,8 @@ class RrdDataService
         }
 
         try {
-            $rows = class_exists('\\App\\Models\\Device')
-                ? \App\Models\Device::whereIn('device_id', $ids)
-                    ->get(['hostname', 'sysName', 'rrd_path'])->keyBy('device_id')
-                : DB::table('devices')->whereIn('device_id', $ids)
-                    ->get(['hostname', 'sysName', 'rrd_path'])->keyBy('device_id');
+            $rows = DB::table('devices')->whereIn('device_id', $ids)
+                ->get(['device_id', 'hostname', 'sysName', 'rrd_path'])->keyBy('device_id');
 
             foreach ($ids as $id) {
                 $this->deviceInfoCache[$id] = $rows->has($id) ? (array) $rows->get($id) : null;
@@ -102,11 +96,8 @@ class RrdDataService
         }
 
         try {
-            $query = class_exists('\\App\\Models\\Port')
-                ? \App\Models\Port::select('device_id', 'ifIndex', 'ifName', 'port_id')
-                    ->where('port_id', $portId)->first()
-                : DB::table('ports')->select('device_id', 'ifIndex', 'ifName', 'port_id')
-                    ->where('port_id', $portId)->first();
+            $query = DB::table('ports')->select('device_id', 'ifIndex', 'ifName', 'port_id')
+                ->where('port_id', $portId)->first();
 
             return $this->portInfoCache[$portId] = $query ? (array) $query : null;
         } catch (\Exception $e) {
@@ -118,7 +109,11 @@ class RrdDataService
     private function resolvePortRrdPath(array $port): ?string
     {
         $config = $this->rrdBase;
-        $device = $this->getDeviceInfo($port['device_id']);
+        $deviceId = isset($port['device_id']) ? (int) $port['device_id'] : null;
+        if (!$deviceId) {
+            return null;
+        }
+        $device = $this->getDeviceInfo($deviceId);
 
         if (!$device) {
             return null;
@@ -161,11 +156,8 @@ class RrdDataService
         }
 
         try {
-            $device = class_exists('\\App\\Models\\Device')
-                ? \App\Models\Device::select('hostname', 'sysName', 'rrd_path')
-                    ->where('device_id', $deviceId)->first()
-                : DB::table('devices')->select('hostname', 'sysName', 'rrd_path')
-                    ->where('device_id', $deviceId)->first();
+            $device = DB::table('devices')->select('device_id', 'hostname', 'sysName', 'rrd_path')
+                ->where('device_id', $deviceId)->first();
 
             return $this->deviceInfoCache[$deviceId] = $device ? (array) $device : null;
         } catch (\Exception $e) {

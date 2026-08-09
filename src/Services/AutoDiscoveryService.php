@@ -43,9 +43,8 @@ class AutoDiscoveryService
         $linkRows = $this->queryTopologyLinks($candidateIds);
 
         if (empty($linkRows)) {
-            Log::info("WeathermapNG: Auto-discovery found no LibreNMS topology links for map {$map->id}. Falling back to interface discovery.");
-            $linksAdded = $this->createStandaloneInterfaceLinks($map, $candidateIds, $nodeMapping);
-            return ['nodes_added' => $nodesAdded, 'links_added' => $linksAdded];
+            Log::info("WeathermapNG: Auto-discovery found no LibreNMS topology links for map {$map->id}.");
+            return ['nodes_added' => $nodesAdded, 'links_added' => 0];
         }
 
         $portsByDevice = $this->getTopologyPorts($candidateIds);
@@ -326,92 +325,5 @@ class AutoDiscoveryService
     {
         // Layout positions are already applied during node creation
         // This method is a placeholder for future advanced layout algorithms
-    }
-
-    /**
-     * For standalone devices with no LLDP/CDP topology neighbours, create a
-     * "Cloud/Internet" placeholder node and one link per active non-loopback
-     * interface so traffic on those ports is visible on the map.
-     */
-    private function createStandaloneInterfaceLinks(Map $map, array $candidateIds, array $nodeMapping): int
-    {
-        $created = 0;
-
-        // Fetch active, non-loopback interfaces for all candidate devices.
-        $query = class_exists('\\App\\Models\\Port')
-            ? \App\Models\Port::whereIn('device_id', $candidateIds)
-                ->where('ifOperStatus', 'up')
-                ->where('ifAdminStatus', 'up')
-                ->where('ifType', '!=', 'softwareLoopback')
-                ->select('device_id', 'port_id', 'ifName')
-            : DB::table('ports')
-                ->whereIn('device_id', $candidateIds)
-                ->where('ifOperStatus', 'up')
-                ->where('ifAdminStatus', 'up')
-                ->where('ifType', '!=', 'softwareLoopback')
-                ->select('device_id', 'port_id', 'ifName');
-
-        $ports = $query->get()->toArray();
-        $ports = array_map(fn($p) => (array) $p, $ports);
-
-        if (empty($ports)) {
-            return 0;
-        }
-
-        // Group by device.
-        $portsByDevice = [];
-        foreach ($ports as $port) {
-            $portsByDevice[$port['device_id']][] = $port;
-        }
-
-        // Find or create one shared "Cloud / Internet" placeholder node for
-        // this map so all standalone device links share the same endpoint.
-        $cloudNode = $map->nodes()->where('label', 'Internet')->first();
-        if (!$cloudNode) {
-            $position = $this->gridLayout->getNextPosition();
-            $cloudNode = Node::create([
-                'map_id'    => $map->id,
-                'label'     => 'Internet',
-                'x'         => $position['x'],
-                'y'         => $position['y'],
-                'device_id' => null,
-                'meta'      => [],
-            ]);
-        }
-
-        // Create one link per active interface, from the device node to the
-        // cloud node, with port_id_a set to that interface's port.
-        foreach ($portsByDevice as $deviceId => $devicePorts) {
-            $srcNodeId = $nodeMapping[$deviceId] ?? null;
-            if (!$srcNodeId) {
-                continue;
-            }
-
-            // Skip if a link from this device to cloud already exists.
-            $existingLink = $map->links()
-                ->where('src_node_id', $srcNodeId)
-                ->where('dst_node_id', $cloudNode->id)
-                ->first();
-            if ($existingLink) {
-                continue;
-            }
-
-            // Use the first port as the primary interface for the link.
-            $primaryPort = $devicePorts[0];
-
-            Link::create([
-                'map_id'        => $map->id,
-                'src_node_id'   => $srcNodeId,
-                'dst_node_id'   => $cloudNode->id,
-                'port_id_a'     => (int) $primaryPort['port_id'],
-                'port_id_b'     => null,
-                'bandwidth_bps' => null,
-                'style'         => [],
-            ]);
-
-            $created++;
-        }
-
-        return $created;
     }
 }
