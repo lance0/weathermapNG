@@ -60,8 +60,8 @@ class MapLinkController
     {
         $this->requireAdmin();
         $data = $request->validate([
-            'src_node_id' => 'sometimes|integer',
-            'dst_node_id' => 'sometimes|integer',
+            'src_node_id' => 'sometimes|integer|exists:wmng_nodes,id',
+            'dst_node_id' => 'sometimes|integer|exists:wmng_nodes,id',
             'port_id_a' => 'sometimes|nullable|integer',
             'port_id_b' => 'sometimes|nullable|integer',
             'bandwidth_bps' => 'sometimes|nullable|integer',

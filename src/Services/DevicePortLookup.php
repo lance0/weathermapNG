@@ -20,7 +20,7 @@ class DevicePortLookup
                 if (class_exists('\App\Models\Port')) {
                     return \App\Models\Port::where('device_id', $deviceId)
                         ->where('deleted', 0)
-                        ->select('port_id', 'ifName', 'ifIndex', 'ifOperStatus', 'ifAdminStatus')
+                        ->select('port_id', 'ifName', 'ifAlias', 'ifIndex', 'ifOperStatus', 'ifAdminStatus')
                         ->orderBy('ifName')
                         ->get()
                         ->toArray();
@@ -28,7 +28,7 @@ class DevicePortLookup
 
                 // Fallback for older versions
                 $ports = dbFetchRows("
-                    SELECT port_id, ifName, ifIndex, ifOperStatus, ifAdminStatus
+                    SELECT port_id, ifName, ifAlias, ifIndex, ifOperStatus, ifAdminStatus
                     FROM ports
                     WHERE device_id = ? AND deleted = 0
                     ORDER BY ifName

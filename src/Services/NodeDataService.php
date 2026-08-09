@@ -353,8 +353,12 @@ class NodeDataService
     {
         $index = [];
         foreach ($links as $link) {
-            $index[$link->src_node_id][] = $link;
-            $index[$link->dst_node_id][] = $link;
+            if ($link->src_node_id) {
+                $index[$link->src_node_id][] = $link;
+            }
+            if ($link->dst_node_id) {
+                $index[$link->dst_node_id][] = $link;
+            }
         }
         return $index;
     }

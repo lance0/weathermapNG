@@ -503,7 +503,8 @@ function loadDeviceInterfaces(deviceId) {
             (data.ports || []).forEach(port => {
                 const option = document.createElement('option');
                 option.value = port.port_id;
-                option.textContent = port.ifName || port.ifIndex || `Port ${port.port_id}`;
+                const desc = port.ifAlias && port.ifAlias !== port.ifName ? ` — ${port.ifAlias}` : '';
+                option.textContent = (port.ifName || port.ifIndex || `Port ${port.port_id}`) + desc;
                 interfaceSelect.appendChild(option);
             });
         });

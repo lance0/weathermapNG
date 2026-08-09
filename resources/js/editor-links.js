@@ -111,7 +111,8 @@ function openLinkModal(linkIndex) {
                 (data.ports || []).forEach(port => {
                     const opt = document.createElement('option');
                     opt.value = port.port_id;
-                    opt.textContent = port.ifName || `Port ${port.port_id}`;
+                    const descA = port.ifAlias && port.ifAlias !== port.ifName ? ` — ${port.ifAlias}` : '';
+                    opt.textContent = (port.ifName || `Port ${port.port_id}`) + descA;
                     if (link.portA == port.port_id) opt.selected = true;
                     srcPortSelect.appendChild(opt);
                 });
@@ -129,7 +130,8 @@ function openLinkModal(linkIndex) {
                 (data.ports || []).forEach(port => {
                     const opt = document.createElement('option');
                     opt.value = port.port_id;
-                    opt.textContent = port.ifName || `Port ${port.port_id}`;
+                    const descB = port.ifAlias && port.ifAlias !== port.ifName ? ` — ${port.ifAlias}` : '';
+                    opt.textContent = (port.ifName || `Port ${port.port_id}`) + descB;
                     if (link.portB == port.port_id) opt.selected = true;
                     dstPortSelect.appendChild(opt);
                 });
