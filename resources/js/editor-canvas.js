@@ -62,7 +62,7 @@ function initCanvas() {
         let rafId = null;
         new ResizeObserver(() => {
             if (rafId) return; // coalesce bursts into one rAF
-            rafId = requestAnimationFrame(() => { rafId = null; fitCanvasToWrap(); });
+            rafId = requestAnimationFrame(() => { rafId = null; fitCanvasToWrap(); renderEditor(); });
         }).observe(wrap);
     }
 
@@ -510,10 +510,7 @@ function renderEditor() {
     ctx.translate(S.viewOffsetX, S.viewOffsetY);
     ctx.scale(S.viewScale, S.viewScale);
 
-    // Draw grid when zoomed or snap is enabled
-    if (S.viewScale !== 1 || S.snapToGrid) {
-        drawGrid();
-    }
+    drawGrid();
 
     const defaultLinkStyle = getDefaultLinkStyle();
     // Viewport culling: skip nodes/links entirely outside the visible world
@@ -602,7 +599,7 @@ function renderEditor() {
 function drawGrid() {
     const ctx = S.ctx;
     const size = S.snapToGrid ? S.gridSize : 50;
-    ctx.strokeStyle = S.snapToGrid ? 'rgba(100, 150, 255, 0.3)' : 'rgba(200, 200, 200, 0.3)';
+    ctx.strokeStyle = S.snapToGrid ? 'rgba(100, 150, 255, 0.4)' : 'rgba(180, 180, 180, 0.2)';
     ctx.lineWidth = 0.5 / S.viewScale;
 
     for (let x = 0; x <= S.mapWidth; x += size) {
