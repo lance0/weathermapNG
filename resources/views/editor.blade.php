@@ -170,7 +170,13 @@
 .panel-header-selected { background: var(--editor-accent); color: #fff; }
 
 /* Scrollable list panels */
-.panel-list-scroll { max-height: 120px; overflow-y: auto; }
+.panel-list-scroll { overflow-y: auto; }
+#nodes-list { max-height: 180px; }
+#links-list  { max-height: calc(100vh - 440px); min-height: 120px; }
+#links-filter { font-size: 11px; padding: 3px 6px; width: 100%; box-sizing: border-box;
+    background: var(--editor-input-bg); border: 1px solid var(--editor-input-border);
+    color: var(--editor-input-text); border-radius: 3px; margin-bottom: 6px; }
+#links-filter::placeholder { color: var(--editor-text-muted); }
 
 /* Toolbox spacer */
 .toolbox-spacer { flex: 1; }
@@ -437,7 +443,10 @@
         <!-- Links List -->
         <div class="panel">
             <div class="panel-header"><i class="fas fa-link mr-1"></i> Links <span class="badge badge-secondary float-right" id="links-badge">0</span></div>
-            <div class="panel-body panel-list-scroll" id="links-list">
+            <div class="panel-body" style="padding-bottom:4px;">
+                <input type="text" id="links-filter" placeholder="Filter by node name…" autocomplete="off">
+            </div>
+            <div class="panel-body panel-list-scroll" style="padding-top:0;" id="links-list">
                 <small class="text-muted">No links yet</small>
             </div>
         </div>
@@ -462,7 +471,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Configure Link</h5>
+                <h5 class="modal-title">Configure Link — <span id="linkModalTitle" style="font-weight:400;"></span></h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">

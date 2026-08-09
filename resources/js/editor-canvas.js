@@ -236,6 +236,12 @@ function handleMouseDown(event) {
         S.marquee = { startX: x, startY: y, x: x, y: y };
         S.isDragging = false;
     } else {
+        // Check if the click landed on a link line before clearing selection.
+        const linkIdx = getLinkAt(x, y);
+        if (linkIdx !== -1) {
+            openLinkModal(linkIdx);
+            return;
+        }
         S.selectedNodes = [];
         S.selectedNode = null;
         populateNodeProperties(null);
@@ -353,6 +359,26 @@ function getNodeAt(x, y) {
         const dy = y - node.y;
         return Math.sqrt(dx * dx + dy * dy) <= radius;
     });
+}
+
+function pointToSegDist(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+    return Math.sqrt((px - (x1 + t * dx)) ** 2 + (py - (y1 + t * dy)) ** 2);
+}
+
+function getLinkAt(x, y) {
+    const threshold = Math.max(5, 7 / (S.viewScale || 1));
+    for (let i = S.links.length - 1; i >= 0; i--) {
+        const segs = S.links[i]._segs;
+        if (!segs) continue;
+        for (const seg of segs) {
+            if (pointToSegDist(x, y, seg.x1, seg.y1, seg.x2, seg.y2) <= threshold) return i;
+        }
+    }
+    return -1;
 }
 
 function findNodeById(id) {

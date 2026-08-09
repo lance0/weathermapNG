@@ -27,6 +27,10 @@ function renderLinksList() {
     const c = document.getElementById('links-list');
     if (!c) return;
     c.textContent = '';
+
+    const filterEl = document.getElementById('links-filter');
+    const term = filterEl ? filterEl.value.trim().toLowerCase() : '';
+
     if (!S.links.length) {
         const empty = document.createElement('small');
         empty.className = 'text-muted';
@@ -34,14 +38,21 @@ function renderLinksList() {
         c.appendChild(empty);
         return;
     }
+
+    let shown = 0;
     S.links.forEach((l, idx) => {
         const a = findNodeById(l.srcId); const b = findNodeById(l.dstId);
-        const aL = a ? a.label : l.srcId; const bL = b ? b.label : l.dstId;
+        const aL = a ? a.label : String(l.srcId);
+        const bL = b ? b.label : String(l.dstId);
+
+        if (term && !aL.toLowerCase().includes(term) && !bL.toLowerCase().includes(term)) return;
+        shown++;
 
         const row = document.createElement('div');
         row.className = 'd-flex align-items-center justify-content-between mb-2';
 
         const labelDiv = document.createElement('div');
+        labelDiv.style.cssText = 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; font-size:12px;';
         const icon = document.createElement('i');
         icon.className = 'fas fa-link';
         labelDiv.appendChild(icon);
@@ -50,8 +61,10 @@ function renderLinksList() {
 
         const btnGroup = document.createElement('div');
         btnGroup.className = 'btn-group btn-group-sm';
+        btnGroup.style.flexShrink = '0';
         const editBtn = document.createElement('button');
         editBtn.className = 'btn btn-outline-secondary';
+        editBtn.title = 'Edit link';
         editBtn.addEventListener('click', () => openLinkModal(idx));
         const editIcon = document.createElement('i');
         editIcon.className = 'fas fa-edit';
@@ -59,6 +72,7 @@ function renderLinksList() {
         btnGroup.appendChild(editBtn);
         const delBtn = document.createElement('button');
         delBtn.className = 'btn btn-outline-danger';
+        delBtn.title = 'Delete link';
         delBtn.addEventListener('click', () => deleteLink(idx));
         const delIcon = document.createElement('i');
         delIcon.className = 'fas fa-trash';
@@ -68,6 +82,13 @@ function renderLinksList() {
 
         c.appendChild(row);
     });
+
+    if (shown === 0) {
+        const empty = document.createElement('small');
+        empty.className = 'text-muted';
+        empty.textContent = term ? 'No matches' : 'No links yet';
+        c.appendChild(empty);
+    }
 }
 
 // ========== Link Modal Functions ==========
@@ -78,6 +99,14 @@ function openLinkModal(linkIndex) {
 
     const srcNode = findNodeById(link.srcId);
     const dstNode = findNodeById(link.dstId);
+
+    const titleEl = document.getElementById('linkModalTitle');
+    if (titleEl) {
+        const aL = srcNode ? srcNode.label : 'Node';
+        const bL = dstNode ? dstNode.label : 'Node';
+        titleEl.textContent = aL + ' → ' + bL;
+    }
+
     const srcPortSelect = document.getElementById('link-src-port');
     const dstPortSelect = document.getElementById('link-dst-port');
     const bandwidthValue = document.getElementById('link-bandwidth-value');
@@ -185,7 +214,7 @@ function deleteLink(linkIndex) {
     );
 }
 
-// Wire up modal buttons
+// Wire up modal buttons and filter input
 document.addEventListener('DOMContentLoaded', function () {
     const saveLinkBtn = document.getElementById('save-link-btn');
     const deleteLinkBtn = document.getElementById('delete-link-btn');
@@ -193,4 +222,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (deleteLinkBtn) deleteLinkBtn.addEventListener('click', () => {
         if (S.currentLinkIndex !== null) deleteLink(S.currentLinkIndex);
     });
+
+    const filterEl = document.getElementById('links-filter');
+    if (filterEl) filterEl.addEventListener('input', renderLinksList);
 });
