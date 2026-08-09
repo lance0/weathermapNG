@@ -819,7 +819,8 @@ $('#createMapForm').on('submit', function(e) {
         method: 'POST',
         body: formData,
         headers: {
-            'X-CSRF-TOKEN': getCsrfToken()
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest'
         }
     })
     .then(response => {
