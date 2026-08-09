@@ -60,8 +60,15 @@
     --editor-list-selected: rgba(13,110,253,0.25);
 }
 
+/* Full-page editor: neutralise LibreNMS content wrapper padding so the
+   editor starts exactly below the fixed 50 px navbar and fills the rest
+   of the viewport without causing any page-level scroll. */
+html, body { overflow: hidden !important; }
+.content-wrapper { padding-top: 50px !important; }
+.content-wrapper > .content { padding: 0 !important; height: calc(100vh - 50px) !important; overflow: hidden !important; }
+
 /* ===== Editor Layout ===== */
-.editor-container { display: flex; height: calc(100vh - 120px); min-height: 500px; }
+.editor-container { display: flex; height: 100%; min-height: 500px; }
 
 /* Left Toolbox */
 .editor-toolbox {
