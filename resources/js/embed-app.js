@@ -43,6 +43,14 @@ const CFG = window.WMNG.EmbedConfig || {};
         let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
         let graphsEnabled = param('graphs', '1') !== '0' && !WMNG_CONFIG.kioskEnabled;
         let nodeMetricsEnabled = param('metrics', WMNG_CONFIG.show_node_metrics ? '1' : '0') !== '0';
+        // ?debugDots=1 — diagnostic overlay: draws a small cross at each
+        // particle's computed pixel position (plus transform values in the
+        // corner). If crosses hug the lines but the particles don't, the bug
+        // is in the render/compositing layer of the viewer's environment;
+        // if crosses sit off-line too, the math itself is wrong. Added after
+        // a user report showed dots off-line in ways headless tests could
+        // never reproduce.
+        let debugDots = param('debugDots', '0') !== '0';
         let eventSourceRef = null;
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
@@ -372,6 +380,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             }
         }
         overlayCtx.restore();
+        if (debugDots) drawDebugTransformCenter(overlayCtx, viewScale);
     }
 
     function initKioskMode() {
@@ -981,6 +990,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             drawCtx.fill();
             drawCtx.globalAlpha = particle.opacity;
             drawCtx.fillStyle = '#40ff40';
+            if (debugDots) drawDebugCross(drawCtx, pos);
             drawCtx.beginPath();
             drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
             drawCtx.fill();
@@ -1001,13 +1011,100 @@ const CFG = window.WMNG.EmbedConfig || {};
             drawCtx.fill();
             drawCtx.globalAlpha = particle.opacity;
             drawCtx.fillStyle = '#40a0ff';
+            if (debugDots) drawDebugCross(drawCtx, pos);
             drawCtx.beginPath();
             drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
             drawCtx.fill();
             });
         }
+    }
+
+    /**
+     * Diagnostic cross at a canvas point (same coordinate space as the
+     * particles). ?debugDots=1. Bright magenta so it can't be confused with
+     * any flow color. If the crosses sit on the lines while the particles
+     * don't, the viewer's environment is compositing the overlay canvas
+     * off-position; if the crosses are off too, the geometry math is wrong.
+     */
+    function drawDebugCross(drawCtx, pos) {
+        drawCtx.save();
+        drawCtx.globalAlpha = 1;
+        drawCtx.strokeStyle = '#ff00ff';
+        drawCtx.lineWidth = 1;
+        drawCtx.beginPath();
+        drawCtx.moveTo(pos.x - 7, pos.y);
+        drawCtx.lineTo(pos.x + 7, pos.y);
+        drawCtx.moveTo(pos.x, pos.y - 7);
+        drawCtx.lineTo(pos.x, pos.y + 7);
+        drawCtx.stroke();
         drawCtx.restore();
     }
+
+    // On-screen diagnostic panel — ?debugDots=2. Dumps the whole render
+    // (map data, live attachment, transport, RAF, transforms, canvas sizes)
+    // without devtools, since their environment shows behaviors that differ
+    // from every probe I can run.
+    let debugPanelEl = null;
+    let debugTickActive = false;
+    function ensureDebugPanel() {
+        if (debugPanelEl) return debugPanelEl;
+        debugPanelEl = document.createElement('pre');
+        debugPanelEl.id = 'debug-panel';
+        debugPanelEl.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;font:10px/1.4 monospace;padding:8px;border-radius:0 0 6px 0;overflow:auto;max-height:50%;max-width:50%;pointer-events:none;white-space:pre;';
+        document.body.appendChild(debugPanelEl);
+        return debugPanelEl;
+    }
+
+    function updateDebugPanel() {
+        if (!debugDots || debugDots !== '2') { if (debugPanelEl) { debugPanelEl.remove(); debugPanelEl = null; } return; }
+        var el = ensureDebugPanel();
+        var info = [];
+        info.push('== WeathermapNG debug panel ==');
+        info.push('href: ' + window.location.href);
+        info.push('mapId: ' + (typeof mapId !== 'undefined' ? mapId : 'n/a'));
+        info.push('mapData: nodes=' + (mapData?.nodes || []).length + ' links=' + (mapData?.links || []).length);
+        var liveAttached = (mapData?.links || []).filter((l) => l.live).length;
+        info.push('live attached to: ' + liveAttached + '/' + (mapData?.links || []).length + ' links');
+        info.push('demoMode: ' + (typeof demoMode !== 'undefined' ? demoMode : 'n/a'));
+        info.push('transport: ' + (typeof currentTransport !== 'undefined' ? currentTransport : 'n/a'));
+        info.push('sseEnabled: ' + (typeof sseEnabled !== 'undefined' ? sseEnabled : 'n/a'));
+        info.push('hasActiveTraffic: ' + (typeof hasActiveTraffic !== 'undefined' ? hasActiveTraffic : 'n/a'));
+        info.push('RAF running: ' + (typeof animationId !== 'undefined' ? !!animationId : 'n/a'));
+        info.push('flowAnimation: ' + (typeof flowAnimationEnabled !== 'undefined' ? flowAnimationEnabled : 'n/a'));
+        info.push('particles cache: ' + Object.keys(typeof particles !== 'undefined' ? particles : {}).length);
+        info.push('transform: scale=' + (typeof viewScale !== 'undefined' ? viewScale.toFixed(3) : '?') +
+            ' ox=' + (typeof viewOffsetX !== 'undefined' ? Math.round(viewOffsetX) : '?') +
+            ' oy=' + (typeof viewOffsetY !== 'undefined' ? Math.round(viewOffsetY) : '?'));
+        var mc = document.getElementById('map-canvas'), oc = document.getElementById('overlay-canvas');
+        info.push('static canvas: ' + (mc ? mc.width + 'x' + mc.height + ' css ' + mc.clientWidth + 'x' + mc.clientHeight : 'MISSING'));
+        info.push('overlay canvas: ' + (oc ? oc.width + 'x' + oc.height + ' css ' + oc.clientWidth + 'x' + oc.clientHeight : 'MISSING'));
+        info.push('overlay style.pos: ' + (oc ? getComputedStyle(oc).position + ' left=' + getComputedStyle(oc).left + ' top=' + getComputedStyle(oc).top : '?'));
+        info.push('dpr: ' + window.devicePixelRatio);
+        info.push('browser zoom: ' + Math.round((window.outerWidth / window.innerWidth) * 100) + '% (approx)');
+        info.push('reducedMotion: ' + (typeof reducedMotion !== 'undefined' ? reducedMotion : 'n/a'));
+        info.push('nodeById size: ' + (typeof nodeById !== 'undefined' ? nodeById.size : 'n/a'));
+        info.push('pct labels config: show_pct=' + WMNG_CONFIG.show_percentages + ' show_bw=' + WMNG_CONFIG.show_bandwidth);
+        var metrics = mapData.links.map((l) => getLinkMetric(l)).join(',');
+        info.push('links live metrics: [' + metrics + ']');
+        info.push('link styles: ' + mapData.links.map((l) => JSON.stringify(l.style || {})).join(' | '));
+        el.textContent = info.join('\\n');
+    }
+
+    // Hook updateDebugPanel into the render cycle: after each renderOverlay
+    // and after each applyLiveUpdate.
+    (function () {
+        var origRenderOverlay = renderOverlay;
+        renderOverlay = function () {
+            origRenderOverlay.apply(this, arguments);
+            updateDebugPanel();
+        };
+        var origApplyLive = applyLiveUpdate;
+        applyLiveUpdate = function (live) {
+            origApplyLive.call(this, live);
+            updateDebugPanel();
+        };
+    })();
+
 
     const defaultNodeStyle = mapData.options?.default_node_style || {};
     const defaultLinkStyle = mapData.options?.default_link_style || {};
