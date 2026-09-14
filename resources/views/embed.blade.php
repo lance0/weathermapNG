@@ -30,7 +30,7 @@
             <i class="fas fa-spinner fa-spin"></i>
             <div>Loading map...</div>
         </div>
-        <canvas id="map-canvas"></canvas>
+        <canvas id="map-canvas" aria-label="Network map: visualizes devices as nodes and their connections as links, colored by traffic utilization. See the status bar below for a text summary of update status."></canvas>
         <canvas id="overlay-canvas"></canvas>
         <canvas id="minimap" width="160" height="120" class="embed-minimap"></canvas>
         <div id="status-bar" class="status-bar" style="display: none;">
