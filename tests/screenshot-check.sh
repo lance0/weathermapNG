@@ -71,8 +71,29 @@ if [[ "$FAIL" -ne 0 ]]; then
     exit 1
 fi
 
-# Every file rendered and is non-empty; sizes reported to catch blank/white
-# captures at a glance.
+# Degenerate-capture guard: identical byte sizes across different pages at
+# the same viewport means all pages rendered the same stub (connection
+# error / login page), not real per-view content. Fail loudly instead of
+# reporting success on captures that validated nothing.
+for vp in "${VIEWPORTS[@]}"; do
+    declare -A seen=()
+    for page in "${PAGES[@]}"; do
+        f="$OUTDIR/${page}-${vp}.png"
+        [[ -f "$f" ]] || continue
+        size="$(wc -c < "$f")"
+        key="${vp}:${size}"
+        if [[ -n "${seen[$key]:-}" ]]; then
+            echo "⚠ two pages produced byte-identical captures at ${vp}" >&2
+            echo "  — they all likely rendered the same page (connection error or" >&2
+            echo "  login screen, since no auth was provided). These captures are NOT" >&2
+            echo "  a valid per-view visual check." >&2
+            exit 3
+        fi
+        seen[$key]=1
+    done
+done
+
+# Sizes reported to catch blank/white captures at a glance.
 echo "Summary:"
 for f in "$OUTDIR"/*.png; do
     size=$(wc -c < "$f")
