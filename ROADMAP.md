@@ -218,12 +218,7 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - LibreNMS exposes graph image endpoints. Use a modern CSS/JS tooltip with embedded `<img>` or `<iframe>`.
   - *The most beloved feature of the classic PHP Weathermap (OverLib graphs). WeathermapNG's text-only tooltips are a step back.*
 
-- [ ] **Nested maps / drill-down hierarchy** *(HIGH impact for multi-scale networks)*
-  - Add `parent_map_id` foreign key to `wmng_maps` — a node can link to a sub-map instead of a device.
-  - Click a "summary" node to navigate to a detailed sub-map (e.g., campus → building → rack).
-  - Breadcrumb navigation showing the map hierarchy.
-  - *Zabbix's killer feature for networks with multiple scales. Not previously in the roadmap.*
-
+- [x] **Nested maps / drill-down hierarchy** *(v1.13.0: `parent_map_id` on `wmng_maps` via a hasColumn-guarded migration + all setup.php paths; `Map::parentMap`/`childMaps`/cycle-bounded `breadcrumb()`; node drill-down via `meta.sub_map_id`; `toJsonModel()` payload carries `parent_map_id`, `breadcrumb`, per-node `sub_map_id`; embed view drills down on sub-map nodes with priority over device click-through and renders a root→current breadcrumb bar. Six test cases in `NestedMapTest`.)* 
 - [x] **LLDP/CDP Auto-Discovery** *(v1.12.0: `AutoDiscoveryService::discoverAndSeedMap()` reads LibreNMS `links` table (protocol lldp/xdp/cdp), dedupes by device pair, creates missing wmng nodes + links; admin-gated autodiscover endpoint + editor trigger + `weathermapng:discover` command)*
   - ~~Query LibreNMS `links` table for actual topology (protocol field: lldp/xdp/cdp, remote_port_id, remote_device_id).~~
   - ~~Create accurate node/link mapping from LLDP/CDP data.~~
