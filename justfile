@@ -1,20 +1,25 @@
 # WeathermapNG task runner — `just <recipe>`
-# Install: brew install just   (or cargo install just)
+# Install just first: brew install just   (or cargo install just)
+#
+# These recipes are thin facades over real entrypoints (RELEASE.md's
+# validation flow, tests/docker-test.sh, verify.php, and tests/screenshot-
+# check.sh) so there's a single spelling per workflow with no duplicated
+# logic to drift.
 #
 # Common flows:
-#   just test                      # full PHPUnit suite
-#   just lint                      # php -l on all src + config + database
-#   just check                     # lint + tests
+#   just check                     # lint + full test suite
+#   just visual                    # screenshot capture pass (requires local LibreNMS)
+#   just verify-install            # install controller script standalone check
 
 PHP := "php"
 
 VENDOR_BIN := "vendor/bin"
 
-# default recipe: what a fresh contributor actually needs
 default:
     @just --list
 
-# Install PHP and Composer dependencies (idempotent)
+# Install PHP and Composer dependencies (idempotent) — the only recipe
+# that contains setup logic of its own, since nothing else covers it.
 setup:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -42,25 +47,32 @@ lint:
       | xargs -0 -n1 {{PHP}} -l > /dev/null
     echo "All PHP files lint clean."
 
-# lint + test
+# lint + test — the "PR-ready" gate
 check: lint test
 
-# One static screenshot pass: renders index/editor/embed at 480/768/1920 px
-# Requires: a running LibreNMS instance at {URL}. Falls back to docker:
-#   just screenshots URL=http://localhost:18080
-screenshots URL="http://localhost:18080" OUTDIR="output/screenshots":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    command -v chromium >/dev/null 2>&1 || command -v google-chrome >/dev/null 2>&1 \
-        || { echo "chromium/chrome not on PATH — see tests/screenshot-check.sh for alternatives" >&2; exit 2; }
-    mkdir -p {{OUTDIR}}
-    bash tests/screenshot-check.sh {{URL}} {{OUTDIR}}
-    echo "Wrote screenshots to {{OUTDIR}}/"
+# Full installation workflow against docker (wraps the existing suite)
+test-install:
+    bash tests/docker-test.sh
 
-# Semantic-release: validate + tag + push (see RELEASE.md)
+# Host path installation test (wraps tests/install-test.sh)
+test-install-host-librenms INSTALL_DIR="/opt/librenms":
+    bash tests/install-test.sh {{INSTALL_DIR}}
+
+# Render index/editor/embed screenshots at several viewports
+# Requires a Chromium-family browser on PATH and a reachable LibreNMS at URL.
+visual URL="http://localhost:18080" OUTDIR="output/screenshots":
+    bash tests/screenshot-check.sh {{URL}} {{OUTDIR}}
+
+# Verify plugin structure and install readiness (stands alone)
+verify:
+    {{PHP}} verify.php
+
+# Smoke-check the deployed install (standalone)
+verify-deployment URL="http://localhost:18080":
+    {{PHP}} verify-deployment.php {{URL}}
+
+# Release: version bump + changelog commit + tag + push (see RELEASE.md)
 tag version:
-    #!/usr/bin/env bash
-    set -euo pipefail
     echo "$(sed 's/^v//' <<< '{{version}}')" > VERSION
     {{VENDOR_BIN}}/phpunit tests/VersionMetadataTest.php
     git add VERSION CHANGELOG.md

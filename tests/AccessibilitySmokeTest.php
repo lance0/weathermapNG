@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
  * Accessibility smoke test — catches the obvious regressions the roadmap
  * asks for (ROADMAP.md "Validation coverage"):
  *
- *  - icon-only controls must have aria-labels
+ *  - icon-only anchors and buttons must have aria-labels
  *  - outline must not be globally removed (keyboard focus visibility)
  *  - interactive elements must be real buttons/links with accessible names
  *  - form inputs must have associated labels or their own aria-label
@@ -17,6 +17,8 @@ use PHPUnit\Framework\TestCase;
  *
  * These are string assertions over the view source rather than a rendered
  * browser audit, so they run in plain PHPUnit on CI with no browser.
+ * index/editor extend layouts.librenmsv1, so document lang is set by the
+ * parent layout; only embed (a standalone page) is checked here.
  */
 class AccessibilitySmokeTest extends TestCase
 {
@@ -56,111 +58,64 @@ class AccessibilitySmokeTest extends TestCase
     {
         $content = $this->source($page);
 
-        // Buttons may span multiple lines; balance is rendered by Blade so
-        // child detection uses: does the opening tag carry a name, or does
-        // the source right after it contain non-tag text before </button>.
-        preg_match_all('/<button\b[^>]*?>/', $content, $buttons);
-        $this->assertNotEmpty($buttons[0], "$page should contain buttons to check");
-
-        foreach ($buttons[0] as $i => $tag) {
-            $named = preg_match('/aria-label=|aria-labelledby=/', $tag);
-            $named = $named || $this->buttonHasVisibleText($content, $tag);
+        foreach ($this->openingTags($content, 'button') as $i => [$tag, $inner, $full]) {
+            $named = preg_match('/aria-label(?:ledby)?=/i', $tag) || trim($this->textOnly($inner)) !== '';
             $this->assertTrue(
-                $named,
-                "$page button #$i lacks aria-label/labelledby or inner text: " . trim($tag)
+                (bool) $named,
+                "$page button #$i lacks aria-label/labelledby or visible text: " . trim($tag)
             );
         }
     }
 
-    private function buttonHasVisibleText(string $content, string $tag): bool
-    {
-        // Locate the button region after the tag and inside the closing
-        // marker; a button with visible text (possibly plus aria-hidden
-        // icons) qualifies as named even without aria-label.
-        $offset = strpos($content, $tag);
-        if ($offset === false) {
-            return false;
-        }
-        $rest = substr($content, $offset + strlen($tag));
-        $end = stripos($rest, '</button>');
-        if ($end === false) {
-            return false;
-        }
-        $inner = substr($rest, 0, $end);
-        $visible = trim(strip_tags($inner));
-
-        return $visible !== '';
-    }
-
     public function test_icon_only_controls_have_aria_labels(): void
     {
-        // Font Awesome icon-only anchors and buttons must be labelled — no
-        // visible text exists for these. Blade source wraps tags across
-        // lines, so capture each opening tag lazily up to its closing `>`
-        // and evaluate the tag with /s so multi-line attributes count.
+        // Rule: for each <a> or <button> opening tag, capture the full
+        // element body. If the body has NO visible text (after stripping
+        // tags) AND contains a Font Awesome icon span, the control must
+        // carry aria-label on its opening tag.
         $sources = [
             'index' => file_get_contents(__DIR__ . '/../resources/views/index.blade.php'),
             'embed' => file_get_contents(__DIR__ . '/../resources/views/embed.blade.php'),
         ];
 
+        $checked = 0;
         foreach ($sources as $page => $content) {
-            preg_match_all(
-                '/<(?:a|button)\b[^>]*?>\s*<i\s[^>]*aria-hidden="true"[^>]*>\s*<\/i>/is',
-                $content,
-                $iconOnly
-            );
-
-            foreach ($iconOnly[0] as $i => $snippet) {
-                // Take only the tag portion (up to the first `>`), which
-                // spans multiple lines for these controls.
-                preg_match('/^<(?:a|button)\b.*?>/is', $snippet, $tagMatch);
-                $tag = $tagMatch[0];
-                $visible = $this->controlHasVisibleText($content, $snippet);
-                $accessible = preg_match('/aria-label(?:ledby)?=/i', $tag) || $visible;
-                $this->assertTrue(
-                    (bool) $accessible,
-                    "$page icon-only control #$i missing aria-label: " . trim($tag)
-                );
+            foreach (['a', 'button'] as $el) {
+                foreach ($this->openingTags($content, $el) as $i => [$tag, $inner, $full]) {
+                    if (!preg_match('/\bfa[b"\']|\bfa\b|\bfas\b|\bfar\b|\bfab\b/', $inner)) {
+                        continue; // no icon inside — skip
+                    }
+                    if (trim($this->textOnly($inner)) !== '') {
+                        continue; // has visible text — no aria-label needed
+                    }
+                    $checked++;
+                    $this->assertMatchesRegularExpression(
+                        '/aria-label(?:ledby)?=/i',
+                        $tag,
+                        "$page icon-only $el #$i missing aria-label: " . trim($tag)
+                    );
+                }
             }
         }
-    }
-
-    private function controlHasVisibleText(string $content, string $snippet): bool
-    {
-        // A control followed by an aria-hidden icon may still have text
-        // content further on; if so, it doesn't need an aria-label.
-        $offset = strpos($content, $snippet);
-        if ($offset === false) {
-            return false;
-        }
-        $rest = substr($content, $offset + strlen($snippet));
-        $end = min(
-            stripos($rest, '</button>') === false ? PHP_INT_MAX : stripos($rest, '</button>'),
-            stripos($rest, '</a>') === false ? PHP_INT_MAX : stripos($rest, '</a>')
-        );
-        if ($end === PHP_INT_MAX) {
-            return false;
-        }
-        $inner = substr($rest, 0, $end);
-        $visible = trim(strip_tags($inner));
-
-        return $visible !== '';
+        $this->assertGreaterThan(0, $checked, 'expected at least one icon-only control across views');
     }
 
     public function test_form_inputs_have_labels(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
 
-        preg_match_all('/<(?:input|select|textarea)\b[^>]*\bid="([^"]+)"[^>]*>/is', $content, $m, PREG_SET_ORDER);
-        $this->assertGreaterThan(0, $m, 'index should have labelled form inputs');
+        $this->assertGreaterThan(
+            0,
+            preg_match_all('/<(?:input|select|textarea)\b[^>]*?\bid="([^"]+)"[^>]*?>(?:.*?<\/(?:select|textarea)>|\s*\/?>)/is', $content, $m, PREG_SET_ORDER),
+            'index should have labelled form inputs'
+        );
 
-        foreach ($m as [1 => $id, 0 => $tag]) {
-            $hasLabelFor = preg_match('/<label[^>]*\bfor="' . preg_quote($id, '/') . '"/i', $content)
-                || preg_match('/<label[^>]*\bfor="' . preg_quote($id, '/') . '"/is', $content);
-            $hasOwnAria = preg_match('/aria-label(?:ledby)?=/i', $tag);
+        foreach ($m as $i => [1 => $id]) {
+            $quality = preg_match('/<label[^>]*\bfor="' . preg_quote($id, '/') . '"/is', $content)
+                || preg_match('/\b(aria-label(?:ledby)?=)/i', $m[$i][0]);
             $this->assertTrue(
-                ($hasLabelFor && $hasOwnAria) || $hasOwnAria || (bool) $hasLabelFor,
-                "index input #$id has neither <label for> nor aria-label: " . trim($tag)
+                (bool) $quality,
+                "index input #$id has neither <label for> nor aria-label: " . trim($m[$i][0])
             );
         }
     }
@@ -168,8 +123,8 @@ class AccessibilitySmokeTest extends TestCase
     public function test_canvas_has_accessible_fallback(): void
     {
         // The embed canvas is the primary interactive surface; give it a
-        // programmatic description. The editor canvas is described by the
-        // properties sidebar, so only require the embed one here.
+        // programmatic description. The editor canvas is paired with the
+        // properties sidebar text, so only require the embed one here.
         $embed = file_get_contents(__DIR__ . '/../resources/views/embed.blade.php');
         $this->assertMatchesRegularExpression(
             '/<canvas[^>]*id="map-canvas"[^>]*aria-label=|<canvas[^>]*aria-label=[^>]*id="map-canvas"/i',
@@ -188,10 +143,60 @@ class AccessibilitySmokeTest extends TestCase
         );
     }
 
+    public function test_index_and_editor_inherit_librenms_layout(): void
+    {
+        // These views rely on the parent LibreNMS layout for lang/meta; they
+        // must not silently drop that inheritance.
+        foreach (['index', 'editor'] as $page) {
+            $src = file_get_contents(__DIR__ . '/../resources/views/' . $page . '.blade.php');
+            $this->assertMatchesRegularExpression(
+                "/@extends\\('layouts\\.librenmsv1'\\)/",
+                $src,
+                "$page should extend the LibreNMS layout (which declares lang)"
+            );
+        }
+    }
+
     public function test_modals_use_role_dialog(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
-        preg_match_all('/<div[^>]*class="[^"]*modal[^"]*"[^>]*role="dialog"/i', $content, $m);
+        preg_match_all('/<div[^>]*class="[^"]*modal[^"]*"[^>]*role="dialog"[^>]*>/i', $content, $m);
         $this->assertNotEmpty($m[0], 'index modals should use role="dialog"');
+    }
+
+    /**
+     * Yield every element by name: [openingTag, innerHtml, wholeSnippet].
+     *
+     * Blade markup ({{ ... }}) and @-directives are removed first — a `>`
+     * inside `{{ $map->id }}` otherwise truncates the opening tag, making
+     * the "inner text" start with stray Blade chunks and misclassify every
+     * tagged control. Tag parsing spans multiple lines.
+     *
+     * @return iterable<int, array{string, string, string}>
+     */
+    private function openingTags(string $content, string $element): iterable
+    {
+        $content = preg_replace('/\{\{.*?\}\}/', '', $content) ?? $content;
+        $content = preg_replace('/@[a-z]+/i', '', $content) ?? $content;
+
+        $open = '/<' . $element . '\b[^>]*?>/is';
+        $close = '</' . $element . '>';
+        if (!preg_match_all($open, $content, $tags, PREG_OFFSET_CAPTURE)) {
+            return;
+        }
+        foreach ($tags[0] as [$tag, $offset]) {
+            $bodyStart = $offset + strlen($tag);
+            $end = stripos($content, $close, $bodyStart);
+            $inner = $end === false ? '' : substr($content, $bodyStart, $end - $bodyStart);
+            $full = $end === false
+                ? $tag
+                : substr($content, $offset, $end - $offset + strlen($close));
+            yield [$tag, $inner, $full];
+        }
+    }
+
+    private function textOnly(string $html): string
+    {
+        return trim(strip_tags($html));
     }
 }
