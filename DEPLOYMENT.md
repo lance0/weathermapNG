@@ -38,6 +38,19 @@ The installer performs the important steps:
 - Enables the LibreNMS plugin
 - Verifies WeathermapNG routes are visible
 
+
+### `just` Facade
+
+The repo-root `justfile` provides thin recipes that wrap the scripts above: `just install`, `just update`, and `just validate-install` call `quick-install.sh`, `deploy.sh`, and `verify-deployment.php` respectively. Pass the LibreNMS path explicitly:
+
+```bash
+just install LIBRENMS_PATH=/opt/librenms
+just update LIBRENMS_PATH=/opt/librenms
+just validate-install LIBRENMS_PATH=/opt/librenms
+```
+
+These are convenience facades over the same underlying scripts — the wrapper choice is a matter of taste, not a new mechanism. The manual commands documented above remain the canonical reference.
+
 ## Manual Production Flow
 
 Use this when you need more control than `quick-install.sh` gives you:
@@ -112,6 +125,10 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
 Read [CHANGELOG.md](CHANGELOG.md) before upgrading across minor versions. Do not drop `wmng_*` tables unless you intend to remove WeathermapNG data.
+
+### Asset Caching After Upgrade
+
+As of v1.13.0 all plugin asset URLs carry a `?v=<mtime>` cache-buster, so stale cached JavaScript is structurally impossible after an upgrade. The first page load after upgrading may still serve a browser-cached copy, so hard-reload the map page once per browser after an upgrade; afterwards staleness cannot recur.
 
 ## Health And Readiness
 
@@ -219,7 +236,17 @@ php database/setup.php
 - Verify the link has valid LibreNMS port associations.
 - Check that the LibreNMS user can read the RRD directory.
 - Use demo mode to separate UI problems from data-source problems.
-- Confirm the map renders before debugging flow animation or labels.
+- As of v1.13.0, flow particles, labels, and badges on curved links follow the visible curve via a densely sampled bezier path; if they appear misaligned, see the Diagnostics section below.
+
+
+### Diagnostics
+
+When investigating rendering complaints such as "dots are off the line" or misaligned particles, append a query param to any map or embed URL:
+
+- `?debugDots=1` — draws a magenta cross at each particle position and shows a transform readout (scale, ox, oy, dpr) in the top-left corner.
+- `?debugDots=2` — shows a full on-screen panel with the entire render-pipeline state: map data, live attach, transport, RAF, transforms, canvas geometry, CSS position, and browser zoom.
+
+Both modes are off by default and have zero production impact when the parameter is absent. The v1.13.1 patch fixed overlay canvas alignment (canvases pinned `top:0/left:0` absolute; overlay composes at the static frame's transform snapshot), so if dots still float after upgrading, use `?debugDots=2` to capture the remaining state mismatch.
 
 ## Security Notes
 

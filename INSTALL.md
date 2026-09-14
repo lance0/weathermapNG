@@ -101,6 +101,32 @@ docker compose -f docker-compose.dev.yml logs -f librenms
 
 When the logs show `nginx entered RUNNING state`, visit http://localhost:8000. This stack is intended for development and testing, not production.
 
+## Task Runner (justfile)
+
+The repository includes a `justfile` with thin recipes that wrap the underlying install, test, and deployment scripts. If you have [`just`](https://github.com/casey/just) installed, you can use these recipes instead of calling the scripts directly:
+
+| Recipe | Description |
+|---|---|
+| `just setup` | Installs Composer and project dependencies (the only recipe that isn't a script facade) |
+| `just lint` | Runs the linter |
+| `just test` | Runs the full PHPUnit suite |
+| `just test-one` | Runs one test class: `just test-one LegacyConfServiceTest` |
+| `just check` | Runs lint and test together |
+| `just install` | Runs `quick-install.sh` (accepts `LIBRENMS_PATH=…`) |
+| `just update` | Runs `deploy.sh` (accepts `LIBRENMS_PATH=…`) |
+| `just validate-install` | Runs `verify-deployment.php` (accepts `LIBRENMS_PATH=…`) |
+| `just dev-up` | Starts the `docker-compose.dev.yml` development stack |
+| `just dev-stop` | Stops the development stack |
+| `just dev-reset` | Tears down and recreates the development stack |
+| `just test-install` | Runs the Docker test suite |
+| `just test-install-local` | Runs the local test install |
+| `just visual` | Runs `tests/screenshot-check.sh` (set `OUTDIR=…` for output location, `URL=…` to target a page) |
+| `just verify` | Runs the verification suite |
+| `just verify-deployment` | Runs `verify-deployment.php` against the deployment |
+| `just tag` | Bumps VERSION if changed, runs `VersionMetadataTest`, tags, and pushes |
+
+All recipes except `setup` are thin facades over the corresponding script (`quick-install.sh`, `deploy.sh`, `verify-deployment.php`, or `tests/*.sh`).
+
 ## Manual Installation
 
 If you prefer manual control or the automated script doesn't work:
@@ -357,6 +383,20 @@ php artisan view:clear
 **Route discovery.** If the "Network Maps" menu entry is missing after upgrade, run `php artisan route:list | grep -iE 'weathermap|wmng'` to verify routes are registered. If no routes appear, ensure the plugin is enabled (`./lnms plugin:enable WeathermapNG`) and `package:discover` has been run.
 
 **Rollback.** To roll back to a previous version, `git checkout <tag>` in the plugin directory and re-run `composer install --no-dev && php artisan package:discover && php artisan optimize:clear`. Database tables from the newer version remain but are harmless — no down migrations are needed.
+
+### Nested maps (v1.13.0+)
+
+Maps can now form a drill-down hierarchy. The `wmng_maps` table gained a `parent_map_id` column (nullable, indexed) that references the parent map. The migration is `hasColumn`-guarded, which means it adds the column only if it doesn't already exist — making the migration idempotent and safe on both fresh and existing installs.
+
+Node drill-down uses `meta.sub_map_id`: set this field on a node to make it clickable in the embed view, navigating to the referenced sub-map while preserving query params. The JSON export (`toJsonModel()`) carries `parent_map_id`, the `breadcrumb` chain, and per-node `sub_map_id`, so embeddings and consumers see the full hierarchy. In the embed view, a breadcrumb bar shows the root→current chain on maps that are part of a hierarchy; the bar is hidden on standalone maps.
+
+### Legacy .conf import and export (v1.13.0+)
+
+WeathermapNG can import and export maps in the legacy PHP Weathermap `.conf` text format. Import accepts `.conf` uploads through the existing import modal — the file extension dispatches the parser (`MapService::importMap`). The parser records `interface_id` and `metric` into node meta, clamps canvas dimensions to editor bounds (100–4096), and rejects duplicate node sections or links referencing unknown nodes. See `config/maps/example.conf` for a sample. Export is available via the map endpoint with `?format=conf` or through the CLI command `weathermapng:export --format=conf`.
+
+### Debug diagnostics (v1.13.0+)
+
+The embed view accepts a `?debugDots` URL parameter for render-pipeline diagnostics. The flag is off by default. Set `?debugDots=1` to render a magenta cross at each particle position and a transform readout (scale, origin x/y, DPR) at the top-left corner. Set `?debugDots=2` for an on-screen panel showing the full render-pipeline state (map data, live attach, transport, RAF, transforms, canvas geometry, CSS position, browser zoom). The parameter has no impact on rendering when absent.
 
 ## Diagnostics Page
 

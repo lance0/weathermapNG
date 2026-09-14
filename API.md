@@ -45,8 +45,8 @@ Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at th
 | `GET` | `/plugin/WeathermapNG/api/maps/{map}/json` | Serialized map model |
 | `GET` | `/plugin/WeathermapNG/api/maps/{map}/live` | Current traffic/status payload |
 | `GET` | `/plugin/WeathermapNG/api/maps/{map}/sse` | Server-Sent Events live stream |
-| `GET` | `/plugin/WeathermapNG/api/maps/{map}/export` | Export a map |
-| `POST` | `/plugin/WeathermapNG/api/import` | Import a map |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/export?format=json\|conf` | Export a map (JSON or legacy `.conf`) |
+| `POST` | `/plugin/WeathermapNG/api/import` | Import a map (`.json` or `.conf`) |
 | `POST` | `/plugin/WeathermapNG/api/maps/{map}/save` | Save full editor state |
 
 Example live payload shape:
@@ -73,6 +73,106 @@ Example live payload shape:
   }
 }
 ```
+
+## Map JSON Payload (GET /api/maps/{map}/json)
+
+The `json` endpoint and `export?format=json` both return the serialized map model produced by `Map::toJsonModel()`. The shape carries the full node and link graph plus nested-map metadata:
+
+```json
+{
+  "_format": "weathermapng-map-v1",
+  "id": 1,
+  "name": "production_map",
+  "title": "Production Network Map",
+  "parent_map_id": null,
+  "breadcrumb": [
+    {"id": 1, "name": "root_map", "title": "Root Map"}
+  ],
+  "width": 1200,
+  "height": 800,
+  "background": "#ffffff",
+  "options": {},
+  "nodes": [
+    {
+      "id": 1,
+      "label": "Core Router",
+      "x": 400,
+      "y": 300,
+      "device_id": 42,
+      "meta": {},
+      "sub_map_id": null,
+      "device_name": "core-router-01",
+      "status": "up"
+    }
+  ],
+  "links": [
+    {
+      "id": 1,
+      "src": 1,
+      "dst": 2,
+      "port_id_a": 101,
+      "port_id_b": 102,
+      "bandwidth_bps": 1000000000,
+      "style": {},
+      "source_port_name": "Gi0/1",
+      "destination_port_name": "Gi0/2",
+      "bandwidth_formatted": "1 Gbps"
+    }
+  ]
+}
+```
+
+### Nested-map fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parent_map_id` | int\|null | ID of the parent map in the drill-down hierarchy. `null` for a root map. |
+| `breadcrumb` | array | Chain from the root ancestor to the current map, inclusive. Each entry is `{id, name, title}`. Empty only when the map is itself the root. |
+| `sub_map_id` (per-node) | int\|null | If set, clicking this node in the embed view navigates to the sub-map with this ID, preserving query params. `null` means no drill-down. Stored in the node's `meta` JSON. |
+
+## Export (GET /api/maps/{map}/export)
+
+Pass `format` as a query parameter:
+
+- `?format=json` (default) — returns the JSON payload above with `Content-Disposition: attachment; filename="<name>.json"`.
+- `?format=conf` — returns legacy PHP Weathermap-style text with `Content-Type: text/plain; charset=UTF-8` and `Content-Disposition: attachment; filename="<name>.conf"`.
+
+You can also export from the CLI:
+
+```bash
+php artisan weathermapng:export 1 --format=conf
+```
+
+## Import (POST /api/import)
+
+Accepts a multipart file upload. The validator accepts mimes `json`, `txt`, and `conf` (max 10 MB). Dispatch is by file extension:
+
+- `.json` — parsed as JSON (must contain `nodes` and `links` arrays).
+- `.conf` — parsed by `LegacyConfService` into the same internal structure.
+
+Required fields:
+
+```json
+{
+  "name": "imported_map",
+  "title": "Optional display title",
+  "file": "<uploaded .json or .conf file>"
+}
+```
+
+`name` must be unique in `wmng_maps`. `title` falls back to the imported map's title, then to `name`. On success the response is:
+
+```json
+{
+  "success": true,
+  "map_id": 2,
+  "message": "Map imported successfully"
+}
+```
+
+## Client URL parameters
+
+`?debugDots=1|2` is a client-side embed diagnostic parameter, not an API endpoint. It overlays particle-position markers and render-pipeline state on the canvas. Omit it for normal use.
 
 ## Lookup Routes (admin-only)
 

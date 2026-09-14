@@ -18,7 +18,7 @@
 - **Pan & zoom**: Mouse-wheel zoom, drag-to-pan, +/-/Reset buttons, double-click zoom
 - **Hover tooltips**: Node In/Out/Sum traffic; link utilization, bandwidth
 - **RRD graph hover**: Hover a node or link for 300ms to show an inline LibreNMS RRD time-series graph image (device traffic for nodes, port traffic for links). Disabled in kiosk mode; use `?graphs=0` to disable.
-- **Click navigation**: Click a node to open its device page; click a link to open port graphs
+- **Drill-down**: Nodes with a `sub_map_id` navigate to the referenced sub-map when clicked; a breadcrumb bar shows the map hierarchy
 - **Kiosk / NOC wall mode**: Hide all chrome, auto-cycle maps, and control click-through target (see below)
 
 ## Query Parameters
@@ -38,6 +38,7 @@
 | `graphs` | `1` | Show RRD graph hover popups (`0` to disable; auto-disabled in kiosk mode) |
 | `metrics` | `1` | Show CPU/memory utilization overlay on nodes (`0` to disable; controlled by `show_node_metrics` config) |
 | `target` | `_blank` | Where node/link click-through opens: `_blank` (new tab) or `self` (same tab) |
+| `debugDots` | `0` | Diagnostics: `1` draws a magenta cross at each particle position with a transform readout; `2` shows an on-screen panel with full render-pipeline state. Off by default, safe in production |
 
 ## Live Data
 
@@ -74,6 +75,12 @@ Auto-cycle between maps with `?kiosk=1&cycle=30` (cycles every 30 seconds). Maps
   `plugin/WeathermapNG/embed/1?kiosk=1&target=self`
 - Static wall, no cycling:  
   `plugin/WeathermapNG/embed/1?kiosk=1`
+
+## Nested Maps (Drill-Down)
+
+Maps can be arranged in a hierarchy using `parent_map_id`. In the embed view, nodes with a `sub_map_id` in their metadata act as drill-down points: clicking them navigates to the referenced sub-map. All URL query parameters (`kiosk`, `scale`, `metric`, `target`, etc.) are preserved when drilling down.
+
+A breadcrumb bar appears at the top of the viewer when the current map has a parent. Each crumb in the root→current chain is clickable except the last (the current map). The breadcrumb bar is hidden when the map has no parent chain.
 
 ## Tips
 

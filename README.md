@@ -4,7 +4,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
-![Version 1.12.0](https://img.shields.io/badge/version-1.12.0-0078D4)
+![Version 1.13.1](https://img.shields.io/badge/version-1.13.1-0078D4)
 
 ![WeathermapNG Live View](wmng.png)
 
@@ -41,6 +41,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **Legacy Weathermap Import**: Read PHP Weathermap-style `.conf` files (round-trip export included)
 - **Common Topology Templates**: Built-in Data Center, WAN/MPLS, Campus, and Branch Office templates with pre-placed topology
 - **Accessibility**: ARIA labels on icon-only controls, keyboard focus visibility, and form labels across index, editor, and embed views
+- **Render Diagnostics**: `?debugDots=1` overlays particle positions and transform state; `?debugDots=2` adds a full render-pipeline panel (map data, transport, transforms, canvas geometry, browser zoom)
 
 ## Quick Start
 
@@ -56,6 +57,7 @@ sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./qu
 ```
 
 The script installs dependencies, registers the Composer package with LibreNMS, sets up database tables, configures permissions, and enables the plugin. Run it as the `librenms` user — running as root can leave root-owned Composer files behind.
+`just install LIBRENMS_PATH=/opt/librenms` runs the same `quick-install.sh` flow — a thin wrapper for the command above.
 
 ### Docker
 
@@ -98,7 +100,7 @@ Drop a map into any dashboard with an iframe:
 </iframe>
 ```
 
-Optional query parameters: `metric` (`percent`/`in`/`out`/`sum`), `sse=0` (force polling), `nav=0` (disable pan/zoom), `scale=bytes`. See the [Embed Viewer Guide](docs/EMBED.md).
+Optional query parameters: `metric` (`percent`/`in`/`out`/`sum`), `sse=0` (force polling), `nav=0` (disable pan/zoom), `scale=bytes`, `debugDots=1`/`2` (render diagnostics). See the [Embed Viewer Guide](docs/EMBED.md).
 
 ## Troubleshooting
 
@@ -195,12 +197,28 @@ SSE is handled inline in `RenderController::sse` — there is no separate stream
 Common workflows are exposed via [just](https://github.com/casey/just) (`brew install just`):
 
 ```bash
-just check                 # lint + full PHPUnit suite — the "PR-ready" gate
-just visual URL=http://localhost:8000   # screenshots (needs a running stack)
-just dev-up                # docker LibreNMS dev stack with plugin mounted live
-just install LIBRENMS_PATH=/opt/librenms  # full install (thin wrapper)
-just tag v1.13.0           # version bump + changelog + tag + push
+just setup                                       # install PHP/Composer dependencies (idempotent)
+just lint                                        # syntax-check all PHP sources
+just test                                        # full PHPUnit suite (no coverage)
+just test-one LegacyConfServiceTest              # run one test class
+just check                                       # lint + test — the "PR-ready" gate
+just install LIBRENMS_PATH=/opt/librenms          # full plugin install (wraps quick-install.sh)
+just update LIBRENMS_PATH=/opt/librenms           # update an existing install (wraps deploy.sh)
+just validate-install LIBRENMS_PATH=/opt/librenms # post-install deployment check
+just verify                                      # verify plugin structure / install readiness
+just verify-deployment URL=http://localhost:18080 # smoke-check a deployed plugin over HTTP
+just dev-up                                      # docker dev stack with plugin mounted live
+just dev-stop                                    # stop the dev stack (data volumes preserved)
+just dev-reset                                   # reset the dev stack including data volumes (destructive)
+just test-install                                # full docker install test suite
+just test-install-local INSTALL_DIR=/opt/librenms # host-path install test suite
+just visual URL=http://localhost:18080           # render screenshots (needs a running stack)
+just tag v1.13.1                                 # bump VERSION + VersionMetadataTest + tag + push
 ```
+
+`visual` takes `URL` as a recipe parameter; pass `OUTDIR` as an environment variable
+(`OUTDIR=/tmp/shots just visual`) to override the output directory — the recipe's
+two default-quoted parameters suppress inline descriptions in just 1.x.
 
 Run `just --list` for the full recipe list. Each recipe is a thin facade
 over an existing entrypoint (`quick-install.sh`, `deploy.sh`,
