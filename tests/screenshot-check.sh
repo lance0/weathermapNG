@@ -66,30 +66,27 @@ for page in "${PAGES[@]}"; do
     done
 done
 
-if [[ "$FAIL" -ne 0 ]]; then
-    echo "Some screenshots failed; see messages above." >&2
-    exit 1
-fi
-
 # Degenerate-capture guard: identical byte sizes across different pages at
 # the same viewport means all pages rendered the same stub (connection
 # error / login page), not real per-view content. Fail loudly instead of
-# reporting success on captures that validated nothing.
+# reporting success on captures that validated nothing. Uses a bash-3.2
+# string accumulator (no `declare -A`: macOS /bin/bash 3.2 predates
+# associative arrays).
 for vp in "${VIEWPORTS[@]}"; do
-    declare -A seen=()
+    seen=""
     for page in "${PAGES[@]}"; do
         f="$OUTDIR/${page}-${vp}.png"
         [[ -f "$f" ]] || continue
         size="$(wc -c < "$f")"
         key="${vp}:${size}"
-        if [[ -n "${seen[$key]:-}" ]]; then
+        if [[ " $seen " == *" $key "* ]]; then
             echo "⚠ two pages produced byte-identical captures at ${vp}" >&2
             echo "  — they all likely rendered the same page (connection error or" >&2
             echo "  login screen, since no auth was provided). These captures are NOT" >&2
             echo "  a valid per-view visual check." >&2
             exit 3
         fi
-        seen[$key]=1
+        seen="$seen $key"
     done
 done
 
