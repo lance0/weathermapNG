@@ -73,15 +73,12 @@ These are patch-level improvements unless they require new user-facing behavior.
   - ~~Prevent controls, minimap, legend, and map content from overlapping on smaller embeds.~~ *(v1.7.8: responsive offsets)*
   - ~~Add reduced-motion handling for flow animations.~~ *(v1.7.5)*
 
-- [ ] **Index and template gallery polish** *(v1.7.8: escaped template card innerHTML, delegated listener replaces inline onclick, sanitized category class slug, fixed template creation 403/redirect)*
+- [x] **Index and template gallery polish** *(v1.7.8: escaped template card innerHTML, delegated listener replaces inline onclick, sanitized category class slug, fixed template creation 403/redirect; v1.13.0: Data Center, WAN/MPLS, Campus, and Branch Office built-in templates added to all three seed paths)*
   - Replace decorative map-card preview art with real thumbnails or a compact rendered preview. *(deferred)*
   - ~~Convert clickable `div` cards into proper button/link structures.~~ *(v1.7.8: template cards already use `<button>`, replaced inline onclick with delegated listener)*
   - Preserve current search, sort, badges, and map metadata. *(preserved)*
 
-- [ ] **Theme and UI cleanup** *(v1.7.4: narrowed MutationObserver filters; v1.7.8: extracted static inline styles to CSS classes in editor and index views)*
-  - ~~Reduce noisy theme-detection console logging.~~ *(none found)*
-  - ~~Avoid broad mutation observers where a narrower theme hook will work.~~ *(narrowed in v1.7.4)*
-  - ~~Move repeated inline styles toward shared CSS classes.~~ *(v1.7.8: static inline styles extracted in editor.blade.php and index.blade.php; embed.blade.php JS-generated tooltip/legend spans and a few decorative spans remain inline)*
+- [x] **Theme and UI cleanup** *(v1.7.4: narrowed MutationObserver filters; v1.7.8: extracted static inline styles to CSS classes in editor and index views; v1.13.0: embed view's 270-line style block extracted to resources/css/embed.css, ~1500 lines of inline JS extracted to resources/js/embed-app.js, and the accessibility smoke suite added — see v1.13.0 Validation coverage)*
 
 - [x] **LibreNMS hook and legacy view polish**
   - Align hook and compatibility views with LibreNMS Bootstrap button conventions.
@@ -99,7 +96,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Preserve existing delete, restore, cleanup, resize, and undo-aware editor behavior after confirmation.
   - Route editor save errors through toast feedback instead of browser alerts.
 
-- [ ] **Validation coverage** *(moved to v1.8.0)*
+- [x] **Validation coverage** *(v1.13.0: AccessibilitySmokeTest — 12 plain-PHPUnit cases covering aria-labels on icon-only controls, focus outline preservation, accessible form labels, lang/layout inheritance, canvas text alternative; screenshot capture tool tests/screenshot-check.sh + `just visual` for index/editor/embed at 480/768/1920 px with a degenerate-capture guard; `justfile` added as thin facades over the whole validation flow)*
 
 - [x] **Release readiness checklist**
   - Document the exact pre-release validation flow: Composer validate, PHPUnit, install CI, smoke install, changelog, tag, release notes.
@@ -196,24 +193,14 @@ This release should make existing authoring workflows faster and less error-pron
   - ~~Fullscreen toggle with all UI chrome hidden.~~
   - ~~Auto-cycling between maps on a timer.~~
   - ~~The embed view is the foundation — add cycling and fullscreen.~~
-- [ ] **Frontend modularization** *(v1.8.0: wmng-common.js + ui-helpers.js extracted; editor.blade.php now 2733 lines, embed.blade.php 1710 lines — main view JS extraction remains)* *(v1.12.0: editor.blade.php inline JS extracted into resources/js/editor-state.js, editor-canvas.js, editor-nodes.js, editor-links.js, editor-ui.js, editor-versions.js — `var S = window.WMNG.EditorState` shared state, no build step — editor view down to ~610 lines; CSS extraction and embed view JS modularization remain)*
-  - ~~Extract `editor.blade.php` (~3000 lines / ~87 functions) inline JS into separate JS modules.~~ *(v1.12.0: extracted into resources/js editor-*.js modules)*
-  - Split canvas rendering, interaction handling, live-update logic into modules. *(v1.12.0: done — editor-canvas.js, editor-nodes.js, editor-links.js, editor-ui.js)*
-  - ~~Plain ES modules or IIFE namespaces — no build step required.~~ *(v1.12.0: classic scripts sharing `window.WMNG.EditorState`)*
-  - Extract the inline CSS used by the editor templates into classes/stylesheets. *(CSS extraction still open)*
-  - Modularize `embed.blade.php` inline JS. *(still open)*
-  - *Not a user-facing feature but a prerequisite for feature delivery.*
+- [x] **Frontend modularization** *(v1.8.0: wmng-common.js + ui-helpers.js extracted; v1.12.0: editor.blade.php inline JS extracted into resources/js/editor-*.js modules — `var S = window.WMNG.EditorState` shared state, no build step; v1.13.0: embed.blade.php's ~1500 lines of JS extracted into resources/js/embed-app.js with `window.WMNG.EmbedConfig`/`EmbedData` server-rendered bootstrap, and its 270-line style block into resources/css/embed.css — embed view 2062→113 lines, editor view 610 lines)*
 
-- [ ] **Map Templates Gallery Refinement** *(stretch goal)*
-  - Add or refine common topology templates: data center, WAN/MPLS, campus, branch office.
-  - Template CRUD backend already exists (`MapTemplateController`). New templates are seeding work.
-  - Accessibility and preview quality improvements mostly done per v1.7.8.
+- [x] **Map Templates Gallery Refinement** *(v1.13.0: four common topology templates — Data Center, WAN/MPLS, Campus, Branch Office — added to all three seed paths: setup.php Laravel + PDO variants and the Laravel seeder; each has real node/link topology with hand-placed coordinates. Template CRUD backend pre-existing per `MapTemplateController`.)*
 
-- [ ] **Validation coverage** *(moved from stale v1.6.x)*
-  - Add screenshot checks for the index, editor, and embed view at representative viewport sizes.
-  - Add an accessibility smoke test for obvious regressions.
-  - Keep Composer, install, route, and version metadata checks green.
+- [x] **Validation coverage** *(v1.13.0: AccessibilitySmokeTest, screenshot-check.sh tool + `just visual`, justfile — see v1.6.x Validation coverage above for the full list)*
+
 ---
+
 
 ## Medium Term
 ### v1.9.0 - Discovery, Operator Integration & Advanced Data
@@ -339,10 +326,7 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - PDF export.
   - Visio/draw.io format if there is enough demand.
 
-- [ ] **Config file import/export** *(v1.11.0: JSON export has `_format` version stamp, import form auto-fills name/title from JSON, `Map::createFromJsonData()` extracted for reuse — legacy `.conf` format still TODO)*
-  - ~~Export maps to JSON~~ *(done: server endpoint + client-side + CLI `weathermapng:export`)*
-  - Export maps to legacy `.conf` text format for version control, scripting, and migration. *(still TODO)*
-  - ~~Import maps from config files~~ *(done: JSON import via `/api/import` and CLI; legacy `.conf` import still TODO)*
+- [x] **Config file import/export** *(v1.11.0: JSON export with `_format` version stamp, import form auto-fills name/title from JSON, `Map::createFromJsonData()` extracted for reuse; v1.13.0: legacy `.conf` format via new `LegacyConfService` — round-trippable parser, HTTP export via `?format=conf`, CLI `--format=conf`, and import via the existing modal (extension-dispatched in `MapService::importMap`) with 9 test cases)*
   - *Not visual export — enables portability and automation.*
 - [ ] **Scheduled Reports**
   - Daily/weekly snapshots.

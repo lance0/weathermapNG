@@ -51,6 +51,26 @@ if (!function_exists('embed_source')) {
     }
 }
 
+/**
+ * Combined index source for JS-content tests.
+ *
+ * The index view's JS (v1.13.0) and CSS were extracted into
+ * resources/js/index-app.js and resources/css/index.css. Tests asserting
+ * index behavior must load the Blade template plus the extracted module.
+ */
+if (!function_exists('index_source')) {
+    function index_source(): string
+    {
+        $base = __DIR__ . '/../';
+        $src = file_get_contents($base . 'resources/views/index.blade.php');
+        $src .= "\n// ==== index-app.js ====\n" . file_get_contents($base . 'resources/js/index-app.js');
+        $src .= "\n// ==== index.css ====\n" . file_get_contents($base . 'resources/css/index.css');
+
+        return $src;
+    }
+}
+
+
 // Shim Laravel's config() helper used by lib classes
 if (!function_exists('config')) {
     function config($key = null, $default = null) {

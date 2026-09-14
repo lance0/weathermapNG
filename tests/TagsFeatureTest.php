@@ -18,7 +18,7 @@ class TagsFeatureTest extends TestCase
         $this->mapModel = file_get_contents(__DIR__ . '/../src/Models/Map.php');
         $this->saveRequest = file_get_contents(__DIR__ . '/../src/Http/Requests/SaveMapRequest.php');
         $this->mapService = file_get_contents(__DIR__ . '/../src/Services/MapService.php');
-        $this->indexView = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
+        $this->indexView = index_source();
         $this->editorView = editor_source();
     }
 
