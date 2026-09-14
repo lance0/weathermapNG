@@ -52,7 +52,7 @@ class UIPolishTest extends TestCase
     public function test_editor_theme_detection_has_no_debug_logging_or_head_observer(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
-        $indexContent = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
+        $indexContent = index_source();
 
         $this->assertStringNotContainsString('console.log', $content);
         $this->assertStringNotContainsString('observer.observe(document.head', $content);
@@ -84,7 +84,7 @@ class UIPolishTest extends TestCase
 
     public function test_template_cards_use_button_semantics_without_nested_button(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
+        $content = index_source();
 
         $this->assertStringContainsString('<button type="button" class="template-card"', $content);
         $this->assertStringContainsString('aria-label="Use template', $content);
@@ -200,7 +200,7 @@ class UIPolishTest extends TestCase
 
     public function test_active_index_and_editor_use_bootstrap_confirmation_modals(): void
     {
-        $index = file_get_contents(__DIR__ . '/../resources/views/index.blade.php');
+        $index = index_source();
         $editor = editor_source();
         $this->assertStringContainsString('id="deleteMapModal"', $index);
         $this->assertStringContainsString('id="confirmDeleteMapBtn"', $index);

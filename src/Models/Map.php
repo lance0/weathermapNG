@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Log;
 class Map extends Model
 {
     protected $table = 'wmng_maps';
-    protected $fillable = ['name', 'title', 'options'];
+    protected $fillable = ['name', 'title', 'description', 'parent_map_id', 'options'];
     protected $casts = ['options' => 'array'];
 
     public function nodes()
@@ -20,6 +20,43 @@ class Map extends Model
     public function links()
     {
         return $this->hasMany(Link::class);
+    }
+
+    /** Parent map (for nested maps / drill-down hierarchy). */
+    public function parentMap()
+    {
+        return $this->belongsTo(Map::class, 'parent_map_id');
+    }
+
+    /** Child (sub-)maps. */
+    public function childMaps()
+    {
+        return $this->hasMany(Map::class, 'parent_map_id');
+    }
+
+    /**
+     * Breadcrumb chain from the root ancestor to this map, inclusive.
+     * Walks up via parent_map_id using an iterative query loop so it works
+     * on engines without recursive CTEs (SQLite, older MySQL < 8).
+     * Depth is bounded to prevent infinite loops on corrupt data (cycles).
+     */
+    public function breadcrumb(): array
+    {
+        $chain = [];
+        $current = $this;
+        $depth = 0;
+        $MAX_DEPTH = 20;
+
+        while ($current && $depth <= $MAX_DEPTH) {
+            array_unshift($chain, ['id' => $current->id, 'name' => $current->name, 'title' => $current->title]);
+            if ($current->parent_map_id === null) {
+                break;
+            }
+            $current = self::find($current->parent_map_id);
+            $depth++;
+        }
+
+        return $chain;
     }
 
     public function getWidthAttribute()
@@ -78,6 +115,8 @@ class Map extends Model
             'id' => $this->id,
             'name' => $this->name,
             'title' => $this->title,
+            'parent_map_id' => $this->parent_map_id,
+            'breadcrumb' => $this->breadcrumb(),
             'width' => $this->width,
             'height' => $this->height,
             'background' => $this->background,
@@ -89,6 +128,7 @@ class Map extends Model
                 'y' => $n->y,
                 'device_id' => $n->device_id,
                 'meta' => $n->meta,
+                'sub_map_id' => $n->sub_map_id,
                 'device_name' => $n->device_name,
                 'status' => $n->status,
             ])->toArray(),

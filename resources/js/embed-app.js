@@ -142,6 +142,7 @@ const CFG = window.WMNG.EmbedConfig || {};
     
     document.addEventListener('DOMContentLoaded', function() {
         initCanvas();
+        renderBreadcrumb();
         initKioskMode();
         // Sync flow toggle button with prefers-reduced-motion default
         const _flowBtn = document.getElementById('toggle-flow');
@@ -1622,6 +1623,11 @@ const CFG = window.WMNG.EmbedConfig || {};
         for (const g of nodeGeoms) {
             if (Math.hypot(mx - g.x, my - g.y) <= g.r + 4) {
                 const n = g.node;
+                // Sub-map drill-down takes priority over device click-through.
+                if (n.sub_map_id) {
+                    navigateToSubMap(n.sub_map_id);
+                    return;
+                }
                 const did = n.device_id || n.deviceId || n.deviceid;
                 if (did) {
                     const url = deviceBaseUrl + '/' + did;
@@ -1720,3 +1726,77 @@ const CFG = window.WMNG.EmbedConfig || {};
         // Border
         ctxm.strokeStyle = '#ccc'; ctxm.strokeRect(0,0,w,h);
     }
+
+// ===== Nested maps / drill-down navigation =====
+
+function navigateToSubMap(subMapId) {
+    if (!subMapId) return;
+    const url = new URL(window.location.href);
+    // Swap the map id in the embed path, preserving query params (kiosk,
+    // scale, sse, etc.). The embed URL shape is /plugin/WeathermapNG/embed/{id}.
+    const parts = url.pathname.split('/');
+    const embedIdx = parts.lastIndexOf('embed');
+    if (embedIdx !== -1 && embedIdx < parts.length - 1) {
+        parts[embedIdx + 1] = String(subMapId);
+        url.pathname = parts.join('/');
+        window.location.assign(url.toString());
+    } else {
+        // Fallback: unknown URL shape — navigate to the plugin embed root.
+        window.location.assign(`${baseUrl}/plugin/WeathermapNG/embed/${subMapId}`);
+    }
+}
+
+function renderBreadcrumb() {
+    const bar = document.getElementById('breadcrumb-bar');
+    if (!bar) return;
+    const crumb = mapData.breadcrumb;
+    const parentId = mapData.parent_map_id;
+    if (!Array.isArray(crumb) || crumb.length < 2) {
+        // No hierarchy — hide unless there's a parent link to go back to.
+        bar.hidden = !(typeof parentId === 'number' && parentId > 0);
+        if (!bar.hidden && parentId) {
+            bar.innerHTML = `<a href="#" data-crumb-id="${parentId}">↑ Parent map</a>`;
+        }
+        return;
+    }
+    const html = crumb.map((c, i) => {
+        const isLast = i === crumb.length - 1;
+        return isLast
+            ? `<span class="crumb-here">${escapeHtml(c.title || c.name)}</span>`
+            : `<a href="#" data-crumb-id="${c.id}">${escapeHtml(c.title || c.name)}</a><span class="crumb-sep">›</span>`;
+    }).join('');
+    bar.innerHTML = html;
+    bar.hidden = false;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const bar = document.getElementById('breadcrumb-bar');
+    if (!bar) return;
+    bar.addEventListener('click', (e) => {
+        const link = e.target.closest('a[data-crumb-id]');
+        if (!link) return;
+        e.preventDefault();
+        navigateToSubMap(parseInt(link.dataset.crumbId, 10));
+    });
+    // Breadcrumb is rendered after mapData is populated. In the normal flow
+    // initCanvas() runs after mapData load; call it from DOMContentLoaded too
+    // so polling-only flows still show the bar.
+    if (mapData && (mapData.breadcrumb || mapData.parent_map_id)) {
+        renderBreadcrumb();
+    }
+});
+
+const _origApplyLiveUpdate = typeof applyLiveUpdate === 'function' ? applyLiveUpdate : null;
+// Render the breadcrumb after the first map data build regardless of transport.
+document.addEventListener('DOMContentLoaded', () => {
+    const orig = fetchMapData;
+    fetchMapData = function (...args) {
+        const res = orig.apply(this, args);
+        if (res && typeof res.then === 'function') {
+            res.then(() => renderBreadcrumb()).catch(() => {});
+        } else {
+            renderBreadcrumb();
+        }
+        return res;
+    };
+});

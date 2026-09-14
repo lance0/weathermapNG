@@ -26,6 +26,7 @@
                 </a>
             </div>
         </div>
+        <nav id="breadcrumb-bar" class="embed-breadcrumb" aria-label="Map hierarchy" hidden></nav>
         <div id="loading" class="loading">
             <i class="fas fa-spinner fa-spin"></i>
             <div>Loading map...</div>

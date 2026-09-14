@@ -458,6 +458,14 @@ try {
                 echo "✓ Added 'title' column to 'wmng_maps'\n";
             }
 
+            if (!Schema::hasColumn('wmng_maps', 'parent_map_id')) {
+                Schema::table('wmng_maps', function (Blueprint $t) {
+                    $t->unsignedBigInteger('parent_map_id')->nullable()->after('description');
+                    $t->index('parent_map_id');
+                });
+                echo "✓ Added 'parent_map_id' column to 'wmng_maps' (nested maps)\n";
+            }
+
             normalizePluginRegistration();
             echo "\n✅ All tables already exist and are up to date.\n";
             exit(0);
@@ -519,6 +527,8 @@ try {
                 $t->string('name')->unique();
                 $t->string('title')->nullable();
                 $t->text('description')->nullable();
+                $t->unsignedBigInteger('parent_map_id')->nullable();
+                $t->index('parent_map_id');
                 $t->integer('width')->default(800);
                 $t->integer('height')->default(600);
                 $t->json('options')->nullable();
@@ -626,6 +636,12 @@ try {
                 $pdo->exec("ALTER TABLE `wmng_maps` ADD COLUMN `title` varchar(255) DEFAULT NULL AFTER `name` ");
                 echo "✓ Added 'title' column to 'wmng_maps' (Direct SQL)\n";
             }
+
+            $pmid = $pdo->query("SHOW COLUMNS FROM `wmng_maps` LIKE 'parent_map_id'")->fetchAll();
+            if (empty($pmid)) {
+                $pdo->exec("ALTER TABLE `wmng_maps` ADD COLUMN `parent_map_id` bigint unsigned DEFAULT NULL AFTER `description`, ADD INDEX `wmng_maps_parent_map_id_index` (`parent_map_id`)");
+                echo "✓ Added 'parent_map_id' column to 'wmng_maps' (Direct SQL, nested maps)\n";
+            }
             normalizePluginRegistration($pdo);
             echo "✅ All tables already exist and are up to date (Direct SQL method).\n";
             exit(0);
@@ -689,20 +705,20 @@ try {
 
         echo "Creating database tables using direct SQL...\n\n";
 
-        // Create tables using direct SQL
         $sql = "
         CREATE TABLE IF NOT EXISTS `wmng_maps` (
           `id` bigint unsigned NOT NULL AUTO_INCREMENT,
           `name` varchar(255) NOT NULL,
           `title` varchar(255) DEFAULT NULL,
           `description` text,
+          `parent_map_id` bigint unsigned DEFAULT NULL,
           `width` int NOT NULL DEFAULT 800,
           `height` int NOT NULL DEFAULT 600,
           `options` json DEFAULT NULL,
           `created_at` timestamp NULL DEFAULT NULL,
           `updated_at` timestamp NULL DEFAULT NULL,
-          PRIMARY KEY (`id`),
-          UNIQUE KEY `wmng_maps_name_unique` (`name`)
+          UNIQUE KEY `wmng_maps_name_unique` (`name`),
+          KEY `wmng_maps_parent_map_id_index` (`parent_map_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
         CREATE TABLE IF NOT EXISTS `wmng_nodes` (

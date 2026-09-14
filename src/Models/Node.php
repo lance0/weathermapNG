@@ -25,6 +25,29 @@ class Node extends Model
     }
 
     /**
+     * The sub-map this node drills down into, if any. Stored in the node's
+     * `meta` JSON as `sub_map_id`; null means the node has no drill-down.
+     * Callers validate against the wmng_maps table on assignment.
+     */
+    public function getSubMapIdAttribute(): ?int
+    {
+        $v = data_get($this->meta, 'sub_map_id');
+
+        return is_numeric($v) ? (int) $v : null;
+    }
+
+    public function setSubMapIdAttribute(?int $id): void
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        if ($id === null) {
+            unset($meta['sub_map_id']);
+        } else {
+            $meta['sub_map_id'] = $id;
+        }
+        $this->meta = $meta;
+    }
+
+    /**
      * Prefetch a set of devices in a single query and cache their array forms.
      *
      * @param array<int> $deviceIds

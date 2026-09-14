@@ -3,6 +3,20 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Common topology templates**: Data Center, WAN/MPLS, Campus, and Branch Office built-in map templates. Added to every seeding path — `database/setup.php` Laravel + PDO variants (used by fresh installs and upgrades) and `database/seeds/MapTemplateSeeder.php`. Node and link coordinates are identical across all three.
+- **Legacy `.conf` import/export**: New `LegacyConfService` parses and writes the PHP Weathermap-style text format (see `config/maps/example.conf`). Import accepts `.conf` uploads through the existing import modal; export via the map endpoint's `?format=conf` or `weathermapng:export --format=conf`. The parser records `interface_id` and `metric` into node meta, clamps canvas dimensions to editor bounds, and rejects duplicate node sections or links referencing unknown nodes. Nine new test cases.
+- **Accessibility smoke test**: New 12-case `AccessibilitySmokeTest` runs in plain PHPUnit (no browser needed) — icon-only controls must have `aria-label`, no global `outline: none`, every button needs an accessible name or visible text, form inputs need `<label for>` or their own `aria-label`, the embed document declares `lang="en"`, baseline views extend the LibreNMS layout, index modals use `role="dialog"`, and the embed map canvas carries a programmatic text alternative (added in this release).
+- **Screenshot capture tool**: `tests/screenshot-check.sh` renders index, editor, and embed at 480×800, 768×1024, and 1920×1080 via headless Chromium. The tool fails loudly (exit 3) when different pages produce byte-identical captures — the signature of every view rendering the same login/connection-error stub — so a degenerate run cannot be mistaken for a validated visual check. Run via `just visual`.
+- **`just` task runner**: New justfile with setup, lint, test, test-one, check, visual, test-install, test-install-host-librenms, verify, verify-deployment, and tag recipes. Thin facades over the existing entrypoints (tests/docker-test.sh, tests/install-test.sh, verify.php, RELEASE.md tag flow); only `setup` contains its own logic.
+
+### Changed
+- **Embed view modularization**: `embed.blade.php` reduced from 2062 to 113 lines. The static `<style>` block (~270 lines) moved to `resources/css/embed.css`; the inline JS (~1500 lines) moved to `resources/js/embed-app.js`. The Blade template now contains only the server-rendered bootstrap (`window.WMNG.EmbedConfig` / `EmbedData`) and one `<script src>` tag — the same pattern as the v1.12.0 editor extraction. During extraction `graphBaseUrl` and `deviceBaseUrl` were not sourced from `EmbedConfig`, which would have broken RRD graph hover popups and link click-through at runtime; both now read from server-rendered config, pinned by a static test.
+- **Roadmap reconciliation**: closed out template gallery refinement, theme/UI cleanup, validation coverage, frontend modularization, and config-file import/export entries; replaced the stale "moved to v1.8.0" validation coverage marker with the v1.13.0 actuals.
+
+
 ## [1.12.0] - 2026-08-05
 
 ### Added
