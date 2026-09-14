@@ -43,6 +43,14 @@ const CFG = window.WMNG.EmbedConfig || {};
         let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
         let graphsEnabled = param('graphs', '1') !== '0' && !WMNG_CONFIG.kioskEnabled;
         let nodeMetricsEnabled = param('metrics', WMNG_CONFIG.show_node_metrics ? '1' : '0') !== '0';
+        // ?debugDots=1 — diagnostic overlay: draws a small cross at each
+        // particle's computed pixel position (plus transform values in the
+        // corner). If crosses hug the lines but the particles don't, the bug
+        // is in the render/compositing layer of the viewer's environment;
+        // if crosses sit off-line too, the math itself is wrong. Added after
+        // a user report showed dots off-line in ways headless tests could
+        // never reproduce.
+        let debugDots = param('debugDots', '0') !== '0';
         let eventSourceRef = null;
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
@@ -372,6 +380,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             }
         }
         overlayCtx.restore();
+        if (debugDots) drawDebugTransformCenter(overlayCtx, viewScale);
     }
 
     function initKioskMode() {
@@ -981,6 +990,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             drawCtx.fill();
             drawCtx.globalAlpha = particle.opacity;
             drawCtx.fillStyle = '#40ff40';
+            if (debugDots) drawDebugCross(drawCtx, pos);
             drawCtx.beginPath();
             drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
             drawCtx.fill();
@@ -1001,12 +1011,45 @@ const CFG = window.WMNG.EmbedConfig || {};
             drawCtx.fill();
             drawCtx.globalAlpha = particle.opacity;
             drawCtx.fillStyle = '#40a0ff';
+            if (debugDots) drawDebugCross(drawCtx, pos);
             drawCtx.beginPath();
             drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
             drawCtx.fill();
             });
         }
+    }
+
+    /**
+     * Diagnostic cross at a canvas point (same coordinate space as the
+     * particles). ?debugDots=1. Bright magenta so it can't be confused with
+     * any flow color. If the crosses sit on the lines while the particles
+     * don't, the viewer's environment is compositing the overlay canvas
+     * off-position; if the crosses are off too, the geometry math is wrong.
+     */
+    function drawDebugCross(drawCtx, pos) {
+        drawCtx.save();
+        drawCtx.globalAlpha = 1;
+        drawCtx.strokeStyle = '#ff00ff';
+        drawCtx.lineWidth = 1;
+        drawCtx.beginPath();
+        drawCtx.moveTo(pos.x - 7, pos.y);
+        drawCtx.lineTo(pos.x + 7, pos.y);
+        drawCtx.moveTo(pos.x, pos.y - 7);
+        drawCtx.lineTo(pos.x, pos.y + 7);
+        drawCtx.stroke();
         drawCtx.restore();
+    }
+
+    // Overlay debug readout: transform + canvas metrics, top-left. Re-rendered
+    // with the static frame so it tracks resizes.
+    function drawDebugTransformCenter(ctx, s) {
+        if (!debugDots) return;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.font = '11px monospace';
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillText('debug: scale=' + s.toFixed(3) + ' ox=' + Math.round(viewOffsetX) + ' oy=' + Math.round(viewOffsetY) + ' dpr=' + window.devicePixelRatio, 8, 14);
+        ctx.restore();
     }
 
     const defaultNodeStyle = mapData.options?.default_node_style || {};
