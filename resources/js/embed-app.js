@@ -114,6 +114,12 @@ const CFG = window.WMNG.EmbedConfig || {};
     rebuildNodeIndex();
     let canvas, ctx, overlayCanvas, overlayCtx, minimap;
     let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
+    // Transform snapshot of the last static frame — renderOverlay composes
+    // dynamic content (flow particles, debug crosses) at this transform so
+    // both layers always share one geometry, even if pan/zoom/SSE mutates
+    // the module-level transform values between the static draw and the
+    // overlay draw.
+    let lastFrameTransform = { scale: 1, ox: 0, oy: 0 };
     let staticDirty = true;
     let hasActiveTraffic = false;
     let animationId;
@@ -187,13 +193,17 @@ const CFG = window.WMNG.EmbedConfig || {};
     });
 
     function syncOverlayCanvas() {
-        // Position and size the overlay canvas to exactly match the main canvas.
-        // The main canvas is flex-centered inside #map-container, so we mirror
-        // its rendered offset rather than assuming top-left alignment.
-        const rect = canvas.getBoundingClientRect();
-        const containerRect = canvas.parentElement.getBoundingClientRect();
-        overlayCanvas.style.left = (rect.left - containerRect.left) + 'px';
-        overlayCanvas.style.top = (rect.top - containerRect.top) + 'px';
+        // Both canvases are position:absolute at 0,0. Copy bitmap + CSS
+        // size only — do not derive left/top from getBoundingClientRect.
+        // That measurement is wrong while #loading is still an in-flow
+        // flex sibling (it shoves the map canvas sideways by half the
+        // spinner width), and the overlay then stays stuck at that
+        // offset after loading is hidden. That's what put flow dots
+        // ~29px off every link.
+        overlayCanvas.style.left = '0';
+        overlayCanvas.style.top = '0';
+        overlayCanvas.style.width = canvas.clientWidth + 'px';
+        overlayCanvas.style.height = canvas.clientHeight + 'px';
         overlayCanvas.width = canvas.width;
         overlayCanvas.height = canvas.height;
     }
@@ -204,15 +214,15 @@ const CFG = window.WMNG.EmbedConfig || {};
         overlayCanvas = document.getElementById('overlay-canvas');
         overlayCtx = overlayCanvas.getContext('2d');
 
-        // Set canvas size
+        // Hide the in-flow loader before measuring the container so it
+        // cannot offset the map canvas (or any leftover overlay math).
+        document.getElementById('loading').style.display = 'none';
+
         const container = document.getElementById('map-container');
         canvas.width = container.clientWidth;
         canvas.height = container.clientHeight;
         syncOverlayCanvas();
         minimap = document.getElementById('minimap');
-
-        // Hide loading
-        document.getElementById('loading').style.display = 'none';
         const bgUrl = mapData.options?.background_image;
         if (bgUrl) {
             bgImg = new Image();
@@ -322,6 +332,15 @@ const CFG = window.WMNG.EmbedConfig || {};
         viewOffsetX = baseOffsetX + userOffsetX;
         viewOffsetY = baseOffsetY + userOffsetY;
 
+        // Snapshot for the overlay layer: renderOverlay always composes the
+        // dynamic layer at the SAME transform the static frame was drawn
+        // with, even if pan/zoom/SSE mutates the globals before the overlay
+        // actually paints. Divergence between the two layers here is what
+        // makes flow dots float off their line on some machines. (Fix for
+        // the "pulses aren't on the lines" report that reproduced only in
+        // the reporter's browser.)
+        lastFrameTransform = { scale: viewScale, ox: viewOffsetX, oy: viewOffsetY };
+
         ctx.save();
         ctx.translate(viewOffsetX, viewOffsetY);
         ctx.scale(viewScale, viewScale);
@@ -348,8 +367,8 @@ const CFG = window.WMNG.EmbedConfig || {};
         // Static layer is now current; only the overlay needs per-frame work.
         staticDirty = false;
 
-        // Draw dynamic overlay (particles / dash animation) immediately so a
-        // single renderMap() call (e.g. from pan/zoom) shows a complete frame.
+        // Draw dynamic overlay immediately so a single renderMap() call
+        // (e.g. from pan/zoom) shows a complete frame.
         renderOverlay();
 
         // Update status and overlays
@@ -363,8 +382,8 @@ const CFG = window.WMNG.EmbedConfig || {};
         if (!mapData || !mapData.links) return;
         overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         overlayCtx.save();
-        overlayCtx.translate(viewOffsetX, viewOffsetY);
-        overlayCtx.scale(viewScale, viewScale);
+        overlayCtx.translate(lastFrameTransform.ox, lastFrameTransform.oy);
+        overlayCtx.scale(lastFrameTransform.scale, lastFrameTransform.scale);
         const vr = worldViewRect();
         if (Array.isArray(mapData.links)) {
             for (const link of mapData.links) {
@@ -1017,6 +1036,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             drawCtx.fill();
             });
         }
+        drawCtx.restore();
     }
 
     /**
@@ -1039,6 +1059,19 @@ const CFG = window.WMNG.EmbedConfig || {};
         drawCtx.stroke();
         drawCtx.restore();
     }
+    // Overlay debug readout: transform + canvas metrics. Drawn in the
+    // canvas's own coordinate space (identity transform) so it doesn't
+    // track pan/zoom. Debug-only.
+    function drawDebugTransformCenter(ctx, s) {
+        if (!debugDots) return;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.font = '11px monospace';
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillText('debug: scale=' + s.toFixed(3) + ' ox=' + Math.round(viewOffsetX) + ' oy=' + Math.round(viewOffsetY) + ' dpr=' + window.devicePixelRatio, 8, 14);
+        ctx.restore();
+    }
+
 
     // On-screen diagnostic panel — ?debugDots=2. Dumps the whole render
     // (map data, live attachment, transport, RAF, transforms, canvas sizes)

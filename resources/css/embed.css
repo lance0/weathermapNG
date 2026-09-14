@@ -15,13 +15,16 @@
         justify-content: center;
     }
 
-    #map-canvas {
+    #map-canvas,
+    #overlay-canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
         border: none;
         display: block;
     }
 
     #overlay-canvas {
-        position: absolute;
         pointer-events: none;
     }
 
