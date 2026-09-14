@@ -85,7 +85,6 @@ test-install:
 test-install-local INSTALL_DIR="/opt/librenms":
     bash tests/install-test.sh {{INSTALL_DIR}}
 
-# ===== Visual + release =====
 
 # Render index/editor/embed screenshots. OUTDIR override is an env var.
 visual URL="http://localhost:18080":
