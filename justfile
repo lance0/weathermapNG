@@ -94,11 +94,15 @@ visual URL="http://localhost:18080":
 verify-deployment URL="http://localhost:18080":
     {{PHP}} verify-deployment.php {{URL}}
 
-# Release: version bump + changelog commit + tag + push (see RELEASE.md)
+# Release: bump VERSION if needed, then tag + push (see RELEASE.md).
 tag version:
+    #!/usr/bin/env bash
+    set -euo pipefail
     echo "$(sed 's/^v//' <<< '{{version}}')" > VERSION
     {{VENDOR_BIN}}/phpunit tests/VersionMetadataTest.php
-    git add VERSION CHANGELOG.md
-    git commit -m "v{{version}}: release"
+    if ! git diff --quiet -- VERSION; then
+        git add VERSION
+        git commit -m "v{{version}}: bump VERSION for release"
+    fi
     git tag -a "v{{version}}" -m "v{{version}}"
     git push origin main "v{{version}}"
