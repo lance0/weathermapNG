@@ -1,11 +1,11 @@
 @extends('layouts.librenmsv1')
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/weathermapng.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/loading.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/toast.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/a11y.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/index.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/weathermapng.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/loading.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/toast.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/a11y.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/index.css') }}">
 @endpush
 
 @section('title', 'WeathermapNG - Network Maps')
@@ -370,9 +370,9 @@
 @endsection
 
 @section('scripts')
-<script src="{{ asset('plugins/WeathermapNG/resources/js/wmng-common.js') }}"></script>
-<script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/index.css') }}">
+<script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/wmng-common.js') }}"></script>
+<script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/ui-helpers.js') }}"></script>
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/index.css') }}">
 <script>
     // Server-rendered bootstrap: URLs the index JS actions call.
     window.WMNG = window.WMNG || {};
@@ -389,5 +389,5 @@
         WMNG.observeTheme('.wmng-index');
     }
 </script>
-<script src="{{ asset('plugins/WeathermapNG/resources/js/index-app.js') }}"></script>
+<script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/index-app.js') }}"></script>
 @endsection

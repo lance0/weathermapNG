@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WeathermapNG - {{ $mapId }}</title>
-    <link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/embed.css') }}">
+    <link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/embed.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -109,6 +109,6 @@
             liveData: @json($liveData ?? []),
         };
     </script>
-    <script src="{{ asset('plugins/WeathermapNG/resources/js/embed-app.js') }}"></script>
+    <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/embed-app.js') }}"></script>
 </body>
 </html>
