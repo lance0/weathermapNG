@@ -211,10 +211,15 @@ class MapService
         }
 
         $content = file_get_contents($file->getRealPath());
-        $data = json_decode($content, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \InvalidArgumentException('Invalid JSON in map file: ' . json_last_error_msg());
+        if ($file->getClientOriginalExtension() === 'conf') {
+            $data = (new LegacyConfService())->parse($content, $validated['name']);
+        } else {
+            $data = json_decode($content, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \InvalidArgumentException('Invalid JSON in map file: ' . json_last_error_msg());
+            }
         }
 
         if (!$data || !isset($data['nodes']) || !isset($data['links'])) {
@@ -230,7 +235,7 @@ class MapService
 
                 $map = Map::create([
                     'name' => $validated['name'],
-                    'title' => $validated['title'] ?? $validated['name'],
+                    'title' => $validated['title'] ?? ($data['title'] ?? $validated['name']),
                     'options' => $options,
                 ]);
 
@@ -244,6 +249,7 @@ class MapService
             throw new \RuntimeException("Failed to import map: " . $e->getMessage(), 0, $e);
         }
     }
+
 
     /**
      * Produce a per-map data-integrity report for the admin diagnostics screen.

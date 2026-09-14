@@ -34,7 +34,7 @@ class DefaultStylesFeatureTest extends TestCase
 
     public function test_embed_render_uses_default_styles(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/embed.blade.php');
+        $content = embed_source();
         $this->assertStringContainsString('defaultNodeStyle', $content);
         $this->assertStringContainsString('defaultLinkStyle', $content);
         $this->assertStringContainsString('defaultNodeStyle.color', $content);

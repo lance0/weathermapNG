@@ -8,7 +8,7 @@ class UIPolishTest extends TestCase
 {
     public function test_embed_controls_do_not_contain_malformed_buttons_or_removed_focus(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/embed.blade.php');
+        $content = embed_source();
 
         $this->assertStringNotContainsString('</nbutton>', $content);
         $this->assertStringNotContainsString("replaceAll('\\nbutton'", $content);
@@ -19,7 +19,7 @@ class UIPolishTest extends TestCase
 
     public function test_embed_controls_have_button_types_and_accessible_names(): void
     {
-        $content = file_get_contents(__DIR__ . '/../resources/views/embed.blade.php');
+        $content = embed_source();
 
         foreach (['toggle-transport', 'toggle-flow', 'viz-settings', 'export-png'] as $id) {
             $this->assertMatchesRegularExpression(

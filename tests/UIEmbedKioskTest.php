@@ -11,7 +11,7 @@ class UIEmbedKioskTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->content = file_get_contents(__DIR__ . '/../resources/views/embed.blade.php');
+        $this->content = embed_source();
     }
 
     public function test_embed_passes_kiosk_config_to_js(): void
@@ -20,8 +20,18 @@ class UIEmbedKioskTest extends TestCase
         $this->assertStringContainsString("cycleSeconds: @json(\$cycleSeconds)", $this->content);
         $this->assertStringContainsString("linkTarget: @json(\$target)", $this->content);
         $this->assertStringContainsString("mapList: @json(\$mapList ?? [])", $this->content);
-        $this->assertStringContainsString("mapData = @json(\$mapData ?? [])", $this->content);
-        $this->assertStringContainsString("initialLive = @json(\$liveData ?? [])", $this->content);
+        $this->assertStringContainsString("mapData: @json(\$mapData ?? [])", $this->content);
+        $this->assertStringContainsString("liveData: @json(\$liveData ?? [])", $this->content);
+    }
+
+    public function test_embed_app_module_declares_config_sourced_globals(): void
+    {
+        // The extracted module must source all server values from
+        // window.WMNG.EmbedConfig — including graphBaseUrl, which feeds the
+        // RRD graph hover popups and link click-through.
+        $app = file_get_contents(__DIR__ . '/../resources/js/embed-app.js');
+        $this->assertStringContainsString("const graphBaseUrl = CFG.graphBaseUrl ?? '';", $app);
+        $this->assertStringContainsString("const deviceBaseUrl = CFG.deviceBaseUrl ?? '';", $app);
     }
 
     public function test_embed_includes_kiosk_mode_styles(): void
