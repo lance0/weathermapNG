@@ -50,7 +50,7 @@ const CFG = window.WMNG.EmbedConfig || {};
         // if crosses sit off-line too, the math itself is wrong. Added after
         // a user report showed dots off-line in ways headless tests could
         // never reproduce.
-        let debugDots = param('debugDots', '0') !== '0';
+        let debugDots = param('debugDots', '0'); // '' | '1' (crosses + readout) | '2' (full panel)
         let eventSourceRef = null;
         let sseReconnectAttempts = 0;
         const maxReconnectAttempts = 5;
