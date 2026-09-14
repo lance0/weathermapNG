@@ -4,6 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Controllers;
 
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
+use LibreNMS\Plugins\WeathermapNG\Services\LegacyConfService;
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeDataService;
 use Illuminate\Http\Request;
@@ -102,14 +103,24 @@ class RenderController
                            ->header('Content-Disposition', 'attachment; filename="' . $safeName . '.json"');
         }
 
-        return response()->json(['error' => 'Unsupported format'], 400);
+        if ($format === 'conf') {
+            $map->load(['nodes', 'links']);
+            $safeName = preg_replace('/[\r\n"\0\\\\\/]+/', '_', $map->name ?? 'map');
+            $safeName = trim($safeName, " \t._-") ?: 'map';
+            $conf = (new LegacyConfService())->toConf($map);
+
+            return response($conf, 200, [
+                'Content-Type' => 'text/plain; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . $safeName . '.conf"',
+            ]);
+        }
     }
 
     public function import(Request $request): JsonResponse
     {
         $this->requireAdmin();
         $validated = $request->validate([
-            'file' => 'required|file|mimes:json|max:10240',
+            'file' => 'required|file|mimes:json,txt,conf|max:10240',
             'name' => 'required|string|max:255|unique:wmng_maps,name',
             'title' => 'nullable|string|max:255',
         ]);

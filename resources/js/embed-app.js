@@ -1,0 +1,1722 @@
+// WeathermapNG embed view application logic.
+// Extracted from resources/views/embed.blade.php (v1.13.0) with no behavior change.
+// The Blade template initializes window.WMNG.EmbedConfig / window.WMNG.EmbedData
+// (server-rendered values) and includes this file before them.
+
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+const CFG = window.WMNG.EmbedConfig || {};
+        const mapDataIn = window.WMNG.EmbedData || {};
+        const mapId = CFG.mapId ?? '';
+        const baseUrl = CFG.baseUrl ?? '';
+        const deviceBaseUrl = CFG.deviceBaseUrl ?? '';
+        const graphBaseUrl = CFG.graphBaseUrl ?? '';
+        const WMNG_CONFIG = {
+            kioskEnabled: !!CFG.kioskEnabled,
+            cycleSeconds: CFG.cycleSeconds ?? null,
+            linkTarget: CFG.linkTarget ?? 'self',
+            mapList: CFG.mapList ?? [],
+            thresholds: CFG.thresholds ?? [50, 80, 95],
+            colors: CFG.colors ?? {
+                link_normal: '#28a745',
+                link_warning: '#ffc107',
+                link_critical: '#dc3545',
+                node_up: '#28a745',
+                node_down: '#dc3545',
+                node_warning: '#ffc107',
+                node_unknown: '#6c757d'
+            },
+            enable_sse: CFG.enable_sse ?? true,
+            client_refresh: CFG.client_refresh ?? 60,
+            scale: CFG.scale ?? 'bits',
+            link_style: CFG.link_style ?? 'straight',
+            show_bandwidth: CFG.show_bandwidth ?? true,
+            show_percentages: CFG.show_percentages ?? true,
+            show_node_metrics: CFG.show_node_metrics ?? true,
+        };
+        const urlParams = new URLSearchParams(window.location.search);
+        const param = (k, d) => urlParams.has(k) ? urlParams.get(k) : d;
+        let scale = (param('scale', WMNG_CONFIG.scale) || '').toLowerCase();
+        if (scale !== 'bytes') scale = 'bits';
+        let intervalSec = parseInt(param('interval', WMNG_CONFIG.client_refresh), 10) || WMNG_CONFIG.client_refresh;
+        let sseEnabled = param('sse', WMNG_CONFIG.enable_sse ? '1' : '0') !== '0' && !!window.EventSource;
+        let sseMax = parseInt(param('max', 300), 10) || 300;  // 5 minutes default
+        let graphsEnabled = param('graphs', '1') !== '0' && !WMNG_CONFIG.kioskEnabled;
+        let nodeMetricsEnabled = param('metrics', WMNG_CONFIG.show_node_metrics ? '1' : '0') !== '0';
+        let eventSourceRef = null;
+        let sseReconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        const reconnectDelay = 2000; // 2 seconds
+        let sseReconnectTimer = null;
+        let currentTransport = 'none';
+        let mapData = {};
+        try {
+            mapData = mapDataIn.mapData ?? {};
+            // Apply initial live data if provided
+            const initialLive = mapDataIn.liveData ?? [];
+            if (initialLive) {
+                if (initialLive.links && Array.isArray(mapData.links)) {
+                    mapData.links.forEach(l => {
+                        const id = l.id ?? l.link_id ?? null;
+                        if (id && initialLive.links[id]) {
+                            l.live = initialLive.links[id];
+                        }
+                    });
+                }
+                // Apply initial node status, metrics, and traffic.
+                if (initialLive.nodes && Array.isArray(mapData.nodes)) {
+                    mapData.nodes.forEach(n => {
+                        const id = n.id ?? n.node_id ?? null;
+                        if (id && initialLive.nodes[id]) {
+                            const ln = initialLive.nodes[id];
+                            n.status = ln.status || n.status;
+                            if (ln.metrics) n.metrics = ln.metrics;
+                            if (ln.traffic) {
+                                n.traffic = ln.traffic;
+                                const sum = Number(ln.traffic.sum_bps || 0);
+                                n.current_value = isFinite(sum) ? sum : null;
+                            }
+                        }
+                    });
+                }
+                // Apply initial alert overlays.
+                if (initialLive.alerts) {
+                    if (initialLive.alerts.nodes && Array.isArray(mapData.nodes)) {
+                        mapData.nodes.forEach(n => {
+                            const id = n.id ?? n.node_id ?? null;
+                            n.alerts = (id && initialLive.alerts.nodes[id]) ? initialLive.alerts.nodes[id] : { count: 0, severity: 'ok' };
+                        });
+                    }
+                    if (initialLive.alerts.links && Array.isArray(mapData.links)) {
+                        mapData.links.forEach(l => {
+                            const id = l.id ?? l.link_id ?? null;
+                            l.alerts = (id && initialLive.alerts.links[id]) ? initialLive.alerts.links[id] : { count: 0, severity: 'ok' };
+                        });
+                    }
+                }
+                lastDataUpdate = Date.now();
+            }
+        } catch (e) {
+            console.error('Failed to parse map data:', e);
+            mapData = { error: 'Invalid map data' };
+        }
+    // nodeById lookup map — rebuilt whenever mapData.nodes changes,
+    // eliminates O(L*N) Array.find() per render frame in drawLink.
+    let nodeById = new Map();
+    rebuildNodeIndex();
+    let canvas, ctx, overlayCanvas, overlayCtx, minimap;
+    let viewScale = 1, viewOffsetX = 0, viewOffsetY = 0;
+    let staticDirty = true;
+    let hasActiveTraffic = false;
+    let animationId;
+    let lastUpdate = Date.now();
+    let animTick = 0;
+    let bgImg = null;
+    let currentMetric = (param('metric', 'percent') || 'percent').toLowerCase();
+    // Navigation (pan/zoom)
+    const navEnabled = (param('nav', '1') !== '0');
+    const MIN_ZOOM = parseFloat(param('minz', '0.5')) || 0.5;
+    const MAX_ZOOM = parseFloat(param('maxz', '4')) || 4;
+    let baseScale = 1, baseOffsetX = 0, baseOffsetY = 0;
+    let userScale = 1, userOffsetX = 0, userOffsetY = 0;
+    let isPanning = false, panLastX = 0, panLastY = 0;
+    
+    // Flow animation particles
+    let particles = [];
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let flowAnimationEnabled = !reducedMotion;
+    let particleDensity = 1.0; // 0.5 to 2.0
+    let particleSpeed = 1.0; // 0.5 to 2.0
+    // Compute initial traffic state from any inline live data so the RAF
+    // loop starts animating immediately when the page loads with traffic.
+    hasActiveTraffic = Array.isArray(mapData.links) &&
+        mapData.links.some(l => (l.live?.in_bps > 0 || l.live?.out_bps > 0));
+    function rebuildNodeIndex() {
+        nodeById = new Map();
+        if (Array.isArray(mapData.nodes)) {
+            for (const n of mapData.nodes) {
+                nodeById.set(n.id ?? n.src_node_id, n);
+            }
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        initCanvas();
+        initKioskMode();
+        // Sync flow toggle button with prefers-reduced-motion default
+        const _flowBtn = document.getElementById('toggle-flow');
+        if (_flowBtn && !flowAnimationEnabled) {
+            _flowBtn.classList.remove('btn-primary');
+            _flowBtn.classList.add('btn-secondary');
+        }
+        if (mapData && !mapData.error) {
+            renderMap();
+            startLiveUpdates();
+            renderLegend();
+            const ms = document.getElementById('metric-select');
+            if (ms) { ms.value = currentMetric; ms.addEventListener('change', () => { currentMetric = ms.value; renderLegend(); staticDirty = true; renderMap(); }); }
+            const ex = document.getElementById('export-png');
+            if (ex) ex.addEventListener('click', exportPNG);
+            if (navEnabled) initNavControls();
+        } else {
+            showError(mapData.error || 'Failed to load map');
+        }
+    });
+
+    // Pause RAF animation and SSE polling when the tab is backgrounded
+    // to save CPU and backend resources in long-lived kiosk operation.
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+            if (typeof stopSSE === 'function' && sseEnabled) stopSSE();
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        } else if (mapData && !mapData.error) {
+            if (!animationId) startAnimationLoop();
+            if (sseEnabled) startSSE();
+            else if (!pollTimer) startAutoUpdate();
+        }
+    });
+
+    function syncOverlayCanvas() {
+        // Position and size the overlay canvas to exactly match the main canvas.
+        // The main canvas is flex-centered inside #map-container, so we mirror
+        // its rendered offset rather than assuming top-left alignment.
+        const rect = canvas.getBoundingClientRect();
+        const containerRect = canvas.parentElement.getBoundingClientRect();
+        overlayCanvas.style.left = (rect.left - containerRect.left) + 'px';
+        overlayCanvas.style.top = (rect.top - containerRect.top) + 'px';
+        overlayCanvas.width = canvas.width;
+        overlayCanvas.height = canvas.height;
+    }
+
+    function initCanvas() {
+        canvas = document.getElementById('map-canvas');
+        ctx = canvas.getContext('2d');
+        overlayCanvas = document.getElementById('overlay-canvas');
+        overlayCtx = overlayCanvas.getContext('2d');
+
+        // Set canvas size
+        const container = document.getElementById('map-container');
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        syncOverlayCanvas();
+        minimap = document.getElementById('minimap');
+
+        // Hide loading
+        document.getElementById('loading').style.display = 'none';
+        const bgUrl = mapData.options?.background_image;
+        if (bgUrl) {
+            bgImg = new Image();
+            bgImg.onload = () => { staticDirty = true; renderMap(); };
+            bgImg.src = bgUrl;
+        }
+    }
+
+    // Avoid off-screen O(N+L) work on pan/zoom: compute the visible map
+    // rect (world coords) once per frame and skip nodes/links entirely
+    // outside it. A node is drawn iff its center is inside (plus a margin);
+    // a link is drawn unless its segment bounding-box misses the rect
+    // entirely, so links that cross the viewport still render.
+    function worldViewRect() {
+        const margin = 24 / viewScale; // world units of padding past the edge
+        return {
+            left: (0 - viewOffsetX) / viewScale - margin,
+            right: (canvas.width - viewOffsetX) / viewScale + margin,
+            top: (0 - viewOffsetY) / viewScale - margin,
+            bottom: (canvas.height - viewOffsetY) / viewScale + margin,
+        };
+    }
+    function nodeInView(n, v) {
+        const x = (n.position?.x ?? n.x) || 0;
+        const y = (n.position?.y ?? n.y) || 0;
+        return x >= v.left && x <= v.right && y >= v.top && y <= v.bottom;
+    }
+    function linkInView(link, v) {
+        const srcId = link.source ?? link.src ?? link.source_id;
+        const dstId = link.target ?? link.dst ?? link.destination_id;
+        const srcNode = nodeById.get(srcId);
+        const dstNode = nodeById.get(dstId);
+        if (!srcNode && !dstNode) return false;
+        if (!srcNode) return nodeInView(dstNode, v);
+        if (!dstNode) return nodeInView(srcNode, v);
+        // Build the path point list (endpoints + via_points) and test
+        // the union AABB against the view rect, so bent links whose path
+        // dips into the viewport stay visible even with off-screen ends.
+        const ax = srcNode.position?.x ?? srcNode.x ?? 0;
+        const ay = srcNode.position?.y ?? srcNode.y ?? 0;
+        const bx = dstNode.position?.x ?? dstNode.x ?? 0;
+        const by = dstNode.position?.y ?? dstNode.y ?? 0;
+        const viaPoints = (link.style && link.style.via_points) || [];
+        const viaStyle = (link.style && link.style.via_style) || defaultLinkStyle.via_style || WMNG_CONFIG.link_style || 'straight';
+        const pts = [{x: ax, y: ay}, ...viaPoints, {x: bx, y: by}];
+        let minX = Math.min(ax, bx), maxX = Math.max(ax, bx);
+        let minY = Math.min(ay, by), maxY = Math.max(ay, by);
+        for (const p of viaPoints) {
+            if (p.x < minX) minX = p.x; else if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y; else if (p.y > maxY) maxY = p.y;
+        }
+        // For curved (Catmull-Rom → cubic bezier) links, the control
+        // points cp1/cp2 can extend beyond the point hull and cause the
+        // rendered curve to bulge outside the AABB. Include them so
+        // on-screen curve segments aren't incorrectly culled.
+        if (viaStyle === 'curved' && pts.length > 2) {
+            for (let i = 0; i < pts.length - 1; i++) {
+                const p0 = pts[Math.max(0, i - 1)];
+                const p1 = pts[i];
+                const p2 = pts[i + 1];
+                const p3 = pts[Math.min(pts.length - 1, i + 2)];
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                const cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                const cp2y = p2.y - (p3.y - p1.y) / 6;
+                for (const cp of [{x: cp1x, y: cp1y}, {x: cp2x, y: cp2y}]) {
+                    if (cp.x < minX) minX = cp.x; else if (cp.x > maxX) maxX = cp.x;
+                    if (cp.y < minY) minY = cp.y; else if (cp.y > maxY) maxY = cp.y;
+                }
+            }
+        }
+        return Math.max(minX, v.left) <= Math.min(maxX, v.right)
+            && Math.max(minY, v.top) <= Math.min(maxY, v.bottom);
+    }
+
+    function renderMap(skipMinimap = false) {
+        if (!mapData || !mapData.nodes) return;
+
+        // Clear geometry arrays for hover/click detection
+        nodeGeoms.length = 0;
+        linkGeoms.length = 0;
+
+        // Clear main canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw background
+        if (bgImg) {
+            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+        } else {
+            ctx.fillStyle = mapData.background || '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // Calculate scale to fit map in canvas
+        const mapWidth = mapData?.width || (mapData?.metadata && mapData.metadata.width) || 800;
+        const mapHeight = mapData?.height || (mapData?.metadata && mapData.metadata.height) || 600;
+        const scaleX = canvas.width / mapWidth;
+        const scaleY = canvas.height / mapHeight;
+        baseScale = Math.min(scaleX, scaleY, 1); // Don't scale up
+
+        // Center the map (base)
+        baseOffsetX = (canvas.width - mapWidth * baseScale) / 2;
+        baseOffsetY = (canvas.height - mapHeight * baseScale) / 2;
+
+        // Effective transform for rendering and hit testing
+        viewScale = baseScale * userScale;
+        viewOffsetX = baseOffsetX + userOffsetX;
+        viewOffsetY = baseOffsetY + userOffsetY;
+
+        ctx.save();
+        ctx.translate(viewOffsetX, viewOffsetY);
+        ctx.scale(viewScale, viewScale);
+        // Compute the visible world rect ONCE per frame (avoids
+        // 600+ redundant worldViewRect() calls on large maps).
+        const vr = worldViewRect();
+
+        // Draw static link parts (line stroke, color, width, labels, badges)
+        if (Array.isArray(mapData.links)) {
+            for (const link of mapData.links) {
+                if (linkInView(link, vr)) drawLink(link);
+            }
+        }
+
+        // Draw nodes
+        if (Array.isArray(mapData.nodes)) {
+            for (const node of mapData.nodes) {
+                if (nodeInView(node, vr)) drawNode(node);
+            }
+        }
+
+        ctx.restore();
+
+        // Static layer is now current; only the overlay needs per-frame work.
+        staticDirty = false;
+
+        // Draw dynamic overlay (particles / dash animation) immediately so a
+        // single renderMap() call (e.g. from pan/zoom) shows a complete frame.
+        renderOverlay();
+
+        // Update status and overlays
+        updateStatus();
+        if (!skipMinimap) drawMinimap();
+    }
+
+    // Draw only the dynamic layer (particles / animated dashes) onto the
+    // overlay canvas. Runs every RAF tick; the main canvas is untouched.
+    function renderOverlay() {
+        if (!mapData || !mapData.links) return;
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.save();
+        overlayCtx.translate(viewOffsetX, viewOffsetY);
+        overlayCtx.scale(viewScale, viewScale);
+        const vr = worldViewRect();
+        if (Array.isArray(mapData.links)) {
+            for (const link of mapData.links) {
+                if (linkInView(link, vr)) drawLinkDynamic(link, overlayCtx);
+            }
+        }
+        // Down-node pulse rings (dynamic, drawn on overlay canvas).
+        if (Array.isArray(mapData.nodes)) {
+            for (const node of mapData.nodes) {
+                if ((node.status || 'unknown') === 'down' && nodeInView(node, vr)) {
+                    drawNodePulse(node, overlayCtx);
+                }
+            }
+        }
+        overlayCtx.restore();
+    }
+
+    function initKioskMode() {
+        if (!WMNG_CONFIG.kioskEnabled) return;
+
+        const body = document.body;
+        body.classList.add('kiosk-mode');
+        body.classList.add('show-chrome');
+
+        let activityTimer = null;
+        const hideChrome = () => body.classList.remove('show-chrome');
+        const showChrome = () => {
+            body.classList.add('show-chrome');
+            window.clearTimeout(activityTimer);
+            activityTimer = window.setTimeout(hideChrome, 3500);
+        };
+
+        document.addEventListener('mousemove', showChrome);
+        document.addEventListener('click', showChrome);
+        document.addEventListener('touchstart', showChrome);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                window.clearTimeout(activityTimer);
+                body.classList.toggle('show-chrome');
+                return;
+            }
+            showChrome();
+        });
+
+        const exitBtn = document.getElementById('kiosk-exit');
+        if (exitBtn) {
+            exitBtn.addEventListener('click', () => {
+                window.location.href = window.location.pathname;
+            });
+        }
+
+        // Cycle to next map on a timer if requested.
+        const cycleSeconds = WMNG_CONFIG.cycleSeconds;
+        const mapList = WMNG_CONFIG.mapList || [];
+        if (cycleSeconds && mapList.length > 1) {
+            const currentId = String(mapId);
+            const idx = mapList.findIndex(m => String(m.id) === currentId);
+            const next = mapList[(idx + 1) % mapList.length];
+            if (next) {
+                const nextUrl = new URL(window.location.pathname.replace(/\d+$/, String(next.id)) + window.location.search, window.location.origin);
+                nextUrl.searchParams.set('kiosk', '1');
+                nextUrl.searchParams.set('cycle', String(cycleSeconds));
+                nextUrl.searchParams.set('target', WMNG_CONFIG.linkTarget === '_self' ? '_self' : '_blank');
+                window.setTimeout(() => { window.location.assign(nextUrl.toString()); }, cycleSeconds * 1000);
+            }
+        }
+    }
+
+    function initNavControls() {
+        const controls = document.getElementById('controls');
+        if (controls) {
+            const group = document.createElement('div');
+            group.style.display = 'inline-flex';
+            group.style.gap = '4px';
+            group.style.marginLeft = '6px';
+            function createZoomButton(id, label, text) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.id = id;
+                button.className = 'btn btn-light btn-sm';
+                button.title = label;
+                button.setAttribute('aria-label', label);
+                button.textContent = text;
+                return button;
+            }
+            group.appendChild(createZoomButton('zoom-in', 'Zoom In (+)', '+'));
+            group.appendChild(createZoomButton('zoom-out', 'Zoom Out (-)', '-'));
+            group.appendChild(createZoomButton('zoom-reset', 'Reset zoom', 'Reset'));
+            controls.appendChild(group);
+            const c = canvas;
+            document.getElementById('zoom-in').addEventListener('click', () => zoomAt(c.width/2, c.height/2, 1.2));
+            document.getElementById('zoom-out').addEventListener('click', () => zoomAt(c.width/2, c.height/2, 1/1.2));
+            document.getElementById('zoom-reset').addEventListener('click', resetView);
+        }
+        // Wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const factor = e.deltaY > 0 ? 0.9 : 1.1;
+            zoomAt(x, y, factor);
+        }, { passive: false });
+        // Drag to pan
+        canvas.addEventListener('mousedown', (e) => {
+            isPanning = true; panLastX = e.clientX; panLastY = e.clientY; canvas.style.cursor = 'grabbing';
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            const dx = e.clientX - panLastX; const dy = e.clientY - panLastY;
+            panLastX = e.clientX; panLastY = e.clientY;
+            userOffsetX += dx; userOffsetY += dy;
+            staticDirty = true;
+            renderMap();
+        });
+        window.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; canvas.style.cursor = 'default'; } });
+        // Double-click zoom (Shift to zoom out)
+        canvas.addEventListener('dblclick', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const factor = e.shiftKey ? 0.9 : 1.1;
+            zoomAt(x, y, factor);
+        });
+    }
+
+    function zoomAt(cx, cy, factor) {
+        const newUserScale = clamp(userScale * factor, MIN_ZOOM, MAX_ZOOM);
+        factor = newUserScale / userScale;
+        // world coords before zoom
+        const wx = (cx - (baseOffsetX + userOffsetX)) / (baseScale * userScale);
+        const wy = (cy - (baseOffsetY + userOffsetY)) / (baseScale * userScale);
+        userScale = newUserScale;
+        // adjust offsets to keep cursor stable
+        const vx = wx * (baseScale * userScale) + baseOffsetX;
+        const vy = wy * (baseScale * userScale) + baseOffsetY;
+        userOffsetX = cx - vx;
+        userOffsetY = cy - vy;
+        staticDirty = true;
+        renderMap();
+    }
+
+    function resetView() { userScale = 1; userOffsetX = 0; userOffsetY = 0; staticDirty = true; renderMap(); }
+    function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+    const nodeGeoms = [];
+    const linkGeoms = [];
+    function getNodeType(node) {
+        const label = (node.label || '').toLowerCase();
+        if (label.includes('router') || label.includes('core')) return 'router';
+        if (label.includes('switch')) return 'switch';
+        if (label.includes('server') || label.includes('db') || label.includes('app') || label.includes('web') || label.includes('file')) return 'server';
+        if (label.includes('firewall') || label.includes('fw')) return 'firewall';
+        return 'default';
+    }
+
+    function drawNode(node) {
+        const x = (node.position?.x ?? node.x) || 0;
+        const y = (node.position?.y ?? node.y) || 0;
+        const nodeType = getNodeType(node);
+        const color = getNodeColor(node);
+        const radius = 10; // Base radius for hit testing and badges
+        const status = node.status || 'unknown';
+
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5;
+
+        // Draw shape based on device type
+        if (nodeType === 'router') {
+            // Diamond
+            ctx.beginPath();
+            ctx.moveTo(x, y - 10);
+            ctx.lineTo(x + 10, y);
+            ctx.lineTo(x, y + 10);
+            ctx.lineTo(x - 10, y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else if (nodeType === 'switch') {
+            // Rounded rectangle (horizontal)
+            const w = 18, h = 10, r = 3;
+            ctx.beginPath();
+            ctx.moveTo(x - w/2 + r, y - h/2);
+            ctx.lineTo(x + w/2 - r, y - h/2);
+            ctx.quadraticCurveTo(x + w/2, y - h/2, x + w/2, y - h/2 + r);
+            ctx.lineTo(x + w/2, y + h/2 - r);
+            ctx.quadraticCurveTo(x + w/2, y + h/2, x + w/2 - r, y + h/2);
+            ctx.lineTo(x - w/2 + r, y + h/2);
+            ctx.quadraticCurveTo(x - w/2, y + h/2, x - w/2, y + h/2 - r);
+            ctx.lineTo(x - w/2, y - h/2 + r);
+            ctx.quadraticCurveTo(x - w/2, y - h/2, x - w/2 + r, y - h/2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else if (nodeType === 'server') {
+            // Tall rectangle (server rack style)
+            ctx.beginPath();
+            ctx.rect(x - 7, y - 12, 14, 24);
+            ctx.fill();
+            ctx.stroke();
+            // Rack lines
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x - 5, y - 6); ctx.lineTo(x + 5, y - 6);
+            ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y);
+            ctx.moveTo(x - 5, y + 6); ctx.lineTo(x + 5, y + 6);
+            ctx.stroke();
+            ctx.strokeStyle = '#000';
+        } else if (nodeType === 'firewall') {
+            // Shield shape
+            ctx.beginPath();
+            ctx.moveTo(x, y - 12);
+            ctx.lineTo(x + 10, y - 6);
+            ctx.lineTo(x + 10, y + 4);
+            ctx.quadraticCurveTo(x + 10, y + 12, x, y + 14);
+            ctx.quadraticCurveTo(x - 10, y + 12, x - 10, y + 4);
+            ctx.lineTo(x - 10, y - 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else {
+            // Default: circle
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+        }
+        // Static status-based rings (drawn on main canvas).
+        // Warning nodes (up but CPU/MEM high): yellow dashed ring.
+        if (isWarningNode(node)) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 5, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 193, 7, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        // Unknown nodes: subtle gray dashed outline.
+        else if (status === 'unknown') {
+            ctx.beginPath();
+            ctx.arc(x, y, radius + 4, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(108, 117, 125, 0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([2, 2]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Node label
+        ctx.fillStyle = defaultNodeStyle.label_color || '#000';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        const labelY = (nodeType === 'server') ? y - 18 : y - 16;
+        ctx.fillText(node.label || node.id, x, labelY);
+
+        // Aggregate traffic indicator: node.current_value is sum_bps
+        // (in_bps + out_bps across attached links). The "Σ " prefix
+        // signals it's a total, not a single direction; the tooltip
+        // breaks down In/Out/Sum and shows the source.
+        if (node.current_value !== null && node.current_value !== undefined) {
+            ctx.font = '10px Arial';
+            ctx.fillStyle = '#666';
+            const value = humanBits(node.current_value);
+            if (value) {
+                ctx.fillText('Σ ' + value, x, y + radius + 15);
+            }
+        }
+
+        // Node CPU/mem utilization line (when present and enabled).
+        if (nodeMetricsEnabled && node.metrics && (node.metrics.cpu != null || node.metrics.mem != null)) {
+            ctx.font = '9px Arial';
+            ctx.fillStyle = '#888';
+            let metricText = '';
+            if (node.metrics.cpu != null) metricText += 'CPU ' + Math.max(0, Math.min(100, Math.round(node.metrics.cpu))) + '%';
+            if (node.metrics.mem != null) {
+                metricText += (metricText ? '  ' : '') + 'MEM ' + Math.max(0, Math.min(100, Math.round(node.metrics.mem))) + '%';
+            }
+            if (metricText) ctx.fillText(metricText, x, y + radius + 26);
+        }
+
+        // Alert badge (if any)
+        if (node.alerts && node.alerts.count > 0) {
+            const bx = x + radius - 3;
+            const by = y - radius + 3;
+            ctx.beginPath();
+            ctx.arc(bx, by, 5, 0, Math.PI * 2);
+            const sev = (node.alerts.severity || 'warning');
+            ctx.fillStyle = (sev === 'severe' || sev === 'critical') ? '#dc3545' : '#ffc107';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#fff';
+            ctx.stroke();
+        }
+
+        // store geometry for hover
+        nodeGeoms.push({ x, y, r: radius, node });
+    }
+
+    // Draw a pulsing red ring around down nodes on the overlay canvas.
+    // Uses animTick for the animation phase so it syncs with the RAF loop.
+    function drawNodePulse(node, octx) {
+        const x = (node.position?.x ?? node.x) || 0;
+        const y = (node.position?.y ?? node.y) || 0;
+        const radius = 10;
+        const phase = reducedMotion ? 0 : animTick * 0.1;
+        const pulseRadius = radius + 4 + 3 * Math.sin(phase);
+        octx.beginPath();
+        octx.arc(x, y, pulseRadius, 0, 2 * Math.PI);
+        octx.strokeStyle = 'rgba(220, 53, 69, ' + (0.4 + 0.3 * Math.sin(phase)) + ')';
+        octx.lineWidth = 3;
+        octx.stroke();
+    }
+
+    function buildLinkPath(link, x1, y1, x2, y2) {
+        const viaPoints = (link.style && link.style.via_points) || [];
+        const viaStyle = (link.style && link.style.via_style) || defaultLinkStyle.via_style || WMNG_CONFIG.link_style || 'straight';
+        const points = [{x: x1, y: y1}];
+        for (const vp of viaPoints) { points.push({x: vp.x, y: vp.y}); }
+        points.push({x: x2, y: y2});
+        return { points, viaStyle };
+    }
+
+    function traceLinkPath(ctx, points, viaStyle) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        if (points.length === 2) {
+            ctx.lineTo(points[1].x, points[1].y);
+            return;
+        }
+        if (viaStyle === 'curved') {
+            for (let i = 0; i < points.length - 1; i++) {
+                const p0 = points[Math.max(0, i - 1)];
+                const p1 = points[i];
+                const p2 = points[i + 1];
+                const p3 = points[Math.min(points.length - 1, i + 2)];
+                const cp1x = p1.x + (p2.x - p0.x) / 6;
+                const cp1y = p1.y + (p2.y - p0.y) / 6;
+                const cp2x = p2.x - (p3.x - p1.x) / 6;
+                const cp2y = p2.y - (p3.y - p1.y) / 6;
+                ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+            }
+        } else {
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+        }
+    }
+
+    function getPathMidpoint(points) {
+        if (points.length === 2) return points[1];
+        let totalLen = 0;
+        const segs = [];
+        for (let i = 1; i < points.length; i++) {
+            const dx = points[i].x - points[i-1].x;
+            const dy = points[i].y - points[i-1].y;
+            const len = Math.sqrt(dx*dx + dy*dy);
+            segs.push(len);
+            totalLen += len;
+        }
+        let half = totalLen / 2, accum = 0;
+        for (let i = 0; i < segs.length; i++) {
+            if (accum + segs[i] >= half) {
+                const t = (half - accum) / Math.max(segs[i], 0.001);
+                return {
+                    x: points[i].x + (points[i+1].x - points[i].x) * t,
+                    y: points[i].y + (points[i+1].y - points[i].y) * t
+                };
+            }
+            accum += segs[i];
+        }
+        return points[Math.floor(points.length / 2)];
+    }
+
+    function getPointOnPath(points, progress) {
+        let totalLen = 0;
+        const segs = [];
+        for (let i = 1; i < points.length; i++) {
+            const dx = points[i].x - points[i-1].x;
+            const dy = points[i].y - points[i-1].y;
+            const len = Math.sqrt(dx*dx + dy*dy);
+            segs.push(len);
+            totalLen += len;
+        }
+        if (totalLen === 0) return points[0];
+        const target = progress * totalLen;
+        let accum = 0;
+        for (let i = 0; i < segs.length; i++) {
+            if (accum + segs[i] >= target) {
+                const t = (target - accum) / Math.max(segs[i], 0.001);
+                return {
+                    x: points[i].x + (points[i+1].x - points[i].x) * t,
+                    y: points[i].y + (points[i+1].y - points[i].y) * t
+                };
+            }
+            accum += segs[i];
+        }
+        return points[points.length - 1];
+    }
+
+    function pathLength(points) {
+        let len = 0;
+        for (let i = 1; i < points.length; i++) {
+            const dx = points[i].x - points[i-1].x;
+            const dy = points[i].y - points[i-1].y;
+            len += Math.sqrt(dx*dx + dy*dy);
+        }
+        return len;
+    }
+
+    function drawLink(link) {
+        const srcId = link.source ?? link.src ?? link.source_id;
+        const dstId = link.target ?? link.dst ?? link.destination_id;
+        const sourceNode = nodeById.get(srcId);
+        const targetNode = nodeById.get(dstId);
+
+        if (!sourceNode || !targetNode) return;
+
+        const x1 = (sourceNode.position?.x ?? sourceNode.x) || 0;
+        const y1 = (sourceNode.position?.y ?? sourceNode.y) || 0;
+        const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
+        const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
+
+        const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+        const metric = getLinkMetric(link);
+        const pct = getLinkPct(link, metric);
+        const linkStyle = link.style || {};
+        const width = Math.max(0.5, linkStyle.width || link.width || defaultLinkStyle.width || 2);
+
+        // Draw link line (static). In flow mode the line is solid; in dash
+        // mode the line stroke is delegated to the overlay (drawLinkDynamic)
+        // so the animated dash offset doesn't force a main-canvas redraw.
+        if (flowAnimationEnabled) {
+            traceLinkPath(ctx, points, viaStyle);
+            ctx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
+            ctx.lineWidth = width;
+            ctx.stroke();
+        }
+        // Dash-mode line and particles are drawn on the overlay by drawLinkDynamic.
+        // Link utilization label
+        if (metric !== null && metric !== undefined) {
+            const showLabel = (currentMetric === 'percent')
+                ? WMNG_CONFIG.show_percentages !== false
+                : WMNG_CONFIG.show_bandwidth !== false;
+            if (showLabel) {
+                const mid = getPathMidpoint(points);
+                ctx.fillStyle = '#111';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'center';
+                const label = (currentMetric === 'percent') ? (Math.round(pct) + '%') : humanBits(metric);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.strokeText(label, mid.x, mid.y - 5);
+                ctx.fillText(label, mid.x, mid.y - 5);
+            }
+        }
+        // Link alert badge (diamond)
+        if (link.alerts && link.alerts.count > 0) {
+            const mid = getPathMidpoint(points);
+            const size = 5;
+            ctx.save();
+            ctx.translate(mid.x + 10, mid.y - 10);
+            ctx.rotate(Math.PI / 4);
+            const sev = (link.alerts.severity || 'warning');
+            ctx.fillStyle = (sev === 'severe' || sev === 'critical') ? '#dc3545' : '#ffc107';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.rect(-size, -size, size * 2, size * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+        // store geometry for hover
+        storeLinkGeom(link, x1, y1, x2, y2, pct, points);
+    }
+
+    // Draw the dynamic parts of a link onto the overlay canvas:
+    // - flow mode: particles via drawFlowParticles
+    // - dash mode: dashed line stroke with animated lineDashOffset
+    function drawLinkDynamic(link, octx) {
+        const srcId = link.source ?? link.src ?? link.source_id;
+        const dstId = link.target ?? link.dst ?? link.destination_id;
+        const sourceNode = nodeById.get(srcId);
+        const targetNode = nodeById.get(dstId);
+        if (!sourceNode || !targetNode) return;
+
+        const x1 = (sourceNode.position?.x ?? sourceNode.x) || 0;
+        const y1 = (sourceNode.position?.y ?? sourceNode.y) || 0;
+        const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
+        const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
+
+        const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+        const metric = getLinkMetric(link);
+        const pct = getLinkPct(link, metric);
+        const linkStyle = link.style || {};
+        const width = Math.max(0.5, linkStyle.width || link.width || defaultLinkStyle.width || 2);
+
+        if (flowAnimationEnabled) {
+            drawFlowParticles(link, x1, y1, x2, y2, pct, points, octx);
+        } else {
+            // Dash-mode: draw the dashed line with animated offset.
+            traceLinkPath(octx, points, viaStyle);
+            octx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
+            octx.lineWidth = width;
+            const dash = Math.max(6, width * 3);
+            octx.setLineDash([dash, dash]);
+            if (!reducedMotion) {
+                const speed = Math.max(0.5, Math.min(5, ((pct ?? 10)) / 20));
+                octx.lineDashOffset = -(animTick * speed);
+            }
+            octx.stroke();
+            octx.setLineDash([]);
+        }
+    }
+    
+    function drawFlowParticles(link, x1, y1, x2, y2, pct, pathPoints, drawCtx) {
+        const live = link.live || {};
+        const inBps = live.in_bps || 0;
+        const outBps = live.out_bps || 0;
+        
+        if (inBps === 0 && outBps === 0) return;
+
+        const points = pathPoints || [{x:x1,y:y1},{x:x2,y:y2}];
+        const length = pathLength(points);
+        if (length === 0) return;
+        
+        const relativeFlow = pct ? pct / 100 : 0.5;
+        const particleCount = Math.max(1, Math.floor((length / 50) * relativeFlow * particleDensity));
+        const speedFactor = 0.5 + (relativeFlow * 1.5) * particleSpeed;
+        
+        const linkId = `${link.id || (x1 + '-' + y1 + '-' + x2 + '-' + y2)}`;
+        
+        if (!particles[linkId]) {
+            particles[linkId] = {
+                forward: [],
+                backward: [],
+                inRatio: inBps / (inBps + outBps + 0.001),
+                outRatio: outBps / (inBps + outBps + 0.001)
+            };
+            
+            if (outBps > 0) {
+                for (let i = 0; i < particleCount * particles[linkId].outRatio; i++) {
+                    particles[linkId].forward.push({
+                        progress: (i / particleCount),
+                        speed: speedFactor * (0.8 + Math.random() * 0.4),
+                        size: 2 + Math.random() * 2,
+                        opacity: 0.6 + Math.random() * 0.4
+                    });
+                }
+            }
+            
+            if (inBps > 0) {
+                for (let i = 0; i < particleCount * particles[linkId].inRatio; i++) {
+                    particles[linkId].backward.push({
+                        progress: (i / particleCount),
+                        speed: speedFactor * (0.8 + Math.random() * 0.4),
+                        size: 2 + Math.random() * 2,
+                        opacity: 0.6 + Math.random() * 0.4
+                    });
+                }
+            }
+        }
+        
+        const linkParticles = particles[linkId];
+        
+        drawCtx.save();
+        if (linkParticles.forward && Array.isArray(linkParticles.forward)) {
+            linkParticles.forward.forEach(particle => {
+            particle.progress += (particle.speed * 0.005);
+            if (particle.progress > 1) particle.progress -= 1;
+            
+            const pos = getPointOnPath(points, particle.progress);
+            
+            drawCtx.globalAlpha = particle.opacity * 0.3;
+            drawCtx.fillStyle = '#00ff00';
+            drawCtx.beginPath();
+            drawCtx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
+            drawCtx.fill();
+            drawCtx.globalAlpha = particle.opacity;
+            drawCtx.fillStyle = '#40ff40';
+            drawCtx.beginPath();
+            drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
+            drawCtx.fill();
+            });
+        }
+        
+        if (linkParticles.backward && Array.isArray(linkParticles.backward)) {
+            linkParticles.backward.forEach(particle => {
+            particle.progress += (particle.speed * 0.005);
+            if (particle.progress > 1) particle.progress -= 1;
+            
+            const pos = getPointOnPath(points, 1 - particle.progress);
+            
+            drawCtx.globalAlpha = particle.opacity * 0.3;
+            drawCtx.fillStyle = '#0080ff';
+            drawCtx.beginPath();
+            drawCtx.arc(pos.x, pos.y, particle.size * 2, 0, Math.PI * 2);
+            drawCtx.fill();
+            drawCtx.globalAlpha = particle.opacity;
+            drawCtx.fillStyle = '#40a0ff';
+            drawCtx.beginPath();
+            drawCtx.arc(pos.x, pos.y, particle.size, 0, Math.PI * 2);
+            drawCtx.fill();
+            });
+        }
+        drawCtx.restore();
+    }
+
+    const defaultNodeStyle = mapData.options?.default_node_style || {};
+    const defaultLinkStyle = mapData.options?.default_link_style || {};
+
+    // Reusable threshold check: returns true if a CPU/MEM value exceeds
+    // the warning threshold (second element of WMNG_CONFIG.thresholds).
+    function warnThreshold(v) {
+        return typeof v === 'number' && v >= ((WMNG_CONFIG.thresholds && WMNG_CONFIG.thresholds[1]) || 80);
+    }
+
+    function isWarningNode(node) {
+        const status = node.status || 'unknown';
+        return status === 'up' && (warnThreshold(node.metrics?.cpu) || warnThreshold(node.metrics?.mem));
+    }
+
+    function getNodeColor(node) {
+        const colors = WMNG_CONFIG.colors || {};
+        if (node?.meta?.color) return node.meta.color;
+
+        const status = node.status || 'unknown';
+        if (status === 'down') return colors.node_down || '#dc3545';
+        if (isWarningNode(node)) return colors.node_warning || '#ffc107';
+        if (status === 'up') return defaultNodeStyle.color || colors.node_up || '#28a745';
+        return defaultNodeStyle.color || colors.node_unknown || '#6c757d';
+    }
+
+    function getLinkMetric(link) {
+        const live = link.live || {};
+        if (currentMetric === 'in') return (typeof live.in_bps === 'number') ? live.in_bps : null;
+        if (currentMetric === 'out') return (typeof live.out_bps === 'number') ? live.out_bps : null;
+        if (currentMetric === 'sum') {
+            const a = (typeof live.in_bps === 'number') ? live.in_bps : 0;
+            const b = (typeof live.out_bps === 'number') ? live.out_bps : 0;
+            return (a + b) || null;
+        }
+        // percent - return the max of in/out bps for calculation
+        const inBps = (typeof live.in_bps === 'number') ? live.in_bps : 0;
+        const outBps = (typeof live.out_bps === 'number') ? live.out_bps : 0;
+        return Math.max(inBps, outBps) || null;
+    }
+
+    function getLinkPct(link, metricBps) {
+        // If we have a pre-calculated pct from live data, use it
+        const live = link.live || {};
+        if (typeof live.pct === 'number') return Math.max(0, Math.min(100, live.pct));
+
+        // Otherwise calculate from bps and bandwidth
+        if (typeof metricBps === 'number') {
+            const bw = link.bandwidth_bps || link.bandwidth || null;
+            if (bw) return Math.max(0, Math.min(100, (metricBps / bw) * 100));
+            return null;
+        }
+        return null;
+    }
+
+    function getLinkColor(pct) {
+        if (pct === null) return defaultLinkStyle.color || WMNG_CONFIG.colors.link_normal || '#28a745';
+        const [t1, t2, t3] = WMNG_CONFIG.thresholds || [50, 80, 95];
+        if (pct >= t2) return WMNG_CONFIG.colors.link_critical || '#dc3545';
+        if (pct >= t1) return WMNG_CONFIG.colors.link_warning || '#ffc107';
+        return WMNG_CONFIG.colors.link_normal || '#28a745';
+    }
+
+    // Single RAF loop helper. The loop redraws the overlay every frame
+    // but only redraws the static (main canvas) layer when staticDirty.
+    // When there is no active traffic (hasActiveTraffic === false) the
+    // loop stops entirely to avoid burning a 60fps redraw cycle for a
+    // static map. applyLiveUpdate() restarts the loop when traffic
+    // reappears. When reduced-motion is preferred and flow animation is
+    // disabled, the loop also stops (animationId nulled).
+    function startAnimationLoop() {
+        function tick() {
+            animTick += 1;
+            if (staticDirty) {
+                renderMap(true);
+            } else {
+                renderOverlay();
+            }
+            const hasDownNode = Array.isArray(mapData.nodes) &&
+                mapData.nodes.some(n => (n.status || 'unknown') === 'down');
+            if ((hasActiveTraffic && (flowAnimationEnabled || !reducedMotion)) ||
+                (hasDownNode && !reducedMotion)) {
+                animationId = requestAnimationFrame(tick);
+            } else {
+                animationId = null;
+            }
+        }
+        if (animationId) { cancelAnimationFrame(animationId); }
+        animationId = requestAnimationFrame(tick);
+    }
+
+    // Live updates via SSE (fallback to polling)
+    function startLiveUpdates() {
+        updateTransportButton();
+        if (sseEnabled) {
+            startSSE();
+        } else {
+            startAutoUpdate();
+        }
+        const btn = document.getElementById('toggle-transport');
+        btn.addEventListener('click', () => {
+            if (currentTransport === 'sse') {
+                stopSSE();
+                sseEnabled = false;
+                startAutoUpdate();
+            } else {
+                stopPolling();
+                sseEnabled = true;
+                startSSE();
+            }
+        });
+        
+        // Flow animation controls
+        document.getElementById('toggle-flow').addEventListener('click', () => {
+            flowAnimationEnabled = !flowAnimationEnabled;
+            const btn = document.getElementById('toggle-flow');
+            if (flowAnimationEnabled) {
+                btn.classList.remove('btn-secondary');
+                btn.classList.add('btn-primary');
+            } else {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-secondary');
+                particles = []; // Clear particles when disabled
+            }
+            // The static layer changes (solid line ↔ no line), so force a
+            // full redraw. Then restart the RAF loop if appropriate.
+            staticDirty = true;
+            renderMap();
+            if (!animationId && (hasActiveTraffic && (flowAnimationEnabled || !reducedMotion))) {
+                startAnimationLoop();
+            }
+        });
+
+        // Visualization settings menu toggle
+        document.getElementById('viz-settings').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const menu = document.getElementById('viz-menu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', () => {
+            document.getElementById('viz-menu').style.display = 'none';
+        });
+        
+        document.getElementById('particle-density').addEventListener('input', (e) => {
+            particleDensity = parseFloat(e.target.value);
+            document.getElementById('density-value').textContent = particleDensity.toFixed(1);
+            particles = []; // Reset particles to apply new density
+        });
+        
+        document.getElementById('particle-speed').addEventListener('input', (e) => {
+            particleSpeed = parseFloat(e.target.value);
+            document.getElementById('speed-value').textContent = particleSpeed.toFixed(1);
+        });
+
+
+        // Start animation loop — only needed when something actually animates.
+        // When reduced-motion is preferred and flow is disabled, render once
+        // and rely on live-update polls / manual interactions to re-render.
+        startAnimationLoop();
+    }
+
+    function startSSE() {
+        try {
+            stopPolling();
+            if (eventSourceRef) { try { eventSourceRef.close(); } catch {} }
+            const url = `${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/sse?interval=${intervalSec}&max=${sseMax}`;
+            const es = new EventSource(url);
+            eventSourceRef = es;
+            currentTransport = 'sse';
+            updateTransportButton();
+            es.onmessage = (e) => {
+                try {
+                    sseReconnectAttempts = 0; // Reset on successful message
+                    const live = JSON.parse(e.data);
+                    applyLiveUpdate(live);
+                } catch {}
+            };
+            es.onerror = () => {
+                es.close();
+                eventSourceRef = null;
+                // Try to reconnect if SSE was enabled
+                if (sseEnabled && sseReconnectAttempts < maxReconnectAttempts) {
+                    sseReconnectTimer = setTimeout(() => {
+                        sseReconnectTimer = null;
+                        if (sseEnabled) startSSE();
+                    }, reconnectDelay);
+                } else {
+                    // Fall back to polling after max attempts
+                    currentTransport = 'poll';
+                    sseEnabled = false;
+                    sseReconnectAttempts = 0;
+                    startAutoUpdate();
+                }
+            };
+        } catch (e) {
+            currentTransport = 'poll';
+            sseEnabled = false;
+            startAutoUpdate();
+        }
+    }
+    function stopSSE() {
+        if (sseReconnectTimer) { clearTimeout(sseReconnectTimer); sseReconnectTimer = null; }
+        if (eventSourceRef) {
+            try { eventSourceRef.close(); } catch {}
+            eventSourceRef = null;
+        }
+    }
+
+    function applyLiveUpdate(live) {
+        lastDataUpdate = Date.now();
+        // Attach link live data by id
+        if (live && live.links && Array.isArray(mapData.links)) {
+            mapData.links.forEach(l => {
+                const id = l.id ?? l.link_id ?? null;
+                if (id && live.links[id]) {
+                    l.live = live.links[id];
+                }
+            });
+        }
+        // Update node status by id
+        if (live && live.nodes && Array.isArray(mapData.nodes)) {
+            mapData.nodes.forEach(n => {
+                const id = n.id ?? n.node_id ?? null;
+                if (id && live.nodes[id]) {
+                    n.status = live.nodes[id].status || n.status;
+                    if (live.nodes[id].metrics) n.metrics = live.nodes[id].metrics;
+                    // Attach aggregated traffic and expose a simple value for label
+                    if (live.nodes[id].traffic) {
+                        n.traffic = live.nodes[id].traffic;
+                        const sum = Number(live.nodes[id].traffic.sum_bps || 0);
+                        n.current_value = isFinite(sum) ? sum : null;
+                    }
+                }
+            });
+        }
+        // Alert overlays
+        if (live && live.alerts) {
+            if (live.alerts.nodes && Array.isArray(mapData.nodes)) {
+                mapData.nodes.forEach(n => {
+                    const id = n.id ?? n.node_id ?? null;
+                    n.alerts = (id && live.alerts.nodes[id]) ? live.alerts.nodes[id] : { count: 0, severity: 'ok' };
+                });
+            }
+            if (live.alerts.links && Array.isArray(mapData.links)) {
+                mapData.links.forEach(l => {
+                    const id = l.id ?? l.link_id ?? null;
+                    l.alerts = (id && live.alerts.links[id]) ? live.alerts.links[id] : { count: 0, severity: 'ok' };
+                });
+            }
+        }
+        // Nodes may have been added/removed by the live update; keep the
+        // lookup map in sync before re-rendering.
+        rebuildNodeIndex();
+        staticDirty = true;
+        // Compute whether any link has active traffic so the RAF loop
+        // can pause when the map is idle (zero bps on every link).
+        hasActiveTraffic = Array.isArray(mapData.links) &&
+            mapData.links.some(l => (l.live?.in_bps > 0 || l.live?.out_bps > 0));
+        renderMap();
+        // Restart the animation loop if traffic appeared or a down-node
+        // pulse is needed while it was paused.
+        const hasDownNode = Array.isArray(mapData.nodes) &&
+            mapData.nodes.some(n => (n.status || 'unknown') === 'down');
+        if ((hasActiveTraffic || hasDownNode) && !animationId) {
+            startAnimationLoop();
+        }
+    }
+
+    function updateStatus() {
+        const statusBar = document.getElementById('status-bar');
+        const lastUpdated = document.getElementById('last-updated');
+
+        if (lastDataUpdate) {
+            const seconds = Math.floor((Date.now() - lastDataUpdate) / 1000);
+            if (seconds < 5) {
+                lastUpdated.textContent = 'Just now';
+            } else if (seconds < 60) {
+                lastUpdated.textContent = `${seconds}s ago`;
+            } else {
+                const mins = Math.floor(seconds / 60);
+                lastUpdated.textContent = `${mins}m ago`;
+            }
+        } else {
+            lastUpdated.textContent = 'Waiting...';
+        }
+        statusBar.style.display = 'block';
+    }
+
+    function renderLegend() {
+        const rows = document.getElementById('legend-rows');
+        if (!rows) return;
+        rows.innerHTML = '';
+        const [t1, t2, t3] = WMNG_CONFIG.thresholds || [50,80,95];
+        const items = [
+            { c: WMNG_CONFIG.colors.link_normal || '#28a745', l: `< ${t1}%` },
+            { c: WMNG_CONFIG.colors.link_warning || '#ffc107', l: `${t1}–${t2}%` },
+            { c: WMNG_CONFIG.colors.link_critical || '#dc3545', l: `≥ ${t2}%` }
+        ];
+        items.forEach(it => {
+            const div = document.createElement('div');
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.gap = '6px';
+            div.innerHTML = `<span style="display:inline-block; width:18px; height:10px; background:${escapeHtml(it.c)}; border:1px solid #999;"></span><span>${escapeHtml(it.l)}</span>`;
+            rows.appendChild(div);
+        });
+        const metricLabel = document.createElement('div');
+        metricLabel.style.marginTop = '6px';
+        metricLabel.style.color = '#444';
+        metricLabel.textContent = `Metric: ${currentMetric}`;
+        rows.appendChild(metricLabel);
+    }
+
+    function exportPNG() {
+        try {
+            const out = document.createElement('canvas');
+            out.width = canvas.width; out.height = canvas.height;
+            const octx = out.getContext('2d');
+            // Composite the static main canvas then the dynamic overlay.
+            octx.drawImage(canvas, 0, 0);
+            octx.drawImage(overlayCanvas, 0, 0);
+            const a = document.createElement('a');
+            a.href = out.toDataURL('image/png');
+            a.download = `weathermap-${mapId}.png`;
+            a.click();
+        } catch (e) { console.error('Export failed', e); }
+    }
+
+    let pollTimer = null;
+    function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    }
+
+    function startAutoUpdate() {
+        stopPolling();
+        currentTransport = 'poll';
+        updateTransportButton();
+        fetchLiveUpdate();
+        pollTimer = setInterval(() => {
+            fetchLiveUpdate();
+        }, intervalSec * 1000);
+    }
+
+    function fetchLiveUpdate() {
+        fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/live`)
+            .then(response => {
+                if (!response.ok) { console.warn('Live update failed: HTTP ' + response.status); return null; }
+                return response.json();
+            })
+            .then(live => {
+                if (live && !live.error) applyLiveUpdate(live);
+            })
+            .catch(error => {
+                console.error('Error fetching live update:', error);
+            });
+    }
+
+    function fetchMapData() {
+        fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/json`)
+            .then(response => {
+                if (!response.ok) { console.warn('Map data fetch failed: HTTP ' + response.status); return null; }
+                return response.json();
+            })
+            .then(data => {
+                if (data && !data.error) {
+                    mapData = data;
+                    rebuildNodeIndex();
+                    lastDataUpdate = Date.now();
+                    staticDirty = true;
+                    renderMap();
+                }
+            })
+            .catch(error => {
+                console.error('Error updating map:', error);
+            });
+    }
+
+    function showError(message) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('map-container').innerHTML = `
+            <div class="error">
+                <div>${escapeHtml(message)}</div>
+            </div>
+        `;
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+        if (canvas) {
+            const container = document.getElementById('map-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            syncOverlayCanvas();
+            staticDirty = true;
+            renderMap();
+        }
+    });
+
+    // Hover tooltip for link bandwidth
+    function storeLinkGeom(link, x1, y1, x2, y2, pct, pathPoints) {
+        const inBps = link.live?.in_bps ?? 0;
+        const outBps = link.live?.out_bps ?? 0;
+        const bandwidth = link.bandwidth_bps || link.bandwidth || null;
+        const points = pathPoints || [{x:x1,y:y1},{x:x2,y:y2}];
+        linkGeoms.push({x1,y1,x2,y2,pct,inBps,outBps,bandwidth,link,points});
+    }
+
+    function distToSegment(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const len2 = dx*dx + dy*dy;
+        if (len2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1)*dx + (py - y1)*dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        const projX = x1 + t*dx, projY = y1 + t*dy;
+        return Math.hypot(px - projX, py - projY);
+    }
+
+    function distToPath(px, py, points) {
+        let minDist = Infinity;
+        for (let i = 1; i < points.length; i++) {
+            const d = distToSegment(px, py, points[i-1].x, points[i-1].y, points[i].x, points[i].y);
+            if (d < minDist) minDist = d;
+        }
+        return minDist;
+    }
+
+    function humanBits(v) {
+        if (scale === 'bytes') {
+            if (v >= 8e9) return (v/8e9).toFixed(2) + ' GB/s';
+            if (v >= 8e6) return (v/8e6).toFixed(2) + ' MB/s';
+            if (v >= 8e3) return (v/8e3).toFixed(2) + ' KB/s';
+            return (v/8).toFixed(0) + ' B/s';
+        }
+        if (v >= 1e9) return (v/1e9).toFixed(2) + ' Gb/s';
+        if (v >= 1e6) return (v/1e6).toFixed(2) + ' Mb/s';
+        if (v >= 1e3) return (v/1e3).toFixed(2) + ' Kb/s';
+        return v + ' b/s';
+    }
+
+    function updateTransportButton() {
+        const btn = document.getElementById('toggle-transport');
+        if (!btn) return;
+        if (currentTransport === 'sse') {
+            btn.textContent = `Live: SSE (${intervalSec}s)`;
+        } else if (currentTransport === 'poll') {
+            btn.textContent = `Live: Poll (${intervalSec}s)`;
+        } else {
+            btn.textContent = 'Live: …';
+        }
+    }
+
+    // --- Graph hover popup state ---
+    let graphHoverTimer = null;
+    let graphHoverTarget = null; // { type: 'node'|'link', id, data }
+    let graphHoverImg = null; // in-flight Image, aborted on new hover
+    const graphPopup = document.getElementById('graph-popup');
+
+    function hideGraphPopup() {
+        if (graphHoverTimer) { clearTimeout(graphHoverTimer); graphHoverTimer = null; }
+        graphHoverTarget = null;
+        if (graphHoverImg) { graphHoverImg.src = ''; graphHoverImg = null; }
+        if (graphPopup) graphPopup.style.display = 'none';
+    }
+
+    function showGraphPopup(target, pageX, pageY) {
+        if (!graphsEnabled || !target || !graphPopup) return;
+
+        const now = Math.floor(Date.now() / 1000);
+        const from = now - 3600; // last 1 hour
+        let imgSrc = null;
+        let caption = '';
+
+        if (target.type === 'node' && target.data.device_id) {
+            imgSrc = `${graphBaseUrl}?type=device_bits&id=${target.data.device_id}&from=${from}&to=${now}`;
+            caption = escapeHtml(target.data.label || target.data.device_name || 'Device ' + target.data.device_id);
+        } else if (target.type === 'link') {
+            const link = target.data;
+            const portId = link.port_id_a || link.port_id_b || null;
+            if (portId) {
+                imgSrc = `${graphBaseUrl}?type=port_bits&id=${portId}&from=${from}&to=${now}`;
+                const portName = link.source_port_name || link.destination_port_name || '';
+                caption = escapeHtml(portName ? 'Port: ' + portName : 'Port ' + portId);
+            }
+        }
+
+        if (!imgSrc) return;
+
+        // Position popup, clamping to viewport
+        const popupW = 420, popupH = 220;
+        let px = pageX + 14;
+        let py = pageY + 14;
+        if (px + popupW > window.innerWidth) px = pageX - popupW - 14;
+        if (py + popupH > window.innerHeight) py = pageY - popupH - 14;
+        if (px < 4) px = 4;
+        if (py < 4) py = 4;
+
+        graphPopup.style.left = px + 'px';
+        graphPopup.style.top = py + 'px';
+        graphPopup.innerHTML = `<div class="graph-loading"><i class="fas fa-spinner fa-spin"></i> Loading graph…</div>`;
+        graphPopup.style.display = 'block';
+
+        // Abort any prior in-flight graph image before starting a new one.
+        if (graphHoverImg) { graphHoverImg.src = ''; graphHoverImg = null; }
+
+        const img = new Image();
+        graphHoverImg = img;
+        img.onload = () => {
+            // Only update if this popup is still for the same target
+            if (graphHoverTarget !== target || graphHoverImg !== img) return;
+            graphHoverImg = null;
+            graphPopup.innerHTML = '';
+            graphPopup.appendChild(img);
+            if (caption) {
+                const cap = document.createElement('div');
+                cap.className = 'graph-caption';
+                cap.textContent = caption;
+                graphPopup.appendChild(cap);
+            }
+        };
+        img.onerror = () => { if (graphHoverImg === img) graphHoverImg = null; hideGraphPopup(); };
+        img.src = imgSrc;
+    }
+
+    document.getElementById('map-canvas').addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const mx = (x - viewOffsetX) / Math.max(0.0001, viewScale);
+        const my = (y - viewOffsetY) / Math.max(0.0001, viewScale);
+        // Node hover first
+        let nbest = null; let nd = 1e9;
+        for (const g of nodeGeoms) {
+            const d = Math.hypot(mx - g.x, my - g.y) - g.r;
+            if (d < nd && d < 8) { nd = d; nbest = g; }
+        }
+        let best = null, bestDist = 12; // threshold px
+        if (!nbest) {
+            for (const g of linkGeoms) {
+                if (g.points && g.points.length > 2) {
+                    const pts = g.points.map(p => ({
+                        x: p.x * viewScale + viewOffsetX,
+                        y: p.y * viewScale + viewOffsetY
+                    }));
+                    const d = distToPath(x, y, pts);
+                    if (d < bestDist) { bestDist = d; best = g; }
+                } else {
+                    const lx1 = g.x1 * viewScale + viewOffsetX;
+                    const ly1 = g.y1 * viewScale + viewOffsetY;
+                    const lx2 = g.x2 * viewScale + viewOffsetX;
+                    const ly2 = g.y2 * viewScale + viewOffsetY;
+                    const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
+                    if (d < bestDist) { bestDist = d; best = g; }
+                }
+            }
+        }
+        const tooltip = document.getElementById('tooltip');
+        // Determine new hover target for graph popup
+        let newTarget = null;
+        if (nbest) {
+            const n = nbest.node;
+            const t = n.traffic || {};
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.pageX + 10) + 'px';
+            tooltip.style.top = (e.pageY + 10) + 'px';
+            const sum = t.sum_bps ?? n.current_value ?? 0;
+            const srcMap = { ports: 'ports', links: 'links', device: 'device', device_guess: 'device*', none: 'unknown' };
+            const src = t.source ? (srcMap[t.source] || 'unknown') : 'unknown';
+            tooltip.innerHTML = `${escapeHtml(n.label || n.id)}<br>` +
+              `In: ${humanBits(t.in_bps ?? 0)}<br>` +
+              `Out: ${humanBits(t.out_bps ?? 0)}<br>` +
+              `Total (In + Out): ${humanBits(sum ?? 0)}<br>` +
+              `<span style="opacity:0.75;">Source: ${src}</span>` +
+              (n.alerts && n.alerts.count > 0
+                ? `<br><span style="color:#ffc107;">⚠ ${n.alerts.count} alert${n.alerts.count > 1 ? 's' : ''} (${n.alerts.severity || 'warning'})</span>`
+                : '');
+            if (n.device_id) newTarget = { type: 'node', id: n.id, data: n };
+        } else if (best) {
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.pageX + 10) + 'px';
+            tooltip.style.top = (e.pageY + 10) + 'px';
+            const pctVal = best.pct !== null ? Math.round(best.pct) + '%' : 'N/A';
+            const bwLine = best.bandwidth ? `<br><span style="opacity:0.75;">Capacity: ${humanBits(best.bandwidth)}</span>` : '';
+            tooltip.innerHTML = `<b>Utilization: ${pctVal}</b><br>` +
+                `<span style="color:#40ff40;">▼</span> In: ${humanBits(best.inBps)}<br>` +
+                `<span style="color:#40a0ff;">▲</span> Out: ${humanBits(best.outBps)}` + bwLine +
+                (best.link && best.link.alerts && best.link.alerts.count > 0
+                  ? `<br><span style="color:#ffc107;">⚠ ${best.link.alerts.count} alert${best.link.alerts.count > 1 ? 's' : ''} (${best.link.alerts.severity || 'warning'})</span>`
+                  : '');
+            const link = best.link;
+            if (link && (link.port_id_a || link.port_id_b)) newTarget = { type: 'link', id: link.id, data: link };
+        } else {
+            tooltip.style.display = 'none';
+        }
+        // Graph popup: schedule or cancel based on hover target
+        if (newTarget) {
+            const targetKey = newTarget.type + ':' + newTarget.id;
+            const prevKey = graphHoverTarget ? graphHoverTarget.type + ':' + graphHoverTarget.id : null;
+            if (targetKey !== prevKey) {
+                hideGraphPopup();
+                graphHoverTarget = newTarget;
+                const px = e.pageX, py = e.pageY;
+                graphHoverTimer = setTimeout(() => {
+                    if (graphHoverTarget === newTarget) showGraphPopup(newTarget, px, py);
+                }, 300);
+            }
+        } else {
+            hideGraphPopup();
+        }
+    });
+    // Hide graph popup when leaving the canvas
+    document.getElementById('map-canvas').addEventListener('mouseleave', hideGraphPopup);
+    // Click: node → device page; else link → port graphs
+    document.getElementById('map-canvas').addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const mx = (x - viewOffsetX) / Math.max(0.0001, viewScale);
+        const my = (y - viewOffsetY) / Math.max(0.0001, viewScale);
+        // Alert badge hit detection (before node/link) — opens device alerts.
+        for (const g of nodeGeoms) {
+            const n = g.node;
+            if (n.alerts && n.alerts.count > 0) {
+                const bx = g.x + g.r - 3;
+                const by = g.y - g.r + 3;
+                if (Math.hypot(mx - bx, my - by) < 10) {
+                    const did = n.device_id || n.deviceId || n.deviceid;
+                    if (did) {
+                        window.open(deviceBaseUrl + '/' + did + '/tab=alerts/', WMNG_CONFIG.linkTarget || '_blank');
+                    }
+                    return;
+                }
+            }
+        }
+        // Link alert badge hit detection (diamond at midpoint offset).
+        for (const g of linkGeoms) {
+            const link = g.link;
+            if (link && link.alerts && link.alerts.count > 0) {
+                const mid = getPathMidpoint(g.points);
+                const bx = mid.x + 10;
+                const by = mid.y - 10;
+                if (Math.hypot(mx - bx, my - by) < 12) {
+                    const srcId = link.source ?? link.src ?? link.source_id;
+                    const srcNode = nodeById.get(srcId);
+                    const did = srcNode && (srcNode.device_id || srcNode.deviceId || srcNode.deviceid);
+                    if (did) {
+                        window.open(deviceBaseUrl + '/' + did + '/tab=alerts/', WMNG_CONFIG.linkTarget || '_blank');
+                    }
+                    return;
+                }
+            }
+        }
+        for (const g of nodeGeoms) {
+            if (Math.hypot(mx - g.x, my - g.y) <= g.r + 4) {
+                const n = g.node;
+                const did = n.device_id || n.deviceId || n.deviceid;
+                if (did) {
+                    const url = deviceBaseUrl + '/' + did;
+                    window.open(url, WMNG_CONFIG.linkTarget || '_blank');
+                    return;
+                }
+            }
+        }
+        // Else link
+        let best = null, bestDist = 10;
+        for (const g of linkGeoms) {
+            if (g.points && g.points.length > 2) {
+                const pts = g.points.map(p => ({
+                    x: p.x * viewScale + viewOffsetX,
+                    y: p.y * viewScale + viewOffsetY
+                }));
+                const d = distToPath(x, y, pts);
+                if (d < bestDist) { bestDist = d; best = g; }
+            } else {
+                const lx1 = g.x1 * viewScale + viewOffsetX;
+                const ly1 = g.y1 * viewScale + viewOffsetY;
+                const lx2 = g.x2 * viewScale + viewOffsetX;
+                const ly2 = g.y2 * viewScale + viewOffsetY;
+                const d = distToSegment(x, y, lx1, ly1, lx2, ly2);
+                if (d < bestDist) { bestDist = d; best = g; }
+            }
+        }
+        if (best && best.link) {
+            const pA = best.link.port_id_a || null;
+            const pB = best.link.port_id_b || null;
+            const now = Math.floor(Date.now()/1000);
+            const from = now - 86400;
+            const openGraph = (portId) => {
+                if (!portId) return;
+                const url = graphBaseUrl + '?type=port_bits&id=' + portId + '&from=' + from + '&to=' + now;
+                window.open(url, WMNG_CONFIG.linkTarget || '_blank');
+            };
+            if (pA) openGraph(pA);
+            if (pB) openGraph(pB);
+        }
+    });
+    function drawMinimap() {
+        if (!minimap || !Array.isArray(mapData.nodes) || mapData.nodes.length === 0) return;
+
+        // Calculate actual bounds from node positions
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        mapData.nodes.forEach(n => {
+            const nx = (n.position?.x ?? n.x) || 0;
+            const ny = (n.position?.y ?? n.y) || 0;
+            minX = Math.min(minX, nx);
+            minY = Math.min(minY, ny);
+            maxX = Math.max(maxX, nx);
+            maxY = Math.max(maxY, ny);
+        });
+
+        // Use larger of map dimensions or node extent (with padding)
+        const padding = 50;
+        const mw = Math.max(mapData.width || 800, maxX + padding);
+        const mh = Math.max(mapData.height || 600, maxY + padding);
+
+        const w = minimap.width, h = minimap.height;
+        const s = Math.min(w/mw, h/mh);
+        // Center the map in minimap
+        const offsetX = (w - mw * s) / 2;
+        const offsetY = (h - mh * s) / 2;
+        const ctxm = minimap.getContext('2d');
+        ctxm.clearRect(0,0,w,h);
+        ctxm.fillStyle = '#fafafa'; ctxm.fillRect(0,0,w,h);
+
+        // Draw map boundary
+        ctxm.strokeStyle = '#ddd';
+        ctxm.strokeRect(offsetX, offsetY, mw * s, mh * s);
+
+        // Draw nodes
+        mapData.nodes.forEach(n => {
+            const x = offsetX + ((n.position?.x ?? n.x)||0) * s;
+            const y = offsetY + ((n.position?.y ?? n.y)||0) * s;
+            ctxm.fillStyle = getNodeColor(n);
+            ctxm.beginPath();
+            ctxm.arc(x, y, 3, 0, Math.PI * 2);
+            ctxm.fill();
+        });
+
+        // Draw viewport rectangle (what's currently visible)
+        if (viewScale > 0 && canvas) {
+            const vpLeft = (-viewOffsetX / viewScale) * s + offsetX;
+            const vpTop = (-viewOffsetY / viewScale) * s + offsetY;
+            const vpWidth = (canvas.width / viewScale) * s;
+            const vpHeight = (canvas.height / viewScale) * s;
+            ctxm.strokeStyle = 'rgba(0, 123, 255, 0.8)';
+            ctxm.lineWidth = 2;
+            ctxm.strokeRect(vpLeft, vpTop, vpWidth, vpHeight);
+            ctxm.lineWidth = 1;
+        }
+
+        // Border
+        ctxm.strokeStyle = '#ccc'; ctxm.strokeRect(0,0,w,h);
+    }

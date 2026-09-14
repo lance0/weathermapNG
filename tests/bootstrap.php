@@ -32,6 +32,25 @@ if (!function_exists('editor_source')) {
     }
 }
 
+/**
+ * Combined embed source for JS-content tests.
+ *
+ * The embed view's JS (v1.13.0) and CSS were extracted into
+ * resources/js/embed-app.js and resources/css/embed.css. Tests asserting
+ * embed behavior must load the Blade template plus the extracted module.
+ */
+if (!function_exists('embed_source')) {
+    function embed_source(): string
+    {
+        $base = __DIR__ . '/../';
+        $src = file_get_contents($base . 'resources/views/embed.blade.php');
+        $src .= "\n// ==== embed-app.js ====\n" . file_get_contents($base . 'resources/js/embed-app.js');
+        $src .= "\n// ==== embed.css ====\n" . file_get_contents($base . 'resources/css/embed.css');
+
+        return $src;
+    }
+}
+
 // Shim Laravel's config() helper used by lib classes
 if (!function_exists('config')) {
     function config($key = null, $default = null) {
