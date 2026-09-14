@@ -717,6 +717,7 @@ try {
           `options` json DEFAULT NULL,
           `created_at` timestamp NULL DEFAULT NULL,
           `updated_at` timestamp NULL DEFAULT NULL,
+          PRIMARY KEY (`id`),
           UNIQUE KEY `wmng_maps_name_unique` (`name`),
           KEY `wmng_maps_parent_map_id_index` (`parent_map_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

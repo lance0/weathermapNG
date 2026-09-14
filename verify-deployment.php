@@ -68,7 +68,8 @@ if (file_exists($librenms_base . '/vendor/autoload.php')) {
     pass("LibreNMS autoloader found");
 } else {
     fail("LibreNMS autoloader not found at $librenms_base/vendor/autoload.php");
-    die("Cannot continue without LibreNMS\n");
+    fwrite(STDERR, "Cannot continue without LibreNMS\n");
+    exit(1);
 }
 
 if (file_exists($librenms_base . '/includes/init.php')) {
