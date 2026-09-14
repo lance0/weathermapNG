@@ -3,10 +3,10 @@
 @section('title', $title)
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/weathermapng.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/loading.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/toast.css') }}">
-<link rel="stylesheet" href="{{ asset('plugins/WeathermapNG/resources/css/a11y.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/weathermapng.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/loading.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/toast.css') }}">
+<link rel="stylesheet" href="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('css/a11y.css') }}">
 <style>
 /* ===== Light Mode (Default) ===== */
 .editor-container {
@@ -565,8 +565,8 @@
         @endsection
 
         @section('scripts')
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/wmng-common.js') }}"></script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/ui-helpers.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/wmng-common.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/ui-helpers.js') }}"></script>
         <script>
             // Shared polyfill + theme (wmng-common.js). Safe if common fails to load.
             if (window.WMNG && typeof WMNG.ensureUiHelpers === 'function') {
@@ -589,7 +589,7 @@
                 WMNG.observeTheme('.editor-container');
             }
         </script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/editor-state.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-state.js') }}"></script>
         <script>
             // Editor bootstrap: inject page-specific values (map id, editor
             // link style, LibreNMS route URLs) into the shared EditorState
@@ -612,9 +612,9 @@
                 graph: '{{ url('graph') }}',
             };
         </script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/editor-canvas.js') }}"></script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/editor-nodes.js') }}"></script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/editor-links.js') }}"></script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/editor-ui.js') }}"></script>
-        <script src="{{ asset('plugins/WeathermapNG/resources/js/editor-versions.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-canvas.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-nodes.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-links.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-ui.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-versions.js') }}"></script>
 @endsection

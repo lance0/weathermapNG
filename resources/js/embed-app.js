@@ -682,6 +682,44 @@ const CFG = window.WMNG.EmbedConfig || {};
         return { points, viaStyle };
     }
 
+    /**
+     * Sample a link's path into a dense polyline so length/point-at-progress
+     * math follows the VISIBLY drawn curve.
+     *
+     * traceLinkPath renders >2-point curved links as a Catmull-Rom spline
+     * (bezierCurveTo), while getPointOnPath/pathLength/getPathMidpoint
+     * interpolate straight chords between the raw via-points. On curved
+     * links that puts flow particles, link labels, and alert badges on the
+     * chord — visibly off the bulging curve. Sampling the same bezier into
+     * ~small chords makes the chord interpolation track the curve to
+     * sub-pixel accuracy.
+     */
+    function densePathPoints(points, viaStyle) {
+        if (viaStyle !== 'curved' || points.length <= 2) return points;
+        const steps = 24; // per segment; ~1-2px chords at typical scales
+        const dense = [points[0]];
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i - 1)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(points.length - 1, i + 2)];
+            const cp1x = p1.x + (p2.x - p0.x) / 6;
+            const cp1y = p1.y + (p2.y - p0.y) / 6;
+            const cp2x = p2.x - (p3.x - p1.x) / 6;
+            const cp2y = p2.y - (p3.y - p1.y) / 6;
+            for (let sIdx = 1; sIdx <= steps; sIdx++) {
+                const t = sIdx / steps;
+                const t2 = t * t, t3 = t2 * t;
+                const mt = 1 - t, mt2 = mt * mt, mt3 = mt2 * mt;
+                dense.push({
+                    x: mt3 * p1.x + 3 * mt2 * t * cp1x + 3 * mt * t2 * cp2x + t3 * p2.x,
+                    y: mt3 * p1.y + 3 * mt2 * t * cp1y + 3 * mt * t2 * cp2y + t3 * p2.y,
+                });
+            }
+        }
+        return dense;
+    }
+
     function traceLinkPath(ctx, points, viaStyle) {
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
@@ -769,6 +807,7 @@ const CFG = window.WMNG.EmbedConfig || {};
         return len;
     }
 
+    
     function drawLink(link) {
         const srcId = link.source ?? link.src ?? link.source_id;
         const dstId = link.target ?? link.dst ?? link.destination_id;
@@ -782,7 +821,8 @@ const CFG = window.WMNG.EmbedConfig || {};
         const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
         const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
 
-        const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+        const { points: rawPoints, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+        const points = densePathPoints(rawPoints, viaStyle);
         const metric = getLinkMetric(link);
         const pct = getLinkPct(link, metric);
         const linkStyle = link.style || {};
@@ -792,7 +832,7 @@ const CFG = window.WMNG.EmbedConfig || {};
         // mode the line stroke is delegated to the overlay (drawLinkDynamic)
         // so the animated dash offset doesn't force a main-canvas redraw.
         if (flowAnimationEnabled) {
-            traceLinkPath(ctx, points, viaStyle);
+            traceLinkPath(ctx, rawPoints, viaStyle);
             ctx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
             ctx.lineWidth = width;
             ctx.stroke();
@@ -832,7 +872,8 @@ const CFG = window.WMNG.EmbedConfig || {};
             ctx.stroke();
             ctx.restore();
         }
-        // store geometry for hover
+        // store geometry for hover (dense points, so hover hit-testing
+        // follows the curve too)
         storeLinkGeom(link, x1, y1, x2, y2, pct, points);
     }
 
@@ -851,7 +892,8 @@ const CFG = window.WMNG.EmbedConfig || {};
         const x2 = (targetNode.position?.x ?? targetNode.x) || 0;
         const y2 = (targetNode.position?.y ?? targetNode.y) || 0;
 
-        const { points, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+        const { points: rawPoints, viaStyle } = buildLinkPath(link, x1, y1, x2, y2);
+        const points = densePathPoints(rawPoints, viaStyle);
         const metric = getLinkMetric(link);
         const pct = getLinkPct(link, metric);
         const linkStyle = link.style || {};
@@ -861,7 +903,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             drawFlowParticles(link, x1, y1, x2, y2, pct, points, octx);
         } else {
             // Dash-mode: draw the dashed line with animated offset.
-            traceLinkPath(octx, points, viaStyle);
+            traceLinkPath(octx, rawPoints, viaStyle);
             octx.strokeStyle = (linkStyle.color !== undefined && linkStyle.color !== null) ? linkStyle.color : getLinkColor(pct);
             octx.lineWidth = width;
             const dash = Math.max(6, width * 3);
@@ -874,7 +916,6 @@ const CFG = window.WMNG.EmbedConfig || {};
             octx.setLineDash([]);
         }
     }
-    
     function drawFlowParticles(link, x1, y1, x2, y2, pct, pathPoints, drawCtx) {
         const live = link.live || {};
         const inBps = live.in_bps || 0;
