@@ -1040,17 +1040,71 @@ const CFG = window.WMNG.EmbedConfig || {};
         drawCtx.restore();
     }
 
-    // Overlay debug readout: transform + canvas metrics, top-left. Re-rendered
-    // with the static frame so it tracks resizes.
-    function drawDebugTransformCenter(ctx, s) {
-        if (!debugDots) return;
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.font = '11px monospace';
-        ctx.fillStyle = '#ff00ff';
-        ctx.fillText('debug: scale=' + s.toFixed(3) + ' ox=' + Math.round(viewOffsetX) + ' oy=' + Math.round(viewOffsetY) + ' dpr=' + window.devicePixelRatio, 8, 14);
-        ctx.restore();
+    // On-screen diagnostic panel — ?debugDots=2. Dumps the whole render
+    // (map data, live attachment, transport, RAF, transforms, canvas sizes)
+    // without devtools, since their environment shows behaviors that differ
+    // from every probe I can run.
+    let debugPanelEl = null;
+    let debugTickActive = false;
+    function ensureDebugPanel() {
+        if (debugPanelEl) return debugPanelEl;
+        debugPanelEl = document.createElement('pre');
+        debugPanelEl.id = 'debug-panel';
+        debugPanelEl.style.cssText = 'position:fixed;top:0;left:0;z-index:99999;background:rgba(0,0,0,0.85);color:#0f0;font:10px/1.4 monospace;padding:8px;border-radius:0 0 6px 0;overflow:auto;max-height:50%;max-width:50%;pointer-events:none;white-space:pre;';
+        document.body.appendChild(debugPanelEl);
+        return debugPanelEl;
     }
+
+    function updateDebugPanel() {
+        if (!debugDots || debugDots !== '2') { if (debugPanelEl) { debugPanelEl.remove(); debugPanelEl = null; } return; }
+        var el = ensureDebugPanel();
+        var info = [];
+        info.push('== WeathermapNG debug panel ==');
+        info.push('href: ' + window.location.href);
+        info.push('mapId: ' + (typeof mapId !== 'undefined' ? mapId : 'n/a'));
+        info.push('mapData: nodes=' + (mapData?.nodes || []).length + ' links=' + (mapData?.links || []).length);
+        var liveAttached = (mapData?.links || []).filter((l) => l.live).length;
+        info.push('live attached to: ' + liveAttached + '/' + (mapData?.links || []).length + ' links');
+        info.push('demoMode: ' + (typeof demoMode !== 'undefined' ? demoMode : 'n/a'));
+        info.push('transport: ' + (typeof currentTransport !== 'undefined' ? currentTransport : 'n/a'));
+        info.push('sseEnabled: ' + (typeof sseEnabled !== 'undefined' ? sseEnabled : 'n/a'));
+        info.push('hasActiveTraffic: ' + (typeof hasActiveTraffic !== 'undefined' ? hasActiveTraffic : 'n/a'));
+        info.push('RAF running: ' + (typeof animationId !== 'undefined' ? !!animationId : 'n/a'));
+        info.push('flowAnimation: ' + (typeof flowAnimationEnabled !== 'undefined' ? flowAnimationEnabled : 'n/a'));
+        info.push('particles cache: ' + Object.keys(typeof particles !== 'undefined' ? particles : {}).length);
+        info.push('transform: scale=' + (typeof viewScale !== 'undefined' ? viewScale.toFixed(3) : '?') +
+            ' ox=' + (typeof viewOffsetX !== 'undefined' ? Math.round(viewOffsetX) : '?') +
+            ' oy=' + (typeof viewOffsetY !== 'undefined' ? Math.round(viewOffsetY) : '?'));
+        var mc = document.getElementById('map-canvas'), oc = document.getElementById('overlay-canvas');
+        info.push('static canvas: ' + (mc ? mc.width + 'x' + mc.height + ' css ' + mc.clientWidth + 'x' + mc.clientHeight : 'MISSING'));
+        info.push('overlay canvas: ' + (oc ? oc.width + 'x' + oc.height + ' css ' + oc.clientWidth + 'x' + oc.clientHeight : 'MISSING'));
+        info.push('overlay style.pos: ' + (oc ? getComputedStyle(oc).position + ' left=' + getComputedStyle(oc).left + ' top=' + getComputedStyle(oc).top : '?'));
+        info.push('dpr: ' + window.devicePixelRatio);
+        info.push('browser zoom: ' + Math.round((window.outerWidth / window.innerWidth) * 100) + '% (approx)');
+        info.push('reducedMotion: ' + (typeof reducedMotion !== 'undefined' ? reducedMotion : 'n/a'));
+        info.push('nodeById size: ' + (typeof nodeById !== 'undefined' ? nodeById.size : 'n/a'));
+        info.push('pct labels config: show_pct=' + WMNG_CONFIG.show_percentages + ' show_bw=' + WMNG_CONFIG.show_bandwidth);
+        var metrics = mapData.links.map((l) => getLinkMetric(l)).join(',');
+        info.push('links live metrics: [' + metrics + ']');
+        info.push('link styles: ' + mapData.links.map((l) => JSON.stringify(l.style || {})).join(' | '));
+        el.textContent = info.join('\\n');
+    }
+
+    // Hook updateDebugPanel into the render cycle: after each renderOverlay
+    // and after each applyLiveUpdate.
+    (function () {
+        var origRenderOverlay = renderOverlay;
+        renderOverlay = function () {
+            origRenderOverlay.apply(this, arguments);
+            updateDebugPanel();
+        };
+        var origApplyLive = applyLiveUpdate;
+        applyLiveUpdate = function (live) {
+            origApplyLive.call(this, live);
+            updateDebugPanel();
+        };
+    })();
+
 
     const defaultNodeStyle = mapData.options?.default_node_style || {};
     const defaultLinkStyle = mapData.options?.default_link_style || {};
