@@ -3,6 +3,21 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.1] - 2026-09-14
+
+### Fixed
+- **Flow particles off the link lines** — the headline fix of this patch, from a user report of dots floating beside every link. Three contributing defects, all verified fixed on the live plugin:
+  - **Overlay canvas offset sideways**: `syncOverlayCanvas()` derived the overlay's CSS `left/top` from `getBoundingClientRect()`, measured while the in-flow `#loading` spinner still occupied the container — the overlay stayed pinned half a spinner-width off after the loader hid. Both canvases are now pinned to `top:0/left:0` and the sync copies sizes only, so the two layers cannot separate regardless of browser zoom or OS display scaling. New `OverlayAlignmentTest` (4 cases) pins the origin-shared layout and sync behavior.
+  - **Overlay composed at a stale transform**: `renderOverlay()` read the live `viewScale`/`viewOffset` globals each frame, so a pan/zoom/SSE mutation between the static draw and the overlay draw made particles/dashes/pulses compose at a different transform than the frame below them. `renderMap` now snapshots its transform and the overlay composes against that snapshot — both layers share one geometry per frame.
+  - **Debug overlay always on**: `?debugDots` defaulted to the string `'0'`, truthy in JS, so crosses always drew. Default is now `''` (properly off), and the diagnostic remains available via `?debugDots=1` (crosses + transform readout) or `?debugDots=2` (full on-screen state panel).
+- **Curved-link particles tracked the chord**, not the visible Catmull-Rom curve (`getPointOnPath` interpolated straight chords while `traceLinkPath` drew a bezier). New `densePathPoints()` samples the same bezier into a dense polyline (24 steps/segment), so particles, labels, badges, and hover hit-testing all follow the visible curve — verified ≤4px from the curve on a representative via offset, vs 108px off before.
+
+### Added
+- **Versioned asset URLs**: plugin assets are served with no `Cache-Control`, so browsers heuristic-cache them; after an upgrade a tab could keep running a stale `embed-app.js` for the heuristic lifetime. All plugin asset URLs now append the file's mtime as `?v=…`, so changed files are new URLs and staleness ends at the next page load.
+- **`?debugDots` diagnostic overlay** for the embed view: `?debugDots=1` draws a magenta cross at each particle's computed position plus a transform readout (`scale`/`ox`/`oy`/`dpr`); `?debugDots=2` renders an on-screen panel with the full render-pipeline state (map Data, live-data attachment, transport, RAF, transforms, canvas geometry, CSS positioning, browser zoom). Zero impact when the param is absent.
+- **`just tag` recipe hardening**: the release recipe now commits VERSION only when it differs from HEAD, so re-running it after a pre-committed stamp no longer aborts.
+
+
 ## [1.13.0] - 2026-09-14
 
 ### Added
