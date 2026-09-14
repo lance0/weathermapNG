@@ -3,7 +3,7 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.13.0] - 2026-09-14
 
 ### Added
 - **Common topology templates**: Data Center, WAN/MPLS, Campus, and Branch Office built-in map templates. Added to every seeding path — `database/setup.php` Laravel + PDO variants (used by fresh installs and upgrades) and `database/seeds/MapTemplateSeeder.php`. Node and link coordinates are identical across all three.

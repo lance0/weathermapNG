@@ -37,6 +37,10 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **RRD Graph Hover**: Hover nodes/links for inline LibreNMS time-series graphs
 - **Alert Integration**: Active alert badges with severity coloring and click-through to alert details
 - **Kiosk/NOC Wall Mode**: Fullscreen display with auto-cycling between maps
+- **Nested Maps / Drill-Down**: Click a summary node to navigate to a detailed sub-map (campus → building → rack); breadcrumb bar tracks the hierarchy
+- **Legacy Weathermap Import**: Read PHP Weathermap-style `.conf` files (round-trip export included)
+- **Common Topology Templates**: Built-in Data Center, WAN/MPLS, Campus, and Branch Office templates with pre-placed topology
+- **Accessibility**: ARIA labels on icon-only controls, keyboard focus visibility, and form labels across index, editor, and embed views
 
 ## Quick Start
 
@@ -186,22 +190,28 @@ SSE is handled inline in `RenderController::sse` — there is no separate stream
 
 ## Development
 
-### Running Tests
+### Task Runner (`just`)
+
+Common workflows are exposed via [just](https://github.com/casey/just) (`brew install just`):
+
+```bash
+just check                 # lint + full PHPUnit suite — the "PR-ready" gate
+just visual URL=http://localhost:8000   # screenshots (needs a running stack)
+just dev-up                # docker LibreNMS dev stack with plugin mounted live
+just install LIBRENMS_PATH=/opt/librenms  # full install (thin wrapper)
+just tag v1.13.0           # version bump + changelog + tag + push
+```
+
+Run `just --list` for the full recipe list. Each recipe is a thin facade
+over an existing entrypoint (`quick-install.sh`, `deploy.sh`,
+`verify.php`, `tests/*.sh`); only `setup` contains logic of its own.
+
+### Running Tests Directly
 
 ```bash
 vendor/bin/phpunit
-```
-
-### Docker Test Suite
-
-```bash
-./tests/docker-test.sh
-```
-
-### Installation Tests
-
-```bash
-./tests/install-test.sh
+./tests/docker-test.sh     # full docker install suite
+./tests/install-test.sh    # host-path install suite
 ```
 
 ## Contributing
