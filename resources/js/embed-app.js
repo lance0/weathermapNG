@@ -194,12 +194,11 @@ const CFG = window.WMNG.EmbedConfig || {};
 
     function syncOverlayCanvas() {
         // Both canvases are position:absolute at 0,0. Copy bitmap + CSS
-        // size only — do not derive left/top from getBoundingClientRect.
-        // That measurement is wrong while #loading is still an in-flow
-        // flex sibling (it shoves the map canvas sideways by half the
-        // spinner width), and the overlay then stays stuck at that
-        // offset after loading is hidden. That's what put flow dots
-        // ~29px off every link.
+        // size only — never pin left/top to a live layout measurement.
+        // Measuring while #loading is still an in-flow flex sibling
+        // shoves the overlay sideways by half the spinner width, and
+        // it stays stuck there after loading is hidden. That's what
+        // put flow dots ~29px off every link.
         overlayCanvas.style.left = '0';
         overlayCanvas.style.top = '0';
         overlayCanvas.style.width = canvas.clientWidth + 'px';
