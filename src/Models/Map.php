@@ -179,6 +179,13 @@ class Map extends Model
             $map = Map::create([
                 'name' => $name,
                 'title' => $title ?? $name,
+                // Only keep the parent reference when it points at an existing
+                // map — the file may come from another install where the ID no
+                // longer resolves, and a dangling FK would break queries.
+                'parent_map_id' => is_numeric($data['parent_map_id'] ?? null)
+                    && self::find((int) $data['parent_map_id']) !== null
+                    ? (int) $data['parent_map_id']
+                    : null,
                 'options' => $options,
             ]);
 

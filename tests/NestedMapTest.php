@@ -192,4 +192,37 @@ class NestedMapTest extends TestCase
         $this->assertNull($n->getSubMapIdAttribute());
         $this->assertArrayNotHasKey('sub_map_id', $n->meta);
     }
+
+    public function test_create_from_json_data_restores_parent_link(): void
+    {
+        $root = $this->makeRoot('root');
+        $child = $this->makeChild($root, 'child');
+
+        // Export shape as toJsonModel() produces it.
+        $payload = [
+            'name' => 'restored',
+            'parent_map_id' => $root->id,
+            'breadcrumb' => $root->breadcrumb(),
+            'nodes' => [],
+            'links' => [],
+        ];
+
+        $map = Map::createFromJsonData($payload, 'restored');
+        $this->assertSame($root->id, $map->parent_map_id);
+    }
+
+    public function test_create_from_json_data_drops_dangling_parent(): void
+    {
+        // Parent id that does not exist on this install must not end up as a
+        // broken reference.
+        $payload = [
+            'name' => 'orphan',
+            'parent_map_id' => 999999,
+            'nodes' => [],
+            'links' => [],
+        ];
+
+        $map = Map::createFromJsonData($payload, 'orphan');
+        $this->assertNull($map->parent_map_id);
+    }
 }
