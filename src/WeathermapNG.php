@@ -58,9 +58,8 @@ class WeathermapNG
             'architecture' => $this->architecture,
             'librenms_version' => $this->librenms_version,
             'hooks' => [
-                'menu' => 'app/Plugins/WeathermapNG/Menu.php',
-                'page' => 'app/Plugins/WeathermapNG/Page.php',
-                'settings' => 'app/Plugins/WeathermapNG/Settings.php'
+                'menu' => 'src/Hooks/MenuEntry.php',
+                'settings' => 'src/Hooks/Settings.php'
             ],
             'note' => 'This plugin uses LibreNMS 24.x hook-based architecture. ' .
                       'Functionality is implemented via hooks, not this bootstrap file.'
@@ -74,9 +73,8 @@ class WeathermapNG
     {
         return [
             'menu_hook' => 'Adds WeathermapNG to LibreNMS navigation menu',
-            'page_hook' => 'Provides main weathermap interface and editor',
             'settings_hook' => 'Adds weathermap configuration to LibreNMS settings',
-            'location' => 'app/Plugins/WeathermapNG/',
+            'location' => 'src/Hooks/',
             'architecture' => 'Hook-based (LibreNMS 24.x+)'
         ];
     }

@@ -130,9 +130,6 @@ class PortUtilServiceTest extends TestCase
 
     public function test_port_with_no_rrd_data_returns_zero(): void
     {
-        if (!class_exists('Illuminate\Support\Facades\Log')) {
-            $this->markTestSkipped('Laravel Log facade not available');
-        }
 
         $service = $this->createServiceWithMockRrd([
             101 => null, // RRD returns null = no data

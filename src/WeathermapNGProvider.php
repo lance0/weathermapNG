@@ -45,6 +45,33 @@ class WeathermapNGProvider extends ServiceProvider
             'weathermapng'
         );
 
+        // Overlay the settings saved via the plugin settings form onto the
+        // config defaults so admin-configured values actually take effect.
+        // The form persists to the plugins.settings JSON column; without
+        // this merge, runtime config only reflects the file defaults.
+        try {
+            $pluginRow = \App\Models\Plugin::where('plugin_name', $pluginName)->first();
+            $stored = $pluginRow?->settings;
+            if (is_array($stored) && $stored !== []) {
+                // Only overlay values for known keys; a stale or malformed
+                // key must not corrupt the defaults array.
+                $config = config('weathermapng');
+                if (is_array($config)) {
+                    foreach ($stored as $key => $value) {
+                        if (array_key_exists($key, $config)) {
+                            if (is_array($config[$key]) && is_array($value)) {
+                                config(['weathermapng.' . $key => array_merge($config[$key], $value)]);
+                            } elseif (!is_array($config[$key])) {
+                                config(['weathermapng.' . $key => $value]);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // DB unavailable during install/migrations — file defaults apply.
+        }
+
         // Keep install and health routes available before the plugin is enabled.
         $this->loadRoutesFrom(__DIR__ . '/../routes/web.php');
 
