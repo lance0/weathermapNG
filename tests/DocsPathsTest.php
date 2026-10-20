@@ -6,9 +6,9 @@ class DocsPathsTest extends TestCase
 {
     private $docs = [
         'README.md',
-        'API.md',
-        'INSTALL.md',
-        'DEPLOYMENT.md',
+        'docs/API.md',
+        'docs/INSTALL.md',
+        'docs/DEPLOYMENT.md',
     ];
 
     public function testDocsUseV2Paths()

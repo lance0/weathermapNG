@@ -111,7 +111,7 @@ php artisan cache:clear
 php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
-Read [CHANGELOG.md](CHANGELOG.md) before upgrading across minor versions. Do not drop `wmng_*` tables unless you intend to remove WeathermapNG data.
+Read [CHANGELOG.md](../CHANGELOG.md) before upgrading across minor versions. Do not drop `wmng_*` tables unless you intend to remove WeathermapNG data.
 
 ## Health And Readiness
 

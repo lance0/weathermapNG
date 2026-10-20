@@ -15,7 +15,7 @@ on:
       - 'views/**'
       - 'resources/**'
       - 'README.md'
-      - 'INSTALL.md'
+      - 'docs/INSTALL.md'
       - 'tests/**'
       - '.github/workflows/installation-tests.yml'
   schedule:
@@ -35,7 +35,7 @@ on:
       - 'views/**'
       - 'resources/**'
       - 'README.md'
-      - 'INSTALL.md'
+      - 'docs/INSTALL.md'
       - 'tests/**'
       - '.github/workflows/installation-tests.yml'
 
@@ -106,7 +106,7 @@ jobs:
         run: |
           set -e
           echo "Checking plugin structure..."
-          for file in src/WeathermapNG.php routes/web.php composer.json phpunit.xml README.md INSTALL.md; do
+          for file in src/WeathermapNG.php routes/web.php composer.json phpunit.xml README.md docs/INSTALL.md; do
             test -f "$file" || (echo "MISSING: $file" && exit 1)
             echo "  OK: $file"
           done

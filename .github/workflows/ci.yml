@@ -159,7 +159,7 @@ jobs:
       - name: Check required documentation files exist
         run: |
           set -e
-          for doc in README.md INSTALL.md API.md DEPLOYMENT.md CHANGELOG.md ROADMAP.md RELEASE.md VERSIONING.md CONTRIBUTING.md docs/EMBED.md; do
+          for doc in README.md CHANGELOG.md ROADMAP.md RELEASE.md CONTRIBUTING.md docs/README.md docs/INSTALL.md docs/API.md docs/DEPLOYMENT.md docs/PERFORMANCE.md docs/VERSIONING.md docs/EMBED.md; do
             test -f "$doc" || (echo "MISSING: $doc" && exit 1)
             echo "  OK: $doc"
           done
@@ -167,7 +167,7 @@ jobs:
       - name: Check install guidance stays aligned
         run: |
           set -euo pipefail
-          for file in quick-install.sh README.md INSTALL.md; do
+          for file in quick-install.sh README.md docs/INSTALL.md; do
             grep -F 'composer config repositories.weathermapng' "$file"
             grep -F 'librenms/weathermapng' "$file"
             grep -E 'route:list.*weathermap|route:list.*wmng' "$file"
@@ -181,7 +181,7 @@ jobs:
           for class in SseStreamService MapDataBuilder MapPolicy NodePolicy; do
             # Allow mentions in CHANGELOG (historical) and ROADMAP/VERSIONING
             # (annotating removal), but not in README/INSTALL/API as active.
-            if grep -r "$class" README.md INSTALL.md API.md 2>/dev/null | \
+            if grep -r "$class" README.md docs/INSTALL.md docs/API.md 2>/dev/null | \
                grep -v "removed\|deleted\|dead\|was\|earlier\|older"; then
               echo "ERROR: $class referenced as active in docs"
               exit 1
