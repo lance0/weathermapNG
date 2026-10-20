@@ -33,9 +33,5 @@ class LibMapTest extends TestCase
         $this->assertSame('#ffffff', $map->background);
     }
 
-    public function test_map_to_json_model_structure()
-    {
-        $this->markTestSkipped('Requires database connection for model relationships');
-    }
 }
 

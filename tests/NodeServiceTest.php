@@ -4,102 +4,25 @@ namespace LibreNMS\Plugins\WeathermapNG\Tests;
 
 use PHPUnit\Framework\TestCase;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeService;
+use LibreNMS\Plugins\WeathermapNG\Models\Map;
 
 class NodeServiceTest extends TestCase
 {
-    private NodeService $nodeService;
-
-    protected function setUp(): void
+    /**
+     * storeNodes() guards against wiping a populated map via an empty
+     * payload. The guard fires before DB::transaction, so no DB is
+     * needed to pin it. Node persistence itself is covered by the
+     * container integration tests.
+     */
+    public function test_store_empty_array_on_populated_map_throws(): void
     {
-        parent::setUp();
-        $this->nodeService = new NodeService();
-    }
+        $service = new NodeService();
+        $map = $this->makeMap(true);
 
-    public function test_create_node_with_minimal_data(): void
-    {
-        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
-            $this->markTestSkipped('Laravel Eloquent not available');
-            return;
-        }
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot replace nodes with an empty array');
 
-        $data = [
-            'map_id' => 1,
-            'label' => 'Test Node',
-            'x' => 100,
-            'y' => 200,
-        ];
-
-        $this->assertEquals(1, $data['map_id']);
-        $this->assertEquals('Test Node', $data['label']);
-        $this->assertEquals(100, $data['x']);
-        $this->assertEquals(200, $data['y']);
-    }
-
-    public function test_create_node_with_device(): void
-    {
-        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
-            $this->markTestSkipped('Laravel Eloquent not available');
-            return;
-        }
-
-        $data = [
-            'map_id' => 1,
-            'label' => 'Test Device',
-            'x' => 150,
-            'y' => 250,
-            'device_id' => 42,
-        ];
-
-        $this->assertEquals(42, $data['device_id']);
-    }
-
-    public function test_create_node_with_meta(): void
-    {
-        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
-            $this->markTestSkipped('Laravel Eloquent not available');
-            return;
-        }
-
-        $meta = ['hostname' => 'router1.example.com', 'sn' => 'R1'];
-
-        $data = [
-            'map_id' => 1,
-            'label' => 'Test Node',
-            'x' => 100,
-            'y' => 200,
-            'meta' => $meta,
-        ];
-
-        $this->assertIsArray($data['meta']);
-        $this->assertEquals('router1.example.com', $data['meta']['hostname']);
-    }
-
-    public function test_update_node_position(): void
-    {
-        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
-            $this->markTestSkipped('Laravel Eloquent not available');
-            return;
-        }
-
-        $data = [
-            'x' => 300,
-            'y' => 400,
-        ];
-
-        $this->assertEquals(300, $data['x']);
-        $this->assertEquals(400, $data['y']);
-    }
-
-    public function test_delete_node_handles_missing_node(): void
-    {
-        if (!class_exists('Illuminate\Database\Eloquent\Model')) {
-            $this->markTestSkipped('Laravel Eloquent not available');
-            return;
-        }
-
-        $nodeId = 99999;
-
-        $this->assertEquals(99999, $nodeId);
+        $service->storeNodes($map, []);
     }
 
     /**
@@ -122,5 +45,17 @@ class NodeServiceTest extends TestCase
             substr_count($content, ", 422)"),
             'all three node write paths must map validation errors to 422'
         );
+    }
+
+    private function makeMap(bool $mapHasNodes): Map
+    {
+        $map = $this->createStub(Map::class);
+        $relation = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['exists', 'delete'])
+            ->getMock();
+        $relation->method('exists')->willReturn($mapHasNodes);
+        $relation->method('delete')->willReturn(0);
+        $map->method('nodes')->willReturn($relation);
+        return $map;
     }
 }
