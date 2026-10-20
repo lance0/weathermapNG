@@ -16,7 +16,7 @@ auto-discovery from LLDP/CDP, templates, versioning, and bulk operations.
 
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
-![Version 1.13.1](https://img.shields.io/badge/version-1.13.1-0078D4)
+![Version 1.14.0](https://img.shields.io/badge/version-1.14.0-0078D4)
 
 ## Install
 

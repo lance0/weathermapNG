@@ -3,7 +3,33 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.13.1] - 2026-09-14
+## [1.14.0] - 2026-10-20
+
+### Added
+- **Map lifecycle webhooks**: POST a JSON payload (`event`, `map_id`, `map_name`, `user`, `timestamp`) to configured URLs on `map.created`, `map.updated` (editor saves and imports), `map.deleted`, and `map.version_saved`. Optional HMAC-SHA256 signature header (`X-WeathermapNG-Signature: t=<ts>,v1=<hex>`) when `WEATHERMAPNG_WEBHOOK_SECRET` is set, so receivers can verify authenticity and reject replays. Delivery is best-effort: 5s timeout per URL, failures logged and never block the mutation. Configure via settings page (Webhook URLs, one per line), `WEATHERMAPNG_WEBHOOK_URLS`, or `webhooks.urls` in config. Slack/automation/change-management integration without polling.
+- **Embed API token auth**: external consumers (Grafana panels, NOC walls, status pages, scripts) can now read map data without a browser session. `Authorization: Bearer <token>` or `?token=` on the embed, json, live, and sse endpoints, gated by `WEATHERMAPNG_EMBED_TOKEN`; constant-time comparison; 401 JSON on a bad token. Session-authenticated routes are unchanged. Grafana IFrame panel setup is documented in docs/EMBED.md.
+
+### Fixed
+- **Settings form was write-only**: saves persisted to the `plugins.settings` JSON column but nothing merged it back into runtime `config('weathermapng.*')` — admin-configured values never took effect. The provider now overlays stored settings onto the merged defaults at boot (scalar replace for known keys, recursive merge for array keys, unknown keys ignored so stale data can't corrupt defaults; DB failures fall back to file defaults during install/migrations).
+- **Device-aggregate nodes always showed zero traffic**: `PortUtilService::fetchDeviceAggregate()` was a stub returning `[0,0]`. Now sums RRD traffic across the device's non-ignored, non-disabled ports.
+- **Security: unauthenticated `/health` info leak**: the public probe returned plugin version, DB connectivity detail, RRD/output path accessibility, PHP extension status, and API-token configuration state. Stripped to `{status, timestamp}` with a bare DB-reachability boolean; `/ready` and `/live` were already minimal; `/health/detailed` (admin) retains full checks.
+- **Security: map-name path traversal in poller**: `bin/map-poller.php` wrote `output/cache/{map->name}.json` and the import/create-from-template/editor-save endpoints validated names as `string|max:255` only — a name like `../../tmp/evil` made the cron-run poller mkdir+write outside the output directory with live traffic data. Fixed both layers: the cache file is keyed by map ID (`map-{id}.json`) and `alpha_dash` was added to the three lenient name rules.
+- **Security: install page not admin-gated**: `InstallController::index()` returned PHP version, DB status, path permissions, and plugin state to any authenticated user (only the POST action was gated). Now `requireAdmin()`.
+- **Auto-discovery could half-seed maps**: node and link creation ran without a transaction; a failure mid-discovery left orphan nodes. Wrapped in `DB::transaction`.
+- **Webhook DI**: optional constructor params (`?WebhookDispatcher $webhooks = null`) resolve to their default (null) in Laravel's container — webhooks would never have fired through container-resolved services. Constructor params are now required.
+- **Token routes in the web middleware group** would 403 anonymously before token auth ran: LibreNMS's `web` group includes `VerifyUserEnabled`/`LoadUserPreferences`, which reject anonymous requests. Token-gated routes are now registered with `EmbedTokenAuth` only, the same pattern as the public health probes.
+- **Stale test assertion**: the node-label integration test checked `embed.blade.php` for `humanBits`/`Σ`, but v1.12.0's modularization moved that JS to `embed-app.js`.
+
+### Removed
+- Dead 734-line `resources/views/settings.blade.php` — never rendered by any controller or route; presented dozens of controls wired to nonexistent config keys (`colors.normal`, `thresholds.warning`, `snmp.*`, `node_size`, `backup_*`, `webhook_url`, …). The functional settings UI is `hooks/settings.blade.php`.
+- `AutoDiscoveryService::applyLayoutAlgorithm()` — empty placeholder, never called.
+- Permanently-skipped empty tests and vestigial skip guards. (`Map::createFromJsonData()` was evaluated for removal but retained — no production callers, but v1.13.x nested-map tests exercise it as the JSON round-trip constructor.)
+
+### Changed
+- **Documentation restructured to the ttl/xfr convention**: root keeps README (rewritten: nav line, badge row, quick-start install, task→guide table), CHANGELOG, CONTRIBUTING, ROADMAP, RELEASE; INSTALL, API, DEPLOYMENT, PERFORMANCE, VERSIONING moved to `docs/` with a `docs/README.md` index. All CI/test/script path pins updated.
+- 15 tautological tests (asserted on local data arrays without calling the services) replaced with behavioral coverage: `mergeMapOptions` recursive-merge regression, `validateLinkData` guard, `storeNodes` wipe guard; new `PureFunctionsTest` for previously untested pure functions (`convertStatusToString`, `getBandwidthFormattedAttribute`, `RRDTool::parseRRDOutput/getMetricIndex/isValidValue`, `Logger::sanitizeContext`).
+- Doc drift fixes: 24 → 22 mutation endpoints (actual route count), device/port lookups and version/health reads relabeled admin-only where controllers call `requireAdmin()`, `hasRole('admin')` added to the documented admin criteria.
+
 
 ### Fixed
 - **Flow particles off the link lines** — the headline fix of this patch, from a user report of dots floating beside every link. Three contributing defects, all verified fixed on the live plugin:
