@@ -210,7 +210,7 @@ test_file_integrity() {
         "routes/web.php"
         "quick-install.sh"
         "verify.php"
-        "INSTALL.md"
+        "docs/INSTALL.md"
         "README.md"
     )
     

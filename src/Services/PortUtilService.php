@@ -127,7 +127,7 @@ class PortUtilService
         // Sum traffic from all ports on the device
         $portIds = \Illuminate\Support\Facades\DB::table('ports')
             ->where('device_id', $deviceId)
-            ->where('ignored', 0)
+            ->where('ignore', 0)
             ->where('disabled', 0)
             ->pluck('port_id')
             ->all();
