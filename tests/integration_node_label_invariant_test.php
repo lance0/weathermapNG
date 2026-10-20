@@ -186,9 +186,10 @@ try {
 
     // ----- PR #25: debug-gated logging config key + embed view formatting -----
     check(array_key_exists('debug', config('weathermapng') ?? []), 'weathermapng.debug config key exists (PR #25)');
-    $embedView = file_get_contents('/opt/librenms/html/plugins/WeathermapNG/resources/views/embed.blade.php');
-    check(str_contains($embedView, 'humanBits') && str_contains($embedView, 'Σ'),
-        'embed view uses humanBits AND Σ for node rate label (PR #25)');
+    // v1.12.0 modularization moved embed JS out of the blade into embed-app.js
+    $embedJs = file_get_contents('/opt/librenms/html/plugins/WeathermapNG/resources/js/embed-app.js');
+    check(str_contains($embedJs, 'humanBits') && str_contains($embedJs, 'Σ'),
+        'embed JS uses humanBits AND Σ for node rate label (PR #25)');
 
 } finally {
     // Cleanup: delete tracked test maps and their nodes/links (by ID).
