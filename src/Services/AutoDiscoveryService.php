@@ -321,9 +321,4 @@ class AutoDiscoveryService
         return $created;
     }
 
-    private function applyLayoutAlgorithm(): void
-    {
-        // Layout positions are already applied during node creation
-        // This method is a placeholder for future advanced layout algorithms
-    }
 }
