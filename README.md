@@ -22,7 +22,7 @@ A modern network weathermap plugin for LibreNMS that provides real-time network 
 - **Grid Snapping**: Toggle snap-to-grid for precise node alignment
 - **RRD-based Traffic Data**: Real-time bandwidth from LibreNMS RRD files
 - **Server-Sent Events**: Live updates without polling (streamed inline from the render controller)
-- **Admin-Only Authorization**: All 24 mutation endpoints require admin (`hasGlobalAdmin()`, `isAdmin()`, `level ≥ 10`, or `hasRole('admin')`); read endpoints are open to every authenticated user
+- **Admin-Only Authorization**: All 22 mutation endpoints require admin (`hasGlobalAdmin()`, `isAdmin()`, `level ≥ 10`, or `hasRole('admin')`); most read endpoints are open to every authenticated user (device/port lookups and map version listings are admin-only)
 - **Import/Export**: JSON format for backup and sharing maps
 - **Embed Support**: Embed maps in dashboards with live updates
 - **Map Templates**: Built-in templates for common network topologies

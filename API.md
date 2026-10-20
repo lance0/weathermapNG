@@ -9,7 +9,7 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 
 ## Authentication & Authorization
 
-All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, or a LibreNMS `level >= 10` and otherwise `abort(403)`.
+All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, a LibreNMS `level >= 10`, or `hasRole('admin')` and otherwise `abort(403)`.
 
 ### Public probe routes (no auth)
 
@@ -21,9 +21,9 @@ These sit outside the `auth` group and are intentionally minimal so they can bac
 
 ### Read routes (open to all authenticated users)
 
-`GET` map index/show/editor/view/embed/json/live/sse/export, `GET templates` index/show, and `GET /health/detailed`, `/health/stats`, `/metrics`. None of these call `requireAdmin()`. Device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports`) are admin-only — they expose device IPs and topology data.
+`GET` map index/show/editor/view/embed/json/live/sse/export and `GET templates` index/show. None of these call `requireAdmin()`. Admin-only reads: device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports` — they expose device IPs and topology data), map version endpoints (list/show/compare/export), and `/health/detailed`, `/health/stats`, `/metrics`.
 
-### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`)
+### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, `level >= 10`, or `hasRole('admin')`)
 
 Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at the top of the controller action and `abort(403)` for non-admins. This covers all map CRUD, node CRUD, link CRUD, template CRUD, full-map save, import, auto-discovery, and the install runner. The `GET /plugin/WeathermapNG/install` UI is authenticated (it sits in the `auth` group); its `POST` counterpart is admin-only.
 
@@ -282,19 +282,19 @@ Create link request:
 | Public | `GET` | `/plugin/WeathermapNG/health` | Basic health |
 | Public | `GET` | `/plugin/WeathermapNG/ready` | Readiness probe |
 | Public | `GET` | `/plugin/WeathermapNG/live` | Basic liveness |
-| Authenticated | `GET` | `/plugin/WeathermapNG/health/detailed` | Detailed health |
-| Authenticated | `GET` | `/plugin/WeathermapNG/health/stats` | Plugin stats |
-| Authenticated | `GET` | `/plugin/WeathermapNG/metrics` | Prometheus-style metrics |
+| Admin | `GET` | `/plugin/WeathermapNG/health/detailed` | Detailed health |
+| Admin | `GET` | `/plugin/WeathermapNG/health/stats` | Plugin stats |
+| Admin | `GET` | `/plugin/WeathermapNG/metrics` | Prometheus-style metrics |
 
 ## Version History Routes
 
-Version routes are registered in `routes/web.php` under the `web` + `auth` middleware group. All mutating endpoints require admin via `requireAdmin()`.
+Version routes are registered in `routes/web.php` under the `web` + `auth` middleware group. All version endpoints (list, show, compare, and export included) require admin via `requireAdmin()`.
 
 | Auth | Method | Path | Purpose |
 |------|--------|------|---------|
-| Authenticated | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
+| Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
 | Admin | `POST` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Create a named version |
-| Authenticated | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details + snapshot |
+| Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details + snapshot |
 | Admin | `POST` | `/plugin/WeathermapNG/api/versions/{versionId}/restore` | Restore map to a version |
 | Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}` | Compare two versions (returns flat diff: `nodes_added`, `nodes_removed`, `nodes_modified`, `links_added`, `links_removed`, `links_modified`) |
 | Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
