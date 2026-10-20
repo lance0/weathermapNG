@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-*Last reviewed v1.13.1 (2026-09-14) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+*Last reviewed v1.14.0 (2026-10-20) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.13.1 (Stable)
+## Current Status: v1.14.0 (Stable)
 
 The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.11.0:
 
@@ -255,10 +255,10 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - ~~Follow `bin/map-poller.php` bootstrap pattern for LibreNMS environment loading.~~ *(v1.11.0: uses Artisan via ServiceProvider auto-discovery — no bootstrap boilerplate needed)*
   - ~~Enables automation and headless map management.~~ *(v1.11.0)*
 
-- [ ] **External embedding API documentation**
-  - Document the existing `/api/maps/{map}/json` and `/api/maps/{map}/live` endpoints as a public embedding API.
-  - Add optional API token auth for non-session access (NOC dashboards, external systems).
-  - *Enables Grafana iframe panels, custom NOC walls, and status page integration without iframe hacks.*
+- [x] **External embedding API documentation** *(v1.14.0: docs/API.md + docs/EMBED.md cover the read endpoints; `WEATHERMAPNG_EMBED_TOKEN` gates embed/json/live/sse via Bearer or `?token=` for sessionless consumers — Grafana panels, NOC walls, scripts; container-verified 200/401)*
+  - ~~Document the existing `/api/maps/{map}/json` and `/api/maps/{map}/live` endpoints as a public embedding API.~~ *(v1.14.0)*
+  - ~~Add optional API token auth for non-session access (NOC dashboards, external systems).~~ *(v1.14.0: `EmbedTokenAuth` middleware, constant-time compare, routes outside the session groups)*
+  - *Enables Grafana iframe panels, custom NOC walls, and status page integration without iframe hacks.* *(delivered; Grafana IFrame panel setup documented)*
 
 - [ ] **Map Organization favorites** *(deferred from v1.8.0)*
   - Per-user favorites (requires user_id mapping table or column).
@@ -329,14 +329,14 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - PDF generation.
   - Scheduled PNG/PDF snapshot generation for NOC wall displays (extend `bin/map-poller.php`).
 
-- [ ] **Grafana integration**
-  - Document Grafana IFrame panel setup (works today with `allow_embedding=true`).
+- [x] **Grafana integration** *(v1.14.0: IFrame panel setup documented in docs/EMBED.md; token auth enables sessionless embedding)*
+  - ~~Document Grafana IFrame panel setup (works today with `allow_embedding=true`).~~ *(v1.14.0)*
   - Explore JSON data source for native Grafana panel rendering weathermap data.
 
-- [ ] **Map lifecycle webhooks**
-  - Notify external systems (Slack, webhook) on map created/updated/deleted/version-saved.
-  - Laravel events on Eloquent model events + webhook dispatcher.
-  - *Extracted from v2.0.0 API v2 — achievable with current architecture.*
+- [x] **Map lifecycle webhooks** *(v1.14.0: `WebhookDispatcher` on map.created/updated/deleted/version_saved with optional HMAC-SHA256 signatures; settings-form and config-file URL configuration; container-verified with receiver-side signature validation)*
+  - ~~Notify external systems (Slack, webhook) on map created/updated/deleted/version-saved.~~ *(v1.14.0)*
+  - ~~Laravel events on Eloquent model events + webhook dispatcher.~~ *(v1.14.0: direct service-level dispatch via constructor injection — simpler than model events and covers import/version paths)*
+  - *Extracted from v2.0.0 API v2 — achievable with current architecture.* *(delivered)*
 
 ---
 
