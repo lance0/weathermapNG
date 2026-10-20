@@ -51,6 +51,10 @@ return [
         'allow_embed' => true,
         'embed_domains' => ['localhost', '*.yourdomain.com'],
         'max_image_size' => 2048, // KB
+        // Token for the token-gated read routes (embed/json/live/sse with
+        // ?token= or Authorization: Bearer). Set WEATHERMAPNG_EMBED_TOKEN
+        // to enable external embedding without a browser session.
+        'embed_token' => env('WEATHERMAPNG_EMBED_TOKEN'),
     ],
     // Map lifecycle webhooks: POST a JSON payload to each URL on
     // map.created / map.updated / map.deleted / map.version_saved.

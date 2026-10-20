@@ -21,7 +21,7 @@ These sit outside the `auth` group and are intentionally minimal so they can bac
 
 ### Read routes (open to all authenticated users)
 
-`GET` map index/show/editor/view/embed/json/live/sse/export and `GET templates` index/show. None of these call `requireAdmin()`. Admin-only reads: device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports` — they expose device IPs and topology data), map version endpoints (list/show/compare/export), and `/health/detailed`, `/health/stats`, `/metrics`.
+`GET` map index/show/editor/view/embed/json/live/sse/export and `GET templates` index/show. None of these call `requireAdmin()`. Admin-only reads: device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports` — they expose device IPs and topology data), map version endpoints (list/show/compare/export), and `/health/detailed`, `/health/stats`, `/metrics`. Token-auth variant: `embed`, `json`, `live`, and `sse` are also reachable without a session using a Bearer token / `?token=` when `WEATHERMAPNG_EMBED_TOKEN` is set (see [docs/EMBED.md](EMBED.md#embed-api-token-auth)).
 
 ### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, `level >= 10`, or `hasRole('admin')`)
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-- Route: `plugin/WeathermapNG/embed/{map}`
+- Route: `plugin/WeathermapNG/embed/{map}` (session) — token-gated variant: same path with `?token=` (see [Embed API Token Auth](#embed-api-token-auth))
 - Renders a compact canvas-based viewer suitable for dashboards/iframes
 - **Auth**: The embed view is a read endpoint open to all authenticated LibreNMS users; no admin role required. (Map editing and all 22 mutation endpoints are admin-only.)
 
@@ -82,6 +82,41 @@ Maps can be arranged in a hierarchy using `parent_map_id`. In the embed view, no
 
 A breadcrumb bar appears at the top of the viewer when the current map has a parent. Each crumb in the root→current chain is clickable except the last (the current map). The breadcrumb bar is hidden when the map has no parent chain.
 
+## Embed API Token Auth
+
+For external systems that can't hold a browser session — Grafana panels, NOC walls, status pages, scripts — set an embed token and append it to the URL:
+
+```bash
+# LibreNMS .env
+WEATHERMAPNG_EMBED_TOKEN=<random-secret>
+```
+
+```html
+<iframe src="https://your-librenms/plugin/WeathermapNG/embed/1?token=<random-secret>"></iframe>
+```
+
+The same token works as an `Authorization: Bearer` header on the data endpoints, which is preferable for scripted access (`?token=` can leak via logs and referrers):
+
+```bash
+curl -H "Authorization: Bearer <random-secret>" \
+  https://your-librenms/plugin/WeathermapNG/api/maps/1/json
+```
+
+Token-gated endpoints: `embed/{map}`, `api/maps/{map}/json`, `api/maps/{map}/live`, `api/maps/{map}/sse`. Without a configured token these routes return 403; the session-authenticated routes are unaffected.
+
+## Grafana IFrame Panel
+
+WeathermapNG works in Grafana today:
+
+1. Add a **Text** panel and paste the iframe (with `?token=` if using token auth):
+   ```html
+   <iframe src="https://your-librenms/plugin/WeathermapNG/embed/1?kiosk=1&nav=1"
+           width="100%" height="500" frameborder="0"></iframe>
+   ```
+2. Or point an **Image** panel at a periodically-refreshed snapshot URL if you generate static PNGs.
+
+Use `kiosk=1` to strip LibreNMS chrome inside the panel; `target=self` keeps drill-down navigation inside the iframe. Grafana's Text panels render raw HTML, so the iframe approach needs no plugin.
+
 ## Tips
 
 - Keep iframes sized to the map dimensions for crisp rendering
@@ -89,3 +124,4 @@ A breadcrumb bar appears at the top of the viewer when the current map has a par
 - Use `nav=0` to disable pan/zoom for static dashboard widgets
 - Use `minz=0.5&maxz=2` to restrict zoom range for embedded views
 - Use `kiosk=1&target=self` in an iframe to keep navigation inside the parent dashboard
+- Keep embed tokens in the `Authorization` header rather than `?token=` where the consumer supports it
