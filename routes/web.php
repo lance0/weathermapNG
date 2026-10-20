@@ -69,9 +69,11 @@ Route::middleware(['web', 'auth'])->group(function () {
 // Token-gated read endpoints for external embedding (Grafana panels,
 // NOC walls, scripts). Same handlers as the session routes above, but
 // authorized by WEATHERMAPNG_EMBED_TOKEN instead of a browser session.
-// Registered with the 'web' group only (no 'auth'), gated by
-// EmbedTokenAuth. Requires security.allow_embed to stay enabled.
-Route::middleware(['web', \LibreNMS\Plugins\WeathermapNG\Http\Middleware\EmbedTokenAuth::class])->group(function () {
+// Deliberately NOT in any middleware group: LibreNMS's 'web' group
+// includes session-user middleware (VerifyUserEnabled et al.) that
+// 403s anonymous requests regardless of token auth. EmbedTokenAuth is
+// the only gate — same pattern as the public health probes below.
+Route::middleware(\LibreNMS\Plugins\WeathermapNG\Http\Middleware\EmbedTokenAuth::class)->group(function () {
     Route::get('plugin/WeathermapNG/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed.token');
     Route::get('plugin/WeathermapNG/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json.token');
     Route::get('plugin/WeathermapNG/api/maps/{map}/live', [RenderController::class, 'live'])->name('weathermapng.live.token');

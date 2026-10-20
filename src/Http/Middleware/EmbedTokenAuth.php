@@ -14,13 +14,14 @@ use Illuminate\Http\Request;
  *   ?token=<token>                  (for <img>/iframe URLs)
  *
  * The token is compared in constant time against the configured
- * weathermapng.embed_token. When no token is configured, this
+ * weathermapng.security.embed_token. When no token is configured, this
  * middleware rejects — routes using it must stay session-gated
  * (register them in the auth group instead, or both).
  *
- * This middleware performs authorization only. The routes it guards
- * must NOT sit behind the auth middleware; group them with
- * ['web'] + EmbedTokenAuth instead.
+ * Routes using this middleware must NOT sit in LibreNMS's 'web'
+ * middleware group: that group includes session-user middleware
+ * (VerifyUserEnabled, LoadUserPreferences) that rejects anonymous
+ * requests before token auth runs. Register with this middleware only.
  */
 class EmbedTokenAuth
 {

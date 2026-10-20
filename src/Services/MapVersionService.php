@@ -10,7 +10,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
 
 class MapVersionService
 {
-    public function __construct(private readonly ?WebhookDispatcher $webhooks = null)
+    public function __construct(private readonly WebhookDispatcher $webhooks)
     {
     }
 
@@ -24,7 +24,7 @@ class MapVersionService
             'created_by' => $userId,
         ]);
 
-        $this->webhooks?->dispatch('map.version_saved', [
+        $this->webhooks->dispatch('map.version_saved', [
             'map_id' => (int) $map->id,
             'map_name' => (string) $map->name,
         ]);

@@ -13,13 +13,13 @@ use Illuminate\Http\Request;
 
 class MapService
 {
-    public function __construct(private readonly ?WebhookDispatcher $webhooks = null)
+    public function __construct(private readonly WebhookDispatcher $webhooks)
     {
     }
 
     private function notify(string $event, Map $map): void
     {
-        $this->webhooks?->dispatch($event, [
+        $this->webhooks->dispatch($event, [
             'map_id' => (int) $map->id,
             'map_name' => (string) $map->name,
         ]);

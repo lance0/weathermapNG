@@ -11,9 +11,10 @@ class EmbedTokenAuthTest extends TestCase
     {
         $routes = file_get_contents(__DIR__ . '/../routes/web.php');
         $this->assertStringContainsString('EmbedTokenAuth::class', $routes);
-        // The token routes must NOT sit in the auth group — the middleware
-        // group line lists 'web' only.
-        $this->assertStringContainsString("Route::middleware(['web', \\LibreNMS\\Plugins\\WeathermapNG\\Http\\Middleware\\EmbedTokenAuth::class])", $routes);
+        // The token routes must NOT sit in the auth or web groups —
+        // LibreNMS's web group rejects anonymous requests before token
+        // auth runs. EmbedTokenAuth is the only middleware.
+        $this->assertStringContainsString('Route::middleware(\\LibreNMS\\Plugins\\WeathermapNG\\Http\\Middleware\\EmbedTokenAuth::class)', $routes);
         // Session routes stay untouched
         $this->assertStringContainsString("Route::middleware(['web', 'auth'])", $routes);
     }

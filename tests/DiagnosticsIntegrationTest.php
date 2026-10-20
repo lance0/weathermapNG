@@ -3,6 +3,7 @@
 namespace LibreNMS\Plugins\WeathermapNG\Tests;
 
 use PHPUnit\Framework\TestCase;
+use LibreNMS\Plugins\WeathermapNG\Services\WebhookDispatcher;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Connectors\ConnectionFactory;
@@ -260,7 +261,7 @@ class DiagnosticsIntegrationTest extends TestCase
 
     private function integrityReport(int $limit = 20): array
     {
-        return (new MapService())->getDataIntegrityIssues($this->rrdService(), $limit);
+        return (new MapService(new WebhookDispatcher()))->getDataIntegrityIssues($this->rrdService(), $limit);
     }
 
     public function test_detects_broken_port_missing_rrd_and_orphans(): void

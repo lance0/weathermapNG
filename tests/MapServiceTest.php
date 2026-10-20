@@ -4,6 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Tests;
 
 use PHPUnit\Framework\TestCase;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
+use LibreNMS\Plugins\WeathermapNG\Services\WebhookDispatcher;
 
 class MapServiceTest extends TestCase
 {
@@ -15,7 +16,7 @@ class MapServiceTest extends TestCase
 
     private function invokeMerge(array $current, array $new): array
     {
-        $service = new MapService();
+        $service = new MapService(new WebhookDispatcher());
         $reflection = new \ReflectionMethod($service, 'mergeMapOptions');
         $reflection->setAccessible(true);
         return $reflection->invoke($service, $current, $new);

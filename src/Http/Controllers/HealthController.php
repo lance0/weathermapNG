@@ -6,6 +6,7 @@ use LibreNMS\Plugins\WeathermapNG\AdminCheck;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Services\Logger;
 use LibreNMS\Plugins\WeathermapNG\Services\MapService;
+use LibreNMS\Plugins\WeathermapNG\Services\WebhookDispatcher;
 use LibreNMS\Plugins\WeathermapNG\Services\RrdDataService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -258,7 +259,7 @@ class HealthController
         // Data-integrity scan: broken ports, missing RRD files, orphaned rows.
         $integrity = [];
         try {
-            $integrity = (new MapService())->getDataIntegrityIssues(
+            $integrity = (new MapService(new WebhookDispatcher()))->getDataIntegrityIssues(
                 $this->resolveRrdDataService(),
                 20
             );

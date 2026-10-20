@@ -76,10 +76,10 @@ class WebhookDispatcherTest extends TestCase
 
     public function test_map_service_wires_webhook_on_create(): void
     {
-        // MapService takes an optional WebhookDispatcher; verify the wiring
-        // contract — createMap fires map.created when a dispatcher is present.
+        // MapService takes a WebhookDispatcher; verify the wiring contract —
+        // createMap fires map.created when a dispatcher is present.
         $content = file_get_contents(__DIR__ . '/../src/Services/MapService.php');
-        $this->assertStringContainsString('private readonly ?WebhookDispatcher $webhooks = null', $content);
+        $this->assertStringContainsString('private readonly WebhookDispatcher $webhooks', $content);
         $this->assertStringContainsString("notify('map.created'", $content);
         $this->assertStringContainsString("notify('map.updated'", $content);
         $this->assertStringContainsString("notify('map.deleted'", $content);
