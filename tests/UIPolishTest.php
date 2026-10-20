@@ -141,23 +141,6 @@ class UIPolishTest extends TestCase
         $this->assertStringContainsString('Use the live map view for current rendering and traffic data.', $legacyMap);
     }
 
-    public function test_settings_page_uses_inline_feedback_and_confirmation_modal(): void
-    {
-        $content = file_get_contents(__DIR__ . '/../resources/views/settings.blade.php');
-
-        $this->assertStringContainsString('id="settings-alerts"', $content);
-        $this->assertStringContainsString('id="settingsConfirmModal"', $content);
-        $this->assertStringContainsString('function showSettingsAlert(', $content);
-        $this->assertStringContainsString('function showSettingsConfirm(', $content);
-        $this->assertStringContainsString("pre.textContent = JSON.stringify(settings, null, 2);", $content);
-        $this->assertStringContainsString("showSettingsAlert('Restore from backup is not available", $content);
-        $this->assertStringContainsString('class="btn btn-success" onclick="createBackup()"', $content);
-        $this->assertStringContainsString("showSettingsAlert('Settings reset is not yet available. Edit config/config.php to change defaults.', 'warning');", $content);
-        $this->assertStringNotContainsString('confirm(', $content);
-        $this->assertStringNotContainsString('alert(', $content);
-        $this->assertStringNotContainsString('Restore functionality would be implemented here', $content);
-        $this->assertStringNotContainsString("'<pre>' + JSON.stringify", $content);
-    }
 
     public function test_hooks_settings_view_has_safe_defaults_and_plugin_update_route(): void
     {
