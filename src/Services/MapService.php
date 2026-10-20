@@ -13,6 +13,18 @@ use Illuminate\Http\Request;
 
 class MapService
 {
+    public function __construct(private readonly ?WebhookDispatcher $webhooks = null)
+    {
+    }
+
+    private function notify(string $event, Map $map): void
+    {
+        $this->webhooks?->dispatch($event, [
+            'map_id' => (int) $map->id,
+            'map_name' => (string) $map->name,
+        ]);
+    }
+
     public function createMap(array $data): Map
     {
         $allowedOptionKeys = ['background', 'tags', 'default_node_style', 'default_link_style'];
@@ -26,11 +38,15 @@ class MapService
             'background' => '#ffffff',
         ], $incomingOptions);
 
-        return Map::create([
+        $map = Map::create([
             'name' => $data['name'],
             'title' => $data['title'] ?? $data['name'],
             'options' => $options,
         ]);
+
+        $this->notify('map.created', $map);
+
+        return $map;
     }
 
     public function updateMap(Map $map, array $data): Map
@@ -49,6 +65,7 @@ class MapService
         }
 
         $map->update($update);
+        $this->notify('map.updated', $map);
         return $map->refresh();
     }
 
@@ -60,6 +77,7 @@ class MapService
                 $map->nodes()->delete();
                 $map->delete();
             });
+            $this->notify('map.deleted', $map);
         } catch (\Exception $e) {
             Log::error("Failed to delete map {$map->id}: " . $e->getMessage());
             throw $e;
@@ -88,6 +106,7 @@ class MapService
                 $this->updateMapProperties($map, $data);
                 $this->replaceMapContent($map, $data);
             });
+            $this->notify('map.updated', $map);
         } catch (\Exception $e) {
             Log::error("Failed to save map {$map->id}: " . $e->getMessage());
             throw new \RuntimeException("Failed to save map: " . $e->getMessage(), 0, $e);
@@ -227,7 +246,7 @@ class MapService
         }
 
         try {
-            return DB::transaction(function () use ($data, $validated) {
+            $map = DB::transaction(function () use ($data, $validated) {
                 $options = $data['options'] ?? [];
                 if (empty($options)) {
                     $options = ['width' => 800, 'height' => 600, 'background' => '#ffffff'];
@@ -244,6 +263,9 @@ class MapService
 
                 return $map;
             });
+            $this->notify('map.created', $map);
+
+            return $map;
         } catch (\Exception $e) {
             Log::error("Failed to import map: " . $e->getMessage());
             throw new \RuntimeException("Failed to import map: " . $e->getMessage(), 0, $e);

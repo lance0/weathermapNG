@@ -87,6 +87,13 @@ if (!function_exists('config')) {
                 'weathermapng.rendering.link_width' => 2,
             ];
         }
+        // Laravel setter form: config(['key' => value]) writes and returns null.
+        if (is_array($key)) {
+            foreach ($key as $k => $v) {
+                $cfg[$k] = $v;
+            }
+            return null;
+        }
         if ($key === null) return $cfg;
         return $cfg[$key] ?? $default;
     }

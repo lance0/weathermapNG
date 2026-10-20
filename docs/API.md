@@ -300,7 +300,42 @@ Version routes are registered in `routes/web.php` under the `web` + `auth` middl
 | Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
 | Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
 
-Diff direction: `compare(v1, v2)` reports what changed going from v1 → v2. `nodes_added` = IDs in v2 but not v1.
+
+## Webhooks
+
+When configured, WeathermapNG POSTs a JSON payload to each webhook URL on map lifecycle events: `map.created`, `map.updated` (including editor saves), `map.deleted`, and `map.version_saved`.
+
+```json
+{
+  "event": "map.updated",
+  "map_id": 12,
+  "map_name": "campus-core",
+  "user": "admin",
+  "timestamp": "2026-10-20T18:55:00Z"
+}
+```
+
+`user` is the acting LibreNMS username, or `null` for CLI-triggered changes (poller, artisan commands).
+
+**Configuration** — settings page (Webhook URLs, one per line), or config:
+
+```php
+// WEATHERMAPNG_WEBHOOK_URLS (newline-separated) or webhooks.urls (array)
+'webhooks' => [
+    'urls' => ['https://hooks.slack.com/services/...'],
+    'secret' => env('WEATHERMAPNG_WEBHOOK_SECRET'),
+],
+```
+
+**Signature verification** — when `WEATHERMAPNG_WEBHOOK_SECRET` is set, each delivery carries `X-WeathermapNG-Signature: t=<unix_ts>,v1=<hex>`. The `v1` value is `HMAC-SHA256("<unix_ts>.<raw_body>", secret)`. Reject deliveries with a timestamp older than five minutes to prevent replay:
+
+```php
+[$t, $v1] = array_map(fn($p) => explode('=', $p, 2), explode(',', $_SERVER['HTTP_X_WEATHERMAPNG_SIGNATURE']));
+assert(abs(time() - $t[1]) < 300);
+assert(hash_equals('v1=' . hash_hmac('sha256', $t[1] . '.' . $body, $secret), 'v1=' . $v1[1]));
+```
+
+Delivery is best-effort: a 5-second timeout per URL, failures are logged and never block the map mutation that triggered them.
 
 ## Error Shape
 

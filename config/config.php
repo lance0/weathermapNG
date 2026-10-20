@@ -52,6 +52,16 @@ return [
         'embed_domains' => ['localhost', '*.yourdomain.com'],
         'max_image_size' => 2048, // KB
     ],
+    // Map lifecycle webhooks: POST a JSON payload to each URL on
+    // map.created / map.updated / map.deleted / map.version_saved.
+    // webhook_urls is the settings-form shape (one URL per line);
+    // webhooks.urls is the config-file array form. Set a secret for
+    // signed deliveries (X-WeathermapNG-Signature).
+    'webhook_urls' => env('WEATHERMAPNG_WEBHOOK_URLS', ''),
+    'webhooks' => [
+        'urls' => [],                                     // e.g. ['https://hooks.slack.com/services/...']
+        'secret' => env('WEATHERMAPNG_WEBHOOK_SECRET'),  // HMAC secret for X-WeathermapNG-Signature
+    ],
     'editor' => [
         'grid_size' => 20,
         'snap_to_grid' => true,
