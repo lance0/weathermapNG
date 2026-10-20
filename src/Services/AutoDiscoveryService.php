@@ -37,20 +37,28 @@ class AutoDiscoveryService
         }
 
         $existingNodes = $this->getExistingNodeMapping($map);
-        $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
-        $nodesAdded = count($nodeMapping) - count($existingNodes);
+        $nodeMapping = [];
+        $nodesAdded = 0;
+        $linksAdded = 0;
 
-        $linkRows = $this->queryTopologyLinks($candidateIds);
+        // Node and link creation run in one transaction so a failure
+        // mid-discovery can't leave the map half-seeded.
+        DB::transaction(function () use ($map, $devices, $existingNodes, $params, $candidateIds, &$nodeMapping, &$nodesAdded, &$linksAdded) {
+            $nodeMapping = $this->createMissingNodes($map, $devices, $existingNodes, $params['minDegree']);
+            $nodesAdded = count($nodeMapping) - count($existingNodes);
 
-        if (empty($linkRows)) {
-            Log::info("WeathermapNG: Auto-discovery found no LibreNMS topology links for map {$map->id}.");
-            return ['nodes_added' => $nodesAdded, 'links_added' => 0];
-        }
+            $linkRows = $this->queryTopologyLinks($candidateIds);
 
-        $portsByDevice = $this->getTopologyPorts($candidateIds);
-        $links = $this->buildLinksFromTopology($linkRows, $nodeMapping, $portsByDevice);
+            if (empty($linkRows)) {
+                Log::info("WeathermapNG: Auto-discovery found no LibreNMS topology links for map {$map->id}.");
+                return;
+            }
 
-        $linksAdded = $this->createDiscoveredLinks($map, $links, $nodeMapping);
+            $portsByDevice = $this->getTopologyPorts($candidateIds);
+            $links = $this->buildLinksFromTopology($linkRows, $nodeMapping, $portsByDevice);
+
+            $linksAdded = $this->createDiscoveredLinks($map, $links, $nodeMapping);
+        });
 
         Log::info("WeathermapNG: Auto-discovery for map {$map->id} added {$nodesAdded} nodes and {$linksAdded} links.");
 
