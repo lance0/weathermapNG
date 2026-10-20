@@ -9,8 +9,34 @@ permissions:
   contents: write
 
 jobs:
+  # The full test suite must pass before a release is published — a tag
+  # alone is not proof the tree is green.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: gd, json, mbstring, pdo
+          tools: composer:v2
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run test suite
+        run: vendor/bin/phpunit --no-coverage
+
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: test
 
     steps:
       - name: Checkout code

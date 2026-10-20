@@ -1,5 +1,12 @@
 name: Installation Tests
 
+# Cancel superseded runs; never cancel the weekly schedule (identical group
+# per ref means scheduled main runs are also protected by cancel-in-progress
+# being false for main).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 on:
   push:
     branches: [main, develop]
@@ -45,6 +52,7 @@ permissions:
 jobs:
   script-validation:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Validate Scripts
 
     steps:
@@ -71,6 +79,7 @@ jobs:
 
   docker-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Docker Compose Validation
 
     steps:
@@ -96,6 +105,7 @@ jobs:
 
   plugin-structure:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Validate Plugin Structure
 
     steps:
@@ -140,6 +150,7 @@ jobs:
 
   composer-registration:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Composer Path Registration
 
     steps:
@@ -184,6 +195,7 @@ jobs:
 
   mocked-install:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: Mock Quick Install Flow
 
     steps:
