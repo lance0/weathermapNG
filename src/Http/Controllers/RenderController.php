@@ -121,7 +121,7 @@ class RenderController
         $this->requireAdmin();
         $validated = $request->validate([
             'file' => 'required|file|mimes:json,txt,conf|max:10240',
-            'name' => 'required|string|max:255|unique:wmng_maps,name',
+            'name' => 'required|string|max:255|alpha_dash|unique:wmng_maps,name',
             'title' => 'nullable|string|max:255',
         ]);
 

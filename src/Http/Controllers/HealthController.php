@@ -26,26 +26,33 @@ class HealthController
     /**
      * Basic health check endpoint (v2)
      * GET /plugin/WeathermapNG/health
+     *
+     * Unauthenticated probe — intentionally minimal so it can back load
+     * balancers and uptime checks without leaking version, DB, filesystem,
+     * or configuration details to anonymous visitors. Detailed health
+     * (the full checks array) requires admin: /health/detailed.
      */
     public function check(): \Illuminate\Http\JsonResponse
     {
         $health = [
             'status' => 'healthy',
             'timestamp' => now()->toISOString(),
-            'version' => $this->getVersion(),
-            'checks' => []
         ];
 
-        // Run all health checks
-        $checks = [
-            'database' => $this->checkDatabase(),
-            'filesystem' => $this->checkFilesystem(),
-            'dependencies' => $this->checkDependencies(),
-            'configuration' => $this->checkConfiguration(),
-        ];
+        // Only the cheap, non-revealing signal drives the probe: DB
+        // reachability as a boolean. Version, filesystem paths,
+        // dependencies, and configuration state require admin
+        // (/health/detailed).
+        $dbOk = false;
+        try {
+            DB::connection()->getPdo();
+            $dbOk = true;
+        } catch (\Exception $e) {
+            // unhealthy — no details in the public response
+        }
 
-        $health['checks'] = $checks;
-        $health['status'] = $this->determineOverallStatus($checks);
+        $health['status'] = $dbOk ? 'healthy' : 'unhealthy';
+
 
         $statusCode = $this->getHttpStatusCode($health['status']);
         return response()->json($health, $statusCode);

@@ -141,7 +141,7 @@ class MapTemplateController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:wmng_maps,name',
+            'name' => 'required|string|max:255|alpha_dash|unique:wmng_maps,name',
         ]);
 
         $config = $this->decodeTemplateConfig($template->config);
