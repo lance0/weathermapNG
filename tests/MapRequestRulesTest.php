@@ -9,7 +9,9 @@ class MapRequestRulesTest extends TestCase
     public function test_save_map_request_allows_name_field(): void
     {
         $content = file_get_contents(__DIR__ . '/../src/Http/Requests/SaveMapRequest.php');
-        $this->assertStringContainsString("'name' => 'nullable|string|max:255'", $content);
+        // alpha_dash: map names reach filesystem paths in the poller cache
+        // (output/cache/{name}.json) — path traversal protection.
+        $this->assertStringContainsString("'name' => 'nullable|string|max:255|alpha_dash'", $content);
     }
 
     public function test_save_map_request_sanitizes_name(): void

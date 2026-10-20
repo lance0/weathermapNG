@@ -98,7 +98,15 @@ $settings = array_merge([
                     </div>
                 </div>
             </div>
-            
+
+            <div class="form-group">
+                <label class="col-sm-3 control-label">Webhook URLs</label>
+                <div class="col-sm-9">
+                    <textarea name="settings[webhook_urls]" class="form-control" rows="2"
+                              placeholder="https://hooks.slack.com/services/... (one URL per line)">{{ $settings['webhook_urls'] ?? '' }}</textarea>
+                    <span class="help-block">One URL per line — receives a JSON POST on map created/updated/deleted/version saved. Optional; set WEATHERMAPNG_WEBHOOK_SECRET for signed deliveries.</span>
+                </div>
+            </div>
             <div class="form-group">
                 <div class="col-sm-offset-3 col-sm-9">
                     <button type="submit" class="btn btn-primary">

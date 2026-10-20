@@ -54,6 +54,8 @@ services:
       REDIS_HOST: redis
       # Demo mode - enable simulated traffic data
       WEATHERMAPNG_DEMO_MODE: "true"
+      WEATHERMAPNG_EMBED_TOKEN: "embed-test-token-123"
+      WEATHERMAPNG_WEBHOOK_SECRET: "test-secret-123"
     restart: unless-stopped
 
   dispatcher:

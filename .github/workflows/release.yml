@@ -104,7 +104,7 @@ jobs:
             ${{ steps.changelog.outputs.CHANGES }}
 
             ### Installation
-            See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/INSTALL.md) for detailed installation instructions.
+            See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/INSTALL.md) for detailed installation instructions.
 
             ### Quick Install
             ```bash

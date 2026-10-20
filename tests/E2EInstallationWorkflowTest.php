@@ -87,11 +87,10 @@ class E2EInstallationWorkflowTest extends TestCase
 
     public function test_install_docs_cover_plugin_duplicates_and_json_collation_warnings(): void
     {
-        $install = file_get_contents(__DIR__ . '/../INSTALL.md');
-        $readme = file_get_contents(__DIR__ . '/../README.md');
-        $deployment = file_get_contents(__DIR__ . '/../DEPLOYMENT.md');
+        $install = file_get_contents(__DIR__ . '/../docs/INSTALL.md');
+        $deployment = file_get_contents(__DIR__ . '/../docs/DEPLOYMENT.md');
 
-        foreach ([$install, $readme, $deployment] as $content) {
+        foreach ([$install, $deployment] as $content) {
             $this->assertStringContainsString('duplicate', strtolower($content));
             $this->assertStringContainsString('utf8mb4_bin', $content);
             $this->assertStringContainsString('wmng_map_templates.config', $content);

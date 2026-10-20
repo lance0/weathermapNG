@@ -125,8 +125,23 @@ class PortUtilService
     private function fetchDeviceAggregate(int $deviceId): array
     {
         // Sum traffic from all ports on the device
-        // This is a placeholder - would need to query all device ports
-        Log::debug("WeathermapNG: Device aggregate not implemented for device {$deviceId}");
-        return ['in' => 0, 'out' => 0];
+        $portIds = \Illuminate\Support\Facades\DB::table('ports')
+            ->where('device_id', $deviceId)
+            ->where('ignore', 0)
+            ->where('disabled', 0)
+            ->pluck('port_id')
+            ->all();
+
+        $in = 0;
+        $out = 0;
+        foreach ($portIds as $portId) {
+            $traffic = $this->rrdService->getPortTraffic((int) $portId);
+            if ($traffic !== null) {
+                $in += (int) ($traffic['in'] ?? 0);
+                $out += (int) ($traffic['out'] ?? 0);
+            }
+        }
+
+        return ['in' => $in, 'out' => $out];
     }
 }

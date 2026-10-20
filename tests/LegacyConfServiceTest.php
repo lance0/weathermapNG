@@ -99,8 +99,4 @@ class LegacyConfServiceTest extends TestCase
         $this->assertSame('My Switch', $result['nodes'][0]['label']);
     }
 
-    public function test_hello_confExport_roundtrip()
-    {
-        $this->markTestSkipped('Requires database connection for model relationships');
-    }
 }

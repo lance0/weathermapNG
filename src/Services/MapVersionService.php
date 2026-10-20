@@ -10,15 +10,26 @@ use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
 
 class MapVersionService
 {
+    public function __construct(private readonly WebhookDispatcher $webhooks)
+    {
+    }
+
     public function createVersion(Map $map, string $name, ?string $description = null, ?int $userId = null): MapVersion
     {
-        return MapVersion::create([
+        $version = MapVersion::create([
             'map_id' => $map->id,
             'name' => $name,
             'description' => $description,
             'config_snapshot' => $this->captureSnapshot($map),
             'created_by' => $userId,
         ]);
+
+        $this->webhooks->dispatch('map.version_saved', [
+            'map_id' => (int) $map->id,
+            'map_name' => (string) $map->name,
+        ]);
+
+        return $version;
     }
 
     public function restoreVersion(MapVersion $version): Map

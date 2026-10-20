@@ -161,8 +161,11 @@ class MapPoller
 
         \Illuminate\Support\Facades\Cache::put($cacheKey, $liveData, $cacheTtl);
 
-        // Optionally write to file for backup
-        $cacheFile = __DIR__ . "/../output/cache/{$map->name}.json";
+        // Optionally write to file for backup. Keyed by map ID, not name:
+        // map names are user-controlled and can contain path separators
+        // (import/template/save endpoints only validate string|max), which
+        // made this file_put_contents a path-traversal write.
+        $cacheFile = __DIR__ . "/../output/cache/map-{$map->id}.json";
         $this->ensureDirectory(dirname($cacheFile));
 
         file_put_contents($cacheFile, json_encode($liveData, JSON_PRETTY_PRINT), LOCK_EX);

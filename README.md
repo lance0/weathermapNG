@@ -1,53 +1,24 @@
-# WeathermapNG — Network Visualization for LibreNMS
+# WeathermapNG
 
-A modern network weathermap plugin for LibreNMS that provides real-time network topology visualization with animated traffic flow.
+<p align="center">
+  <img src="wmng.png" alt="WeathermapNG live map: nodes with traffic labels, colored links, minimap and legend" width="900">
+</p>
 
-![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
+**Network weathermap plugin for LibreNMS — real-time topology visualization with animated traffic flow.**
+
+WeathermapNG renders your LibreNMS topology as live weathermaps: RRD-backed
+per-link traffic, CPU/memory overlays, alert badges, and an embeddable viewer
+with Server-Sent Events. Design maps in a 3-panel editor with undo/redo,
+auto-discovery from LLDP/CDP, templates, versioning, and bulk operations.
+
+[Documentation](docs/README.md) · [Install](#install) ·
+[Releases](https://github.com/lance0/weathermapNG/releases) · [Changelog](CHANGELOG.md)
+
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
+![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
 ![Version 1.13.1](https://img.shields.io/badge/version-1.13.1-0078D4)
 
-![WeathermapNG Live View](wmng.png)
-
-![WeathermapNG Editor](wmng-editor.png)
-
-## Features
-
-- **Real-time Visualization**: Live traffic data with animated flow indicators
-- **Professional Editor**: 3-panel layout with toolbox, canvas, and properties sidebar
-- **Via Points & Curved Links**: Route links through intermediate waypoints with straight, angled, or Catmull-Rom curved paths
-- **Zoom, Pan & Minimap**: Mouse-wheel zoom, middle-click pan, click-to-navigate minimap
-- **Keyboard Shortcuts**: Ctrl+S save, Ctrl+Z/Y undo/redo, arrow nudge, Delete, +/-/0 zoom
-- **Undo/Redo**: 50-state history with full node and link state tracking
-- **Dark/Light Mode**: Auto-detects LibreNMS theme and matches it
-- **Grid Snapping**: Toggle snap-to-grid for precise node alignment
-- **RRD-based Traffic Data**: Real-time bandwidth from LibreNMS RRD files
-- **Server-Sent Events**: Live updates without polling (streamed inline from the render controller)
-- **Admin-Only Authorization**: All 24 mutation endpoints require admin (`hasGlobalAdmin()`, `isAdmin()`, `level ≥ 10`, or `hasRole('admin')`); read endpoints are open to every authenticated user
-- **Import/Export**: JSON format for backup and sharing maps
-- **Embed Support**: Embed maps in dashboards with live updates
-- **Map Templates**: Built-in templates for common network topologies
-- **Map Tags & Filtering**: Organize maps with tags from the editor and filter the index gallery by tag
-- **Per-Map Default Styles**: Configure default node/link colors and link width/via style per map; stored in map options and applied at render time without mutating node/link data
-- **Operational Diagnostics**: Admin page with health checks, route registration, writable paths, and resource counts
-- **Map Versioning**: Snapshot storage, history, restore, compare, and delete workflows
-- **LLDP/CDP Auto-Discovery**: Automatically seed map topology from LibreNMS neighbor data
-- **Editor Bulk Operations**: Multi-select, marquee, bulk delete with undo, group drag and nudge
-- **Viewport Culling**: Large-map pan/zoom performance — off-screen nodes and links are skipped
-- **CPU/Memory Overlay**: Node CPU and memory utilization displayed in the embed view
-- **RRD Graph Hover**: Hover nodes/links for inline LibreNMS time-series graphs
-- **Alert Integration**: Active alert badges with severity coloring and click-through to alert details
-- **Kiosk/NOC Wall Mode**: Fullscreen display with auto-cycling between maps
-- **Nested Maps / Drill-Down**: Click a summary node to navigate to a detailed sub-map (campus → building → rack); breadcrumb bar tracks the hierarchy
-- **Legacy Weathermap Import**: Read PHP Weathermap-style `.conf` files (round-trip export included)
-- **Common Topology Templates**: Built-in Data Center, WAN/MPLS, Campus, and Branch Office templates with pre-placed topology
-- **Accessibility**: ARIA labels on icon-only controls, keyboard focus visibility, and form labels across index, editor, and embed views
-- **Render Diagnostics**: `?debugDots=1` overlays particle positions and transform state; `?debugDots=2` adds a full render-pipeline panel (map data, transport, transforms, canvas geometry, browser zoom)
-
-## Quick Start
-
-### One-Command Install (Recommended)
-
-Three commands get you running on a native LibreNMS install:
+## Install
 
 ```bash
 cd /opt/librenms/html/plugins
@@ -56,92 +27,54 @@ sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
 sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
 ```
 
-The script installs dependencies, registers the Composer package with LibreNMS, sets up database tables, configures permissions, and enables the plugin. Run it as the `librenms` user — running as root can leave root-owned Composer files behind.
-`just install LIBRENMS_PATH=/opt/librenms` runs the same `quick-install.sh` flow — a thin wrapper for the command above.
+The script installs dependencies, registers the Composer package with LibreNMS, sets up database tables, and enables the plugin. Run it as the `librenms` user — running as root can leave root-owned Composer files behind. `just install LIBRENMS_PATH=/opt/librenms` runs the same flow as a thin wrapper.
 
-### Docker
-
-A Docker-based install is available for development and testing. See [INSTALL.md](INSTALL.md) for the full Docker setup.
-
-### Demo Mode
-
-Try the plugin without real LibreNMS devices — demo mode generates smooth, deterministic simulated traffic (per-id sine waves, jitter-free):
-
-```bash
-echo "WEATHERMAPNG_DEMO_MODE=true" >> /opt/librenms/.env
-php /opt/librenms/html/plugins/WeathermapNG/database/seed-demo.php
-```
-
-See [INSTALL.md](INSTALL.md) for details and sample topologies.
-
-### First Map
-
-1. **Open the plugin** at `https://your-librenms/plugin/WeathermapNG`
-2. **Create a map** — click "Create New Map", pick a template, or import an existing map
-3. **Configure** the name, title, dimensions, tags, and default node/link styles
-4. **Design** in the canvas editor: add devices from the right sidebar, drag to position, draw links between nodes
-5. **Save** — your map is live with real-time traffic data
-6. **Troubleshoot** via the admin **Diagnostics** page if anything looks off
-
-### Requirements
-
-- LibreNMS (latest stable)
-- PHP 8.2+
-- Composer
-- MySQL/MariaDB
-
-## Embedding
-
-Drop a map into any dashboard with an iframe:
-
-```html
-<iframe src="https://your-librenms/plugin/WeathermapNG/embed/1"
-        width="800" height="600" frameborder="0">
-</iframe>
-```
-
-Optional query parameters: `metric` (`percent`/`in`/`out`/`sum`), `sse=0` (force polling), `nav=0` (disable pan/zoom), `scale=bytes`, `debugDots=1`/`2` (render diagnostics). See the [Embed Viewer Guide](docs/EMBED.md).
-
-## Troubleshooting
-
-### Plugin Not Showing
+If routes don't appear after install:
 
 ```bash
 cd /opt/librenms
 php artisan route:list | grep -iE 'weathermap|wmng'
-php artisan cache:clear
-php artisan view:clear
-```
-
-If no WeathermapNG routes are listed, register the plugin as a Composer path package:
-
-```bash
-cd /opt/librenms
 composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
 FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
-php artisan config:clear
 ```
 
-LibreNMS `validate.php` may report `wmng_*` tables as extra tables — those belong to WeathermapNG and should not be dropped. It may also report `utf8mb4_bin` collation warnings on JSON-backed columns such as `wmng_map_templates.config`, `wmng_nodes.meta`, `wmng_maps.options`, and `wmng_links.style`; those are expected for the current schema.
+After install, open `https://your-librenms/plugin/WeathermapNG` and create your first map. Docker-based install for development and testing, demo mode, permissions, and troubleshooting: [installation guide](docs/INSTALL.md).
 
-If an older install left duplicate `WeathermapNG` rows in LibreNMS' `plugins` table, rerun `quick-install.sh` or `php database/setup.php` as the `librenms` user — both normalize plugin registration and remove stale duplicates.
+## What it does
 
-### Permission Errors
+- **Live traffic weathermaps**: RRD-based bandwidth per link, animated flow, percent/in/out/sum metrics
+- **CPU & memory overlay**: per-node utilization with warning thresholds
+- **Alert integration**: severity-colored badges with click-through to LibreNMS alerts
+- **Nested maps / drill-down**: click a summary node to navigate to a detailed sub-map (campus → building → rack); breadcrumb bar tracks the hierarchy
+- **3-panel editor**: toolbox, canvas, properties — undo/redo, grid snap, zoom/pan/minimap, keyboard shortcuts
+- **Bulk operations**: marquee multi-select, group drag, bulk delete with undo
+- **LLDP/CDP auto-discovery**: seed topology from LibreNMS neighbor data
+- **Templates, tags & per-map styles**: built-in Data Center, WAN/MPLS, Campus, and Branch Office topologies; tag filtering; default node/link styling
+- **Legacy Weathermap import**: read PHP Weathermap-style `.conf` files (round-trip export included)
+- **Map versioning**: snapshot, history, restore, compare, delete
+- **Embed viewer**: iframes, kiosk/NOC wall with map cycling, RRD graph hover
+- **Accessibility**: ARIA labels on icon-only controls, keyboard focus visibility, form labels
+- **Render diagnostics**: `?debugDots=1` overlays particle positions; `?debugDots=2` adds a full render-pipeline panel
+- **Import/export**: JSON round-trip for backup and sharing
+- **Admin-only mutations**: all write endpoints require admin; reads are open to authenticated users
 
-```bash
-sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
-```
+<p align="center">
+  <img src="wmng-editor.png" alt="WeathermapNG editor: 3-panel layout with toolbox, canvas, and properties sidebar" width="900">
+</p>
 
-### Maps Not Updating
+## Tasks
 
-- Verify the map has valid device and port associations.
-- Check that the LibreNMS user can read the relevant RRD files.
-- If you use the optional poller (`bin/map-poller.php`), check its cron entry and logs.
-- Use demo mode to separate rendering issues from live data issues.
-
-More troubleshooting in [INSTALL.md](INSTALL.md).
+| Task | Guide |
+|------|-------|
+| Install, update, or troubleshoot | [Installation](docs/INSTALL.md) · [Updating](#updating) · [Deployment](docs/DEPLOYMENT.md) |
+| Embed a map or run a NOC wall | [Embed Viewer](docs/EMBED.md) |
+| Call a route or script against the API | [API reference](docs/API.md) |
+| Tune large-map performance | [Performance notes](docs/PERFORMANCE.md) |
+| Diagnose a broken install | [API: probes & diagnostics](docs/API.md#health-and-metrics-routes) |
+| Contribute or run tests | [Contributing](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) |
+| Cut a release | [Release process](RELEASE.md) · [Versioning](docs/VERSIONING.md) |
 
 ## Updating
 
@@ -154,92 +87,11 @@ cd /opt/librenms
 FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
 php artisan package:discover
 php artisan optimize:clear
-php artisan route:clear
-php artisan view:clear
-php artisan config:clear
-php artisan cache:clear
 php artisan route:list | grep -iE 'weathermap|wmng'
 ```
 
-## Documentation
-
-- [Installation Guide](INSTALL.md) — detailed setup, Docker, demo mode, and troubleshooting
-- [Deployment Guide](DEPLOYMENT.md)
-- [API Documentation](API.md)
-- [Embed Viewer Guide](docs/EMBED.md)
-- [Performance Notes](PERFORMANCE.md)
-- [Roadmap](ROADMAP.md)
-- [Release Notes](RELEASE.md)
-- [Versioning Guide](VERSIONING.md)
-- [Contributing](CONTRIBUTING.md)
-
-## Architecture
-
-WeathermapNG follows a modular service-oriented architecture:
-
-| Service | Purpose |
-|---------|---------|
-| NodeDataService | Node data aggregation, metrics, and traffic |
-| DeviceDataService | Device status and hostname-based traffic |
-| LinkDataService | Link alerts and port-level aggregation |
-| PortUtilService | RRD-based traffic data for links |
-| MapService | Map CRUD and JSON import/export |
-| AutoDiscoveryService | LLDP/CDP topology discovery from the LibreNMS `links` table |
-| MapVersionService | Version snapshot storage, history, restore, compare (routes registered) |
-| RenderController | Live rendering and inline Server-Sent Events streaming |
-
-SSE is handled inline in `RenderController::sse` — there is no separate streaming service.
-
-## Development
-
-### Task Runner (`just`)
-
-Common workflows are exposed via [just](https://github.com/casey/just) (`brew install just`):
-
-```bash
-just setup                                       # install PHP/Composer dependencies (idempotent)
-just lint                                        # syntax-check all PHP sources
-just test                                        # full PHPUnit suite (no coverage)
-just test-one LegacyConfServiceTest              # run one test class
-just check                                       # lint + test — the "PR-ready" gate
-just install LIBRENMS_PATH=/opt/librenms          # full plugin install (wraps quick-install.sh)
-just update LIBRENMS_PATH=/opt/librenms           # update an existing install (wraps deploy.sh)
-just validate-install LIBRENMS_PATH=/opt/librenms # post-install deployment check
-just verify                                      # verify plugin structure / install readiness
-just verify-deployment URL=http://localhost:18080 # smoke-check a deployed plugin over HTTP
-just dev-up                                      # docker dev stack with plugin mounted live
-just dev-stop                                    # stop the dev stack (data volumes preserved)
-just dev-reset                                   # reset the dev stack including data volumes (destructive)
-just test-install                                # full docker install test suite
-just test-install-local INSTALL_DIR=/opt/librenms # host-path install test suite
-just visual URL=http://localhost:18080           # render screenshots (needs a running stack)
-just tag v1.13.1                                 # bump VERSION + VersionMetadataTest + tag + push
-```
-
-`visual` takes `URL` as a recipe parameter; pass `OUTDIR` as an environment variable
-(`OUTDIR=/tmp/shots just visual`) to override the output directory — the recipe's
-two default-quoted parameters suppress inline descriptions in just 1.x.
-
-Run `just --list` for the full recipe list. Each recipe is a thin facade
-over an existing entrypoint (`quick-install.sh`, `deploy.sh`,
-`verify.php`, `tests/*.sh`); only `setup` contains logic of its own.
-
-### Running Tests Directly
-
-```bash
-vendor/bin/phpunit
-./tests/docker-test.sh     # full docker install suite
-./tests/install-test.sh    # host-path install suite
-```
-
-## Contributing
-
-Pull requests welcome. Please follow PSR-12 coding standards and include tests.
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/lance0/weathermapNG/issues)
-- **Community**: [community.librenms.org](https://community.librenms.org)
+Upgrade safety notes (schema, config, and plugin-row normalization) are in the
+[installation guide](docs/INSTALL.md#updating).
 
 ## License
 

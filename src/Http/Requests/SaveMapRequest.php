@@ -18,7 +18,7 @@ class SaveMapRequest extends FormRequest
     {
         return [
             'title' => 'nullable|string|max:255',
-            'name' => 'nullable|string|max:255',
+            'name' => 'nullable|string|max:255|alpha_dash',
             'options' => 'nullable|array',
             'options.width' => 'nullable|integer|min:100|max:4096',
             'options.height' => 'nullable|integer|min:100|max:4096',

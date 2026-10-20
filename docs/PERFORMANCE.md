@@ -118,4 +118,4 @@ When working on performance-sensitive changes:
 
 ## Roadmap Link
 
-Large-map performance is tracked in [ROADMAP.md](ROADMAP.md) under the medium-term roadmap. Avoid documenting hard limits until they are backed by repeatable measurements.
+Large-map performance is tracked in [ROADMAP.md](../ROADMAP.md) under the medium-term roadmap. Avoid documenting hard limits until they are backed by repeatable measurements.

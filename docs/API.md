@@ -9,7 +9,7 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 
 ## Authentication & Authorization
 
-All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, or a LibreNMS `level >= 10` and otherwise `abort(403)`.
+All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, a LibreNMS `level >= 10`, or `hasRole('admin')` and otherwise `abort(403)`.
 
 ### Public probe routes (no auth)
 
@@ -21,9 +21,9 @@ These sit outside the `auth` group and are intentionally minimal so they can bac
 
 ### Read routes (open to all authenticated users)
 
-`GET` map index/show/editor/view/embed/json/live/sse/export, `GET templates` index/show, and `GET /health/detailed`, `/health/stats`, `/metrics`. None of these call `requireAdmin()`. Device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports`) are admin-only — they expose device IPs and topology data.
+`GET` map index/show/editor/view/embed/json/live/sse/export and `GET templates` index/show. None of these call `requireAdmin()`. Admin-only reads: device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports` — they expose device IPs and topology data), map version endpoints (list/show/compare/export), and `/health/detailed`, `/health/stats`, `/metrics`. Token-auth variant: `embed`, `json`, `live`, and `sse` are also reachable without a session using a Bearer token / `?token=` when `WEATHERMAPNG_EMBED_TOKEN` is set (see [docs/EMBED.md](EMBED.md#embed-api-token-auth)).
 
-### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`)
+### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, `level >= 10`, or `hasRole('admin')`)
 
 Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at the top of the controller action and `abort(403)` for non-admins. This covers all map CRUD, node CRUD, link CRUD, template CRUD, full-map save, import, auto-discovery, and the install runner. The `GET /plugin/WeathermapNG/install` UI is authenticated (it sits in the `auth` group); its `POST` counterpart is admin-only.
 
@@ -282,25 +282,60 @@ Create link request:
 | Public | `GET` | `/plugin/WeathermapNG/health` | Basic health |
 | Public | `GET` | `/plugin/WeathermapNG/ready` | Readiness probe |
 | Public | `GET` | `/plugin/WeathermapNG/live` | Basic liveness |
-| Authenticated | `GET` | `/plugin/WeathermapNG/health/detailed` | Detailed health |
-| Authenticated | `GET` | `/plugin/WeathermapNG/health/stats` | Plugin stats |
-| Authenticated | `GET` | `/plugin/WeathermapNG/metrics` | Prometheus-style metrics |
+| Admin | `GET` | `/plugin/WeathermapNG/health/detailed` | Detailed health |
+| Admin | `GET` | `/plugin/WeathermapNG/health/stats` | Plugin stats |
+| Admin | `GET` | `/plugin/WeathermapNG/metrics` | Prometheus-style metrics |
 
 ## Version History Routes
 
-Version routes are registered in `routes/web.php` under the `web` + `auth` middleware group. All mutating endpoints require admin via `requireAdmin()`.
+Version routes are registered in `routes/web.php` under the `web` + `auth` middleware group. All version endpoints (list, show, compare, and export included) require admin via `requireAdmin()`.
 
 | Auth | Method | Path | Purpose |
 |------|--------|------|---------|
-| Authenticated | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
+| Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
 | Admin | `POST` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Create a named version |
-| Authenticated | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details + snapshot |
+| Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details + snapshot |
 | Admin | `POST` | `/plugin/WeathermapNG/api/versions/{versionId}/restore` | Restore map to a version |
 | Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}` | Compare two versions (returns flat diff: `nodes_added`, `nodes_removed`, `nodes_modified`, `links_added`, `links_removed`, `links_modified`) |
 | Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
 | Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
 
-Diff direction: `compare(v1, v2)` reports what changed going from v1 → v2. `nodes_added` = IDs in v2 but not v1.
+
+## Webhooks
+
+When configured, WeathermapNG POSTs a JSON payload to each webhook URL on map lifecycle events: `map.created`, `map.updated` (including editor saves), `map.deleted`, and `map.version_saved`.
+
+```json
+{
+  "event": "map.updated",
+  "map_id": 12,
+  "map_name": "campus-core",
+  "user": "admin",
+  "timestamp": "2026-10-20T18:55:00Z"
+}
+```
+
+`user` is the acting LibreNMS username, or `null` for CLI-triggered changes (poller, artisan commands).
+
+**Configuration** — settings page (Webhook URLs, one per line), or config:
+
+```php
+// WEATHERMAPNG_WEBHOOK_URLS (newline-separated) or webhooks.urls (array)
+'webhooks' => [
+    'urls' => ['https://hooks.slack.com/services/...'],
+    'secret' => env('WEATHERMAPNG_WEBHOOK_SECRET'),
+],
+```
+
+**Signature verification** — when `WEATHERMAPNG_WEBHOOK_SECRET` is set, each delivery carries `X-WeathermapNG-Signature: t=<unix_ts>,v1=<hex>`. The `v1` value is `HMAC-SHA256("<unix_ts>.<raw_body>", secret)`. Reject deliveries with a timestamp older than five minutes to prevent replay:
+
+```php
+[$t, $v1] = array_map(fn($p) => explode('=', $p, 2), explode(',', $_SERVER['HTTP_X_WEATHERMAPNG_SIGNATURE']));
+assert(abs(time() - $t[1]) < 300);
+assert(hash_equals('v1=' . hash_hmac('sha256', $t[1] . '.' . $body, $secret), 'v1=' . $v1[1]));
+```
+
+Delivery is best-effort: a 5-second timeout per URL, failures are logged and never block the map mutation that triggered them.
 
 ## Error Shape
 

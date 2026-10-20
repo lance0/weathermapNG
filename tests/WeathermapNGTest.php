@@ -42,8 +42,11 @@ class WeathermapNGTest extends TestCase
         $hooks = $info['hooks'];
 
         $this->assertArrayHasKey('menu', $hooks);
-        $this->assertArrayHasKey('page', $hooks);
         $this->assertArrayHasKey('settings', $hooks);
+        // No 'page' hook exists — pages are served by plugin routes, not hooks.
+        $this->assertArrayNotHasKey('page', $hooks);
+        $this->assertSame('src/Hooks/MenuEntry.php', $hooks['menu']);
+        $this->assertSame('src/Hooks/Settings.php', $hooks['settings']);
     }
 
     public function test_hooks_info_returns_expected_keys(): void
@@ -51,10 +54,11 @@ class WeathermapNGTest extends TestCase
         $hooks = $this->plugin->getHooksInfo();
 
         $this->assertArrayHasKey('menu_hook', $hooks);
-        $this->assertArrayHasKey('page_hook', $hooks);
         $this->assertArrayHasKey('settings_hook', $hooks);
+        $this->assertArrayNotHasKey('page_hook', $hooks);
         $this->assertArrayHasKey('location', $hooks);
         $this->assertArrayHasKey('architecture', $hooks);
+        $this->assertSame('src/Hooks/', $hooks['location']);
     }
 
     public function test_check_requirements_returns_boolean_values(): void

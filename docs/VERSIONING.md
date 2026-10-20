@@ -32,7 +32,7 @@ v1.7.0 standardized authorization on a simple admin-only model: maps have no per
 
 ## Pre-release Checklist
 
-The full pre-release validation flow — syntax checks, `composer validate`, the test suite, CI verification, version-source alignment, tagging, and manual QA — lives in [RELEASE.md](RELEASE.md). Follow that checklist before tagging any release. The quick checks below are a fast pre-flight, not a substitute for the full release readiness flow:
+The full pre-release validation flow — syntax checks, `composer validate`, the test suite, CI verification, version-source alignment, tagging, and manual QA — lives in [RELEASE.md](../RELEASE.md). Follow that checklist before tagging any release. The quick checks below are a fast pre-flight, not a substitute for the full release readiness flow:
 
 ```bash
 composer validate --no-check-publish

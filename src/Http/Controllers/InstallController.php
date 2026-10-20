@@ -15,6 +15,7 @@ class InstallController extends Controller
 
     public function index(): \Illuminate\View\View
     {
+        $this->requireAdmin();
         $requirements = $this->checkRequirements();
         $steps = [
             'requirements' => $this->checkRequirementsMet($requirements),
