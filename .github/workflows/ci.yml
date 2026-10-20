@@ -1,5 +1,10 @@
 name: CI
 
+# Cancel superseded runs on the same branch/PR; never cancel main.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 on:
   push:
     branches: [main, develop]
@@ -13,6 +18,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     name: PHP Lint & Metadata
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -25,49 +31,23 @@ jobs:
           extensions: gd, json, mbstring, pdo, pdo_mysql
           coverage: none
 
-      - name: Check PHP syntax
-        run: |
-          set -e
-          ERROR=0
-          while IFS= read -r file; do
-            if ! php -l "$file" 2>&1 | grep -q "No syntax errors"; then
-              php -l "$file"
-              ERROR=1
-            fi
-          done < <(find src routes database views -name "*.php" -not -path "*/vendor/*")
-          exit $ERROR
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
-      - name: Validate composer.json
-        run: composer validate --no-check-publish
+      - name: Lint all PHP sources
+        run: just lint
 
       - name: Validate version metadata
-        run: |
-          php <<'PHP'
-          <?php
-          $version = trim(file_get_contents('VERSION'));
-          $composer = json_decode(file_get_contents('composer.json'), true);
-          $changelog = file_get_contents('CHANGELOG.md');
-
-          if (! preg_match('/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/', $version)) {
-              fwrite(STDERR, "VERSION is not SemVer: {$version}\n");
-              exit(1);
-          }
-
-          if (($composer['version'] ?? null) !== $version) {
-              fwrite(STDERR, "composer.json version does not match VERSION\n");
-              exit(1);
-          }
-
-          if (! str_contains($changelog, "## [{$version}]")) {
-              fwrite(STDERR, "CHANGELOG.md is missing ## [{$version}]\n");
-              exit(1);
-          }
-          PHP
+        run: just check-metadata
 
   test:
     runs-on: ubuntu-latest
     name: PHPUnit (${{ matrix.php-version }})
+    timeout-minutes: 15
     needs: lint
+
     strategy:
       fail-fast: false
       matrix:
@@ -85,23 +65,33 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Cache Composer dependencies
-        uses: actions/cache@v6
+      # Cache composer's own download cache (not vendor/) — vendor
+      # restoration is fragile across PHP versions; the dist cache makes
+      # `composer install` near-instant and always consistent with the lock.
+      - name: Cache Composer packages
+        uses: actions/cache@v4
         with:
-          path: vendor
-          key: composer-${{ runner.os }}-php${{ matrix.php-version }}-${{ hashFiles('composer.json') }}
+          path: ~/.cache/composer
+          key: composer-dist-${{ runner.os }}-php${{ matrix.php-version }}-${{ hashFiles('composer.lock') }}
           restore-keys: |
-            composer-${{ runner.os }}-php${{ matrix.php-version }}-
+            composer-dist-${{ runner.os }}-php${{ matrix.php-version }}-
+            composer-dist-${{ runner.os }}-
 
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Run tests
-        run: vendor/bin/phpunit --no-coverage
+        run: just test
 
   docker-test:
     runs-on: ubuntu-latest
     name: PHPUnit (Docker / LibreNMS image)
+    timeout-minutes: 15
     needs: lint
 
     steps:
@@ -129,49 +119,36 @@ jobs:
   security:
     runs-on: ubuntu-latest
     name: Security Check
-    needs: lint
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
+
       - name: Check for hardcoded secrets
-        run: |
-          set -e
-          # Simple check for common secret patterns in PHP source
-          if grep -rE "(password|secret|api_key)\s*=\s*['\"][^'\"$][^'\"]{8,}['\"]" \
-             --include="*.php" --exclude-dir=vendor --exclude-dir=tests . 2>/dev/null | \
-             grep -v "example\|placeholder\|your_\|test_\|dummy\|config\|env"; then
-            echo "Warning: Potential hardcoded secrets found"
-            exit 1
-          fi
-          echo "No hardcoded secrets detected"
+        run: just check-security
 
   docs:
     runs-on: ubuntu-latest
     name: Documentation Validation
-    needs: lint
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Check required documentation files exist
-        run: |
-          set -e
-          for doc in README.md CHANGELOG.md ROADMAP.md RELEASE.md CONTRIBUTING.md docs/README.md docs/INSTALL.md docs/API.md docs/DEPLOYMENT.md docs/PERFORMANCE.md docs/VERSIONING.md docs/EMBED.md; do
-            test -f "$doc" || (echo "MISSING: $doc" && exit 1)
-            echo "  OK: $doc"
-          done
+      - name: Install just
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just
 
-      - name: Check install guidance stays aligned
-        run: |
-          set -euo pipefail
-          for file in quick-install.sh README.md docs/INSTALL.md; do
-            grep -F 'composer config repositories.weathermapng' "$file"
-            grep -F 'librenms/weathermapng' "$file"
-            grep -E 'route:list.*weathermap|route:list.*wmng' "$file"
-          done
+      - name: Check required docs and install-guidance alignment
+        run: just check-docs
 
       - name: Check no stale references to deleted classes
         run: |

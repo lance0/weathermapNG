@@ -5,58 +5,42 @@ Applies to all versions. SemVer guidelines and version-source rules at the botto
 
 ## 1. Pre-release Validation Flow
 
-Run these in order before tagging. Stop and fix if any step fails.
+The `just` recipes automate most of this. Run them in order; stop and fix if
+anything fails.
 
-1. **Syntax check all changed PHP files**
+1. **Run the full pre-flight gate** (lint, metadata, docs, security, tests):
    ```bash
-   for f in $(git diff --name-only --diff-filter=ACMR HEAD~1 HEAD -- '*.php'); do
-     php -l "$f"
-   done
-   ```
-   Container equivalent (LibreNMS image):
-   ```bash
-   docker run --rm --entrypoint php -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
-     -w /opt/librenms/html/plugins/WeathermapNG librenms/librenms:latest \
-     -l <file>
+   just check
    ```
 
-2. **Validate composer.json**
+2. **Bump version sources** (VERSION, composer.json, README badge, ROADMAP
+   status):
    ```bash
-   composer validate
+   just release-bump v<version>
    ```
 
-3. **Run the test suite**
-   ```bash
-   vendor/bin/phpunit --no-coverage
-   ```
-   Container equivalent:
-   ```bash
-   docker run --rm --entrypoint php -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
-     -w /opt/librenms/html/plugins/WeathermapNG librenms/librenms:latest \
-     vendor/bin/phpunit --no-coverage
-   ```
+3. **Add the CHANGELOG.md entry** — `just release-bump` warns if a
+   `## [<version>]` section is missing; write it (dated, above the previous
+   release section) before continuing.
 
-4. **Verify CI is green** on the release branch for all workflows in
-   `.github/workflows/`:
-   - `installation-tests.yml`
+4. **Commit the version bump** and verify CI is green on the release branch
+   for all workflows in `.github/workflows/`:
    - `ci.yml`
-   - `release.yml`
+   - `installation-tests.yml`
+   - `release.yml` (validates on tag)
 
-5. **Verify version sources match** — `VERSION` and `composer.json` `"version"`
-   must be identical, and `CHANGELOG.md` must have a matching section.
+5. **Run the manual QA checklist** (section 2 below).
 
-6. **Update CHANGELOG.md** — replace the `## [Unreleased]` heading with the new
-   `## [<version>] - <YYYY-MM-DD>` section, or add a new dated section above
-   `## [Unreleased]`.
-
-7. **Tag and push the release**
+6. **Tag and push the release** — runs the full check gate, then tags:
    ```bash
-   git tag v<version>
-   git push origin v<version>
+   just release-tag v<version>
    ```
 
-8. **Create the GitHub release** — use the matching `CHANGELOG.md` section as
-   the release notes. Title it `v<version>`.
+7. **The Release workflow publishes the GitHub release** — it runs the full
+   test suite, validates that the tag matches `VERSION`/`composer.json`/
+   `CHANGELOG.md`, extracts the matching `CHANGELOG.md` section as release
+   notes (title `v<version>`), and attaches the `.zip`/`.tar.gz` archives.
+   No fallback: a missing CHANGELOG section or a red suite blocks the release.
 
 ## 2. Manual QA Checklist
 

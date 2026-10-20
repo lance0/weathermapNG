@@ -35,7 +35,7 @@ docker run --rm --entrypoint php \
   vendor/bin/phpunit --no-coverage
 ```
 
-The current suite has 178 tests, 579 assertions, and 18 skipped tests. The skipped tests are pre-existing stubs that require a live Eloquent/DB connection and are skipped when running outside a full LibreNMS environment; they are not regressions. When you add a feature, add tests for it.
+The current suite has 394 tests, 1241 assertions, and 0 skipped tests. `just test` runs the suite directly; `just check` is the full PR gate (lint, metadata, docs, security, tests) — the same recipes CI runs. When you add a feature, add tests for it.
 
 ### LibreNMS Plugin Setup
 
