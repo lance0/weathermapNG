@@ -3,6 +3,12 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Replace the deployment checker's stale source-file checks and directory repairs with a read-only installation report. The CLI and admin diagnostics share runtime registration, persistent registry, permissions, and nullable database counts. JSON support reports omit secrets and distinguish unavailable data from empty tables.
+- Keep admin diagnostics usable when named routes are missing; show unknown counts after database failures and suppress raw exception details.
+
 ## [1.14.1] - 2026-10-28
 
 ### Fixed

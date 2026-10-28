@@ -45,7 +45,7 @@ test-one name:
 test-integration:
     #!/usr/bin/env bash
     set -euo pipefail
-    for t in tests/integration_savemaprequest_test.php tests/integration_node_label_invariant_test.php tests/integration_version_test.php tests/integration_embed_auth_test.php; do
+    for t in tests/integration_savemaprequest_test.php tests/integration_node_label_invariant_test.php tests/integration_version_test.php tests/integration_embed_auth_test.php tests/integration_install_report_test.php; do
         echo "=== $t ==="
         docker exec -u librenms librenms-dev bash -c "cd /opt/librenms/html/plugins/WeathermapNG && php $t"
     done
@@ -225,8 +225,8 @@ update LIBRENMS_PATH="/opt/librenms":
     LIBRENMS_PATH="{{LIBRENMS_PATH}}" ./deploy.sh
 
 # Post-install deployment check against a LibreNMS install root
-validate-install LIBRENMS_PATH="/opt/librenms":
-    LIBRENMS_PATH="{{LIBRENMS_PATH}}" {{PHP}} verify-deployment.php
+validate-install LIBRENMS_PATH="/opt/librenms" *args:
+    LIBRENMS_PATH="{{LIBRENMS_PATH}}" {{PHP}} verify-deployment.php {{args}}
 
 # Verify plugin structure and install readiness (stands alone)
 verify:
@@ -269,6 +269,6 @@ test-install-local INSTALL_DIR="/opt/librenms":
 visual URL="http://localhost:18080":
     bash tests/screenshot-check.sh "{{URL}}" "${OUTDIR:-output/screenshots}"
 
-# Smoke-check a deployed plugin over HTTP
-verify-deployment URL="http://localhost:18080":
-    {{PHP}} verify-deployment.php {{URL}}
+# Inspect a selected LibreNMS installation (pass --json for a support report)
+verify-deployment LIBRENMS_PATH="/opt/librenms" *args:
+    LIBRENMS_PATH="{{LIBRENMS_PATH}}" {{PHP}} verify-deployment.php {{args}}

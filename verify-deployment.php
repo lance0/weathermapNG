@@ -1,233 +1,35 @@
 #!/usr/bin/env php
 <?php
-/**
- * WeathermapNG Deployment Verification Script
- * Checks that the plugin is properly installed and configured for LibreNMS v2
- */
+// Load the collector directly: missing package discovery is itself a diagnostic case.
+require_once __DIR__ . '/src/Services/InstallationReport.php';
 
-// Colors for output
-define('RED', "\033[0;31m");
-define('GREEN', "\033[0;32m");
-define('YELLOW', "\033[1;33m");
-define('NC', "\033[0m"); // No Color
-
-$errors = 0;
-$warnings = 0;
-
-function pass($message) {
-    echo GREEN . "[✓] " . NC . $message . PHP_EOL;
+if (array_diff(array_slice($argv, 1), ['--json'])) {
+    fwrite(STDERR, "Usage: php verify-deployment.php [--json]\n");
+    exit(2);
 }
-
-function fail($message) {
-    global $errors;
-    $errors++;
-    echo RED . "[✗] " . NC . $message . PHP_EOL;
+$root = getenv('LIBRENMS_PATH') ?: '/opt/librenms';
+$app = null;
+ob_start();
+try {
+    if (!is_file($root . '/vendor/autoload.php') || !is_file($root . '/bootstrap/app.php')) {
+        throw new RuntimeException('LibreNMS bootstrap unavailable');
+    }
+    require_once $root . '/vendor/autoload.php';
+    $app = require $root . '/bootstrap/app.php';
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+} catch (Throwable $e) {
+    $app = null;
+} finally {
+    ob_end_clean();
 }
-
-function warn($message) {
-    global $warnings;
-    $warnings++;
-    echo YELLOW . "[!] " . NC . $message . PHP_EOL;
-}
-
-function info($message) {
-    echo "    " . $message . PHP_EOL;
-}
-
-echo PHP_EOL;
-echo "========================================" . PHP_EOL;
-echo "  WeathermapNG v2 Deployment Checker" . PHP_EOL;
-echo "========================================" . PHP_EOL;
-echo PHP_EOL;
-
-// 1. Check PHP version
-echo "Checking PHP version..." . PHP_EOL;
-if (version_compare(PHP_VERSION, '8.2.0', '>=')) {
-    pass("PHP version " . PHP_VERSION . " meets requirements");
+$report = LibreNMS\Plugins\WeathermapNG\Services\InstallationReport::collect($app, $root, __DIR__);
+if (in_array('--json', $argv, true)) {
+    echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
 } else {
-    fail("PHP version " . PHP_VERSION . " is too old (need 8.2+)");
-}
-
-// 2. Check required PHP extensions
-echo PHP_EOL . "Checking PHP extensions..." . PHP_EOL;
-$required_extensions = ['gd', 'json', 'pdo', 'mbstring'];
-foreach ($required_extensions as $ext) {
-    if (extension_loaded($ext)) {
-        pass("Extension '$ext' is loaded");
-    } else {
-        fail("Extension '$ext' is missing");
+    echo "WeathermapNG installation report\n";
+    foreach ($report['checks'] as $name => $check) {
+        echo ($check['ok'] ? 'PASS ' : 'FAIL ') . $name . ($check['recovery'] ? ': ' . $check['recovery'] : '') . "\n";
     }
+    echo $report['observation'] . "\n";
 }
-
-// 3. Check LibreNMS bootstrap
-echo PHP_EOL . "Checking LibreNMS integration..." . PHP_EOL;
-$librenms_base = getenv('LIBRENMS_PATH') ?: '/opt/librenms';
-
-if (file_exists($librenms_base . '/vendor/autoload.php')) {
-    require_once $librenms_base . '/vendor/autoload.php';
-    pass("LibreNMS autoloader found");
-} else {
-    fail("LibreNMS autoloader not found at $librenms_base/vendor/autoload.php");
-    fwrite(STDERR, "Cannot continue without LibreNMS\n");
-    exit(1);
-}
-
-if (file_exists($librenms_base . '/includes/init.php')) {
-    // Set init_modules to avoid warnings
-    $init_modules = ['web'];
-    require_once $librenms_base . '/includes/init.php';
-    pass("LibreNMS initialized");
-} else {
-    warn("LibreNMS init.php not found - some checks will be skipped");
-}
-
-// 4. Check plugin files
-echo PHP_EOL . "Checking plugin files..." . PHP_EOL;
-$plugin_dir = dirname(__FILE__);
-
-$required_files = [
-    'composer.json' => 'Composer package manifest',
-    'routes/web.php' => 'Route definitions',
-    'config/config.php' => 'Configuration file',
-    'src/WeathermapNGProvider.php' => 'Service provider',
-    'src/Hooks/MenuEntry.php' => 'Menu hook',
-    'src/Hooks/Settings.php' => 'Settings hook',
-];
-
-foreach ($required_files as $file => $description) {
-    if (file_exists($plugin_dir . '/' . $file)) {
-        pass("$description exists");
-    } else {
-        fail("$description missing: $file");
-    }
-}
-
-// 5. Check hook classes
-echo PHP_EOL . "Checking hook classes..." . PHP_EOL;
-$hook_classes = [
-    'LibreNMS\Plugins\WeathermapNG\Hooks\MenuEntry',
-    'LibreNMS\Plugins\WeathermapNG\Hooks\Settings',
-];
-
-foreach ($hook_classes as $class) {
-    if (class_exists($class)) {
-        pass("Hook class $class exists");
-        
-        // Check if it extends the right base class
-        $reflection = new ReflectionClass($class);
-        $parent = $reflection->getParentClass();
-        if ($parent) {
-            info("Extends: " . $parent->getName());
-        }
-    } else {
-        fail("Hook class $class not found");
-    }
-}
-
-// 6. Check database tables
-echo PHP_EOL . "Checking database..." . PHP_EOL;
-if (class_exists('\Illuminate\Support\Facades\Schema')) {
-    $tables = ['wmng_maps', 'wmng_nodes', 'wmng_links'];
-    foreach ($tables as $table) {
-        if (\Illuminate\Support\Facades\Schema::hasTable($table)) {
-            pass("Table '$table' exists");
-        } else {
-            fail("Table '$table' does not exist - run migrations");
-        }
-    }
-} else {
-    warn("Cannot check database - Schema facade not available");
-}
-
-// 7. Check permissions
-echo PHP_EOL . "Checking permissions..." . PHP_EOL;
-$writable_dirs = [
-    'output',
-    'output/maps',
-    'output/cache',
-];
-
-foreach ($writable_dirs as $dir) {
-    $path = $plugin_dir . '/' . $dir;
-    if (!file_exists($path)) {
-        warn("Directory '$dir' does not exist");
-        if (mkdir($path, 0755, true)) {
-            info("Created $dir");
-        }
-    } elseif (is_writable($path)) {
-        pass("Directory '$dir' is writable");
-    } else {
-        fail("Directory '$dir' is not writable");
-    }
-}
-
-// 8. Check views
-echo PHP_EOL . "Checking view files..." . PHP_EOL;
-$view_files = [
-    'resources/views/menu.blade.php',
-    'resources/views/page.blade.php',
-    'resources/views/settings.blade.php',
-    'resources/views/editor.blade.php',
-];
-
-foreach ($view_files as $view) {
-    if (file_exists($plugin_dir . '/' . $view)) {
-        pass("View '$view' exists");
-    } else {
-        warn("View '$view' missing");
-    }
-}
-
-// 9. Check routes
-echo PHP_EOL . "Checking routes..." . PHP_EOL;
-$routes_file = $plugin_dir . '/routes/web.php';
-if (file_exists($routes_file)) {
-    $routes_content = file_get_contents($routes_file);
-    
-    // Check for v2 routes
-    if (strpos($routes_content, '/plugin/WeathermapNG') !== false || 
-        strpos($routes_content, 'plugin/WeathermapNG') !== false) {
-        pass("Routes use v2 pattern (/plugin/WeathermapNG)");
-    } else {
-        warn("Routes may not be using v2 pattern");
-    }
-    
-    // Check for auth middleware
-    if (strpos($routes_content, "'auth'") !== false || 
-        strpos($routes_content, '"auth"') !== false) {
-        pass("Routes use auth middleware");
-    } else {
-        warn("Routes may not be protected by auth");
-    }
-}
-
-// 10. Test API endpoint
-echo PHP_EOL . "Testing API endpoints..." . PHP_EOL;
-// This would need to be done via HTTP request in real deployment
-info("Manual test: Visit http://your-server/plugin/WeathermapNG");
-info("Manual test: Check for 'Network Maps' in menu");
-
-// Summary
-echo PHP_EOL;
-echo "========================================" . PHP_EOL;
-if ($errors === 0 && $warnings === 0) {
-    echo GREEN . "  All checks passed!" . NC . PHP_EOL;
-} else {
-    if ($errors > 0) {
-        echo RED . "  $errors errors found" . NC . PHP_EOL;
-    }
-    if ($warnings > 0) {
-        echo YELLOW . "  $warnings warnings found" . NC . PHP_EOL;
-    }
-}
-echo "========================================" . PHP_EOL;
-echo PHP_EOL;
-
-if ($errors > 0) {
-    echo "To fix errors, run:" . PHP_EOL;
-    echo "  ./deploy.sh" . PHP_EOL;
-    echo PHP_EOL;
-    exit(1);
-}
-
-exit(0);
+exit($report['ok'] ? 0 : 1);

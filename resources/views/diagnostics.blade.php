@@ -4,6 +4,14 @@
 
 @section('content')
 <div class="container-fluid">
+    <div class="card mb-3">
+        <div class="card-header"><label for="installation-report">Installation support report</label></div>
+        <div class="card-body">
+            <p class="text-muted">Read-only, redacted installation checks. Copy this report when requesting support.</p>
+            <textarea id="installation-report" class="form-control" rows="12" readonly>{{ json_encode($installationReport, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</textarea>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-md-12">
             <h2>WeathermapNG Diagnostics</h2>
@@ -26,9 +34,9 @@
                 <div class="card-header">Counts</div>
                 <div class="card-body">
                     <table class="table table-sm table-borderless mb-0">
-                        <tr><td>Maps</td><td class="text-end">{{ $stats['maps'] ?? 0 }}</td></tr>
-                        <tr><td>Nodes</td><td class="text-end">{{ $stats['nodes'] ?? 0 }}</td></tr>
-                        <tr><td>Links</td><td class="text-end">{{ $stats['links'] ?? 0 }}</td></tr>
+                        <tr><td>Maps</td><td class="text-end">{{ $stats['maps'] ?? 'Unknown' }}</td></tr>
+                        <tr><td>Nodes</td><td class="text-end">{{ $stats['nodes'] ?? 'Unknown' }}</td></tr>
+                        <tr><td>Links</td><td class="text-end">{{ $stats['links'] ?? 'Unknown' }}</td></tr>
                         <tr><td>DB size</td><td class="text-end">{{ $stats['database_size'] ?? 'Unknown' }}</td></tr>
                     </table>
                     @if(!empty($stats['error']))
