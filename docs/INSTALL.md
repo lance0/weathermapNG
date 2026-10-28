@@ -14,6 +14,35 @@ Before installing WeathermapNG, ensure your environment meets these requirements
 
 WeathermapNG is a LibreNMS v2 Composer-discovered plugin. It does not use the legacy manifest or root-level route registration model.
 
+## Docker lifecycle and persistent settings
+
+The supplied Compose files keep the official LibreNMS entrypoint and mount
+`docker/99-weathermapng.sh` at `/etc/cont-init.d/99-weathermapng.sh`. This late hook
+runs the common installer after LibreNMS config/database initialization. Keep
+`S6_BEHAVIOUR_IF_STAGE2_FAILS=2`: a required installation failure must stop startup
+before nginx/PHP-FPM serve an incomplete plugin. Mount the checkout and hook in
+the app service only; dispatcher sidecars must not install into the shared
+checkout. Preserve the database and `/data` volumes when recreating the app.
+The root Composer files and whole vendor tree do not need persistent mounts.
+
+Store custom plugin environment settings in `/data/.env`, preserving its existing
+`APP_KEY` and `NODE_ID`. Official startup generates `/opt/librenms/.env`, then
+appends `/data/.env`. For example, add `WEATHERMAPNG_EMBED_TOKEN=<your-token>` to
+that persistent file, restrict access to it, and recreate the app service. A token
+supplied only as a Docker environment variable can appear in CLI configuration
+while PHP-FPM returns 403 because its environment is cleared. Verify the actual
+HTTP endpoint after recreation; a successful CLI report alone does not prove web
+authentication or opcode-cache freshness. The image defaults to file sessions
+in its ephemeral filesystem, so users may need to log in again after app
+recreation; this does not remove their maps, settings, or accounts.
+
+Native LibreNMS updates restore registered plugin dependencies through
+`composer.plugins.json` and the runtime user's global path repository. The
+lifecycle regression runs the real `daily.sh post-pull` dependency-restoration
+path after resetting Composer files to those from the exact installed image.
+This qualifies restoration in the disposable container; it does not qualify a
+full native Git pull or a bare-metal OS upgrade.
+
 ## Automated Install (Recommended)
 
 For most users, use the automated installer:

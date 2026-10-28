@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Restore WeathermapNG registration during official Docker startup with a late init hook, and stop the container if installation fails. Compose examples retain the official entrypoint and install only in the app container. Qualify native post-pull dependency restoration and populated container recreation, including persistent token and session access through PHP-FPM.
 - Stop installation and upgrade on required-step failures, verify runtime registration before success, and register path packages through LibreNMS's persistent plugin registry. Run all install/update writes as the runtime user; detached tags and archives retain their selected source.
 - Use the selected LibreNMS Laravel connection for schema setup and duplicate-row normalization; remove the fallback that guessed separate PDO credentials and could hide failures.
 - Replace the deployment checker's stale source-file checks and directory repairs with a read-only installation report. The CLI and admin diagnostics share runtime registration, persistent registry, permissions, and nullable database counts. JSON support reports omit secrets and distinguish unavailable data from empty tables.
