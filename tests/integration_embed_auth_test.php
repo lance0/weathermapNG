@@ -4,6 +4,10 @@
 require '/opt/librenms/vendor/autoload.php';
 $app = require '/opt/librenms/bootstrap/app.php';
 $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+set_exception_handler(static function (Throwable $error): void {
+    fwrite(STDERR, get_class($error) . ': ' . $error->getMessage() . "\n");
+    exit(1);
+});
 
 use App\Models\User;
 use Illuminate\Cookie\CookieValuePrefix;

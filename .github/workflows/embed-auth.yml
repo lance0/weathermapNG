@@ -19,8 +19,9 @@ jobs:
           sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
           docker compose -p wmng-auth -f docker-compose.dev.yml up -d db redis librenms
           for _ in {1..90}; do
-            # Avoid warming PHP's opcode cache with pre-install route manifests.
-            if (exec 3<>/dev/tcp/localhost/8000) 2>/dev/null; then
+            # Docker's port proxy can accept TCP before application initialization.
+            status=$(curl -s -o "$RUNNER_TEMP/wmng-live.json" -w '%{http_code}' http://localhost:8000/plugin/WeathermapNG/live) || status=000
+            if [ "$status" = 200 ] && jq -e '.alive == true' "$RUNNER_TEMP/wmng-live.json" >/dev/null; then
               exit 0
             fi
             sleep 2
