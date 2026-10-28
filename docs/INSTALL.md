@@ -153,6 +153,7 @@ LibreNMS must know about the package before Laravel can discover the service pro
 ```bash
 cd /opt/librenms
 composer config --global repositories.weathermapng '{"type":"path","url":"/opt/librenms/html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer config --unset repositories.weathermapng
 ./lnms plugin:add librenms/weathermapng '*' --no-interaction
 php artisan package:discover
 ```
@@ -292,6 +293,7 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 ```bash
 cd /opt/librenms
 composer config --global repositories.weathermapng '{"type":"path","url":"/opt/librenms/html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer config --unset repositories.weathermapng
 ./lnms plugin:add librenms/weathermapng '*' --no-interaction
 php artisan package:discover
 php artisan optimize:clear
