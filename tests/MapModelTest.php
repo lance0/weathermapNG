@@ -3,9 +3,61 @@
 namespace LibreNMS\Plugins\WeathermapNG\Tests;
 
 use PHPUnit\Framework\TestCase;
+use LibreNMS\Plugins\WeathermapNG\Models\Map;
 
 class MapModelTest extends TestCase
 {
+    public function test_legacy_dimensions_are_read_when_options_omit_them(): void
+    {
+        foreach ([null, json_encode(['background' => '#123456'])] as $options) {
+            $map = (new Map())->setRawAttributes(['width' => 1173, 'height' => 641, 'options' => $options]);
+            $this->assertSame(1173, $map->width);
+            $this->assertSame(641, $map->height);
+        }
+    }
+
+    public function test_options_dimensions_take_precedence_over_legacy_columns(): void
+    {
+        $map = (new Map())->setRawAttributes([
+            'width' => 1173, 'height' => 641,
+            'options' => json_encode(['width' => 2048, 'height' => 1024]),
+        ]);
+        $this->assertSame(2048, $map->width);
+        $this->assertSame(1024, $map->height);
+    }
+
+    public function test_partial_options_fall_back_per_dimension(): void
+    {
+        $map = (new Map())->setRawAttributes([
+            'width' => 1173, 'height' => 641, 'options' => json_encode(['width' => 2048]),
+        ]);
+        $this->assertSame(2048, $map->width);
+        $this->assertSame(641, $map->height);
+
+        $map->setRawAttributes(['width' => 1173, 'height' => 641, 'options' => json_encode(['height' => 1024])]);
+        $this->assertSame(1173, $map->width);
+        $this->assertSame(1024, $map->height);
+    }
+
+    public function test_absent_dimensions_keep_existing_defaults(): void
+    {
+        foreach ([[], ['width' => null, 'height' => null]] as $attributes) {
+            $map = (new Map())->setRawAttributes($attributes + ['options' => '{}']);
+            $this->assertSame(800, $map->width);
+            $this->assertSame(600, $map->height);
+        }
+    }
+
+    public function test_explicit_null_options_dimensions_keep_precedence(): void
+    {
+        $map = (new Map())->setRawAttributes([
+            'width' => 1173, 'height' => 641,
+            'options' => json_encode(['width' => null, 'height' => null]),
+        ]);
+        $this->assertNull($map->width);
+        $this->assertNull($map->height);
+    }
+
     public function test_map_has_tags_accessor(): void
     {
         $content = file_get_contents(__DIR__ . '/../src/Models/Map.php');
