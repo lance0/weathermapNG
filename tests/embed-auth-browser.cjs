@@ -31,7 +31,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         const page = await context.newPage();
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
-        await page.goto(`${base}/plugin/WeathermapNG/embed/${fixture.map}`);
+        await page.goto(`${base}/plugin/WeathermapNG/embed/${fixture.map}?interval=1&max=5`);
         assert.ok(new URL(page.url()).pathname.endsWith('/login'));
         await page.locator('[name=username]').fill(fixture.username);
         await page.locator('[name=password]').fill(fixture.password);
@@ -41,7 +41,10 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         ]);
         assert.ok(new URL(page.url()).pathname.endsWith(`/embed/${fixture.map}`));
         assert.equal((await page.goto(`${base}/plugin/WeathermapNG`)).status(), 200);
-        assert.equal((await page.goto(`${base}/plugin/WeathermapNG/editor/${fixture.child}`)).status(), 200);
+        const editorData = page.waitForResponse(r => r.url().endsWith(`/api/maps/${fixture.child}/json`));
+        await page.goto(`${base}/plugin/WeathermapNG/editor/${fixture.child}`);
+        assert.equal((await editorData).status(), 200);
+        assert.equal((await (await editorData).json()).id, fixture.child);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.equal(await page.evaluate(() => WMNG.EditorState.nodes.length), 1);
         const saved = page.waitForResponse(r => r.url().endsWith(`/api/maps/${fixture.child}/save`));
@@ -59,7 +62,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         const tokenContext = await browser.newContext();
         const tokenPage = await tokenContext.newPage();
         tokenPage.on('pageerror', error => errors.push(error.message));
-        const url = `${base}/plugin/WeathermapNG/embed/${fixture.map}?token=${encodeURIComponent(fixture.token)}`;
+        const url = `${base}/plugin/WeathermapNG/embed/${fixture.map}?token=${encodeURIComponent(fixture.token)}&interval=1&max=5`;
         const appStream = tokenPage.waitForResponse(r => r.url().includes(`/api/maps/${fixture.map}/sse`));
         assert.equal((await tokenPage.goto(url)).status(), 200);
         assert.equal((await appStream).status(), 200);
@@ -82,7 +85,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await tokenPage.waitForURL(url => url.pathname.endsWith(`/embed/${fixture.map}`));
         console.log('PASS: anonymous token viewer renders, refreshes JSON, streams live data, and navigates nested maps');
 
-        await tokenPage.goto(url + '&sse=0&interval=1&kiosk=1&cycle=5');
+        await tokenPage.goto(url + '&sse=0&kiosk=1&cycle=5');
         await tokenPage.waitForURL(next => next.pathname.endsWith(`/embed/${fixture.child}`), { timeout: 15000 });
         assert.equal(new URL(tokenPage.url()).searchParams.get('token'), fixture.token);
         const tokenLive = tokenPage.waitForResponse(r => r.url().includes(`/api/maps/${fixture.child}/live`));

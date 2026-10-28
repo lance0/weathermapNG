@@ -137,9 +137,12 @@ try {
     $twoFactor = embedRequest($paths['json'], $cookies);
     checkEmbed($twoFactor->getStatusCode() === 302 && str_ends_with($twoFactor->headers->get('Location', ''), '/2fa'),
         'session user must complete configured two-factor authentication');
+    \App\Facades\LibrenmsConfig::set('twofactor', false);
     $user->enabled = false;
     $user->save();
-    checkEmbed(embedRequest($paths['json'], $cookies)->getStatusCode() !== 200, 'disabled session user is denied');
+    $disabled = embedRequest($paths['json'], $cookies);
+    checkEmbed($disabled->getStatusCode() === 302 && str_ends_with($disabled->headers->get('Location', ''), '/login'),
+        'disabled session user is logged out');
 } finally {
     if ($map) {
         $map->nodes()->delete();
