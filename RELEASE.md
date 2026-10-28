@@ -19,7 +19,7 @@ anything fails.
    just release-bump v<version>
    ```
 
-3. **Add the CHANGELOG.md entry** — `just release-bump` warns if a
+3. **Update the tagged install examples** in `docs/INSTALL.md` for the release version, then **add the CHANGELOG.md entry** — `just release-bump` warns if a
    `## [<version>]` section is missing; write it (dated, above the previous
    release section) before continuing.
 
@@ -59,8 +59,10 @@ the release.
   denied); confirm existing settings load and save.
 - **Install**: on a clean LibreNMS install, run `quick-install.sh`; confirm
   WeathermapNG routes appear under the LibreNMS plugin menu.
-- **Upgrade**: from the previous release, pull latest, run `composer install` and
-  `php setup.php`; confirm routes appear and existing maps still load.
+- **Upgrade**: select the candidate release from the previous release and follow
+  [the canonical upgrade guide](docs/INSTALL.md#updating); confirm existing maps,
+  templates, saved versions, settings, editor and embed access survive. The lifecycle
+  and full scratch database/config recovery controls run in `embed-auth.yml`.
 
 ## 3. SemVer Guidelines
 

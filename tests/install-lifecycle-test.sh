@@ -103,6 +103,7 @@ echo 'PASS: pre-lifecycle ordinary session resolves populated map in kernel and 
 
 # Qualify the actual post-pull dependency restoration, using this exact image's pristine files.
 image="$(docker inspect "$app" --format '{{.Image}}')"
+docker image inspect "$image" --format 'ImageID={{.Id}} RepoDigests={{json .RepoDigests}}' | tee "$logs/image.txt"
 pristine_container="$(docker create "$image")"
 docker cp "$pristine_container:$root/composer.json" "$work/pristine.json"
 docker cp "$pristine_container:$root/composer.lock" "$work/pristine.lock"
@@ -154,7 +155,10 @@ check_retained() {
     code="$(curl -sS -o "$work/token.json" -w '%{http_code}' -H "Authorization: Bearer $token" "$base/plugin/WeathermapNG/api/maps/$map/json")"
     [ "$code" = 200 ]
     php -r '$s=json_decode(file_get_contents($argv[1]),true); if (($s["id"]??0)!=(int)$argv[2] || count($s["nodes"]??[])!==2 || count($s["links"]??[])!==1) exit(1);' "$work/token.json" "$map"
-    echo 'PASS: recreated FPM serves retained map via persistent token and same-user fresh session'
+    code="$(curl -sS -o "$work/embed.html" -w '%{http_code}' -H "Authorization: Bearer $token" "$base/plugin/WeathermapNG/embed/$map")"
+    [ "$code" = 200 ]
+    grep -q "mapId: '$map'" "$work/embed.html"
+    echo 'PASS: recreated FPM serves retained map JSON/embed via persistent token and editor via same-user fresh session'
 }
 
 recreated=true

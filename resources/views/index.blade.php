@@ -180,8 +180,8 @@
                                aria-label="Open diagnostics">
                                 <i class="fas fa-stethoscope mr-2" aria-hidden="true"></i>Diagnostics
                             </a>
-                            <a href="https://github.com/lance0/weathermapNG/blob/main/docs/EMBED.md" class="btn btn-outline-primary btn-lg" target="_blank" rel="noopener noreferrer"
-                               aria-label="Read embed documentation">
+                            <a href="https://github.com/lance0/weathermapNG/blob/main/docs/INSTALL.md" class="btn btn-outline-primary btn-lg" target="_blank" rel="noopener noreferrer"
+                               aria-label="Read installation and recovery documentation">
                                 <i class="fas fa-book mr-2" aria-hidden="true"></i>Docs
                             </a>
                         </div>

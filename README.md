@@ -16,32 +16,19 @@ auto-discovery from LLDP/CDP, templates, versioning, and bulk operations.
 
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
-![Version 1.14.1](https://img.shields.io/badge/version-1.14.1-0078D4)
+![Version 1.15.0](https://img.shields.io/badge/version-1.15.0-0078D4)
 
 ## Install
 
-```bash
-cd /opt/librenms/html/plugins
-git clone https://github.com/lance0/weathermapNG.git WeathermapNG
-sudo chown -R librenms:librenms /opt/librenms/html/plugins/WeathermapNG
-sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
-```
+Use the [v1.15.0 installation and recovery guide](docs/INSTALL.md) for stable
+native/Docker installation, configuration, upgrades, diagnostics, and full backups.
+Following `main` is an explicit development alternative documented there.
 
-The script installs dependencies, registers the Composer package with LibreNMS, sets up database tables, and enables the plugin. Run it as the `librenms` user — running as root can leave root-owned Composer files behind. `just install LIBRENMS_PATH=/opt/librenms` runs the same flow as a thin wrapper.
-
-The installer registers a per-LibreNMS-user Composer path repository with
-`composer config --global repositories.weathermapng` and records the package using
-`lnms plugin:add librenms/weathermapng`. This lets the native LibreNMS updater
-restore the package after resetting its own Composer files. Other global repository
-keys remain unchanged. Run installation and the updater as the same LibreNMS user.
-
-For a read-only installation report (including missing registration/routes):
-
-```bash
-sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && php verify-deployment.php'
-```
-
-After install, open `https://your-librenms/plugin/WeathermapNG` and create your first map. Docker-based install for development and testing, demo mode, permissions, and troubleshooting: [installation guide](docs/INSTALL.md).
+The common installer manages `composer config --global repositories.weathermapng`
+and LibreNMS `plugin:add librenms/weathermapng` registration under the runtime
+user. Its final read-only `verify-deployment.php` report checks actual runtime
+registration. After installation, log in to `/plugin/WeathermapNG` and verify
+editor/embed access too.
 
 ## What it does
 
@@ -79,12 +66,9 @@ After install, open `https://your-librenms/plugin/WeathermapNG` and create your 
 
 ## Updating
 
-```bash
-sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./deploy.sh'
-```
-
-Upgrade safety notes (schema, config, and plugin-row normalization) are in the
-[installation guide](docs/INSTALL.md#updating).
+Select the intended release and follow [the upgrade procedure](docs/INSTALL.md#updating).
+Back up the full database/configuration first; LibreNMS updates and plugin source
+upgrades are separate operations.
 
 ## License
 
