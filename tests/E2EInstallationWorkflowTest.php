@@ -26,38 +26,37 @@ class E2EInstallationWorkflowTest extends TestCase
         $this->assertStringContainsString('version_compare', $scriptContent);
     }
 
-    public function test_quick_install_script_validates_composer_install(): void
+    public function test_required_install_and_upgrade_failures_are_not_reported_as_success(): void
     {
-        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
-        $this->assertStringContainsString('composer install', $scriptContent);
-        $this->assertStringContainsString('Composer install failed', $scriptContent);
+        $process = new \Symfony\Component\Process\Process(['bash', __DIR__ . '/install-failure-test.sh']);
+        $this->assertSame(0, $process->run(), $process->getOutput() . $process->getErrorOutput());
     }
 
-    public function test_quick_install_script_guards_native_root_runs(): void
+
+    public function test_quick_install_script_refuses_native_root_and_drops_docker_root(): void
     {
-        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
-        $this->assertStringContainsString('Do not run quick-install.sh as root', $scriptContent);
-        $this->assertStringContainsString('WEATHERMAPNG_ALLOW_ROOT', $scriptContent);
+        $script = file_get_contents(__DIR__ . '/../quick-install.sh');
+        $this->assertStringContainsString('Do not run quick-install.sh as root', $script);
+        $this->assertStringContainsString('exec su -l librenms', $script);
+        $this->assertStringNotContainsString('WEATHERMAPNG_ALLOW_ROOT', $script);
     }
 
-    public function test_quick_install_script_forces_librenms_composer_registration(): void
+
+    public function test_quick_install_uses_supported_persistent_plugin_registration(): void
     {
-        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
-        $this->assertStringContainsString('FORCE=1 COMPOSER_ALLOW_SUPERUSER=1 composer require', $scriptContent);
+        $script = file_get_contents(__DIR__ . '/../quick-install.sh');
+        $this->assertStringContainsString('composer config --global repositories.weathermapng', $script);
+        $this->assertStringContainsString('./lnms plugin:add librenms/weathermapng', $script);
     }
 
-    public function test_quick_install_normalizes_duplicate_plugin_rows(): void
-    {
-        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
 
-        $this->assertStringContainsString('Normalizing WeathermapNG plugin registration', $scriptContent);
-        $this->assertStringContainsString("where('plugin_name', 'WeathermapNG')", $scriptContent);
-        $this->assertStringContainsString("'plugin_id', 'plugin_name', 'plugin_active', 'version'", $scriptContent);
-        $this->assertStringContainsString('Prefer version=2 rows', $scriptContent);
-        $this->assertStringContainsString("update(['plugin_active' => 1, 'version' => 2])", $scriptContent);
-        $this->assertStringContainsString("where('plugin_id', '!=', \$keep->plugin_id)", $scriptContent);
-        $this->assertStringContainsString('Cleaned $deleted duplicate WeathermapNG plugin row(s)', $scriptContent);
+    public function test_installer_uses_the_shared_database_normalizer(): void
+    {
+        $script = file_get_contents(__DIR__ . '/../quick-install.sh');
+        $this->assertStringContainsString('php database/setup.php', $script);
+        $this->assertStringNotContainsString("where('plugin_name'", $script);
     }
+
 
     public function test_database_setup_normalizes_duplicate_plugin_rows(): void
     {
@@ -71,19 +70,18 @@ class E2EInstallationWorkflowTest extends TestCase
         $this->assertStringContainsString("where('plugin_id', '!=', \$keep->plugin_id)", $scriptContent);
         // Verify the normalizer is called before every success exit
         $this->assertStringContainsString('normalizePluginRegistration()', $scriptContent);
-        $this->assertStringContainsString('normalizePluginRegistration($pdo)', $scriptContent);
+        $this->assertStringNotContainsString('new PDO', $scriptContent);
     }
 
-    public function test_quick_install_plugin_row_cleanup_is_defensive(): void
+    public function test_database_normalization_rejects_missing_required_schema(): void
     {
-        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
-
-        $this->assertStringContainsString("hasTable('plugins')", $scriptContent);
-        $this->assertStringContainsString('getColumnListing(\'plugins\')', $scriptContent);
-        $this->assertStringContainsString('missing expected column(s)', $scriptContent);
-        $this->assertStringContainsString('Skipped plugin row normalization', $scriptContent);
-        $this->assertStringContainsString('Plugin row normalization failed', $scriptContent);
+        $script = file_get_contents(__DIR__ . '/../database/setup.php');
+        $this->assertStringContainsString("hasTable('plugins')", $script);
+        $this->assertStringContainsString("getColumnListing('plugins')", $script);
+        $this->assertStringContainsString('LibreNMS plugins schema is incomplete', $script);
+        $this->assertStringNotContainsString('Plugin row normalization failed:', $script);
     }
+
 
     public function test_install_docs_cover_plugin_duplicates_and_json_collation_warnings(): void
     {
@@ -124,7 +122,7 @@ class E2EInstallationWorkflowTest extends TestCase
     public function test_database_setup_creates_tables(): void
     {
         $scriptContent = file_get_contents(__DIR__ . '/../database/setup.php');
-        $this->assertStringContainsString('CREATE TABLE IF NOT EXISTS', $scriptContent);
+        $this->assertStringContainsString('Schema::create', $scriptContent);
         $this->assertStringContainsString('wmng_maps', $scriptContent);
         $this->assertStringContainsString('wmng_nodes', $scriptContent);
         $this->assertStringContainsString('wmng_links', $scriptContent);

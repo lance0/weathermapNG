@@ -40,6 +40,31 @@ The installer performs:
 - Enables the LibreNMS plugin
 - Verifies WeathermapNG routes are visible
 
+### Verified installer and updater
+
+Run `quick-install.sh` as the LibreNMS runtime user. In Docker, a root invocation
+restarts the entire process as `librenms` with that user's home before dependencies
+or database setup run. Native root invocations are refused. `LIBRENMS_PATH` selects
+the intended installation; an invalid selection fails rather than trying another database.
+
+The installer uses `composer config --global repositories.weathermapng` for the
+absolute plugin path and `lnms plugin:add librenms/weathermapng` for LibreNMS's
+persistent `composer.plugins.json` registry. It removes only the old root-local
+`repositories.weathermapng` key; unrelated Composer configuration remains intact.
+Use the same runtime user and Composer home for native daily updates.
+
+Required registration, discovery, enablement, database, cache, and permission
+failures return nonzero. Before reporting success, the installer runs the shared
+read-only `php verify-deployment.php` checks. These verify CLI runtime state;
+open a map while logged in to verify browser access, and check web PHP/opcode
+caches separately when CLI and browser results disagree.
+
+`deploy.sh` fast-forwards a clean tracked branch with an upstream and then runs
+the same installer. A failed Git check stops before dependency/database work.
+A detached release checkout or extracted archive retains the selected source and
+runs installation without trying to advance it. Choose and check out a release
+before running `deploy.sh`; untracked operator files do not block a branch update.
+
 ## Docker Installation
 
 If you're running LibreNMS in Docker, mount the plugin into the container:
@@ -60,28 +85,11 @@ services:
 Then run setup inside the container:
 
 ```bash
-# Install dependencies
-docker exec -u librenms <container_name> composer install -d /opt/librenms/html/plugins/WeathermapNG --no-dev
-
-# Register the plugin package with LibreNMS Composer
-docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && composer config repositories.weathermapng "{\"type\":\"path\",\"url\":\"html/plugins/WeathermapNG\",\"options\":{\"symlink\":true}}"'
-docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && FORCE=1 composer require "librenms/weathermapng:*" --with-dependencies --no-interaction'
-docker exec -u librenms <container_name> php /opt/librenms/artisan package:discover
-
-# Setup database
-docker exec -u librenms <container_name> php /opt/librenms/html/plugins/WeathermapNG/database/setup.php
-
-# Enable plugin
-docker exec -u librenms <container_name> /opt/librenms/lnms plugin:enable WeathermapNG
-
-# Clear caches and verify routes
-docker exec -u librenms <container_name> php /opt/librenms/artisan optimize:clear
-docker exec -u librenms <container_name> php /opt/librenms/artisan route:clear
-docker exec -u librenms <container_name> php /opt/librenms/artisan cache:clear
-docker exec -u librenms <container_name> php /opt/librenms/artisan view:clear
-docker exec -u librenms <container_name> php /opt/librenms/artisan config:clear
-docker exec -u librenms <container_name> bash -lc 'cd /opt/librenms && php artisan route:list | grep -iE "weathermap|wmng"'
+docker exec -u librenms -w /opt/librenms/html/plugins/WeathermapNG <container_name> bash ./quick-install.sh
+docker exec -u librenms -w /opt/librenms/html/plugins/WeathermapNG <container_name> php verify-deployment.php
 ```
+
+The shared installer performs registration, database setup, enablement, and verification.
 
 **Important**: Always run commands as the `librenms` user (`-u librenms`), not root.
 
@@ -144,8 +152,9 @@ LibreNMS must know about the package before Laravel can discover the service pro
 
 ```bash
 cd /opt/librenms
-composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
+composer config --global repositories.weathermapng '{"type":"path","url":"/opt/librenms/html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer config --unset repositories.weathermapng
+./lnms plugin:add librenms/weathermapng '*' --no-interaction
 php artisan package:discover
 ```
 
@@ -283,8 +292,9 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 **Solution:**
 ```bash
 cd /opt/librenms
-composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
+composer config --global repositories.weathermapng '{"type":"path","url":"/opt/librenms/html/plugins/WeathermapNG","options":{"symlink":true}}'
+composer config --unset repositories.weathermapng
+./lnms plugin:add librenms/weathermapng '*' --no-interaction
 php artisan package:discover
 php artisan optimize:clear
 php artisan route:clear
@@ -356,17 +366,13 @@ This replaces the older per-map policy model. The `MapPolicy` and `NodePolicy` c
 ## Updating
 
 ```bash
-cd /opt/librenms/html/plugins/WeathermapNG
-git pull
-composer install --no-dev
-php database/setup.php
-cd /opt/librenms
-FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
-php artisan package:discover
-php artisan optimize:clear
-php artisan config:clear
-php artisan view:clear
+sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./deploy.sh'
 ```
+
+For a release checkout, select the intended tag first; deployment retains a detached
+checkout. For a tracked branch, deployment requires clean tracked files and an
+upstream, then uses a fast-forward-only pull. Back up data before upgrading.
+
 
 ### Upgrade safety
 

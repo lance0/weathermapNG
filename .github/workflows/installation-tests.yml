@@ -12,6 +12,8 @@ on:
     branches: [main, develop]
     paths:
       - 'quick-install.sh'
+      - 'deploy.sh'
+      - 'verify-deployment.php'
       - 'verify.php'
       - 'database/**'
       - 'docker-compose*.yml'
@@ -32,6 +34,8 @@ on:
     branches: [main]
     paths:
       - 'quick-install.sh'
+      - 'deploy.sh'
+      - 'verify-deployment.php'
       - 'verify.php'
       - 'database/**'
       - 'docker-compose*.yml'
@@ -69,6 +73,8 @@ jobs:
       - name: Validate bash scripts
         run: |
           bash -n quick-install.sh
+          bash -n deploy.sh
+          bash -n tests/install-failure-test.sh
           bash -n tests/install-test.sh
           bash -n tests/docker-test.sh
 
@@ -202,65 +208,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Run quick install against mocked LibreNMS
-        run: |
-          set -euo pipefail
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: gd, json, pdo, mbstring
+          coverage: none
 
-          WORK="$(mktemp -d)"
-          LIBRENMS_ROOT="$WORK/librenms"
-          FAKE_BIN="$WORK/bin"
-          LOG="$WORK/install.log"
-
-          mkdir -p "$LIBRENMS_ROOT" "$FAKE_BIN"
-          touch "$LIBRENMS_ROOT/composer.json" "$LIBRENMS_ROOT/artisan"
-
-          cat > "$LIBRENMS_ROOT/lnms" <<'SH'
-          #!/usr/bin/env bash
-          echo "lnms $*" >> "$INSTALL_LOG"
-          SH
-          chmod +x "$LIBRENMS_ROOT/lnms"
-
-          cat > "$FAKE_BIN/composer" <<'SH'
-          #!/usr/bin/env bash
-          echo "composer $PWD $*" >> "$INSTALL_LOG"
-          SH
-          chmod +x "$FAKE_BIN/composer"
-
-          cat > "$FAKE_BIN/chown" <<'SH'
-          #!/usr/bin/env bash
-          echo "chown $*" >> "$INSTALL_LOG"
-          SH
-          chmod +x "$FAKE_BIN/chown"
-
-          cat > "$FAKE_BIN/php" <<'SH'
-          #!/usr/bin/env bash
-          echo "php $PWD $*" >> "$INSTALL_LOG"
-          if [ "${1:-}" = "-r" ]; then
-              if printf '%s' "${2:-}" | grep -q 'echo PHP_VERSION'; then
-                  printf '8.2.99'
-              fi
-              exit 0
-          fi
-          if [ "${1:-}" = "database/setup.php" ]; then
-              exit 0
-          fi
-          if [ "${1:-}" = "artisan" ] && [ "${2:-}" = "route:list" ]; then
-              printf 'GET plugin/WeathermapNG/health weathermapng.health\n'
-              exit 0
-          fi
-          exit 0
-          SH
-          chmod +x "$FAKE_BIN/php"
-
-          INSTALL_LOG="$LOG" PATH="$FAKE_BIN:$PATH" LIBRENMS_PATH="$LIBRENMS_ROOT" ./quick-install.sh
-
-          grep -F 'composer '"$LIBRENMS_ROOT"' config repositories.weathermapng' "$LOG"
-          grep -F "composer $LIBRENMS_ROOT require librenms/weathermapng:* --with-dependencies --no-interaction" "$LOG"
-          grep -F "php $LIBRENMS_ROOT artisan package:discover" "$LOG"
-          grep -F "php $GITHUB_WORKSPACE database/setup.php" "$LOG"
-          grep -F "lnms plugin:enable WeathermapNG" "$LOG"
-          grep -F "php $LIBRENMS_ROOT artisan route:list" "$LOG"
-          grep -F "php $LIBRENMS_ROOT artisan config:clear" "$LOG"
+      - name: Check required install and upgrade failures
+        run: bash tests/install-failure-test.sh
 
   weekly-librenms-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'

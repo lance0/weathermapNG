@@ -8,45 +8,24 @@
  * Usage: php database/setup.php
  */
 
-// Determine LibreNMS path
-$possiblePaths = [
-    dirname(__DIR__, 3),  // /opt/librenms from plugin directory
-    '/opt/librenms',
-    '/usr/local/librenms',
-    getenv('LIBRENMS_PATH') ?: '',
-];
-
-$libreNMSPath = null;
-foreach ($possiblePaths as $path) {
-    if ($path && file_exists($path . '/vendor/autoload.php')) {
-        $libreNMSPath = $path;
-        break;
-    }
-}
-
-if (!$libreNMSPath) {
-    echo "Error: Could not find LibreNMS installation.\n";
-    echo "Please set LIBRENMS_PATH environment variable.\n";
+$libreNMSPath = getenv('LIBRENMS_PATH') ?: '/opt/librenms';
+if (!is_file($libreNMSPath . '/vendor/autoload.php') || !is_file($libreNMSPath . '/bootstrap/app.php')) {
+    fwrite(STDERR, "Error: Selected LibreNMS bootstrap unavailable; set LIBRENMS_PATH.\n");
     exit(1);
 }
-
-// Load LibreNMS bootstrap
-require_once $libreNMSPath . '/vendor/autoload.php';
-
-$app = require_once $libreNMSPath . '/bootstrap/app.php';
-
-// Bootstrap Laravel application to initialize facades
 try {
-    if (method_exists($app, 'make')) {
-        $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-        if (method_exists($kernel, 'bootstrap')) {
-            $kernel->bootstrap();
-        }
-    }
-} catch (Exception $e) {
-    // If Laravel bootstrap fails, we'll fall back to direct SQL
-    echo "⚠️  Laravel bootstrap failed, will use direct SQL method\n";
+    require_once $libreNMSPath . '/vendor/autoload.php';
+    $app = require $libreNMSPath . '/bootstrap/app.php';
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+} catch (Throwable $e) {
+    fwrite(STDERR, "Error: LibreNMS bootstrap failed; check its configuration and database connection.\n");
+    exit(1);
 }
+// Upstream console exception handlers must not turn setup failures into a successful exit.
+set_exception_handler(function (Throwable $e): void {
+    fwrite(STDERR, "Error: Database setup failed; check the selected LibreNMS database/schema permissions.\n");
+    exit(1);
+});
 
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -294,230 +273,61 @@ function seedBuiltInTemplates(): void
     echo "  ↳ Seeded " . count($templates) . " built-in templates\n";
 }
 
-// Function to seed built-in templates using PDO (for direct SQL fallback)
-function seedBuiltInTemplatesPdo(PDO $pdo): void
+// Keep normalization in the shared schema setup, used by every install path.
+function normalizePluginRegistration(): void
 {
-    $templates = [
-        ['small-network', 'Small Network', 'Simple 2-router network with direct connection', 800, 600, 'basic', 'fas fa-network-wired', '{"default_nodes":[{"label":"Router A","x":150,"y":300},{"label":"Router B","x":650,"y":300}],"default_links":[{"src_node_idx":0,"dst_node_idx":1}]}'],
-        ['star-topology', 'Star Topology', 'Star network with central router and 3 edge routers', 1000, 700, 'basic', 'fas fa-project-diagram', '{"default_nodes":[{"label":"Core Router","x":500,"y":350},{"label":"Edge Router 1","x":250,"y":150},{"label":"Edge Router 2","x":750,"y":150},{"label":"Edge Router 3","x":500,"y":550}],"default_links":[{"src_node_idx":0,"dst_node_idx":1},{"src_node_idx":0,"dst_node_idx":2},{"src_node_idx":0,"dst_node_idx":3}]}'],
-        ['redundant-links', 'Redundant Links', 'Dual-homed network with redundant paths', 1000, 800, 'advanced', 'fas fa-server', '{"default_nodes":[{"label":"Site A Router 1","x":200,"y":300},{"label":"Site A Router 2","x":800,"y":300},{"label":"Site B Router 1","x":200,"y":500},{"label":"Site B Router 2","x":800,"y":500}],"default_links":[{"src_node_idx":0,"dst_node_idx":2},{"src_node_idx":1,"dst_node_idx":3},{"src_node_idx":2,"dst_node_idx":3},{"src_node_idx":0,"dst_node_idx":1}]}'],
-        ['isp-backbone', 'ISP Backbone', 'Multi-tier ISP backbone network', 1400, 900, 'advanced', 'fas fa-cloud', '{"default_nodes":[{"label":"Core Router","x":700,"y":450},{"label":"Edge Router 1","x":350,"y":300},{"label":"Edge Router 2","x":1050,"y":300},{"label":"Edge Router 3","x":350,"y":600}],"default_links":[{"src_node_idx":0,"dst_node_idx":1},{"src_node_idx":0,"dst_node_idx":2},{"src_node_idx":1,"dst_node_idx":3}]}'],
-        ['blank-canvas', 'Blank Canvas', 'Empty canvas for custom topology', 1200, 800, 'custom', 'fas fa-plus', '{"default_nodes":[],"default_links":[]}'],
-        ['data-center', 'Data Center', 'Dual core switches with access layer and server racks', 1200, 900, 'data center', 'fas fa-database', '{"default_nodes":[{"label":"Core Sw A","x":450,"y":200},{"label":"Core Sw B","x":750,"y":200},{"label":"Access Sw A","x":300,"y":500},{"label":"Access Sw B","x":600,"y":500},{"label":"Access Sw C","x":900,"y":500},{"label":"Rack 1","x":300,"y":750},{"label":"Rack 2","x":600,"y":750},{"label":"Rack 3","x":900,"y":750}],"default_links":[{"src_node_idx":0,"dst_node_idx":1},{"src_node_idx":0,"dst_node_idx":2},{"src_node_idx":0,"dst_node_idx":3},{"src_node_idx":1,"dst_node_idx":4},{"src_node_idx":1,"dst_node_idx":3},{"src_node_idx":2,"dst_node_idx":5},{"src_node_idx":3,"dst_node_idx":6},{"src_node_idx":4,"dst_node_idx":7}]}'],
-        ['wan-mpls', 'WAN / MPLS', 'Multi-site WAN over an MPLS cloud with dual exits', 1400, 900, 'wan', 'fas fa-globe', '{"default_nodes":[{"label":"MPLS Cloud","x":700,"y":400},{"label":"HQ Edge","x":250,"y":250},{"label":"Branch Edge","x":1150,"y":250},{"label":"DC Edge","x":250,"y":600},{"label":"Remote Site","x":1150,"y":600}],"default_links":[{"src_node_idx":0,"dst_node_idx":1},{"src_node_idx":0,"dst_node_idx":2},{"src_node_idx":0,"dst_node_idx":3},{"src_node_idx":0,"dst_node_idx":4},{"src_node_idx":1,"dst_node_idx":3},{"src_node_idx":2,"dst_node_idx":4}]}'],
-        ['campus', 'Campus Network', 'Collapsed-core campus: core, buildings, and floor switches', 1300, 900, 'campus', 'fas fa-school', '{"default_nodes":[{"label":"Core 1","x":500,"y":250},{"label":"Core 2","x":800,"y":250},{"label":"Building A Dist","x":300,"y":500},{"label":"Building B Dist","x":650,"y":500},{"label":"Building C Dist","x":1000,"y":500},{"label":"Bldg A Floor 1","x":300,"y":720},{"label":"Bldg A Floor 2","x":300,"y":790},{"label":"Bldg B Floor 1","x":650,"y":720},{"label":"Bldg B Floor 2","x":650,"y":790},{"label":"Bldg C Floor 1","x":1000,"y":720},{"label":"Bldg C Floor 2","x":1000,"y":790}],"default_links":[{"src_node_idx":0,"dst_node_idx":1},{"src_node_idx":0,"dst_node_idx":2},{"src_node_idx":0,"dst_node_idx":3},{"src_node_idx":1,"dst_node_idx":3},{"src_node_idx":1,"dst_node_idx":4},{"src_node_idx":2,"dst_node_idx":5},{"src_node_idx":2,"dst_node_idx":6},{"src_node_idx":3,"dst_node_idx":7},{"src_node_idx":3,"dst_node_idx":8},{"src_node_idx":4,"dst_node_idx":9},{"src_node_idx":4,"dst_node_idx":10}]}'],
-        ['branch-office', 'Branch Office', 'Single branch: edge router, switch, and endpoints', 900, 600, 'basic', 'fas fa-building', '{"default_nodes":[{"label":"WAN Router","x":450,"y":150},{"label":"Edge Firewall","x":450,"y":300},{"label":"Branch Switch","x":450,"y":450},{"label":"AP 1","x":200,"y":500},{"label":"AP 2","x":700,"y":500}],"default_links":[{"src_node_idx":0,"dst_node_idx":1},{"src_node_idx":1,"dst_node_idx":2},{"src_node_idx":2,"dst_node_idx":3},{"src_node_idx":2,"dst_node_idx":4}]}'],
-    ];
-    $stmt = $pdo->prepare("INSERT INTO `wmng_map_templates` (`name`, `title`, `description`, `width`, `height`, `category`, `icon`, `config`, `is_built_in`, `created_at`, `updated_at`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())");
+    // Laravel facade path
+    $schema = Illuminate\Support\Facades\Schema::class;
+    $db = Illuminate\Support\Facades\DB::class;
 
-    foreach ($templates as $t) {
-        $stmt->execute($t);
+    if (!$schema::hasTable('plugins')) {
+        throw new RuntimeException('LibreNMS plugins table unavailable');
     }
-    echo "  ↳ Seeded " . count($templates) . " built-in templates\n";
-}
 
-/**
- * Normalize LibreNMS plugin registration: keep one active WeathermapNG row,
- * remove stale duplicates (including legacy version=1 rows that coexist with
- * version=2 rows due to the composite unique key on (version, plugin_name)).
- *
- * Works with either Laravel facades (Schema/DB) or a PDO connection.
- */
-function normalizePluginRegistration(?PDO $pdo = null): void
-{
-    try {
-        if ($pdo !== null) {
-            $stmt = $pdo->query("SHOW COLUMNS FROM plugins");
-            if (!$stmt) {
-                echo "  ⚠️  Could not inspect plugins table; skipped plugin row normalization\n";
-                return;
-            }
-            $cols = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'Field');
-            $required = ['plugin_id', 'plugin_name', 'plugin_active', 'version'];
-            $missing = array_diff($required, $cols);
-            if (!empty($missing)) {
-                echo "  ⚠️  Plugins table missing column(s): " . implode(', ', $missing) . "; skipped normalization\n";
-                return;
-            }
+    $columns = $schema::getColumnListing('plugins');
+    $required = ['plugin_id', 'plugin_name', 'plugin_active', 'version'];
+    $missing = array_diff($required, $columns);
+    if (!empty($missing)) {
+        throw new RuntimeException('LibreNMS plugins schema is incomplete');
+    }
 
-            $rows = $pdo->query("SELECT * FROM plugins WHERE plugin_name = 'WeathermapNG' ORDER BY plugin_id")->fetchAll(PDO::FETCH_OBJ);
-            if (empty($rows)) {
-                echo "  ⚠️  No WeathermapNG plugin row found; skipped plugin row normalization\n";
-                return;
-            }
+    $rows = $db::table('plugins')
+        ->where('plugin_name', 'WeathermapNG')
+        ->orderBy('plugin_id')
+        ->get();
 
-            // Prefer version=2 rows; if none exist, promote the kept row to version=2
-            $v2Rows = array_values(array_filter($rows, fn($r) => (int)$r->version === 2));
-            $activeV2 = array_values(array_filter($v2Rows, fn($r) => (int)$r->plugin_active === 1));
-            $keep = !empty($activeV2)
-                ? $activeV2[count($activeV2) - 1]
-                : (!empty($v2Rows) ? $v2Rows[count($v2Rows) - 1] : $rows[count($rows) - 1]);
+    if ($rows->isEmpty()) {
+        echo "  ⚠️  No WeathermapNG plugin row found; skipped plugin row normalization\n";
+        return;
+    }
 
-            $pdo->exec("UPDATE plugins SET plugin_active = 1, version = 2 WHERE plugin_name = 'WeathermapNG' AND plugin_id = {$keep->plugin_id}");
-            $deleted = $pdo->exec("DELETE FROM plugins WHERE plugin_name = 'WeathermapNG' AND plugin_id != {$keep->plugin_id}");
+    // Prefer version=2 rows; if none exist, promote the kept row to version=2
+    $v2Rows = $rows->filter(fn($row) => (int)$row->version === 2)->values();
+    $activeV2 = $v2Rows->filter(fn($row) => (int)$row->plugin_active === 1)->values();
+    $keep = $activeV2->isNotEmpty()
+        ? $activeV2->sortByDesc('plugin_id')->first()
+        : ($v2Rows->isNotEmpty() ? $v2Rows->sortByDesc('plugin_id')->first() : $rows->sortByDesc('plugin_id')->first());
 
-            if ($deleted > 0 || (int)$keep->version !== 2) {
-                $action = (int)$keep->version !== 2 ? 'promoted v1→v2 and ' : '';
-                echo "  ↳ {$action}Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
-            } else {
-                echo "  ↳ WeathermapNG plugin registration is already normalized\n";
-            }
-            return;
-        }
+    $deleted = $db::transaction(function () use ($db, $keep) {
+        $db::table('plugins')->where('plugin_name', 'WeathermapNG')
+            ->where('plugin_id', $keep->plugin_id)->update(['plugin_active' => 1, 'version' => 2]);
+        return $db::table('plugins')->where('plugin_name', 'WeathermapNG')
+            ->where('plugin_id', '!=', $keep->plugin_id)->delete();
+    });
 
-        // Laravel facade path
-        $schema = Illuminate\Support\Facades\Schema::class;
-        $db = Illuminate\Support\Facades\DB::class;
-
-        if (!$schema::hasTable('plugins')) {
-            echo "  ⚠️  LibreNMS plugins table not found; skipped plugin row normalization\n";
-            return;
-        }
-
-        $columns = $schema::getColumnListing('plugins');
-        $required = ['plugin_id', 'plugin_name', 'plugin_active', 'version'];
-        $missing = array_diff($required, $columns);
-        if (!empty($missing)) {
-            echo "  ⚠️  Plugins table missing column(s): " . implode(', ', $missing) . "; skipped normalization\n";
-            return;
-        }
-
-        $rows = $db::table('plugins')
-            ->where('plugin_name', 'WeathermapNG')
-            ->orderBy('plugin_id')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            echo "  ⚠️  No WeathermapNG plugin row found; skipped plugin row normalization\n";
-            return;
-        }
-
-        // Prefer version=2 rows; if none exist, promote the kept row to version=2
-        $v2Rows = $rows->filter(fn($row) => (int)$row->version === 2)->values();
-        $activeV2 = $v2Rows->filter(fn($row) => (int)$row->plugin_active === 1)->values();
-        $keep = $activeV2->isNotEmpty()
-            ? $activeV2->sortByDesc('plugin_id')->first()
-            : ($v2Rows->isNotEmpty() ? $v2Rows->sortByDesc('plugin_id')->first() : $rows->sortByDesc('plugin_id')->first());
-
-        $db::table('plugins')
-            ->where('plugin_name', 'WeathermapNG')
-            ->where('plugin_id', $keep->plugin_id)
-            ->update(['plugin_active' => 1, 'version' => 2]);
-
-        $deleted = $db::table('plugins')
-            ->where('plugin_name', 'WeathermapNG')
-            ->where('plugin_id', '!=', $keep->plugin_id)
-            ->delete();
-
-        if ($deleted > 0 || (int)$keep->version !== 2) {
-            $action = (int)$keep->version !== 2 ? 'promoted v1→v2 and ' : '';
-            echo "  ↳ {$action}Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
-        } else {
-            echo "  ↳ WeathermapNG plugin registration is already normalized\n";
-        }
-    } catch (Throwable $e) {
-        echo "  ⚠️  Plugin row normalization failed: {$e->getMessage()}\n";
+    if ($deleted > 0 || (int)$keep->version !== 2) {
+        $action = (int)$keep->version !== 2 ? 'promoted v1→v2 and ' : '';
+        echo "  ↳ {$action}Cleaned $deleted duplicate WeathermapNG plugin row(s); kept plugin_id {$keep->plugin_id}\n";
+    } else {
+        echo "  ↳ WeathermapNG plugin registration is already normalized\n";
     }
 }
 
 try {
-    // Method 1: Try Laravel Schema approach
-    echo "🔄 Attempting Laravel Schema method...\n";
+    echo "Checking the selected LibreNMS schema...\n";
 
     // Check if Schema facade is available
-    if (class_exists('Illuminate\Support\Facades\Schema') && method_exists('Illuminate\Support\Facades\Schema', 'hasTable')) {
-        // Check if tables already exist
-        $tablesExist = 0;
-        if (Schema::hasTable('wmng_maps')) {
-            echo "✓ Table 'wmng_maps' already exists\n";
-            $tablesExist++;
-        }
-        if (Schema::hasTable('wmng_nodes')) {
-            echo "✓ Table 'wmng_nodes' already exists\n";
-            $tablesExist++;
-        }
-        if (Schema::hasTable('wmng_links')) {
-            echo "✓ Table 'wmng_links' already exists\n";
-            $tablesExist++;
-        }
-        if (Schema::hasTable('wmng_map_versions')) {
-            echo "✓ Table 'wmng_map_versions' already exists\n";
-            $tablesExist++;
-        }
-        if (Schema::hasTable('wmng_map_templates')) {
-            echo "✓ Table 'wmng_map_templates' already exists\n";
-            $tablesExist++;
-        }
-
-        if ($tablesExist === 5) {
-            // Check for missing columns in existing tables
-            if (!Schema::hasColumn('wmng_maps', 'title')) {
-                Schema::table('wmng_maps', function (Blueprint $t) {
-                    $t->string('title')->nullable()->after('name');
-                });
-                echo "✓ Added 'title' column to 'wmng_maps'\n";
-            }
-
-            if (!Schema::hasColumn('wmng_maps', 'parent_map_id')) {
-                Schema::table('wmng_maps', function (Blueprint $t) {
-                    $t->unsignedBigInteger('parent_map_id')->nullable()->after('description');
-                    $t->index('parent_map_id');
-                });
-                echo "✓ Added 'parent_map_id' column to 'wmng_maps' (nested maps)\n";
-            }
-
-            normalizePluginRegistration();
-            echo "\n✅ All tables already exist and are up to date.\n";
-            exit(0);
-        }
-
-        // Check if versions table is missing (upgrade from older install)
-        if ($tablesExist >= 3 && !Schema::hasTable('wmng_map_versions')) {
-            echo "🔄 Adding missing wmng_map_versions table...\n";
-            Schema::create('wmng_map_versions', function (Blueprint $t) {
-                $t->id();
-                $t->unsignedBigInteger('map_id');
-                $t->foreign('map_id')->references('id')->on('wmng_maps')->onDelete('cascade');
-                $t->string('name')->nullable();
-                $t->text('description')->nullable();
-                $t->longText('config_snapshot')->nullable();
-                $t->string('created_by')->nullable();
-                $t->timestamp('created_at')->useCurrent();
-                $t->index(['map_id']);
-                $t->index(['created_at']);
-            });
-            echo "✓ Created table 'wmng_map_versions'\n";
-            $tablesExist++;
-        }
-
-        // Check if templates table is missing (upgrade from older install)
-        if ($tablesExist >= 3 && !Schema::hasTable('wmng_map_templates')) {
-            echo "🔄 Adding missing wmng_map_templates table...\n";
-            Schema::create('wmng_map_templates', function (Blueprint $t) {
-                $t->id();
-                $t->string('name')->unique();
-                $t->string('title');
-                $t->text('description')->nullable();
-                $t->integer('width')->default(800);
-                $t->integer('height')->default(600);
-                $t->json('config')->nullable();
-                $t->string('icon')->default('fas fa-map');
-                $t->string('category')->default('custom');
-                $t->boolean('is_built_in')->default(false);
-                $t->timestamps();
-            });
-            echo "✓ Created table 'wmng_map_templates'\n";
-            seedBuiltInTemplates();
-            $tablesExist++;
-        }
-
-        // If we upgraded tables, exit successfully
-        if ($tablesExist === 5) {
-            normalizePluginRegistration();
-            echo "\n✅ Database upgraded successfully!\n";
-            exit(0);
-        }
-
+    if (Schema::getFacadeRoot() !== null) {
         echo "Creating database tables...\n\n";
 
         // Create maps table
@@ -603,6 +413,12 @@ try {
             echo "✓ Created table 'wmng_map_templates'\n";
             seedBuiltInTemplates();
         }
+        if (!Schema::hasColumn('wmng_maps', 'title')) {
+            Schema::table('wmng_maps', function (Blueprint $t) { $t->string('title')->nullable(); });
+        }
+        if (!Schema::hasColumn('wmng_maps', 'parent_map_id')) {
+            Schema::table('wmng_maps', function (Blueprint $t) { $t->unsignedBigInteger('parent_map_id')->nullable()->index(); });
+        }
         normalizePluginRegistration();
         echo "\n✅ Database setup completed successfully (Laravel Schema method)!\n";
         exit(0);
@@ -610,198 +426,7 @@ try {
         throw new Exception("Laravel Schema facade not available");
     }
 
-} catch (Exception $e) {
-    echo "⚠️  Laravel Schema method failed: " . $e->getMessage() . "\n";
-    echo "🔄 Falling back to direct SQL method...\n\n";
-
-    // Method 2: Direct SQL fallback
-    try {
-        // Get database configuration from environment or defaults
-        $dbHost = getenv('DB_HOST') ?: 'localhost';
-        $dbName = getenv('DB_DATABASE') ?: 'librenms';
-        $dbUser = getenv('DB_USERNAME') ?: 'librenms';
-        $dbPass = getenv('DB_PASSWORD') ?: 'librenms';
-
-        $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName", $dbUser, $dbPass);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-        // Check if tables already exist
-        $result = $pdo->query("SHOW TABLES LIKE 'wmng_%'");
-        $existingTables = $result->fetchAll(PDO::FETCH_COLUMN);
-
-        if (count($existingTables) >= 5) {
-            // Check for missing columns
-            $columns = $pdo->query("SHOW COLUMNS FROM `wmng_maps` LIKE 'title'")->fetchAll();
-            if (empty($columns)) {
-                $pdo->exec("ALTER TABLE `wmng_maps` ADD COLUMN `title` varchar(255) DEFAULT NULL AFTER `name` ");
-                echo "✓ Added 'title' column to 'wmng_maps' (Direct SQL)\n";
-            }
-
-            $pmid = $pdo->query("SHOW COLUMNS FROM `wmng_maps` LIKE 'parent_map_id'")->fetchAll();
-            if (empty($pmid)) {
-                $pdo->exec("ALTER TABLE `wmng_maps` ADD COLUMN `parent_map_id` bigint unsigned DEFAULT NULL AFTER `description`, ADD INDEX `wmng_maps_parent_map_id_index` (`parent_map_id`)");
-                echo "✓ Added 'parent_map_id' column to 'wmng_maps' (Direct SQL, nested maps)\n";
-            }
-            normalizePluginRegistration($pdo);
-            echo "✅ All tables already exist and are up to date (Direct SQL method).\n";
-            exit(0);
-        }
-
-        $upgraded = false;
-
-        // Check if versions table is missing (upgrade from older install)
-        if (count($existingTables) >= 3 && !in_array('wmng_map_versions', $existingTables)) {
-            echo "🔄 Adding missing wmng_map_versions table...\n";
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS `wmng_map_versions` (
-                  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-                  `map_id` bigint unsigned NOT NULL,
-                  `name` varchar(255) DEFAULT NULL,
-                  `description` text,
-                  `config_snapshot` longtext,
-                  `created_by` varchar(255) DEFAULT NULL,
-                  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                  PRIMARY KEY (`id`),
-                  KEY `wmng_map_versions_map_id_index` (`map_id`),
-                  KEY `wmng_map_versions_created_at_index` (`created_at`),
-                  CONSTRAINT `wmng_map_versions_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            ");
-            echo "✓ Created table 'wmng_map_versions'\n";
-            $upgraded = true;
-        }
-
-        // Check if templates table is missing (upgrade from older install)
-        if (count($existingTables) >= 3 && !in_array('wmng_map_templates', $existingTables)) {
-            echo "🔄 Adding missing wmng_map_templates table...\n";
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS `wmng_map_templates` (
-                  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-                  `name` varchar(255) NOT NULL,
-                  `title` varchar(255) NOT NULL,
-                  `description` text,
-                  `width` int NOT NULL DEFAULT 800,
-                  `height` int NOT NULL DEFAULT 600,
-                  `config` json DEFAULT NULL,
-                  `icon` varchar(255) DEFAULT 'fas fa-map',
-                  `category` varchar(255) DEFAULT 'custom',
-                  `is_built_in` tinyint(1) DEFAULT 0,
-                  `created_at` timestamp NULL DEFAULT NULL,
-                  `updated_at` timestamp NULL DEFAULT NULL,
-                  PRIMARY KEY (`id`),
-                  UNIQUE KEY `wmng_map_templates_name_unique` (`name`)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            ");
-            echo "✓ Created table 'wmng_map_templates'\n";
-            seedBuiltInTemplatesPdo($pdo);
-            $upgraded = true;
-        }
-
-        if ($upgraded) {
-            normalizePluginRegistration($pdo);
-            echo "✅ Database upgraded successfully (Direct SQL method).\n";
-            exit(0);
-        }
-
-        echo "Creating database tables using direct SQL...\n\n";
-
-        $sql = "
-        CREATE TABLE IF NOT EXISTS `wmng_maps` (
-          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-          `name` varchar(255) NOT NULL,
-          `title` varchar(255) DEFAULT NULL,
-          `description` text,
-          `parent_map_id` bigint unsigned DEFAULT NULL,
-          `width` int NOT NULL DEFAULT 800,
-          `height` int NOT NULL DEFAULT 600,
-          `options` json DEFAULT NULL,
-          `created_at` timestamp NULL DEFAULT NULL,
-          `updated_at` timestamp NULL DEFAULT NULL,
-          PRIMARY KEY (`id`),
-          UNIQUE KEY `wmng_maps_name_unique` (`name`),
-          KEY `wmng_maps_parent_map_id_index` (`parent_map_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `wmng_nodes` (
-          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-          `map_id` bigint unsigned NOT NULL,
-          `label` varchar(255) NOT NULL,
-          `x` float NOT NULL,
-          `y` float NOT NULL,
-          `device_id` bigint unsigned DEFAULT NULL,
-          `meta` json DEFAULT NULL,
-          `created_at` timestamp NULL DEFAULT NULL,
-          `updated_at` timestamp NULL DEFAULT NULL,
-          PRIMARY KEY (`id`),
-          KEY `wmng_nodes_map_id_foreign` (`map_id`),
-          CONSTRAINT `wmng_nodes_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `wmng_links` (
-          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-          `map_id` bigint unsigned NOT NULL,
-          `src_node_id` bigint unsigned NOT NULL,
-          `dst_node_id` bigint unsigned NOT NULL,
-          `port_id_a` bigint unsigned DEFAULT NULL,
-          `port_id_b` bigint unsigned DEFAULT NULL,
-          `bandwidth_bps` bigint unsigned DEFAULT NULL,
-          `style` json DEFAULT NULL,
-          `created_at` timestamp NULL DEFAULT NULL,
-          `updated_at` timestamp NULL DEFAULT NULL,
-          PRIMARY KEY (`id`),
-          KEY `wmng_links_map_id_foreign` (`map_id`),
-          KEY `wmng_links_src_node_id_foreign` (`src_node_id`),
-          KEY `wmng_links_dst_node_id_foreign` (`dst_node_id`),
-          CONSTRAINT `wmng_links_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE,
-          CONSTRAINT `wmng_links_src_node_id_foreign` FOREIGN KEY (`src_node_id`) REFERENCES `wmng_nodes` (`id`),
-          CONSTRAINT `wmng_links_dst_node_id_foreign` FOREIGN KEY (`dst_node_id`) REFERENCES `wmng_nodes` (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `wmng_map_versions` (
-          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-          `map_id` bigint unsigned NOT NULL,
-          `name` varchar(255) DEFAULT NULL,
-          `description` text,
-          `config_snapshot` longtext,
-          `created_by` varchar(255) DEFAULT NULL,
-          `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`),
-          KEY `wmng_map_versions_map_id_index` (`map_id`),
-          KEY `wmng_map_versions_created_at_index` (`created_at`),
-          CONSTRAINT `wmng_map_versions_map_id_foreign` FOREIGN KEY (`map_id`) REFERENCES `wmng_maps` (`id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-        CREATE TABLE IF NOT EXISTS `wmng_map_templates` (
-          `id` bigint unsigned NOT NULL AUTO_INCREMENT,
-          `name` varchar(255) NOT NULL,
-          `title` varchar(255) NOT NULL,
-          `description` text,
-          `width` int NOT NULL DEFAULT 800,
-          `height` int NOT NULL DEFAULT 600,
-          `config` json DEFAULT NULL,
-          `icon` varchar(255) DEFAULT 'fas fa-map',
-          `category` varchar(255) DEFAULT 'custom',
-          `is_built_in` tinyint(1) DEFAULT 0,
-          `created_at` timestamp NULL DEFAULT NULL,
-          `updated_at` timestamp NULL DEFAULT NULL,
-          PRIMARY KEY (`id`),
-          UNIQUE KEY `wmng_map_templates_name_unique` (`name`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-        ";
-
-        $pdo->exec($sql);
-        seedBuiltInTemplatesPdo($pdo);
-        normalizePluginRegistration($pdo);
-        echo "✅ Database tables created successfully (Direct SQL method)!\n";
-        exit(0);
-
-    } catch (PDOException $pdoError) {
-        echo "❌ Direct SQL method also failed: " . $pdoError->getMessage() . "\n";
-        echo "\n💡 Troubleshooting:\n";
-        echo "1. Check database connection: mysql -u $dbUser -p$dbPass -h $dbHost $dbName\n";
-        echo "2. Ensure database user has CREATE TABLE permissions\n";
-        echo "3. Try running the SQL manually: mysql -u $dbUser -p$dbPass $dbName < database/schema.sql\n";
-        echo "4. Check LibreNMS database configuration in config/database.php\n";
-        exit(1);
-    }
+} catch (Throwable $e) {
+    fwrite(STDERR, "Error: Database setup failed; check the selected LibreNMS database/schema permissions.\n");
+    exit(1);
 }

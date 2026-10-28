@@ -108,9 +108,9 @@ check-docs:
         test -f "$doc" || { echo "MISSING: $doc"; exit 1; }
     done
     for file in quick-install.sh README.md docs/INSTALL.md; do
-        grep -qF 'composer config repositories.weathermapng' "$file"
-        grep -qF 'librenms/weathermapng' "$file"
-        grep -qE 'route:list.*weathermap|route:list.*wmng' "$file"
+        grep -qF 'composer config --global repositories.weathermapng' "$file"
+        grep -qF 'plugin:add librenms/weathermapng' "$file"
+        grep -qF 'verify-deployment.php' "$file"
     done
     echo "Docs checks pass."
 
