@@ -15,6 +15,10 @@ permissions:
   contents: read
 
 jobs:
+  embed-auth:
+    needs: lint
+    uses: ./.github/workflows/embed-auth.yml
+
   lint:
     runs-on: ubuntu-latest
     name: PHP Lint & Metadata

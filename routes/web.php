@@ -20,12 +20,8 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('plugin/WeathermapNG/editor/{map?}', [PageController::class, 'editor'])->name('weathermapng.editor');
     Route::get('plugin/WeathermapNG/view/{map}', [PageController::class, 'view'])->name('weathermapng.view');
 
-    Route::get('plugin/WeathermapNG/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed');
-    Route::get('plugin/WeathermapNG/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json');
-    Route::get('plugin/WeathermapNG/api/maps/{map}/live', [RenderController::class, 'live'])->name('weathermapng.live');
     Route::get('plugin/WeathermapNG/api/maps/{map}/export', [RenderController::class, 'export'])->name('weathermapng.export');
     Route::post('plugin/WeathermapNG/api/import', [RenderController::class, 'import'])->name('weathermapng.import');
-    Route::get('plugin/WeathermapNG/api/maps/{map}/sse', [RenderController::class, 'sse'])->name('weathermapng.sse');
 
     Route::get('plugin/WeathermapNG/api/devices', [LookupController::class, 'devices'])->name('weathermapng.devices');
     Route::get('plugin/WeathermapNG/api/device/{id}/ports', [LookupController::class, 'ports'])->name('weathermapng.device.ports');
@@ -66,18 +62,13 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('plugin/WeathermapNG/diagnostics', [HealthController::class, 'diagnostics'])->name('weathermapng.diagnostics');
 });
 
-// Token-gated read endpoints for external embedding (Grafana panels,
-// NOC walls, scripts). Same handlers as the session routes above, but
-// authorized by WEATHERMAPNG_EMBED_TOKEN instead of a browser session.
-// Deliberately NOT in any middleware group: LibreNMS's 'web' group
-// includes session-user middleware (VerifyUserEnabled et al.) that
-// 403s anonymous requests regardless of token auth. EmbedTokenAuth is
-// the only gate — same pattern as the public health probes below.
+// Register each read URL once. The middleware chooses token auth or the
+// full LibreNMS web/auth stack, including session-user checks and bindings.
 Route::middleware(\LibreNMS\Plugins\WeathermapNG\Http\Middleware\EmbedTokenAuth::class)->group(function () {
-    Route::get('plugin/WeathermapNG/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed.token');
-    Route::get('plugin/WeathermapNG/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json.token');
-    Route::get('plugin/WeathermapNG/api/maps/{map}/live', [RenderController::class, 'live'])->name('weathermapng.live.token');
-    Route::get('plugin/WeathermapNG/api/maps/{map}/sse', [RenderController::class, 'sse'])->name('weathermapng.sse.token');
+    Route::get('plugin/WeathermapNG/embed/{map}', [RenderController::class, 'embed'])->name('weathermapng.embed');
+    Route::get('plugin/WeathermapNG/api/maps/{map}/json', [RenderController::class, 'json'])->name('weathermapng.json');
+    Route::get('plugin/WeathermapNG/api/maps/{map}/live', [RenderController::class, 'live'])->name('weathermapng.live');
+    Route::get('plugin/WeathermapNG/api/maps/{map}/sse', [RenderController::class, 'sse'])->name('weathermapng.sse');
 });
 
 Route::prefix('plugin/WeathermapNG')->group(function () {

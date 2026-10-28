@@ -6,6 +6,11 @@
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 const CFG = window.WMNG.EmbedConfig || {};
+function embedUrl(path) {
+    const url = new URL(path, window.location.origin);
+    if (CFG.embedToken) url.searchParams.set('token', CFG.embedToken);
+    return url.toString();
+}
         const mapDataIn = window.WMNG.EmbedData || {};
         const mapId = CFG.mapId ?? '';
         const baseUrl = CFG.baseUrl ?? '';
@@ -431,7 +436,10 @@ const CFG = window.WMNG.EmbedConfig || {};
         const exitBtn = document.getElementById('kiosk-exit');
         if (exitBtn) {
             exitBtn.addEventListener('click', () => {
-                window.location.href = window.location.pathname;
+                const url = new URL(window.location.href);
+                url.searchParams.delete('kiosk');
+                url.searchParams.delete('cycle');
+                window.location.assign(embedUrl(url));
             });
         }
 
@@ -447,7 +455,7 @@ const CFG = window.WMNG.EmbedConfig || {};
                 nextUrl.searchParams.set('kiosk', '1');
                 nextUrl.searchParams.set('cycle', String(cycleSeconds));
                 nextUrl.searchParams.set('target', WMNG_CONFIG.linkTarget === '_self' ? '_self' : '_blank');
-                window.setTimeout(() => { window.location.assign(nextUrl.toString()); }, cycleSeconds * 1000);
+                window.setTimeout(() => { window.location.assign(embedUrl(nextUrl)); }, cycleSeconds * 1000);
             }
         }
     }
@@ -1305,7 +1313,7 @@ const CFG = window.WMNG.EmbedConfig || {};
             stopPolling();
             if (eventSourceRef) { try { eventSourceRef.close(); } catch {} }
             const url = `${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/sse?interval=${intervalSec}&max=${sseMax}`;
-            const es = new EventSource(url);
+            const es = new EventSource(embedUrl(url));
             eventSourceRef = es;
             currentTransport = 'sse';
             updateTransportButton();
@@ -1483,7 +1491,7 @@ const CFG = window.WMNG.EmbedConfig || {};
     }
 
     function fetchLiveUpdate() {
-        fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/live`)
+        fetch(embedUrl(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/live`))
             .then(response => {
                 if (!response.ok) { console.warn('Live update failed: HTTP ' + response.status); return null; }
                 return response.json();
@@ -1497,7 +1505,7 @@ const CFG = window.WMNG.EmbedConfig || {};
     }
 
     function fetchMapData() {
-        fetch(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/json`)
+        fetch(embedUrl(`${baseUrl}/plugin/WeathermapNG/api/maps/${mapId}/json`))
             .then(response => {
                 if (!response.ok) { console.warn('Map data fetch failed: HTTP ' + response.status); return null; }
                 return response.json();
@@ -1909,10 +1917,10 @@ function navigateToSubMap(subMapId) {
     if (embedIdx !== -1 && embedIdx < parts.length - 1) {
         parts[embedIdx + 1] = String(subMapId);
         url.pathname = parts.join('/');
-        window.location.assign(url.toString());
+        window.location.assign(embedUrl(url));
     } else {
         // Fallback: unknown URL shape — navigate to the plugin embed root.
-        window.location.assign(`${baseUrl}/plugin/WeathermapNG/embed/${subMapId}`);
+        window.location.assign(embedUrl(`${baseUrl}/plugin/WeathermapNG/embed/${subMapId}`));
     }
 }
 

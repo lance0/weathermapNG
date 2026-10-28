@@ -1,0 +1,59 @@
+name: Embed Authentication
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  embed-auth:
+    name: LibreNMS HTTP and browser regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start disposable LibreNMS stack
+        run: |
+          sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
+          docker compose -p wmng-auth -f docker-compose.dev.yml up -d db redis librenms
+          for _ in {1..90}; do
+            if curl --fail --silent --output /dev/null http://localhost:8000/login; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Install plugin and configure browser fixtures
+        run: |
+          docker exec -u librenms -w /opt/librenms/html/plugins/WeathermapNG librenms-dev bash ./quick-install.sh
+          docker exec librenms-dev sh -c '
+            sed -i "/^INSTALL=/d" /opt/librenms/.env
+            printf "\nWEATHERMAPNG_EMBED_TOKEN=%s\nWEATHERMAPNG_DEMO_MODE=true\n" "$WEATHERMAPNG_EMBED_TOKEN" >> /opt/librenms/.env
+          '
+
+      - name: Exercise real session/token middleware and route binding
+        run: |
+          docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_embed_auth_test.php
+          docker exec -u librenms -w /opt/librenms librenms-dev php artisan route:cache
+          docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_embed_auth_test.php
+
+      - name: Install test browser
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/wmng-browser" playwright@1.62.1
+          "$RUNNER_TEMP/wmng-browser/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Exercise editor, viewer updates, and token navigation in Chromium
+        run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/embed-auth-browser.cjs
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -p wmng-auth -f docker-compose.dev.yml logs --no-color --tail 100
+
+      - name: Remove disposable stack
+        if: always()
+        run: |
+          docker compose -p wmng-auth -f docker-compose.dev.yml down --volumes
+          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"

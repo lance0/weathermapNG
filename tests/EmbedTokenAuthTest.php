@@ -11,19 +11,19 @@ class EmbedTokenAuthTest extends TestCase
     {
         $routes = file_get_contents(__DIR__ . '/../routes/web.php');
         $this->assertStringContainsString('EmbedTokenAuth::class', $routes);
-        // The token routes must NOT sit in the auth or web groups —
-        // LibreNMS's web group rejects anonymous requests before token
-        // auth runs. EmbedTokenAuth is the only middleware.
+        // The middleware selects web/auth or token auth for a single route.
         $this->assertStringContainsString('Route::middleware(\\LibreNMS\\Plugins\\WeathermapNG\\Http\\Middleware\\EmbedTokenAuth::class)', $routes);
-        // Session routes stay untouched
         $this->assertStringContainsString("Route::middleware(['web', 'auth'])", $routes);
     }
 
     public function test_token_routes_cover_embed_json_live_sse(): void
     {
         $routes = file_get_contents(__DIR__ . '/../routes/web.php');
-        foreach (['weathermapng.embed.token', 'weathermapng.json.token', 'weathermapng.live.token', 'weathermapng.sse.token'] as $name) {
-            $this->assertStringContainsString($name, $routes, "token route {$name} must be registered");
+        foreach (['embed', 'json', 'live', 'sse'] as $endpoint) {
+            $this->assertSame(1, substr_count($routes, "->name('weathermapng.$endpoint')"));
+            $path = $endpoint === 'embed' ? 'embed/{map}' : "api/maps/{map}/$endpoint";
+            $this->assertSame(1, substr_count($routes, "Route::get('plugin/WeathermapNG/$path'"),
+                'Duplicate URLs overwrite the session route, regardless of route name');
         }
     }
 
