@@ -19,7 +19,8 @@ jobs:
           sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
           docker compose -p wmng-auth -f docker-compose.dev.yml up -d db redis librenms
           for _ in {1..90}; do
-            if curl --fail --silent --output /dev/null http://localhost:8000/login; then
+            # Avoid warming PHP's opcode cache with pre-install route manifests.
+            if (exec 3<>/dev/tcp/localhost/8000) 2>/dev/null; then
               exit 0
             fi
             sleep 2

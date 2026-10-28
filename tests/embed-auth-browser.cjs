@@ -41,7 +41,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         ]);
         assert.ok(new URL(page.url()).pathname.endsWith(`/embed/${fixture.map}`));
         assert.equal((await page.goto(`${base}/plugin/WeathermapNG`)).status(), 200);
-        await page.goto(`${base}/plugin/WeathermapNG/editor/${fixture.child}`);
+        assert.equal((await page.goto(`${base}/plugin/WeathermapNG/editor/${fixture.child}`)).status(), 200);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.equal(await page.evaluate(() => WMNG.EditorState.nodes.length), 1);
         const saved = page.waitForResponse(r => r.url().endsWith(`/api/maps/${fixture.child}/save`));
