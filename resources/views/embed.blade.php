@@ -78,6 +78,7 @@
         // Server-rendered bootstrap: everything the JS modules need from Blade.
         window.WMNG = window.WMNG || {};
         window.WMNG.EmbedConfig = {
+            embedToken: @json($embedToken),
             mapId: '{{ $mapId }}',
             baseUrl: '{{ url("/") }}',
             deviceBaseUrl: '{{ url("device") }}',

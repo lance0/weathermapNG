@@ -102,7 +102,9 @@ curl -H "Authorization: Bearer <random-secret>" \
   https://your-librenms/plugin/WeathermapNG/api/maps/1/json
 ```
 
-Token-gated endpoints: `embed/{map}`, `api/maps/{map}/json`, `api/maps/{map}/live`, `api/maps/{map}/sse`. Without a configured token these routes return 403; the session-authenticated routes are unaffected.
+These endpoints accept either a LibreNMS session or an explicitly supplied token: `embed/{map}`, `api/maps/{map}/json`, `api/maps/{map}/live`, `api/maps/{map}/sse`. Logged-in users do not need an embed token. Without a token, normal LibreNMS login, account-enabled, and two-factor checks apply. An explicit token returns 403 when token auth is unconfigured, or 401 when it is invalid; anonymous requests without a token require login. Bearer tokens take precedence over query tokens.
+
+The viewer forwards its authenticated token to JSON, live updates, SSE, drill-down, kiosk cycling, and kiosk exit. Token responses disable caching and referrers. The token grants access only to these map read endpoints; LibreNMS device pages and RRD graphs still require a LibreNMS session.
 
 ## Grafana IFrame Panel
 

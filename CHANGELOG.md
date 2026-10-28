@@ -3,6 +3,17 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.1] - 2026-10-28
+
+### Fixed
+- Restore session access to the embed, JSON, live, and SSE endpoints. v1.14.0 registered duplicate URLs whose token-only middleware replaced normal login access, causing `403 Embed token auth is not configured` even for logged-in users. Each URL now accepts either normal LibreNMS session authentication or an explicit embed token. Logged-in users do not need to configure a token.
+- Resolve the requested map on token-authenticated routes. These routes previously skipped model binding and could return an empty map; missing maps now return 404.
+- Preserve the authenticated embed token through viewer JSON refreshes, polling, SSE, nested-map navigation, kiosk cycling, and kiosk exit. Token responses disable caching and referrers.
+- Correct the date call in `just release-bump`, which previously stopped after updating only some version sources.
+
+### Changed
+- Gate PRs and release publication on real LibreNMS HTTP-kernel tests with session cookies, with and without route caching, plus Chromium checks for editor loading/saving and session/token viewers. Cover missing and invalid credentials, disabled accounts, map binding, live updates, and token navigation.
+
 ## [1.14.0] - 2026-10-20
 
 ### Added
