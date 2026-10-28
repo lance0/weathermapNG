@@ -43,7 +43,14 @@ class InstallationReport
         } catch (\Throwable $e) {
             $check('plugin_enabled', false, 'Check database connectivity and plugin registration.');
         }
-        foreach (['maps','nodes','links','map_templates','map_versions'] as $table) {
+        $requiredColumns = [
+            'maps' => ['id','name','title','description','parent_map_id','width','height','options','created_at','updated_at'],
+            'nodes' => ['id','map_id','label','x','y','device_id','meta','created_at','updated_at'],
+            'links' => ['id','map_id','src_node_id','dst_node_id','port_id_a','port_id_b','bandwidth_bps','style','created_at','updated_at'],
+            'map_templates' => ['id','name','title','description','width','height','config','icon','category','is_built_in','created_at','updated_at'],
+            'map_versions' => ['id','map_id','name','description','config_snapshot','created_by','created_at'],
+        ];
+        foreach ($requiredColumns as $table => $columns) {
             $report['counts'][$table] = null;
             try {
                 if ($database) $report['counts'][$table] = $app->make('db')->table('wmng_' . $table)->count();
@@ -51,6 +58,18 @@ class InstallationReport
                 // Counts remain unknown when a database or table cannot be read.
             }
             $check('table_' . $table, $report['counts'][$table] !== null, $database ? 'Check table permissions and schema. For missing tables, as the LibreNMS user: cd ' . escapeshellarg($plugin) . ' && php database/setup.php' : 'Restore database connectivity before checking whether this table exists.');
+            $schema = false;
+            try {
+                if ($database) {
+                    // Query the actual runtime table (including temporary shadows), without reading rows.
+                    $app->make('db')->table('wmng_' . $table)
+                        ->select(array_map(fn($column) => 'wmng_' . $table . '.' . $column, $columns))->limit(0)->get();
+                    $schema = true;
+                }
+            } catch (\Throwable $e) {}
+            $check('schema_' . $table, $schema, $database
+                ? 'Check required table columns and read permissions. ' . $installCommand
+                : 'Restore database connectivity before checking required table columns.');
         }
         foreach (['index','editor','embed','json','live','sse','diagnostics'] as $route) {
             try {
