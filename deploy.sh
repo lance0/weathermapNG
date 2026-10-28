@@ -1,83 +1,34 @@
 #!/bin/bash
-# WeathermapNG Deployment/Update Script
-# Use this to update an existing installation
-
-set -e
-
-# Colors
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-echo -e "${GREEN}WeathermapNG Deployment${NC}"
-echo "========================"
-
-# Detect environment
-PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIBRENMS_PATH="${LIBRENMS_PATH:-/opt/librenms}"
-
-# Check if we're in the right directory
-if [ ! -f "$PLUGIN_DIR/composer.json" ]; then
-    echo "Error: Not in WeathermapNG directory"
+# Update a tracked branch, or reinstall an explicitly selected tag/archive.
+set -Eeuo pipefail
+PLUGIN_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+export LIBRENMS_PATH="${LIBRENMS_PATH:-/opt/librenms}"
+if [ "$(id -u)" -eq 0 ]; then
+    if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+        id librenms >/dev/null
+        printf -v update_command 'exec env LIBRENMS_PATH=%q bash %q' "$LIBRENMS_PATH" "$PLUGIN_DIR/deploy.sh"
+        exec su -l librenms -s /bin/bash -c "$update_command"
+    fi
+    echo 'Error: Run deploy.sh as the LibreNMS user, not root.' >&2
     exit 1
 fi
-
-# Find LibreNMS
-if [ ! -d "$LIBRENMS_PATH" ]; then
-    for path in /opt/librenms /usr/local/librenms /data; do
-        if [ -f "$path/artisan" ]; then
-            LIBRENMS_PATH="$path"
-            break
-        fi
-    done
-fi
-
-echo "LibreNMS: $LIBRENMS_PATH"
-echo "Plugin: $PLUGIN_DIR"
-echo ""
-
-# 1. Pull latest changes (if git repo)
-echo -e "${GREEN}[1/5]${NC} Pulling latest changes..."
+step='checking source checkout'
+trap 'result=$?; printf "Error: %s failed; existing installation was not reinstalled.\nResolve the checkout/upstream error, then retry as the LibreNMS user: cd %q && LIBRENMS_PATH=%q ./deploy.sh\n" "$step" "$PLUGIN_DIR" "$LIBRENMS_PATH" >&2; exit "$result"' ERR
 cd "$PLUGIN_DIR"
-if [ -d ".git" ]; then
-    git pull || echo -e "${YELLOW}Not a git repo or pull failed, skipping...${NC}"
+if [ -e .git ]; then
+    step='checking unstaged tracked changes'
+    git diff --quiet
+    step='checking staged tracked changes'
+    git diff --cached --quiet
+    if git symbolic-ref -q HEAD >/dev/null; then
+        step='checking branch upstream'
+        git rev-parse --verify '@{upstream}' >/dev/null
+        step='fast-forwarding tracked branch'
+        git pull --ff-only
+    else
+        echo 'Detached checkout: keeping the explicitly selected release; no Git update performed.'
+    fi
 else
-    echo "  Not a git repo, skipping..."
+    echo 'Archive installation: keeping the selected source; no Git update performed.'
 fi
-
-# 2. Install dependencies
-echo -e "${GREEN}[2/5]${NC} Installing dependencies..."
-composer install --no-dev --optimize-autoloader
-
-# 3. Run database setup (handles migrations and updates)
-echo -e "${GREEN}[3/5]${NC} Updating database..."
-php database/setup.php
-
-# 4. Clear caches
-echo -e "${GREEN}[4/5]${NC} Clearing caches..."
-if [ -f "$LIBRENMS_PATH/artisan" ]; then
-    cd "$LIBRENMS_PATH"
-    php artisan cache:clear 2>/dev/null || true
-    php artisan route:clear 2>/dev/null || true
-    php artisan view:clear 2>/dev/null || true
-    php artisan config:clear 2>/dev/null || true
-else
-    echo -e "${YELLOW}  Artisan not found, skipping cache clear${NC}"
-fi
-
-# 5. Set permissions (if not in Docker)
-echo -e "${GREEN}[5/5]${NC} Setting permissions..."
-if [ -f "/.dockerenv" ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
-    echo "  Skipped in Docker"
-else
-    cd "$PLUGIN_DIR"
-    chown -R librenms:librenms . 2>/dev/null || echo -e "${YELLOW}  Could not set ownership (try with sudo)${NC}"
-fi
-
-echo ""
-echo -e "${GREEN}Deployment complete!${NC}"
-echo ""
-echo "Visit: https://your-server/plugin/WeathermapNG"
-echo ""
-echo "If you see errors, try:"
-echo "  cd $LIBRENMS_PATH && php artisan view:clear"
+exec bash "$PLUGIN_DIR/quick-install.sh"

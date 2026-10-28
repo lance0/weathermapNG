@@ -29,15 +29,16 @@ sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./qu
 
 The script installs dependencies, registers the Composer package with LibreNMS, sets up database tables, and enables the plugin. Run it as the `librenms` user — running as root can leave root-owned Composer files behind. `just install LIBRENMS_PATH=/opt/librenms` runs the same flow as a thin wrapper.
 
-If routes don't appear after install:
+The installer registers a per-LibreNMS-user Composer path repository with
+`composer config --global repositories.weathermapng` and records the package using
+`lnms plugin:add librenms/weathermapng`. This lets the native LibreNMS updater
+restore the package after resetting its own Composer files. Other global repository
+keys remain unchanged. Run installation and the updater as the same LibreNMS user.
+
+For a read-only installation report (including missing registration/routes):
 
 ```bash
-cd /opt/librenms
-php artisan route:list | grep -iE 'weathermap|wmng'
-composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
-php artisan package:discover
-php artisan optimize:clear
+sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && php verify-deployment.php'
 ```
 
 After install, open `https://your-librenms/plugin/WeathermapNG` and create your first map. Docker-based install for development and testing, demo mode, permissions, and troubleshooting: [installation guide](docs/INSTALL.md).
@@ -79,15 +80,7 @@ After install, open `https://your-librenms/plugin/WeathermapNG` and create your 
 ## Updating
 
 ```bash
-cd /opt/librenms/html/plugins/WeathermapNG
-git pull
-composer install --no-dev --optimize-autoloader
-php database/setup.php
-cd /opt/librenms
-FORCE=1 composer require 'librenms/weathermapng:*' --with-dependencies --no-interaction
-php artisan package:discover
-php artisan optimize:clear
-php artisan route:list | grep -iE 'weathermap|wmng'
+sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./deploy.sh'
 ```
 
 Upgrade safety notes (schema, config, and plugin-row normalization) are in the
