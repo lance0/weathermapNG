@@ -19,10 +19,10 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         $user->save();
         $user->assignRole('admin');
         $map = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::create(['name' => 'wmng-browser-' . $tag]);
-        $child = app(LibreNMS\\Plugins\\WeathermapNG\\Services\\MapService::class)->createMap(['name' => 'wmng-browser-child-' . $tag, 'width' => 1013, 'height' => 619]);
+        $child = app(LibreNMS\\Plugins\\WeathermapNG\\Services\\MapService::class)->createMap(['name' => 'wmng-browser-' . $tag . '-child', 'width' => 1013, 'height' => 619]);
         $child->update(['parent_map_id' => $map->id]);
         Illuminate\\Support\\Facades\\DB::table('wmng_maps')->where('id', $child->id)->update(['width' => 1173, 'height' => 641]);
-        $legacy = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::forceCreate(['name' => 'wmng-browser-legacy-' . $tag, 'width' => 1173, 'height' => 641, 'options' => ['background' => '#ffffff']]);
+        $legacy = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::forceCreate(['name' => 'wmng-browser-' . $tag . '-legacy', 'width' => 1173, 'height' => 641, 'options' => ['background' => '#ffffff']]);
         $a = LibreNMS\\Plugins\\WeathermapNG\\Models\\Node::create(['map_id' => $legacy->id, 'label' => 'Legacy A', 'x' => 100, 'y' => 150]);
         $b = LibreNMS\\Plugins\\WeathermapNG\\Models\\Node::create(['map_id' => $legacy->id, 'label' => 'Legacy B', 'x' => 200, 'y' => 150]);
         Illuminate\\Support\\Facades\\DB::table('wmng_links')->insert(['map_id' => $legacy->id, 'src_node_id' => $a->id, 'dst_node_id' => $b->id, 'bandwidth_bps' => 123456]);
