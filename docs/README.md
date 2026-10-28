@@ -7,7 +7,7 @@ short overview; everything else lives here.
 
 | Page | Scope |
 |------|-------|
-| [Installation](INSTALL.md) | Install channels (`quick-install.sh`, manual, Docker), demo mode, authorization model, updating, upgrade safety, troubleshooting. |
+| [Installation](INSTALL.md) | Canonical stable native/Docker install, upgrades, configuration, diagnostics, full backup and recovery. |
 | [Embed Viewer](EMBED.md) | Iframe embedding, query parameters, kiosk/NOC mode, live updates. |
 | [API](API.md) | Every route with method, auth tier, and request/response shapes. |
 
@@ -15,7 +15,7 @@ short overview; everything else lives here.
 
 | Page | Scope |
 |------|-------|
-| [Deployment](DEPLOYMENT.md) | Production checks, Docker notes, monitoring probes, backup, and recovery. |
+| [Deployment](DEPLOYMENT.md) | Production monitoring, rendering diagnostics, optional poller, and authorization notes. |
 | [Performance](PERFORMANCE.md) | Large-map behavior, viewport culling, benchmark method, profiling checklist. |
 | [Diagnostics](API.md#health-and-metrics-routes) | Health/readiness/liveness probes and the admin diagnostics page. |
 

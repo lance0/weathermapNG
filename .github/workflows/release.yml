@@ -133,15 +133,8 @@ jobs:
             ${{ steps.changelog.outputs.CHANGES }}
 
             ### Installation
-            See [INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/INSTALL.md) for detailed installation instructions.
+            See [INSTALL.md](https://github.com/${{ github.repository }}/blob/${{ steps.version.outputs.VERSION }}/docs/INSTALL.md) for detailed installation instructions.
 
-            ### Quick Install
-            ```bash
-            cd /opt/librenms/html/plugins
-            curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.VERSION }}/WeathermapNG-${{ steps.version.outputs.VERSION }}.tar.gz | tar xz
-            chown -R librenms:librenms WeathermapNG
-            sudo -u librenms -H bash -lc 'cd /opt/librenms/html/plugins/WeathermapNG && ./quick-install.sh'
-            ```
           files: |
             dist/WeathermapNG-${{ steps.version.outputs.VERSION }}.zip
             dist/WeathermapNG-${{ steps.version.outputs.VERSION }}.tar.gz

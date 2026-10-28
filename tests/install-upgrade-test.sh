@@ -8,11 +8,18 @@ root="${LIBRENMS_PATH:-/opt/librenms}"
 plugin="$root/html/plugins/WeathermapNG"
 scratch="wmng_upgrade_$(date +%s)_${RANDOM}"
 work="$(mktemp -d /tmp/wmng-upgrade.XXXXXXXX)"
+logs="${WMNG_EVIDENCE_DIR:-/tmp/wmng-install-evidence/recovery-$(date +%s)_${RANDOM}}"
+mkdir -p "$logs"
 created=false
+restore="wmng_restore_$(date +%s)_${RANDOM}"
+restore_created=false
 cleanup() {
-    if "$created"; then
-        docker exec "$db_container" mariadb -uroot -e "REVOKE ALL ON \`$scratch\`.* FROM 'librenms'@'%'; DROP DATABASE \`$scratch\`;" || true
-    fi
+    for database in "$scratch" "$restore"; do
+        if { [ "$database" = "$scratch" ] && "$created"; } || { [ "$database" = "$restore" ] && "$restore_created"; }; then
+            docker exec "$db_container" mariadb -uroot -e "REVOKE ALL ON \`$database\`.* FROM 'librenms'@'%';" || true
+            docker exec "$db_container" mariadb -uroot -e "DROP DATABASE \`$database\`;" || true
+        fi
+    done
     rm -rf "$work"
 }
 trap cleanup EXIT
@@ -100,6 +107,49 @@ runtime "$scratch" full > "$work/first.json"
 setup
 runtime "$scratch" full > "$work/repeated.json"
 cmp "$work/first.json" "$work/repeated.json"
+# Full matching-version recovery, seeded even when the source CI installation is empty.
+fixture() {
+    docker exec -i -u librenms -e DB_DATABASE="$1" "$app_container" php "$plugin/tests/integration_lifecycle_fixture.php" "$2"
+}
+[[ "$(runtime "$scratch" identity)" == "$scratch" ]]
+fixture "$scratch" seed-recovery > "$work/recovery-state.json"
+fixture "$scratch" recovery-check < "$work/recovery-state.json"
+runtime "$scratch" full > "$work/backup-before.json"
+docker exec "$db_container" mariadb-dump -uroot --single-transaction --routines --events --triggers "$scratch" > "$work/full.sql"
+! grep -qiE '^USE[[:space:]]' "$work/full.sql"
+docker exec "$db_container" mariadb -uroot -e "CREATE DATABASE \`$restore\`;"
+restore_created=true
+docker exec "$db_container" mariadb -uroot -e "GRANT ALL ON \`$restore\`.* TO 'librenms'@'%';"
+[[ "$(runtime "$restore" identity)" == "$restore" ]]
+docker exec -i "$db_container" mariadb -uroot "$restore" < "$work/full.sql"
+runtime "$restore" full > "$work/restored.json"
+cmp "$work/backup-before.json" "$work/restored.json"
+cp "$work/backup-before.json" "$logs/before-restore.json"
+cp "$work/restored.json" "$logs/restored.json"
+sha256sum "$logs/before-restore.json" "$logs/restored.json" > "$logs/hashes.txt"
+fixture "$restore" recovery-check < "$work/recovery-state.json"
+
+# Archive the actual runtime config privately; extraction never targets the running app.
+mkdir "$work/config-source" "$work/config-restored"
+for entry in .env config composer.plugins.json composer.json composer.lock; do
+    docker cp "$app_container:$root/$entry" "$work/config-source/$entry"
+done
+for entry in config.php; do
+    if docker exec "$app_container" test -f "$root/$entry"; then docker cp "$app_container:$root/$entry" "$work/config-source/$entry"; fi
+done
+composer_home="$(docker exec "$app_container" su -l librenms -s /bin/bash -c 'composer config --global home')"
+mkdir "$work/config-source/composer-user"
+for entry in config.json auth.json; do
+    if docker exec -u librenms "$app_container" test -f "$composer_home/$entry"; then
+        docker cp "$app_container:$composer_home/$entry" "$work/config-source/composer-user/$entry"
+    fi
+done
+if docker exec "$app_container" test -f /data/.env; then docker cp "$app_container:/data/.env" "$work/config-source/docker-persistent.env"; fi
+tar -czf "$work/config.tgz" -C "$work/config-source" .
+tar -xzf "$work/config.tgz" -C "$work/config-restored"
+diff -r "$work/config-source" "$work/config-restored"
+echo 'PASS: full populated database restore and private runtime configuration archive roundtrip'
+
 runtime "$scratch" break
 if setup > "$work/failure.log" 2>&1; then
     echo 'FAIL: missing required plugin column succeeded' >&2
@@ -111,4 +161,8 @@ if grep -q 'Database setup completed successfully' "$work/failure.log"; then
 fi
 runtime librenms full > "$work/original-after.json"
 cmp "$work/original.json" "$work/original-after.json"
+cp "$work/original.json" "$logs/original.json"
+cp "$work/original-after.json" "$logs/original-after.json"
+sha256sum "$logs/original.json" "$logs/original-after.json" >> "$logs/hashes.txt"
+echo "Recovery evidence: $logs"
 echo 'PASS: legacy schema upgrade, preserved rows/settings, repeat, and required-column failure; original fixture unchanged'

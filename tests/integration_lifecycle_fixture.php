@@ -13,6 +13,10 @@ use Illuminate\Http\Request;
 use Illuminate\Cookie\CookieValuePrefix;
 use App\Models\User;
 
+// Explicit scratch selection must match the connection used by this exact runtime.
+if (getenv('DB_DATABASE') && DB::selectOne('SELECT DATABASE() AS name')->name !== getenv('DB_DATABASE')) {
+    throw new RuntimeException('Fixture database selection mismatch');
+}
 $mode = $argv[1];
 $state = json_decode(stream_get_contents(STDIN), true) ?: [];
 if ($mode === 'snapshot') {
@@ -36,8 +40,9 @@ function lifecycleSession(array $state): array
     $state['cookie'] = $name.'='.$enc->encrypt(CookieValuePrefix::create($name,$enc->getKey()).$session->getId(),false);
     return $state;
 }
-if ($mode === 'seed') {
-    $state = DB::transaction(function () use ($state) {
+if ($mode === 'seed' || $mode === 'seed-recovery') {
+    if ($mode === 'seed-recovery' && !str_starts_with((string)getenv('DB_DATABASE'), 'wmng_upgrade_')) { throw new RuntimeException('Recovery seed requires scratch'); }
+    $state = DB::transaction(function () use ($state, $mode) {
         $tag = 'lifecycle-'.bin2hex(random_bytes(5));
         $plugin = DB::table('plugins')->where('plugin_name','WeathermapNG')->where('version',2)->first();
         if (!$plugin) { throw new RuntimeException('Installed v2 plugin absent'); }
@@ -55,6 +60,7 @@ if ($mode === 'seed') {
         app(LibreNMS\Plugins\WeathermapNG\Services\MapVersionService::class)->createVersion(
             LibreNMS\Plugins\WeathermapNG\Models\Map::findOrFail($state['map']), 'Retained version', 'Lifecycle qualification', null
         );
+        if ($mode === 'seed-recovery') { return $state; }
         $user = new User(['username'=>$tag,'auth_type'=>'mysql','enabled'=>true]);
         $user->setPassword(bin2hex(random_bytes(16)));
         $user->save();
@@ -63,6 +69,19 @@ if ($mode === 'seed') {
         return lifecycleSession($state);
     });
     echo json_encode($state, JSON_THROW_ON_ERROR);
+    exit;
+}
+if ($mode === 'recovery-check') {
+    if (config('weathermapng.default_width') !== 1173) { throw new RuntimeException('Restored effective setting mismatch'); }
+    $version = DB::table('wmng_map_versions')->where('map_id',$state['map'])->where('name','Retained version')->first();
+    $snapshot = json_decode($version->config_snapshot ?? '', true);
+    $template = DB::table('wmng_map_templates')->where('id',$state['template'])->first();
+    $config = json_decode($template->config ?? '', true);
+    if (count($snapshot['nodes'] ?? []) !== 2 || count($snapshot['links'] ?? []) !== 1
+        || count($config['default_nodes'] ?? []) !== 1 || !array_key_exists('default_links',$config ?? [])) {
+        throw new RuntimeException('Restored version/template data invalid');
+    }
+    echo "PASS: restored valid saved version/template and effective setting\n";
     exit;
 }
 if ($mode === 'session') {
