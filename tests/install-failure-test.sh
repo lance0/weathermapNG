@@ -5,12 +5,14 @@ SOURCE="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 PLUGIN="$WORK/plugin source"
+export COMPOSER_HOME="$WORK/composer-home"
 export LIBRENMS_PATH="$WORK/selected root's app"
 FAKE_BIN="$WORK/bin"
 export INSTALL_LOG="$WORK/commands.log" REAL_PHP
 REAL_PHP="$(command -v php)"
 mkdir -p "$PLUGIN/database" "$LIBRENMS_PATH/vendor" "$LIBRENMS_PATH/bootstrap" "$FAKE_BIN"
 cp "$SOURCE/quick-install.sh" "$SOURCE/deploy.sh" "$PLUGIN/"
+cp -r "$SOURCE/scripts" "$PLUGIN/"
 touch "$PLUGIN/composer.json" "$PLUGIN/database/setup.php" "$PLUGIN/verify-deployment.php"
 touch "$LIBRENMS_PATH/composer.json" "$LIBRENMS_PATH/artisan" "$LIBRENMS_PATH/vendor/autoload.php" "$LIBRENMS_PATH/bootstrap/app.php"
 cat > "$FAKE_BIN/id" <<'EOF'

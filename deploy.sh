@@ -14,6 +14,11 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 step='checking source checkout'
 trap 'result=$?; printf "Error: %s failed; existing installation was not reinstalled.\nResolve the checkout/upstream error, then retry as the LibreNMS user: cd %q && LIBRENMS_PATH=%q ./deploy.sh\n" "$step" "$PLUGIN_DIR" "$LIBRENMS_PATH" >&2; exit "$result"' ERR
+step='acquiring installer locks'
+# shellcheck source=scripts/install-common.sh
+source "$PLUGIN_DIR/scripts/install-common.sh"
+acquire_install_locks
+
 cd "$PLUGIN_DIR"
 if [ -e .git ]; then
     step='checking unstaged tracked changes'
