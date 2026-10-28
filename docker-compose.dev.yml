@@ -42,7 +42,9 @@ services:
       - librenms_data:/data
       # Mount plugin for live development
       - ./:/opt/librenms/html/plugins/WeathermapNG:rw
+      - ./docker/99-weathermapng.sh:/etc/cont-init.d/99-weathermapng.sh:ro
     environment:
+      S6_BEHAVIOUR_IF_STAGE2_FAILS: "2"
       TZ: "UTC"
       PUID: "1000"
       PGID: "1000"
@@ -66,7 +68,6 @@ services:
       - librenms
     volumes:
       - librenms_data:/data
-      - ./:/opt/librenms/html/plugins/WeathermapNG:rw
     environment:
       TZ: "UTC"
       PUID: "1000"

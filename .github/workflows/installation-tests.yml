@@ -17,6 +17,8 @@ on:
       - 'verify.php'
       - 'database/**'
       - 'docker-compose*.yml'
+      - 'docker/**'
+      - '.github/workflows/embed-auth.yml'
       - '.env.*'
       - 'composer.json'
       - 'src/**'
@@ -39,6 +41,8 @@ on:
       - 'verify.php'
       - 'database/**'
       - 'docker-compose*.yml'
+      - 'docker/**'
+      - '.github/workflows/embed-auth.yml'
       - '.env.*'
       - 'composer.json'
       - 'src/**'
@@ -75,12 +79,15 @@ jobs:
           bash -n quick-install.sh
           bash -n deploy.sh
           bash -n tests/install-failure-test.sh
+          bash -n tests/install-lifecycle-test.sh
+          bash -n docker/99-weathermapng.sh
           bash -n tests/install-test.sh
           bash -n tests/docker-test.sh
 
       - name: Validate PHP scripts
         run: |
           php -l verify.php
+          php -l tests/integration_lifecycle_fixture.php
           php -l src/WeathermapNG.php
 
   docker-test:
@@ -220,62 +227,4 @@ jobs:
 
   weekly-librenms-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    name: Weekly LibreNMS Install Smoke
-    timeout-minutes: 30
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
-
-      - name: Start LibreNMS stack
-        run: |
-          set -euo pipefail
-          docker compose -f docker-compose.simple.yml up -d db redis librenms
-
-      - name: Wait for LibreNMS container
-        run: |
-          set -euo pipefail
-          timeout 300 bash -c '
-            until docker compose -f docker-compose.simple.yml exec -T librenms test -f /opt/librenms/artisan; do
-              docker compose -f docker-compose.simple.yml ps
-              sleep 10
-            done
-          '
-
-      - name: Run plugin quick install
-        run: |
-          set -euo pipefail
-          docker compose -f docker-compose.simple.yml exec -T librenms bash -lc '
-            cd /opt/librenms/html/plugins/WeathermapNG
-            LIBRENMS_PATH=/opt/librenms ./quick-install.sh
-          '
-
-      - name: Verify package routes
-        run: |
-          set -euo pipefail
-          docker compose -f docker-compose.simple.yml exec -T -u librenms librenms bash -lc '
-            cd /opt/librenms
-            php artisan route:list | grep -iE "weathermap|wmng"
-            php artisan route:list | grep -i "weathermapng.ready"
-          '
-
-      - name: Verify unauthenticated health endpoints
-        run: |
-          set -euo pipefail
-          timeout 180 bash -c '
-            until curl -fsS http://127.0.0.1:8000/plugin/WeathermapNG/live >/dev/null; do
-              docker compose -f docker-compose.simple.yml ps
-              sleep 10
-            done
-          '
-          curl -fsS http://127.0.0.1:8000/plugin/WeathermapNG/live
-          curl -fsS http://127.0.0.1:8000/plugin/WeathermapNG/health
-
-      - name: Dump logs on failure
-        if: failure()
-        run: docker compose -f docker-compose.simple.yml logs --tail=300
-
-      - name: Stop LibreNMS stack
-        if: always()
-        run: docker compose -f docker-compose.simple.yml down -v
+    uses: ./.github/workflows/embed-auth.yml

@@ -10,7 +10,7 @@ jobs:
   embed-auth:
     name: LibreNMS HTTP and browser regression
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -19,20 +19,22 @@ jobs:
           sudo chown -R 1000:1000 "$GITHUB_WORKSPACE"
           docker compose -p wmng-auth -f docker-compose.dev.yml up -d db redis librenms
           for _ in {1..90}; do
-            # Avoid warming PHP's opcode cache with pre-install route manifests.
-            if (exec 3<>/dev/tcp/localhost/8000) 2>/dev/null; then
+            # Docker's port proxy can accept TCP before application initialization.
+            status=$(curl -s -o "$RUNNER_TEMP/wmng-live.json" -w '%{http_code}' http://localhost:8000/plugin/WeathermapNG/live) || status=000
+            if [ "$status" = 200 ] && jq -e '.alive == true' "$RUNNER_TEMP/wmng-live.json" >/dev/null; then
               exit 0
             fi
             sleep 2
           done
           exit 1
 
-      - name: Install plugin and configure browser fixtures
+      - name: Configure browser fixtures
         run: |
-          docker exec -u librenms -w /opt/librenms/html/plugins/WeathermapNG librenms-dev bash ./quick-install.sh
           docker exec librenms-dev sh -c '
-            sed -i "/^INSTALL=/d" /opt/librenms/.env
-            printf "\nWEATHERMAPNG_EMBED_TOKEN=%s\nWEATHERMAPNG_DEMO_MODE=true\n" "$WEATHERMAPNG_EMBED_TOKEN" >> /opt/librenms/.env
+            for config in /data/.env /opt/librenms/.env; do
+              sed -i "/^INSTALL=/d; /^WEATHERMAPNG_EMBED_TOKEN=/d; /^WEATHERMAPNG_DEMO_MODE=/d" "$config"
+              printf "\nWEATHERMAPNG_EMBED_TOKEN=%s\nWEATHERMAPNG_DEMO_MODE=true\nINSTALL=false\n" "$WEATHERMAPNG_EMBED_TOKEN" >> "$config"
+            done
           '
 
       - name: Exercise real session/token middleware and route binding
@@ -45,6 +47,9 @@ jobs:
 
       - name: Qualify populated legacy schema upgrades in a scratch database
         run: bash tests/install-upgrade-test.sh
+
+      - name: Qualify native dependency restoration and Docker lifecycle
+        run: bash tests/install-lifecycle-test.sh
 
       - name: Install test browser
         run: |
