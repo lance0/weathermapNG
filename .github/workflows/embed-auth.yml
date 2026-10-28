@@ -38,8 +38,10 @@ jobs:
       - name: Exercise real session/token middleware and route binding
         run: |
           docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_embed_auth_test.php
+          docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_install_report_test.php
           docker exec -u librenms -w /opt/librenms librenms-dev php artisan route:cache
           docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_embed_auth_test.php
+          docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_install_report_test.php
 
       - name: Install test browser
         run: |

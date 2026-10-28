@@ -189,24 +189,23 @@ class HealthController
         $this->requireAdmin();
 
         $health = $this->check()->getData(true);
+        $installationReport = \LibreNMS\Plugins\WeathermapNG\Services\InstallationReport::collect(app(), base_path(), dirname(__DIR__, 3));
 
         $stats = [
-            'maps' => 0,
-            'nodes' => 0,
-            'links' => 0,
-            'database_size' => 'Unknown',
+            'maps' => $installationReport['counts']['maps'],
+            'nodes' => $installationReport['counts']['nodes'],
+            'links' => $installationReport['counts']['links'],
+            'database_size' => $installationReport['checks']['database']['ok'] ? $this->getDatabaseSize() : 'Unknown',
         ];
-        try {
-            $stats['maps'] = Map::count();
-            $stats['nodes'] = DB::table('wmng_nodes')->count();
-            $stats['links'] = DB::table('wmng_links')->count();
-            $stats['database_size'] = $this->getDatabaseSize();
-        } catch (\Exception $e) {
-            $stats['error'] = 'Unable to query statistics: ' . $e->getMessage();
+        if (in_array(null, [$stats['maps'], $stats['nodes'], $stats['links']], true)) {
+            $stats['error'] = 'Database statistics are unavailable.';
         }
 
         $checks = [
-            'database' => $this->checkDatabase(),
+            'database' => [
+                'status' => $installationReport['checks']['database']['ok'] ? 'healthy' : 'unhealthy',
+                'message' => $installationReport['checks']['database']['ok'] ? 'Database connected' : 'Database connection failed',
+            ],
             'filesystem' => $this->checkFilesystem(),
             'dependencies' => $this->checkDependencies(),
             'configuration' => $this->checkConfiguration(),
@@ -214,16 +213,16 @@ class HealthController
         ];
 
         $routes = [
-            ['name' => 'Index', 'route' => 'weathermapng.index', 'method' => 'GET', 'url' => route('weathermapng.index')],
+            ['name' => 'Index', 'route' => 'weathermapng.index', 'method' => 'GET', 'link' => true],
             ['name' => 'Embed', 'route' => 'weathermapng.embed', 'method' => 'GET'],
             ['name' => 'Map JSON', 'route' => 'weathermapng.json', 'method' => 'GET'],
             ['name' => 'Live data', 'route' => 'weathermapng.live', 'method' => 'GET'],
             ['name' => 'Save map', 'route' => 'weathermapng.map.save', 'method' => 'POST'],
-            ['name' => 'Health check', 'route' => 'weathermapng.health', 'method' => 'GET', 'url' => route('weathermapng.health')],
-            ['name' => 'Health detailed', 'route' => 'weathermapng.health.detailed', 'method' => 'GET', 'url' => route('weathermapng.health.detailed')],
-            ['name' => 'Health stats', 'route' => 'weathermapng.health.stats', 'method' => 'GET', 'url' => route('weathermapng.health.stats')],
-            ['name' => 'Metrics', 'route' => 'weathermapng.metrics', 'method' => 'GET', 'url' => route('weathermapng.metrics')],
-            ['name' => 'Diagnostics', 'route' => 'weathermapng.diagnostics', 'method' => 'GET', 'url' => route('weathermapng.diagnostics')],
+            ['name' => 'Health check', 'route' => 'weathermapng.health', 'method' => 'GET', 'link' => true],
+            ['name' => 'Health detailed', 'route' => 'weathermapng.health.detailed', 'method' => 'GET', 'link' => true],
+            ['name' => 'Health stats', 'route' => 'weathermapng.health.stats', 'method' => 'GET', 'link' => true],
+            ['name' => 'Metrics', 'route' => 'weathermapng.metrics', 'method' => 'GET', 'link' => true],
+            ['name' => 'Diagnostics', 'route' => 'weathermapng.diagnostics', 'method' => 'GET', 'link' => true],
         ];
 
         $routeStatus = array_map(function ($r) {
@@ -232,18 +231,15 @@ class HealthController
                 $r['status'] = 'missing';
                 return $r;
             }
-            // Parameterized routes are registered; don't try to synthesize a URL.
-            if (!isset($r['url'])) {
-                $r['url'] = '#';
-            }
+            // Generate URLs only after confirming registration.
+            $r['url'] = !empty($r['link']) ? route($r['route']) : '#';
             $r['status'] = 'ok';
             return $r;
         }, $routes);
 
         $writablePaths = [
             'output/maps' => config('weathermapng.output_dir', __DIR__ . '/../../../output/maps/'),
-            'resources/output' => __DIR__ . '/../../../resources/output/',
-            'storage' => __DIR__ . '/../../../storage/',
+            'output/cache' => __DIR__ . '/../../../output/cache/',
         ];
 
         $pathStatus = [];
@@ -264,13 +260,13 @@ class HealthController
                 20
             );
         } catch (\Exception $e) {
-            $this->getLogger()->error('Data integrity scan failed', ['error' => $e->getMessage()]);
-            $integrity = ['maps' => [], 'summary' => [], 'error' => $e->getMessage()];
+            $integrity = ['maps' => [], 'summary' => [], 'error' => 'Data integrity scan is unavailable.'];
         }
 
         return view('WeathermapNG::diagnostics', [
+            'installationReport' => $installationReport,
             'version' => $this->getVersion(),
-            'overallStatus' => $health['status'] ?? 'unknown',
+            'overallStatus' => $installationReport['ok'] ? ($health['status'] ?? 'unknown') : 'unhealthy',
             'checks' => $checks,
             'stats' => $stats,
             'routes' => $routeStatus,
@@ -460,7 +456,7 @@ class HealthController
 
         // API token check
         $apiToken = config('weathermapng.api_token');
-        if (!$apiToken) {
+        if (!$apiToken && config('weathermapng.enable_api_fallback', false)) {
             $issues[] = 'Configuration incomplete (API fallback may not work)';
         }
 

@@ -402,6 +402,22 @@ The embed view accepts a `?debugDots` URL parameter for render-pipeline diagnost
 
 Administrators can open **Network Maps → Diagnostics** (or visit `/plugin/WeathermapNG/diagnostics`) to see a consolidated operational status panel:
 
+The page includes a copyable installation support report. The same read-only checks
+work from the CLI even when plugin routes are unavailable. Run as the LibreNMS
+runtime user from the plugin directory:
+
+```bash
+LIBRENMS_PATH=/opt/librenms php verify-deployment.php --json
+```
+
+The report checks the selected LibreNMS root's Composer declaration and persistent
+plugin registry, loaded provider, enabled state, runtime routes, permissions, and
+database counts. Unavailable counts appear as `null` (Unknown), rather than zero.
+It includes token-configuration booleans without tokens, cookies, connection strings,
+or map topology. Each failed check gives a targeted next step; inspection performs
+no repairs. CLI results do not verify web PHP/opcode-cache freshness or authenticated
+browser access. A nonzero exit means at least one installation check failed.
+
 - Overall health status and plugin version
 - Map/node/link counts and estimated DB size
 - Per-check results for database, filesystem, dependencies, configuration, and performance

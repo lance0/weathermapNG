@@ -41,7 +41,7 @@ class DiagnosticsTest extends TestCase
     public function test_diagnostics_uses_route_has_for_status(): void
     {
         $this->assertStringContainsString('Route::has($r[\'route\'])', $this->controller);
-        $this->assertStringContainsString("if (!isset(\$r['url'])) {", $this->controller);
+        $this->assertStringContainsString("route(\$r['route'])", $this->controller);
         $this->assertStringContainsString("\$r['url'] = '#'", $this->controller);
     }
 
