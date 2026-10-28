@@ -9,6 +9,9 @@ permissions:
   contents: write
 
 jobs:
+  embed-auth:
+    uses: ./.github/workflows/embed-auth.yml
+
   # The full test suite must pass before a release is published — a tag
   # alone is not proof the tree is green.
   test:
@@ -36,7 +39,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: test
+    needs: [test, embed-auth]
 
     steps:
       - name: Checkout code

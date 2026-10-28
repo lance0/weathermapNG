@@ -59,6 +59,7 @@ class RenderController
         ];
 
         $demoMode = config('weathermapng.demo_mode', false);
+        $embedToken = $request->attributes->get('weathermapng.embed_token');
 
         $kiosk = $request->boolean('kiosk');
         $cycle = $request->input('cycle');
@@ -82,6 +83,7 @@ class RenderController
             'mapId',
             'liveData',
             'demoMode',
+            'embedToken',
             'kiosk',
             'cycleSeconds',
             'target',

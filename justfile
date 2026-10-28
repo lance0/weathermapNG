@@ -45,7 +45,7 @@ test-one name:
 test-integration:
     #!/usr/bin/env bash
     set -euo pipefail
-    for t in tests/integration_savemaprequest_test.php tests/integration_node_label_invariant_test.php tests/integration_version_test.php; do
+    for t in tests/integration_savemaprequest_test.php tests/integration_node_label_invariant_test.php tests/integration_version_test.php tests/integration_embed_auth_test.php; do
         echo "=== $t ==="
         docker exec -u librenms librenms-dev bash -c "cd /opt/librenms/html/plugins/WeathermapNG && php $t"
     done
@@ -170,7 +170,7 @@ release-bump version:
     r = r.replace(f'Version {old}', f'Version {new}')
     open('README.md', 'w').write(r)
     rm = open('ROADMAP.md').read()
-    rm = re.sub(r'Last reviewed v[\d.]+ \(\d{4}-\d{2}-\d{2}\)', f'Last reviewed v{new} ({__import__("datetime").date().today()})', rm, count=1)
+    rm = re.sub(r'Last reviewed v[\d.]+ \(\d{4}-\d{2}-\d{2}\)', f'Last reviewed v{new} ({__import__("datetime").date.today()})', rm, count=1)
     rm = re.sub(r'## Current Status: v[\d.]+', f'## Current Status: v{new}', rm, count=1)
     open('ROADMAP.md', 'w').write(rm)
     print(f'bumped {old} -> {new}')

@@ -45,7 +45,7 @@ class UIEmbedKioskTest extends TestCase
     {
         $this->assertStringContainsString('function initKioskMode()', $this->content);
         $this->assertStringContainsString('if (!WMNG_CONFIG.kioskEnabled) return;', $this->content);
-        $this->assertStringContainsString('window.setTimeout(() => { window.location.assign(nextUrl.toString()); }', $this->content);
+        $this->assertStringContainsString('window.setTimeout(() => { window.location.assign(embedUrl(nextUrl)); }', $this->content);
     }
 
     public function test_embed_click_through_uses_configurable_target(): void

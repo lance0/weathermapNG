@@ -27,6 +27,7 @@ anything fails.
    for all workflows in `.github/workflows/`:
    - `ci.yml`
    - `installation-tests.yml`
+   - `embed-auth.yml` (called by CI and the release workflow)
    - `release.yml` (validates on tag)
 
 5. **Run the manual QA checklist** (section 2 below).
@@ -51,6 +52,9 @@ the release.
   zoom and pan.
 - **Embed**: open an embedded map; confirm it renders; verify live updates via SSE;
   verify embed controls are present and functional.
+  CI's `embed-auth.yml` also checks real session cookies with token auth configured
+  and unconfigured, token-only access, route binding, and Chromium viewer navigation.
+  Run the HTTP checks locally with `just test-integration` against `librenms-dev`.
 - **Settings**: open the settings page; confirm it is admin-only (non-admin gets
   denied); confirm existing settings load and save.
 - **Install**: on a clean LibreNMS install, run `quick-install.sh`; confirm

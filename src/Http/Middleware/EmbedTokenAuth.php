@@ -4,6 +4,8 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Pipeline;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 /**
  * Allows map read endpoints to be consumed by external systems
@@ -13,39 +15,44 @@ use Illuminate\Http\Request;
  *   Authorization: Bearer <token>   (preferred)
  *   ?token=<token>                  (for <img>/iframe URLs)
  *
- * The token is compared in constant time against the configured
- * weathermapng.security.embed_token. When no token is configured, this
- * middleware rejects — routes using it must stay session-gated
- * (register them in the auth group instead, or both).
+ * Without a token, use the complete LibreNMS web/auth middleware stack.
+ * Explicit tokens require weathermapng.security.embed_token and are
+ * compared in constant time; they never fall back to session auth.
  *
  * Routes using this middleware must NOT sit in LibreNMS's 'web'
  * middleware group: that group includes session-user middleware
- * (VerifyUserEnabled, LoadUserPreferences) that rejects anonymous
- * requests before token auth runs. Register with this middleware only.
+ * (VerifyUserEnabled, LoadUserPreferences). Token requests only need
+ * route bindings. Register each URL once with this middleware only.
  */
 class EmbedTokenAuth
 {
     public function handle(Request $request, Closure $next)
     {
+        $presented = $this->extractToken($request);
+        if ($presented === null) {
+            return app(Pipeline::class)->send($request)
+                ->through(app('router')->resolveMiddleware(['web', 'auth']))
+                ->then($next);
+        }
+
         $configured = config('weathermapng.security.embed_token');
 
         if (empty($configured)) {
-            // Token auth not configured — deny. Operators who want
-            // token-gated embeds must set WEATHERMAPNG_EMBED_TOKEN;
-            // otherwise the session-gated routes remain the only path.
             abort(403, 'Embed token auth is not configured.');
         }
 
-        $presented = $this->extractToken($request);
-
-        if ($presented === null || !hash_equals((string) $configured, $presented)) {
+        if (!hash_equals((string) $configured, $presented)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid or missing embed token.',
             ], 401);
         }
 
-        return $next($request);
+        $request->attributes->set('weathermapng.embed_token', $presented);
+        $response = app(SubstituteBindings::class)->handle($request, $next);
+        $response->headers->set('Cache-Control', 'private, no-store, no-transform');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        return $response;
     }
 
     private function extractToken(Request $request): ?string
