@@ -1,12 +1,13 @@
 # Install, upgrade, and recover WeathermapNG
 
-This is the canonical guide for **v1.15.0**. Use the tagged release for a stable
+This is the canonical guide for **v1.15.1**. Use the tagged release for a stable
 installation; following `main` is an explicit development choice. WeathermapNG is
 a LibreNMS v2 Composer-discovered plugin, served at `/plugin/WeathermapNG`.
 
 Requirements: an initialized LibreNMS MySQL/MariaDB installation, PHP 8.2+ with
 `gd`, `json`, `pdo`, and `mbstring`, Composer, readable RRD files, and a checkout
-writable by the LibreNMS runtime user. Examples use `/opt/librenms` and user
+writable by the LibreNMS runtime user. Also meet your LibreNMS release's PHP
+minimum: the tested LibreNMS 26.10.2 release supports PHP 8.4 and 8.5. Examples use `/opt/librenms` and user
 `librenms`; substitute your actual installation root and runtime user.
 
 ## Native stable installation
@@ -17,7 +18,7 @@ Open a shell as the LibreNMS user, with that user's normal home:
 sudo -u librenms -H bash
 export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins"
-git clone --branch v1.15.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.15.1 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 ./quick-install.sh
 php verify-deployment.php --json
@@ -55,7 +56,7 @@ opcode freshness or authenticated browser access.
 From a host checkout of the selected release:
 
 ```bash
-git clone --branch v1.15.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.15.1 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 # Match ownership to PUID/PGID in the Compose file (defaults: 1000:1000).
 sudo chown -R 1000:1000 .
@@ -149,8 +150,8 @@ export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins/WeathermapNG"
 git diff --quiet
 git diff --cached --quiet
-git fetch origin tag v1.15.0
-git checkout --detach v1.15.0
+git fetch origin tag v1.15.1
+git checkout --detach v1.15.1
 ./deploy.sh
 exit
 ```
@@ -305,11 +306,24 @@ Rolling source back alone does not reverse database changes. Recovery uses the
 saved matching database/config/source set; it is not an automatic downgrade or
 OS recovery mechanism.
 
-WeathermapNG v1.15.0 was qualified against LibreNMS 26.10.1/PHP 8.4.21 in the
+The v1.15.0 container installation path was qualified against LibreNMS 26.10.1/PHP 8.4.21 in the
 disposable official-image stack (image ID and repository digest
 `sha256:661ad568d441edd157ced5c7a58a559b3c2bc34c3824b6e492f8bc13b8c70e9f`).
 Tests exercise actual `daily.sh post-pull`
 dependency restoration, populated app recreation, fail-stop registration failure,
 and full single-database restore into a second owned database plus a private
-configuration-archive roundtrip. These are matching-version container controls,
-not a full native Git pull, bare-metal upgrade, or general disaster-recovery test.
+configuration-archive roundtrip. These are matching-version container and recovery controls.
+
+Native smoke on 2026-10-28 used full Debian 13.7/PHP 8.4 and Ubuntu 26.04.1/PHP 8.5
+KVM guests with native MariaDB, nginx and PHP-FPM. Populated v1.14.1 installs were
+upgraded to v1.15.0, then LibreNMS's unmodified release-channel `daily.sh` advanced
+26.9.1.1 to 26.10.2 and ran again. The patch was separately checked on those hosts.
+Ubuntu package maintenance upgraded 30 packages and installed eight, including a
+new kernel. Debian was already current; an explicitly constructed baseline using
+official PHP 8.4.24 packages was verified before a normal security upgrade of 14
+packages to 8.4.27. Both guests rebooted and retained accounts, map data, settings,
+registration and authenticated editor/embed access. Cached/uncached middleware,
+Chromium editing, streaming, legacy dimensions and new version capture were tested.
+
+This covers those source and package paths. Major distribution migrations,
+existing production hosts and general OS disaster recovery were not exercised.

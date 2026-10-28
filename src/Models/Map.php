@@ -61,12 +61,12 @@ class Map extends Model
 
     public function getWidthAttribute()
     {
-        return data_get($this->options, 'width', 800);
+        return data_get($this->options, 'width', $this->attributes['width'] ?? 800);
     }
 
     public function getHeightAttribute()
     {
-        return data_get($this->options, 'height', 600);
+        return data_get($this->options, 'height', $this->attributes['height'] ?? 600);
     }
 
     public function getBackgroundAttribute()

@@ -3,6 +3,15 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-10-28
+
+### Fixed
+- Retain legacy map dimensions when options omit width or height. API reads, editor loading, and newly saved versions now fall back to the existing database columns before canvas defaults; explicit options still take precedence. Existing rows and saved-version history are preserved.
+
+### Changed
+- Extend the hosted Chromium regression to cover legacy canvas dimensions and modern options through editor save/reload and version capture.
+- Smoke the native installation path on full Ubuntu 26.04/PHP 8.5 and Debian 13/PHP 8.4 hosts, including the full LibreNMS stable updater, populated data, package maintenance, and reboot. Record the tested paths and limits in the installation guide.
+
 ## [1.15.0] - 2026-10-28
 
 ### Changed
