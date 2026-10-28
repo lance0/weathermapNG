@@ -4,7 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Pipeline\Pipeline;
+use Illuminate\Routing\Pipeline;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 
 /**

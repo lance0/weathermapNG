@@ -31,13 +31,15 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         const page = await context.newPage();
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
-        await page.goto(`${base}/login`);
+        await page.goto(`${base}/plugin/WeathermapNG/embed/${fixture.map}`);
+        assert.ok(new URL(page.url()).pathname.endsWith('/login'));
         await page.locator('[name=username]').fill(fixture.username);
         await page.locator('[name=password]').fill(fixture.password);
         await Promise.all([
             page.waitForURL(url => !url.pathname.endsWith('/login')),
             page.locator('button[type=submit]').click(),
         ]);
+        assert.ok(new URL(page.url()).pathname.endsWith(`/embed/${fixture.map}`));
         assert.equal((await page.goto(`${base}/plugin/WeathermapNG`)).status(), 200);
         await page.goto(`${base}/plugin/WeathermapNG/editor/${fixture.child}`);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
