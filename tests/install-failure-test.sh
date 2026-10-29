@@ -1,7 +1,7 @@
 #!/bin/bash
 # Exercise installer commands in an isolated checkout; no LibreNMS/database is touched.
 set -euo pipefail
-SOURCE="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE=${INSTALL_SOURCE:-$(cd "$(dirname "$0")/.." && pwd)}
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 PLUGIN="$WORK/plugin source"
@@ -14,7 +14,8 @@ mkdir -p "$PLUGIN/database" "$LIBRENMS_PATH/vendor" "$LIBRENMS_PATH/bootstrap" "
 cp "$SOURCE/quick-install.sh" "$SOURCE/deploy.sh" "$PLUGIN/"
 cp -r "$SOURCE/scripts" "$PLUGIN/"
 touch "$PLUGIN/composer.json" "$PLUGIN/database/setup.php" "$PLUGIN/verify-deployment.php"
-touch "$LIBRENMS_PATH/composer.json" "$LIBRENMS_PATH/artisan" "$LIBRENMS_PATH/vendor/autoload.php" "$LIBRENMS_PATH/bootstrap/app.php"
+printf '{}\n' > "$LIBRENMS_PATH/composer.json"
+touch "$LIBRENMS_PATH/artisan" "$LIBRENMS_PATH/vendor/autoload.php" "$LIBRENMS_PATH/bootstrap/app.php"
 cat > "$FAKE_BIN/id" <<'EOF'
 #!/bin/bash
 if [ "${1:-}" = -u ]; then echo 1000; else /usr/bin/id "$@"; fi
@@ -25,6 +26,20 @@ printf 'composer %s\n' "$*" >> "$INSTALL_LOG"
 case "${FAIL_STAGE:-}:$*" in
     dependencies:install*|repository:'config --global'*|migration:'config --unset'*) exit 21;;
 esac
+if [ "${1:-}" = config ]; then
+    "$REAL_PHP" -r '
+        $global = $argv[1] === "--global";
+        $file = $global ? getenv("COMPOSER_HOME") . "/config.json" : getenv("LIBRENMS_PATH") . "/composer.json";
+        $config = is_file($file) ? json_decode(file_get_contents($file), false, 512, JSON_THROW_ON_ERROR) : new stdClass;
+        $config->repositories ??= new stdClass;
+        if ($global) {
+            $config->repositories->weathermapng = json_decode($argv[2], false, 512, JSON_THROW_ON_ERROR);
+        } else {
+            unset($config->repositories->weathermapng);
+        }
+        file_put_contents($file, json_encode($config, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n");
+    ' -- "$2" "${4:-}"
+fi
 EOF
 cat > "$LIBRENMS_PATH/lnms" <<'EOF'
 #!/bin/bash
@@ -57,14 +72,26 @@ EOF
 chmod +x "$FAKE_BIN"/* "$LIBRENMS_PATH/lnms"
 export PATH="$FAKE_BIN:$PATH"
 for stage in dependencies repository migration registration discovery schema enable optimize:clear route:clear view:clear config:clear cache:clear report; do
+    rm -f "$COMPOSER_HOME/config.json"
     : > "$INSTALL_LOG"
     if FAIL_STAGE="$stage" bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then
         echo "FAIL: required failure $stage was ignored" >&2; exit 1
+    else
+        result=$?
     fi
+    case "$stage" in
+        dependencies|repository|migration) expected=21;;
+        registration|enable) expected=22;;
+        schema|discovery) expected=23;;
+        report) expected=25;;
+        *) expected=24;;
+    esac
+    [ "$result" -eq "$expected" ] || { echo "FAIL: $stage did not reach the injected failure (exit $result)" >&2; cat "$WORK/output" >&2; exit 1; }
     if grep -q 'Installation complete' "$WORK/output"; then echo "FAIL: false success for $stage" >&2; exit 1; fi
     grep -q 'Error:' "$WORK/output"
     echo "PASS: $stage fails explicitly"
 done
+rm -f "$COMPOSER_HOME/config.json"
 : > "$INSTALL_LOG"
 bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
 grep -q 'Installation complete' "$WORK/output"
@@ -95,3 +122,109 @@ echo 'PASS: archive upgrade uses the shared installer'
 if LIBRENMS_PATH="$WORK/missing" bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: missing selected root accepted' >&2; exit 1; fi
 [ ! -s "$INSTALL_LOG" ]
 echo 'PASS: missing selected root fails before dependency or database work'
+
+# Exercise repository ownership with actual JSON reads/writes in the isolated mock.
+repository_config() {
+    "$REAL_PHP" -r '
+        $config = ["config" => ["sort-packages" => true], "repositories" => ["unrelated" => ["type" => "vcs", "url" => "https://example.invalid/project"]]];
+        if ($argv[2] !== "") {
+            $config["repositories"]["weathermapng"] = ["type" => $argv[3], "url" => $argv[2], "options" => ["symlink" => false, "reference" => "none"]];
+        }
+        file_put_contents($argv[1], json_encode($config, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n");
+    ' "$1" "$2" "${3:-path}"
+}
+refuse_repository() {
+    cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+    cp "$LIBRENMS_PATH/composer.json" "$WORK/local.before"
+    : > "$INSTALL_LOG"
+    if bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: conflicting repository accepted' >&2; exit 1; fi
+    grep -q 'repositories.weathermapng' "$WORK/output"
+    if grep -Eq '^(composer |lnms |php database/)' "$INSTALL_LOG"; then echo 'FAIL: repository refusal followed mutation' >&2; exit 1; fi
+    cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+    cmp "$WORK/local.before" "$LIBRENMS_PATH/composer.json"
+}
+printf '{"http-basic":{"example.invalid":{"username":"fixture","password":"untouched"}}}\n' > "$COMPOSER_HOME/auth.json"
+cp "$COMPOSER_HOME/auth.json" "$WORK/auth.before"
+mkdir "$WORK/other-plugin"
+repository_config "$COMPOSER_HOME/config.json" "$WORK/other-plugin"
+repository_config "$LIBRENMS_PATH/composer.json" "$PLUGIN"
+refuse_repository
+echo 'PASS: conflicting global checkout is preserved before dependency mutation'
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN" vcs
+refuse_repository
+echo 'PASS: non-path global managed entry is preserved and refused'
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN"
+repository_config "$LIBRENMS_PATH/composer.json" "$WORK/other-plugin"
+refuse_repository
+echo 'PASS: conflicting local managed entry is preserved and refused'
+repository_config "$LIBRENMS_PATH/composer.json" "$PLUGIN" vcs
+refuse_repository
+echo 'PASS: non-path local managed entry is preserved and refused'
+repository_config "$LIBRENMS_PATH/composer.json" ""
+for invalid in '{broken' '[]' '{"repositories":null}' '{"repositories":{"weathermapng":false}}'; do
+    printf '%s\n' "$invalid" > "$COMPOSER_HOME/config.json"
+    refuse_repository
+done
+echo 'PASS: malformed configuration and invalid managed entries fail closed'
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN"
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+chmod 000 "$COMPOSER_HOME/config.json"
+: > "$INSTALL_LOG"
+if bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: unreadable global configuration accepted' >&2; exit 1; fi
+chmod 600 "$COMPOSER_HOME/config.json"
+grep -q 'repositories.weathermapng' "$WORK/output"
+if grep -q '^composer ' "$INSTALL_LOG"; then echo 'FAIL: unreadable configuration reached Composer' >&2; exit 1; fi
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+echo 'PASS: unreadable global configuration is preserved and refused'
+ln -s "$PLUGIN" "$WORK/plugin-alias"
+for url in "$PLUGIN" "$PLUGIN/." "$WORK/plugin-alias" '../plugin source'; do
+    repository_config "$COMPOSER_HOME/config.json" "$url"
+    cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+    : > "$INSTALL_LOG"
+    bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+    cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+    if grep -q '^composer config --global' "$INSTALL_LOG"; then echo 'FAIL: compatible repository was rewritten' >&2; exit 1; fi
+done
+echo 'PASS: repeat installs preserve global URL spelling, options, and unrelated settings'
+repository_config "$COMPOSER_HOME/config.json" "$WORK/plugin-alias"
+repository_config "$LIBRENMS_PATH/composer.json" '../plugin source'
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+cp "$LIBRENMS_PATH/composer.json" "$WORK/local.before"
+: > "$INSTALL_LOG"
+if FAIL_STAGE=registration bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: registration failure ignored' >&2; exit 1; else result=$?; fi
+[ "$result" -eq 22 ]
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+cmp "$WORK/local.before" "$LIBRENMS_PATH/composer.json"
+if grep -q '^composer config --unset' "$INSTALL_LOG"; then echo 'FAIL: local lookup removed before successful registration' >&2; exit 1; fi
+echo 'PASS: failed registration preserves existing global and local migration entries'
+rm "$COMPOSER_HOME/config.json"
+if FAIL_STAGE=registration bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: fresh registration failure ignored' >&2; exit 1; else result=$?; fi
+[ "$result" -eq 22 ]
+cmp "$WORK/local.before" "$LIBRENMS_PATH/composer.json"
+test -f "$COMPOSER_HOME/config.json"
+echo 'PASS: failed fresh registration retains the local lookup and newly created global entry'
+rm "$COMPOSER_HOME/config.json"
+: > "$INSTALL_LOG"
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+"$REAL_PHP" -r '
+    $global = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+    $local = json_decode(file_get_contents($argv[2]), true, 512, JSON_THROW_ON_ERROR);
+    if (($global["repositories"]["weathermapng"]["url"] ?? null) !== $argv[3]
+        || isset($local["repositories"]["weathermapng"])
+        || ($local["config"]["sort-packages"] ?? null) !== true
+        || ($local["repositories"]["unrelated"]["url"] ?? null) !== "https://example.invalid/project") {
+        exit(1);
+    }
+' "$COMPOSER_HOME/config.json" "$LIBRENMS_PATH/composer.json" "$PLUGIN"
+echo 'PASS: successful local-only migration creates global lookup and preserves unrelated local settings'
+repository_config "$COMPOSER_HOME/config.json" ""
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+"$REAL_PHP" -r '
+    $config = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+    if (($config["config"]["sort-packages"] ?? null) !== true
+        || ($config["repositories"]["unrelated"]["url"] ?? null) !== "https://example.invalid/project") {
+        exit(1);
+    }
+' "$COMPOSER_HOME/config.json"
+cmp "$WORK/auth.before" "$COMPOSER_HOME/auth.json"
+echo 'PASS: adding the managed entry preserves unrelated global repositories and authentication'
