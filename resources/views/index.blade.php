@@ -98,6 +98,7 @@
                      data-tags="{{ json_encode($map->tags) }}">
                     <div class="map-card">
                         <div class="map-card-preview">
+                            <div class="topology-preview" data-topology-preview="{{ json_encode($previews[$map->id]) }}"></div>
                             <div class="map-card-dimensions">
                                 <i class="fas fa-expand-arrows-alt" aria-hidden="true"></i>
                                 {{ $map->width ?? 800 }} &times; {{ $map->height ?? 600 }}
@@ -206,7 +207,6 @@
             </button>
         </div>
     </div>
-</div>
 
 <!-- Create Map Modal -->
 <div class="modal fade" id="createMapModal" tabindex="-1" role="dialog" aria-labelledby="createMapModalTitle">
@@ -371,6 +371,7 @@
     @csrf
     @method('DELETE')
 </form>
+</div>
 @endsection
 
 @section('scripts')
@@ -393,5 +394,6 @@
         WMNG.observeTheme('.wmng-index');
     }
 </script>
+<script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/topology-preview.js') }}"></script>
 <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/index-app.js') }}"></script>
 @endsection

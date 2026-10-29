@@ -22,6 +22,10 @@ if (window.WMNG && typeof WMNG.ensureUiHelpers === 'function') {
     if (window.WMNG && typeof WMNG.observeTheme === 'function') {
         WMNG.observeTheme('.wmng-index');
     }
+document.querySelectorAll('[data-topology-preview]').forEach(container => {
+    WMNG.TopologyPreview.render(container, JSON.parse(container.dataset.topologyPreview));
+});
+
 let pendingDeleteMapId = null;
 
 function getCsrfToken() {
@@ -343,9 +347,7 @@ function renderTemplates(templates) {
         card.className = 'col-md-6 col-lg-4';
         card.innerHTML = `
             <button type="button" class="template-card" data-template-id="${escapeHtml(String(template.id))}" aria-label="Use template ${escapeHtml(template.title || template.name)}">
-                <span class="template-card-icon">
-                    <i class="${escapeHtml(template.icon || 'fas fa-map')}"></i>
-                </span>
+                <span class="topology-preview template-topology-preview"></span>
                 <span class="template-card-title">${escapeHtml(template.title || template.name)}</span>
                 <span class="template-card-desc">${escapeHtml(template.description || '')}</span>
                 <span class="template-card-meta">
@@ -359,6 +361,7 @@ function renderTemplates(templates) {
                 </span>
             </button>
         `;
+        WMNG.TopologyPreview.render(card.querySelector('.topology-preview'), WMNG.TopologyPreview.templateGraph(template));
         grid.appendChild(card);
     });
 }
