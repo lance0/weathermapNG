@@ -51,12 +51,16 @@ $('#createMapForm').on('submit', function(e) {
         method: 'POST',
         body: formData,
         headers: {
-            'X-CSRF-TOKEN': getCsrfToken()
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest'
         }
     })
     .then(response => {
         if (!response.ok) {
-            throw new Error('HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+            return response.json().catch(() => ({})).then(data => {
+                throw new Error(data?.message || data?.error || 'HTTP ' + response.status + (response.statusText ? ' ' + response.statusText : ''));
+            });
         }
         return response.json();
     })
@@ -70,11 +74,11 @@ $('#createMapForm').on('submit', function(e) {
                 location.reload();
             }
         } else {
-            WMNGToast.error('Error: ' + (data.message || 'Unknown error'));
+            WMNGToast.error('Error: ' + escapeHtml(data.message || 'Unknown error'));
         }
     })
     .catch(error => {
-        WMNGToast.error('Error: ' + error.message);
+        WMNGToast.error('Error: ' + escapeHtml(error.message));
     })
     .finally(() => {
         submitBtn.disabled = false;
