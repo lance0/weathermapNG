@@ -57,9 +57,24 @@ key, preserving unrelated repositories. LibreNMS records the requirement in
 runtime user/home so the repository remains discoverable. Do not replace this
 flow with a root-only `composer require` or manual database inserts.
 
+On unreleased `main`, installation refuses an existing managed repository entry
+that selects another checkout, has an unsupported type, or contains ambiguous
+glob paths. Use the existing checkout, or back up and deliberately correct only
+the `weathermapng` entry in the runtime user's Composer configuration before
+retrying. Object and named-list repository formats and equivalent home,
+environment and symlink paths are supported. Compatible global entries retain
+their stored options; the legacy local entry is removed only after successful
+registration. A failed fresh install can retain its newly created global entry.
+This does not roll back root Composer files, dependencies or database changes.
+
 After success, log in to LibreNMS and open `/plugin/WeathermapNG`, then open an
 existing map in the editor and embed viewer. CLI success cannot verify PHP-FPM
 opcode freshness or authenticated browser access.
+
+On unreleased `main`, an empty index also offers **Create Sample Map**. Enter a
+unique name to create the device-free Star Topology example, then associate its
+nodes and links with your devices and ports in the editor. Canceling creates no
+data. **Browse Templates**, **Create Custom Map**, and import remain available.
 
 ## Docker stable installation
 

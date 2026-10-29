@@ -31,11 +31,24 @@ if [ "${1:-}" = config ]; then
         $global = $argv[1] === "--global";
         $file = $global ? getenv("COMPOSER_HOME") . "/config.json" : getenv("LIBRENMS_PATH") . "/composer.json";
         $config = is_file($file) ? json_decode(file_get_contents($file), false, 512, JSON_THROW_ON_ERROR) : new stdClass;
-        $config->repositories ??= new stdClass;
+        $config->repositories ??= [];
         if ($global) {
-            $config->repositories->weathermapng = json_decode($argv[2], false, 512, JSON_THROW_ON_ERROR);
+            $repositories = [];
+            foreach ($config->repositories as $name => $entry) {
+                if ($name === "weathermapng" || ($entry->name ?? null) === "weathermapng") continue;
+                if (is_string($name) && is_object($entry)) $entry->name ??= $name;
+                $repositories[] = $entry;
+            }
+            $entry = json_decode($argv[2], false, 512, JSON_THROW_ON_ERROR);
+            $entry->name = "weathermapng";
+            array_unshift($repositories, $entry);
+            $config->repositories = $repositories;
         } else {
-            unset($config->repositories->weathermapng);
+            if (is_array($config->repositories)) {
+                $config->repositories = array_values(array_filter($config->repositories, fn($entry) => ($entry->name ?? null) !== "weathermapng"));
+            } else {
+                unset($config->repositories->weathermapng);
+            }
         }
         file_put_contents($file, json_encode($config, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n");
     ' -- "$2" "${4:-}"
@@ -139,8 +152,12 @@ repository_config() {
         if ($argv[2] !== "") {
             $config["repositories"]["weathermapng"] = ["type" => $argv[3], "url" => $argv[2], "options" => ["symlink" => false, "reference" => "none"]];
         }
+        if (($argv[4] ?? "assoc") === "list") {
+            $config["repositories"] = array_map(fn($name, $entry) => ["name" => $name] + $entry,
+                array_keys($config["repositories"]), array_values($config["repositories"]));
+        }
         file_put_contents($argv[1], json_encode($config, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n");
-    ' "$1" "$2" "${3:-path}"
+    ' "$1" "$2" "${3:-path}" "${4:-assoc}"
 }
 refuse_repository() {
     cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
@@ -218,7 +235,8 @@ bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
 "$REAL_PHP" -r '
     $global = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
     $local = json_decode(file_get_contents($argv[2]), true, 512, JSON_THROW_ON_ERROR);
-    if (($global["repositories"]["weathermapng"]["url"] ?? null) !== $argv[3]
+    if (($global["repositories"][0]["name"] ?? null) !== "weathermapng"
+        || ($global["repositories"][0]["url"] ?? null) !== $argv[3]
         || isset($local["repositories"]["weathermapng"])
         || ($local["config"]["sort-packages"] ?? null) !== true
         || ($local["repositories"]["unrelated"]["url"] ?? null) !== "https://example.invalid/project") {
@@ -231,12 +249,90 @@ bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
 "$REAL_PHP" -r '
     $config = json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
     if (($config["config"]["sort-packages"] ?? null) !== true
-        || ($config["repositories"]["unrelated"]["url"] ?? null) !== "https://example.invalid/project") {
+        || ($config["repositories"][1]["name"] ?? null) !== "unrelated"
+        || ($config["repositories"][1]["url"] ?? null) !== "https://example.invalid/project") {
         exit(1);
     }
 ' "$COMPOSER_HOME/config.json"
 cmp "$WORK/auth.before" "$COMPOSER_HOME/auth.json"
 echo 'PASS: adding the managed entry preserves unrelated global repositories and authentication'
+
+# Composer config writes named repositories as list entries, including on a fresh install.
+repository_config "$LIBRENMS_PATH/composer.json" ""
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+: > "$INSTALL_LOG"
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+if grep -q '^composer config --global' "$INSTALL_LOG"; then echo 'FAIL: repeat install rewrote Composer list entry' >&2; exit 1; fi
+echo 'PASS: fresh Composer list entry is preserved on repeat install'
+
+repository_config "$COMPOSER_HOME/config.json" "$WORK/other-plugin" path list
+refuse_repository
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN" vcs list
+refuse_repository
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN" path list
+repository_config "$LIBRENMS_PATH/composer.json" "$WORK/other-plugin" path list
+refuse_repository
+repository_config "$LIBRENMS_PATH/composer.json" "$PLUGIN" vcs list
+refuse_repository
+repository_config "$LIBRENMS_PATH/composer.json" ""
+printf '{"repositories":[{"weathermapng":false}]}\n' > "$COMPOSER_HOME/config.json"
+refuse_repository
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN" path list
+"$REAL_PHP" -r '$data=json_decode(file_get_contents($argv[1])); $data->repositories[]=clone $data->repositories[1]; file_put_contents($argv[1], json_encode($data));' "$COMPOSER_HOME/config.json"
+refuse_repository
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN"
+"$REAL_PHP" -r '$data=json_decode(file_get_contents($argv[1])); $data->repositories->weathermapng->name="another-repository"; file_put_contents($argv[1], json_encode($data));' "$COMPOSER_HOME/config.json"
+refuse_repository
+repository_config "$COMPOSER_HOME/config.json" "$WORK/plugin-*" path list
+refuse_repository
+ln -s "$PLUGIN" "$WORK/plugin[0]-alias"
+repository_config "$COMPOSER_HOME/config.json" "$WORK/plugin[0]-alias" path list
+refuse_repository
+echo 'PASS: conflicting, disabled, duplicate, and wildcard Composer list entries fail before dependencies'
+
+export WMNG_TEST_CHECKOUT="$PLUGIN"
+# Literal aliases are expanded by Composer, not the shell.
+# shellcheck disable=SC2088,SC2016
+for url in "$PLUGIN" "$WORK/plugin-alias" '../plugin source' '$WMNG_TEST_CHECKOUT' '%WMNG_TEST_CHECKOUT%' '~/plugin source'; do
+    repository_config "$COMPOSER_HOME/config.json" "$url" path list
+    cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+    : > "$INSTALL_LOG"
+    HOME="$WORK" bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+    cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+    if grep -q '^composer config --global' "$INSTALL_LOG"; then echo 'FAIL: compatible Composer list alias was rewritten' >&2; exit 1; fi
+done
+echo 'PASS: Composer list URLs and supported path aliases preserve original bytes'
+
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN" path list
+repository_config "$LIBRENMS_PATH/composer.json" '../plugin source' path list
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+cp "$LIBRENMS_PATH/composer.json" "$WORK/local.before"
+: > "$INSTALL_LOG"
+if FAIL_STAGE=registration bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: registration failure ignored for list repository' >&2; exit 1; else result=$?; fi
+[ "$result" -eq 22 ]
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+cmp "$WORK/local.before" "$LIBRENMS_PATH/composer.json"
+if grep -q '^composer config --unset' "$INSTALL_LOG"; then echo 'FAIL: local list entry removed before registration' >&2; exit 1; fi
+: > "$INSTALL_LOG"
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+"$REAL_PHP" -r '
+    $config=json_decode(file_get_contents($argv[1]), true, 512, JSON_THROW_ON_ERROR);
+    $names=array_column($config["repositories"], "name");
+    if (in_array("weathermapng", $names, true) || !in_array("unrelated", $names, true)) exit(1);
+' "$LIBRENMS_PATH/composer.json"
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+echo 'PASS: local Composer list entry migrates only after successful registration'
+
+cp -R "$PLUGIN" "$WORK/plugin[0]"
+printf '{}\n' > "$COMPOSER_HOME/config.json"
+repository_config "$LIBRENMS_PATH/composer.json" ""
+: > "$INSTALL_LOG"
+if bash "$WORK/plugin[0]/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: glob-like selected checkout path accepted' >&2; exit 1; fi
+grep -q 'move it to a plain path' "$WORK/output"
+if grep -Eq '^(composer |lnms |php database/)' "$INSTALL_LOG"; then echo 'FAIL: glob-like checkout reached dependency mutation' >&2; exit 1; fi
+printf '{}\n' | cmp - "$COMPOSER_HOME/config.json"
+echo 'PASS: fresh checkout path with glob characters fails before dependencies'
 
 # A real local remote has a pending fast-forward throughout every failed preflight.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1

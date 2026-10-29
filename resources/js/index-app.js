@@ -192,6 +192,17 @@ document.addEventListener('click', function(e) {
     selectTemplate(card.dataset.templateId);
 });
 
+document.getElementById('createSampleMapBtn')?.addEventListener('click', function() {
+    this.disabled = true;
+    const ready = templatesLoaded ? Promise.resolve() : loadTemplates();
+    ready.then(() => {
+        const sample = templatesData.find(template => template.name === 'star-topology');
+        if (!sample) throw new Error('Star Topology template is unavailable');
+        return selectTemplate(sample.id);
+    }).catch(error => WMNGToast.error('Error: ' + error.message))
+      .finally(() => { this.disabled = false; });
+});
+
 document.getElementById('confirmDeleteMapBtn')?.addEventListener('click', function() {
     if (!pendingDeleteMapId) return;
 
@@ -287,7 +298,7 @@ function loadTemplates() {
     grid.style.display = 'none';
     error.style.display = 'none';
 
-    fetch(`${WMNG_INDEX_URLS.templates}`, {
+    return fetch(`${WMNG_INDEX_URLS.templates}`, {
         headers: {
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
@@ -303,12 +314,13 @@ function loadTemplates() {
         renderTemplates(templatesData);
         templatesLoaded = true;
         loading.style.display = 'none';
-        grid.style.display = 'flex';
+        grid.style.display = 'block';
     })
     .catch(err => {
         console.error('Templates load error:', err);
         loading.style.display = 'none';
         error.style.display = '';
+        throw err;
     });
 }
 
@@ -360,7 +372,7 @@ function selectTemplate(templateId) {
 
     const cleanName = mapName.trim().toLowerCase().replace(/[^a-z0-9\-_]/g, '-');
 
-    createMapFromTemplate(templateId, cleanName);
+    return createMapFromTemplate(templateId, cleanName);
 }
 
 function createMapFromTemplate(templateId, mapName) {
@@ -368,7 +380,7 @@ function createMapFromTemplate(templateId, mapName) {
     grid.style.opacity = '0.5';
     grid.style.pointerEvents = 'none';
 
-    fetch(`${WMNG_INDEX_URLS.templates}/${templateId}/create-map`, {
+    return fetch(`${WMNG_INDEX_URLS.templates}/${templateId}/create-map`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -412,9 +424,14 @@ function escapeHtml(text) {
 }
 
 // Load templates when modal opens
+$('#createMapModal').on('show.bs.modal', function(event) {
+    const tab = event.relatedTarget?.dataset.createTab === 'custom' ? 'custom' : 'templates';
+    $(`#${tab}-tab`).tab('show');
+});
+
 $('#createMapModal').on('shown.bs.modal', function() {
     if (!templatesLoaded) {
-        loadTemplates();
+        loadTemplates().catch(() => {});
     }
 });
 
