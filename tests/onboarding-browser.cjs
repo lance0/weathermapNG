@@ -75,8 +75,24 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         assert.equal(count(), 0);
 
         page.once('dialog', dialog => dialog.accept(name));
+        let releasePost;
+        const postBarrier = new Promise(resolve => { releasePost = resolve; });
+        await page.route('**/templates/*/create-map', async route => {
+            await postBarrier;
+            await route.continue();
+        });
+        const postRequest = page.waitForRequest(request => request.url().endsWith('/create-map') && request.method() === 'POST');
         const created = page.waitForResponse(response => response.url().includes('/templates/') && response.url().endsWith('/create-map') && response.request().method() === 'POST');
-        await page.getByRole('button', { name: 'Create a sample map from the Star Topology template' }).click();
+        try {
+            const clicked = page.getByRole('button', { name: 'Create a sample map from the Star Topology template' }).click();
+            await postRequest;
+            assert.equal(await page.locator('#createSampleMapBtn').isDisabled(), true);
+            assert.equal(count(), 0);
+            releasePost();
+            await clicked;
+        } finally {
+            releasePost();
+        }
         const response = await created;
         assert.equal(response.status(), 201);
         await page.waitForURL(/\/editor\/\d+$/);

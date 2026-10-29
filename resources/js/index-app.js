@@ -198,7 +198,7 @@ document.getElementById('createSampleMapBtn')?.addEventListener('click', functio
     ready.then(() => {
         const sample = templatesData.find(template => template.name === 'star-topology');
         if (!sample) throw new Error('Star Topology template is unavailable');
-        selectTemplate(sample.id);
+        return selectTemplate(sample.id);
     }).catch(error => WMNGToast.error('Error: ' + error.message))
       .finally(() => { this.disabled = false; });
 });
@@ -372,7 +372,7 @@ function selectTemplate(templateId) {
 
     const cleanName = mapName.trim().toLowerCase().replace(/[^a-z0-9\-_]/g, '-');
 
-    createMapFromTemplate(templateId, cleanName);
+    return createMapFromTemplate(templateId, cleanName);
 }
 
 function createMapFromTemplate(templateId, mapName) {
@@ -380,7 +380,7 @@ function createMapFromTemplate(templateId, mapName) {
     grid.style.opacity = '0.5';
     grid.style.pointerEvents = 'none';
 
-    fetch(`${WMNG_INDEX_URLS.templates}/${templateId}/create-map`, {
+    return fetch(`${WMNG_INDEX_URLS.templates}/${templateId}/create-map`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
