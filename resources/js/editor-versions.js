@@ -14,6 +14,7 @@ var S = window.WMNG.EditorState;
     const API_VERSIONS = S.uris.versions;
 
     let versionsCache = [];
+    let diffRequest = 0;
 
     function csrfHeaders() {
         return { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': WMNG.getCsrfToken() };
@@ -128,8 +129,16 @@ var S = window.WMNG.EditorState;
     }
 
     function clearDiff() {
+        diffRequest++;
+        const visual = document.getElementById('versionDiffVisual');
+        if (visual) visual.replaceChildren();
+        const status = document.getElementById('versionDiffStatus');
+        if (status) status.textContent = '';
         const area = document.getElementById('versionDiffArea');
-        if (area) area.style.display = 'none';
+        if (area) {
+            area.style.display = 'none';
+            area.setAttribute('aria-busy', 'false');
+        }
         const summary = document.getElementById('diffSummary');
         if (summary) summary.innerHTML = '';
         const n1 = document.getElementById('diffVersion1Name');
@@ -186,12 +195,26 @@ var S = window.WMNG.EditorState;
     }
 
     function loadDiff(v1Id, v2Id) {
+        clearDiff();
+        const request = diffRequest;
+        const area = document.getElementById('versionDiffArea');
+        const status = document.getElementById('versionDiffStatus');
+        area.style.display = '';
+        area.setAttribute('aria-busy', 'true');
+        status.textContent = 'Loading comparison…';
         WMNG.fetchJson(`${API_VERSIONS}/${v1Id}/compare/${v2Id}`)
             .then(data => {
+                if (request !== diffRequest) return;
                 renderDiff(data, v1Id, v2Id);
+                status.textContent = '';
             })
             .catch(() => {
+                if (request !== diffRequest) return;
+                status.textContent = 'Failed to load comparison. Choose versions and try again.';
                 toast('error', 'Failed to load comparison', { duration: 3000 });
+            })
+            .finally(() => {
+                if (request === diffRequest) area.setAttribute('aria-busy', 'false');
             });
     }
 
@@ -200,8 +223,9 @@ var S = window.WMNG.EditorState;
         if (!area) return;
         area.style.display = '';
 
-        const v1 = versionsCache.find(x => x.id === v1Id);
-        const v2 = versionsCache.find(x => x.id === v2Id);
+        WMNG.VersionComparison.render(document.getElementById('versionDiffVisual'), diff);
+        const v1 = diff.version1;
+        const v2 = diff.version2;
         const n1 = document.getElementById('diffVersion1Name');
         const n2 = document.getElementById('diffVersion2Name');
         if (n1) n1.textContent = v1 ? (v1.name || `Version ${v1.id}`) : `Version ${v1Id}`;
@@ -231,6 +255,7 @@ var S = window.WMNG.EditorState;
             li.appendChild(valSpan);
             summary.appendChild(li);
         });
+        area.scrollIntoView({ block: 'start' });
     }
 
     function saveVersion() {
@@ -332,6 +357,8 @@ var S = window.WMNG.EditorState;
             fetchVersions();
         });
     }
+
+    $('#versionHistoryModal').on('hidden.bs.modal', clearDiff);
 
     // Save version
     const saveVersionBtn = document.getElementById('saveVersionBtn');

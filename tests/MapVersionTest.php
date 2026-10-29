@@ -3,18 +3,52 @@
 namespace LibreNMS\Plugins\WeathermapNG\Tests;
 
 use PHPUnit\Framework\TestCase;
+use LibreNMS\Plugins\WeathermapNG\Models\MapVersion;
+use LibreNMS\Plugins\WeathermapNG\Services\MapVersionService;
+use LibreNMS\Plugins\WeathermapNG\Services\WebhookDispatcher;
 
 /**
  * Tests for MapVersionService diff logic and versioning infrastructure.
  *
- * The diff logic (getAddedRemovedIds, getModifiedIds) is tested as pure
- * functions since it mirrors array_diff semantics. The service/controller
- * classes depend on Laravel FormRequest/Controller which aren't in the
- * plugin's dev deps, so we test via file-content checks rather than
- * class_exists (which would trigger autoloading of missing parents).
+ * Comparison behavior runs against the service with in-memory snapshots.
+ * Controller wiring uses file-content checks because Laravel's full HTTP
+ * stack is only available in the separate LibreNMS integration tests.
  */
 class MapVersionTest extends TestCase
 {
+    public function testCompareUsesRecordIdsForBothListAndKeyedSnapshots(): void
+    {
+        $service = new MapVersionService($this->createMock(WebhookDispatcher::class));
+        $before = [
+            'nodes' => [['id' => 11, 'x' => 10], ['id' => 12, 'x' => 20]],
+            'links' => [['id' => 21, 'bandwidth_bps' => 100], ['id' => 22, 'bandwidth_bps' => 200]],
+        ];
+        $after = [
+            'nodes' => [['id' => 11, 'x' => 15], ['id' => 13, 'x' => 30]],
+            'links' => [['id' => 21, 'bandwidth_bps' => 150], ['id' => 23, 'bandwidth_bps' => 300]],
+        ];
+        foreach ([false, true] as $keyedBefore) {
+            foreach ([false, true] as $keyedAfter) {
+                $a = $before;
+                $b = $after;
+                foreach (['nodes', 'links'] as $type) {
+                    if ($keyedBefore) $a[$type] = array_column($a[$type], null, 'id');
+                    if ($keyedAfter) $b[$type] = array_column($b[$type], null, 'id');
+                }
+                $v1 = new MapVersion(['config_snapshot' => $a]);
+                $v2 = new MapVersion(['config_snapshot' => $b]);
+                $this->assertSame([
+                    'nodes_added' => [13], 'nodes_removed' => [12], 'nodes_modified' => [11],
+                    'links_added' => [23], 'links_removed' => [22], 'links_modified' => [21],
+                ], $service->compareVersions($v1, $v2));
+                $this->assertSame([
+                    'nodes_added' => [12], 'nodes_removed' => [13], 'nodes_modified' => [11],
+                    'links_added' => [22], 'links_removed' => [23], 'links_modified' => [21],
+                ], $service->compareVersions($v2, $v1));
+            }
+        }
+    }
+
     public function testMapVersionServiceFileExists(): void
     {
         $this->assertFileExists(__DIR__ . '/../src/Services/MapVersionService.php');

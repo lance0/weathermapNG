@@ -111,6 +111,22 @@ selected map, independently of the list's display limit. It retains complete
 snapshots and available creator names. This export remains a map-history feature;
 follow the installation guide for full database and configuration backups.
 
+## Visual Comparison on Unreleased Main
+
+In Version History, choose **Compare** on one version, select another, and run
+the comparison. The left view is before; the right view is after. Added, removed
+and modified nodes/links have text markers and colors. Both views share a scale
+so position changes remain visible. The table shows before/after map options,
+node fields and link configuration.
+
+Fields that older snapshots did not capture are marked unavailable. A recorded
+`null` remains distinct from an unset or unrecorded value. Matching uses saved
+node/link IDs: editor saves can replace IDs, so some edits appear as removals and
+additions. The preview draws straight links; saved bends and styling appear in
+the details. Each view displays up to 100 nodes and 150 links, with up to 200
+detail rows and explicit omitted/invalid counts. These are display limits; the
+response still contains the complete snapshots. Comparing changes no saved data.
+
 ## Planned Versioning Work
 
 The following items are planned, not yet implemented:

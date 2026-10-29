@@ -312,6 +312,11 @@ The unreleased history export includes all versions for the selected map,
 independently of list limits, with complete snapshots and available creator and
 exporter names. It remains administrator-only and does not change saved rows.
 
+Comparison keeps the six existing ID-change lists and both version snapshots in
+the response. The unreleased editor renders side-by-side geometry and field
+differences from that data, including explicit unavailable historical fields.
+List-shaped and ID-keyed snapshots both compare by each record's saved ID.
+
 
 ## Webhooks
 
