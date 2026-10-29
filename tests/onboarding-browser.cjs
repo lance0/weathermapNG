@@ -44,8 +44,13 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.getByRole('link', { name: 'Open diagnostics' }).count().then(n => assert.equal(n, 1));
         await page.getByRole('link', { name: 'Read installation and recovery documentation' }).count().then(n => assert.equal(n, 1));
 
+        await page.route('**/plugin/WeathermapNG/templates', route => route.fulfill({ status: 503, body: '{}' }));
         await page.getByRole('button', { name: 'Browse map templates' }).click();
         await page.locator('#templatesPane.active').waitFor();
+        await page.locator('#templatesError').waitFor({ state: 'visible' });
+        assert.equal(count(), 0);
+        await page.unroute('**/plugin/WeathermapNG/templates');
+        await page.locator('#templatesError a').click();
         await page.locator('#templatesGrid [data-template-id]').first().waitFor();
         assert.ok(new URL(page.url()).pathname.endsWith('/WeathermapNG'));
         await page.keyboard.press('Escape');
@@ -68,9 +73,8 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.getByRole('button', { name: 'Create a sample map from the Star Topology template' }).click();
         const response = await created;
         assert.equal(response.status(), 201);
-        const body = await response.json();
-        const mapId = body.map.id;
-        await page.waitForURL(url => url.pathname.endsWith(`/editor/${mapId}`));
+        await page.waitForURL(/\/editor\/\d+$/);
+        const mapId = Number(new URL(page.url()).pathname.match(/\/editor\/(\d+)$/)[1]);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         const graph = await (await page.request.get(`${base}/plugin/WeathermapNG/api/maps/${mapId}/json`)).json();
         assert.equal(graph.name, name);

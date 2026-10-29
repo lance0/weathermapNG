@@ -247,7 +247,7 @@
                         <div id="templatesGrid" class="row" style="display: none;"></div>
                         <div id="templatesError" class="alert alert-warning" style="display: none;">
                             <i class="fas fa-exclamation-triangle mr-2"></i>
-                            <span>Failed to load templates. <a href="#" onclick="loadTemplates(); return false;">Retry</a></span>
+                            <span>Failed to load templates. <a href="#" onclick="loadTemplates().catch(() => {}); return false;">Retry</a></span>
                         </div>
                     </div>
                 </div>
