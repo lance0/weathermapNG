@@ -29,6 +29,8 @@ test "$(ps -p 1 -o comm=)" = systemd
 test ! -e /.dockerenv
 test ! -e "$root"
 test -r "$fixture"
+# Runtime commands must not inherit the runner's potentially private workspace.
+cd /
 
 as_librenms() { sudo -u librenms -H "$@"; }
 logged() {
