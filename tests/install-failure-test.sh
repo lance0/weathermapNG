@@ -277,6 +277,9 @@ repository_config "$COMPOSER_HOME/config.json" "$PLUGIN"
 refuse_repository
 repository_config "$COMPOSER_HOME/config.json" "$WORK/plugin-*" path list
 refuse_repository
+ln -s "$PLUGIN" "$WORK/plugin[0]-alias"
+repository_config "$COMPOSER_HOME/config.json" "$WORK/plugin[0]-alias" path list
+refuse_repository
 echo 'PASS: conflicting, disabled, duplicate, and wildcard Composer list entries fail before dependencies'
 
 export WMNG_TEST_CHECKOUT="$PLUGIN"
@@ -311,3 +314,13 @@ bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
 ' "$LIBRENMS_PATH/composer.json"
 cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
 echo 'PASS: local Composer list entry migrates only after successful registration'
+
+cp -R "$PLUGIN" "$WORK/plugin[0]"
+printf '{}\n' > "$COMPOSER_HOME/config.json"
+repository_config "$LIBRENMS_PATH/composer.json" ""
+: > "$INSTALL_LOG"
+if bash "$WORK/plugin[0]/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: glob-like selected checkout path accepted' >&2; exit 1; fi
+grep -q 'move it to a plain path' "$WORK/output"
+if grep -Eq '^(composer |lnms |php database/)' "$INSTALL_LOG"; then echo 'FAIL: glob-like checkout reached dependency mutation' >&2; exit 1; fi
+printf '{}\n' | cmp - "$COMPOSER_HOME/config.json"
+echo 'PASS: fresh checkout path with glob characters fails before dependencies'

@@ -72,6 +72,10 @@ acquire_install_locks() {
 prepare_install_repository() {
     php -r '
     try {
+        $file = $argv[3];
+        if (strpbrk($argv[3], "*?{}[]") !== false) {
+            throw new RuntimeException("selected checkout path contains glob characters; move it to a plain path before retrying");
+        }
         chdir($argv[2]);
         $globalExists = false;
         foreach ([$argv[1] . "/config.json", $argv[2] . "/composer.json"] as $index => $file) {
@@ -112,8 +116,8 @@ prepare_install_repository() {
                 throw new RuntimeException("managed entry is not a path repository for the selected checkout");
             }
             $path = $repository->url;
-            if (strpbrk($path, "*?{}") !== false) {
-                throw new RuntimeException("managed path contains a wildcard; set it to the selected checkout explicitly");
+            if (strpbrk($path, "*?{}[]") !== false) {
+                throw new RuntimeException("managed path contains glob characters; set it to a plain checkout path explicitly");
             }
             if (str_starts_with($path, "~/")) {
                 $home = getenv("HOME") ?: (function_exists("posix_getpwuid") ? (posix_getpwuid(posix_getuid())["dir"] ?? false) : false);
