@@ -45,13 +45,15 @@ class MapVersion extends Model
     public function scopeLatestForMap($query, $mapId)
     {
         return $query->where('map_id', $mapId)
-            ->orderBy('created_at', 'desc');
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc');
     }
 
     public function scopeVersions($query, $mapId, $limit = 10)
     {
         return $query->where('map_id', $mapId)
             ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->limit($limit);
     }
 

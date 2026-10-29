@@ -45,6 +45,9 @@ jobs:
           docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_embed_auth_test.php
           docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_install_report_test.php
 
+      - name: Verify recoverable version restores on MariaDB
+        run: docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_version_test.php
+
       - name: Qualify populated legacy schema upgrades in a scratch database
         run: bash tests/install-upgrade-test.sh
 
@@ -55,6 +58,9 @@ jobs:
         run: |
           npm install --no-save --prefix "$RUNNER_TEMP/wmng-browser" playwright@1.62.1
           "$RUNNER_TEMP/wmng-browser/node_modules/.bin/playwright" install --with-deps chromium
+
+      - name: Verify version restore authorization and HTTP recovery
+        run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/version-restore-browser.cjs
 
       - name: Exercise first-run onboarding in Chromium
         run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/onboarding-browser.cjs

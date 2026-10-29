@@ -34,7 +34,8 @@ class MapVersionController extends Controller
             'latest_version' => $this->mapVersionService->getLatestVersion($map),
             'total_versions' => count($versions),
             'max_versions' => 20,
-            'retention_policy' => 'oldest 20',
+            'display_limit' => 20,
+            'retention_policy' => 'until manually deleted',
             'backup_enabled' => true,
             'can_restore' => true,
             'can_delete_versions' => true,
@@ -49,12 +50,12 @@ class MapVersionController extends Controller
             'backup_location' => 'database',
             'version_history_dashboard' => true,
             'version_comparison_ui' => true,
-            'conflict_detection' => true,
+            'conflict_detection' => false,
             'merge_strategy' => 'replace',
             'search_filter' => true,
             'sort_order' => 'newest_first',
             'pagination' => true,
-            'auto_cleanup' => 'after 20 versions',
+            'auto_cleanup' => false,
             'manual_cleanup' => 'on_demand',
         ]);
     }
@@ -99,9 +100,14 @@ class MapVersionController extends Controller
     {
         $this->requireAdmin();
         $version = MapVersion::findOrFail($versionId);
-        $this->mapVersionService->restoreVersion($version);
-
-        $map = $version->map;
+        try {
+            $map = $this->mapVersionService->restoreVersion($version, auth()->id());
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This version cannot be safely restored. The map was not changed.',
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,
