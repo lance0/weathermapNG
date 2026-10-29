@@ -308,6 +308,11 @@ The history response uses `display_limit` for the newest 20 displayed entries,
 retains `max_versions` as a compatibility alias for that display limit,
 and reports manual retention, without automatic cleanup or conflict detection.
 
+Comparison keeps the six existing ID-change lists and both version snapshots in
+the response. The unreleased editor renders side-by-side geometry and field
+differences from that data, including explicit unavailable historical fields.
+List-shaped and ID-keyed snapshots both compare by each record's saved ID.
+
 
 ## Webhooks
 
