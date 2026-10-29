@@ -1,0 +1,5 @@
+# actionlint 1.7.12 lacks GitHub's official Ubuntu 26.04 hosted runner label.
+# https://github.com/actions/runner-images/issues/14747
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
