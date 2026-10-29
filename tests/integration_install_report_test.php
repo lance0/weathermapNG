@@ -118,9 +118,13 @@ try {
 
     $db->statement('CREATE TEMPORARY TABLE wmng_maps (id INTEGER PRIMARY KEY)');
     $temporaryTable = true;
-    checkReport(InstallationReport::collect($app, $root, $plugin)['counts']['maps'] === 0, 'a genuinely empty table reports zero');
+    $report = InstallationReport::collect($app, $root, $plugin);
+    checkReport($report['counts']['maps'] === 0, 'a genuinely empty table reports zero');
+    checkReport(!$report['ok'] && !$report['checks']['schema_maps']['ok'], 'id-only temporary table shadows healthy permanent schema and fails runtime usability');
+    checkReport($report['checks']['table_maps']['ok'], 'readable count remains separate from required-column health');
     $db->statement('DROP TEMPORARY TABLE wmng_maps');
     $temporaryTable = false;
+    checkReport(InstallationReport::collect($app, $root, $plugin)['ok'], 'dropping temporary shadow restores healthy permanent schema');
 
     $app->instance('db', new class($db) {
         public function __construct(private $database) {}

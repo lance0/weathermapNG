@@ -188,7 +188,9 @@ LIBRENMS_PATH=/opt/librenms php verify-deployment.php --json
 The admin diagnostics page `/plugin/WeathermapNG/diagnostics` provides the same
 redacted report. It checks the selected root's requirement/registry, actual loaded
 provider and runtime routes, plugin enablement, database/table access, required
-extensions, and read/write permissions. Unavailable counts are `null`; an empty
+extensions, and read/write permissions. Unreleased `main` also checks the required
+columns on each runtime table: a readable zero count alone does not establish a
+usable schema. Unavailable counts are `null`; an empty
 table is zero. It does not repair files, expose configuration values, or establish
 web worker freshness/authenticated HTTP access. From the checkout under the runtime user,
 `just verify-deployment /opt/librenms --json` wraps the checker.
