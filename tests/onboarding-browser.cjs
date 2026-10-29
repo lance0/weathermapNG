@@ -115,8 +115,8 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.deepEqual(await page.evaluate(() => ({
             name: document.getElementById('map-name').value,
-            width: WMNG.EditorState.mapWidth,
-            height: WMNG.EditorState.mapHeight,
+            width: Number(WMNG.EditorState.mapWidth),
+            height: Number(WMNG.EditorState.mapHeight),
         })), { name: customName, width: 960, height: 640 });
         assert.equal(count(), 1);
         await page.goto(`${base}/plugin/WeathermapNG`);
