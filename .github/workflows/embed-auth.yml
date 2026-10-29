@@ -59,6 +59,9 @@ jobs:
           npm install --no-save --prefix "$RUNNER_TEMP/wmng-browser" playwright@1.62.1
           "$RUNNER_TEMP/wmng-browser/node_modules/.bin/playwright" install --with-deps chromium
 
+      - name: Verify version restore authorization and HTTP recovery
+        run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/version-restore-browser.cjs
+
       - name: Exercise first-run onboarding in Chromium
         run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/onboarding-browser.cjs
 
