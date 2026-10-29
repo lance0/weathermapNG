@@ -1,7 +1,13 @@
 #!/bin/bash
 # Exercise installer commands in an isolated checkout; no LibreNMS/database is touched.
 set -euo pipefail
-SOURCE=${INSTALL_SOURCE:-$(cd "$(dirname "$0")/.." && pwd)}
+SCRIPT=$(cd "$(dirname "$0")" && pwd -P)/$(basename "$0")
+SOURCE=$(cd "${INSTALL_SOURCE:-$(dirname "$SCRIPT")/..}" && pwd -P)
+if [ "$(id -u)" -eq 0 ]; then
+    printf -v command 'exec env INSTALL_SOURCE=%q bash %q' "$SOURCE" "$SCRIPT"
+    exec su -l librenms -s /bin/bash -c "$command"
+fi
+printf 'Installer fixture UID: %s\n' "$(id -u)"
 WORK="$(mktemp -d)"
 trap 'chmod -R u+rwX "$WORK"; rm -rf "$WORK"' EXIT
 PLUGIN="$WORK/plugin source"
@@ -202,6 +208,22 @@ grep -q 'config.json' "$WORK/output"
 if grep -q '^composer ' "$INSTALL_LOG"; then echo 'FAIL: unreadable configuration reached Composer' >&2; exit 1; fi
 cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
 echo 'PASS: unreadable global configuration is preserved and refused'
+repository_config "$LIBRENMS_PATH/composer.json" ""
+repository_config "$COMPOSER_HOME/config.json" ""
+chmod 400 "$COMPOSER_HOME/config.json"
+refuse_repository
+grep -q 'not writable' "$WORK/output"
+chmod 600 "$COMPOSER_HOME/config.json"
+echo 'PASS: read-only global configuration without managed entry refuses registration'
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN" path list
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+chmod 400 "$COMPOSER_HOME/config.json"
+: > "$INSTALL_LOG"
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+if grep -q '^composer config --global' "$INSTALL_LOG"; then echo 'FAIL: compatible read-only global configuration was rewritten' >&2; exit 1; fi
+chmod 600 "$COMPOSER_HOME/config.json"
+echo 'PASS: compatible read-only global entry can be reused without a write'
 ln -s "$PLUGIN" "$WORK/plugin-alias"
 for url in "$PLUGIN" "$PLUGIN/." "$WORK/plugin-alias" '../plugin source'; do
     repository_config "$COMPOSER_HOME/config.json" "$url"
