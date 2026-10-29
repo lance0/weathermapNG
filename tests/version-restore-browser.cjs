@@ -109,6 +109,7 @@ function snapshotProjection(snapshot) {
         const exportRowsBefore = JSON.parse(before).wmng_map_versions;
         assert.equal(exportRowsBefore.length,25);
         assert.equal(exported.metadata.total_versions,25);
+        assert.equal(exported.metadata.exported_by,fixture.users.admin.displayName);
         assert.equal(exported.versions.length,25,'export includes history beyond list limits');
         const ordered = [...exportRowsBefore].sort((a,b) => b.created_at.localeCompare(a.created_at) || b.id-a.id);
         assert.deepEqual(exported.versions.map(row => row.id),ordered.map(row => row.id));

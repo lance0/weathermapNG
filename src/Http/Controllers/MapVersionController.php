@@ -188,7 +188,7 @@ class MapVersionController extends Controller
                     'total_versions' => count($versions),
                     'format' => 'json',
                     'compression' => 'none',
-                    'exported_by' => auth()->user()?->name ?? 'Unknown',
+                    'exported_by' => auth()->user()?->realname ?: (auth()->user()?->username ?: 'Unknown'),
                 ],
             ],
         ]);
