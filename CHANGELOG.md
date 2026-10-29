@@ -3,7 +3,7 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.16.0] - 2026-10-28
 
 ### Added
 - Offer deliberate, named sample-map creation from the first-run welcome screen using the existing Star Topology template. Canceling leaves the installation empty; creation stays disabled until the request finishes.

@@ -92,7 +92,7 @@ The following features are implemented:
 - Compare two versions: shows added/removed/modified node and link IDs.
 - Export all versions for a map as JSON.
 
-## Safe Restoration on Unreleased Main
+## Safe Restoration in v1.16.0
 
 Restoring validates the snapshot and its references before changing the map. One
 transaction saves a **Before restore** checkpoint, restores the selected snapshot,
@@ -106,12 +106,12 @@ recorded; omitted historical settings are not guessed. History remains until
 manually deleted; the list displays the newest 20 entries. Coordinate restores
 with active editors: concurrent editing is not a shared, conflict-aware session.
 
-On unreleased `main`, the JSON export includes every saved version for the
+In v1.16.0, the JSON export includes every saved version for the
 selected map, independently of the list's display limit. It retains complete
 snapshots and available creator names. This export remains a map-history feature;
 follow the installation guide for full database and configuration backups.
 
-## Visual Comparison on Unreleased Main
+## Visual Comparison in v1.16.0
 
 In Version History, choose **Compare** on one version, select another, and run
 the comparison. The left view is before; the right view is after. Added, removed

@@ -16,11 +16,11 @@ auto-discovery from LLDP/CDP, templates, versioning, and bulk operations.
 
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
-![Version 1.15.1](https://img.shields.io/badge/version-1.15.1-0078D4)
+![Version 1.16.0](https://img.shields.io/badge/version-1.16.0-0078D4)
 
 ## Install
 
-Use the [v1.15.1 installation and recovery guide](docs/INSTALL.md) for stable
+Use the [v1.16.0 installation and recovery guide](docs/INSTALL.md) for stable
 native/Docker installation, configuration, upgrades, diagnostics, and full backups.
 Following `main` is an explicit development alternative documented there.
 

@@ -2,9 +2,9 @@
 
 This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
 
-*Last reviewed v1.15.0 (2026-10-28) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+*Last reviewed v1.16.0 (2026-10-28) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
 
-## Current Status: v1.15.1 (Stable)
+## Current Status: v1.16.0 (Stable)
 
 The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.11.0:
 
@@ -74,7 +74,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - ~~Add reduced-motion handling for flow animations.~~ *(v1.7.5)*
 
 - [x] **Index and template gallery polish** *(v1.7.8: escaped template card innerHTML, delegated listener replaces inline onclick, sanitized category class slug, fixed template creation 403/redirect; v1.13.0: Data Center, WAN/MPLS, Campus, and Branch Office built-in templates added to all three seed paths)*
-  - ~~Replace decorative map-card art with real previews.~~ *(unreleased: map and template SVG topology, bounded per-map loading, empty/overview labels, keyboard and theme regression coverage)*
+  - ~~Replace decorative map-card art with real previews.~~ *(v1.16.0: map and template SVG topology, bounded per-map loading, empty/overview labels, keyboard and theme regression coverage)*
   - ~~Convert clickable `div` cards into proper button/link structures.~~ *(v1.7.8: template cards already use `<button>`, replaced inline onclick with delegated listener)*
   - Preserve current search, sort, badges, and map metadata. *(preserved)*
 
@@ -155,7 +155,7 @@ These improvements shipped in v1.7.0. The bulk of the work was reliability, safe
 
 This release should make existing authoring workflows faster and less error-prone before adding major visualization features.
 
-- [x] **Version Comparison** *(routes/history activated v1.8.0; unreleased: side-by-side topology, before/after field details, explicit legacy availability and read-only browser regressions)*
+- [x] **Version Comparison** *(routes/history activated v1.8.0; v1.16.0: side-by-side topology, before/after field details, explicit legacy availability and read-only browser regressions)*
   - Registered version routes in `routes/web.php` and built editor UI: save-version button, version list modal, restore confirmation, compare diff view.
   - Fixed dormant backend bugs: `json_decode()` TypeError on cast array in compare/show/export, `captureSnapshot()` wrong field names (`database_id` → `device_id`, removed nonexistent `link.meta`), `restoreVersion()` now does true rollback with `forceCreate` preserving original IDs, `destroy()` now deletes only the selected version, `compareVersions()` returns flat lists.
   - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store.
@@ -173,7 +173,7 @@ This release should make existing authoring workflows faster and less error-pron
   - Surface stale data, missing RRD files, and broken port associations. *(v1.12.0: admin data-integrity section in diagnostics — per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows via `MapService::getDataIntegrityIssues()` + `RrdDataService::hasRrdFile()`)*
   - ~~Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.~~
 
-- [x] **First-run onboarding** *(v1.9.0: welcome/docs/diagnostics links; unreleased: working gallery and Custom actions, deliberate named sample creation, cancellation and browser regression coverage)*
+- [x] **First-run onboarding** *(v1.9.0: welcome/docs/diagnostics links; v1.16.0: working gallery and Custom actions, deliberate named sample creation, cancellation and browser regression coverage)*
   - ~~Add a lightweight first-run state that helps users create or import their first useful map.~~
   - ~~Offer demo/sample map creation only when it will not touch production data unexpectedly.~~
   - ~~Link directly to install checks, docs, and troubleshooting from empty/error states.~~

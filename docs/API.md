@@ -300,7 +300,7 @@ Version routes are registered in `routes/web.php` under the `web` + `auth` middl
 | Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
 | Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
 
-On unreleased `main`, restore returns `422` when a snapshot cannot be safely
+In v1.16.0, restore returns `422` when a snapshot cannot be safely
 applied, with `success: false` and a redacted message. The map and history remain
 unchanged. A successful restore returns the fresh map and adds a pre-restore
 checkpoint plus a restored-state version; prior saved versions are retained.
@@ -308,12 +308,12 @@ The history response uses `display_limit` for the newest 20 displayed entries,
 retains `max_versions` as a compatibility alias for that display limit,
 and reports manual retention, without automatic cleanup or conflict detection.
 
-The unreleased history export includes all versions for the selected map,
+The v1.16.0 history export includes all versions for the selected map,
 independently of list limits, with complete snapshots and available creator and
 exporter names. It remains administrator-only and does not change saved rows.
 
 Comparison keeps the six existing ID-change lists and both version snapshots in
-the response. The unreleased editor renders side-by-side geometry and field
+the response. The v1.16.0 editor renders side-by-side geometry and field
 differences from that data, including explicit unavailable historical fields.
 List-shaped and ID-keyed snapshots both compare by each record's saved ID.
 
