@@ -284,7 +284,7 @@ class MapVersionService
         if (!is_array($snapshot)) {
             $snapshot = json_decode($snapshot ?? '', true) ?: [];
         }
-        return collect($snapshot['nodes'] ?? []);
+        return collect($snapshot['nodes'] ?? [])->keyBy('id');
     }
 
     private function getSnapshotLinks(MapVersion $version): \Illuminate\Support\Collection
@@ -293,7 +293,7 @@ class MapVersionService
         if (!is_array($snapshot)) {
             $snapshot = json_decode($snapshot ?? '', true) ?: [];
         }
-        return collect($snapshot['links'] ?? []);
+        return collect($snapshot['links'] ?? [])->keyBy('id');
     }
 
     private function getAddedRemovedIds(MapVersion $v1, MapVersion $v2, string $type): array

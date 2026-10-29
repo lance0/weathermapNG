@@ -195,6 +195,31 @@
 
 /* Confirm modal must appear above the version history modal */
 #editorConfirmModal { z-index: 1060 !important; }
+
+/* Version comparison stays independent of the editable canvas. */
+#versionHistoryModal .modal-dialog { width: calc(100% - 2rem); max-width: 1100px; }
+#versionDiffArea { font-variant-numeric: tabular-nums; }
+#versionDiffArea .version-diff-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#versionDiffArea .version-diff-pane { min-width: 0; margin: 0; }
+#versionDiffArea figcaption { overflow-wrap: anywhere; }
+#versionDiffArea svg { display: block; width: 100%; height: auto; background: #fff; border: 1px solid #ccc; }
+#versionDiffArea .version-diff-node circle { fill: currentColor; stroke: #fff; stroke-width: 1.5; }
+#versionDiffArea .version-diff-node text { fill: #212529; font: 11px sans-serif; }
+#versionDiffArea .version-diff-link { stroke: currentColor; stroke-width: 3; }
+#versionDiffArea .version-diff-link.version-diff-unchanged { stroke-width: 1.5; }
+#versionDiffArea .version-diff-link.version-diff-removed { stroke-dasharray: 6 4; }
+#versionDiffArea .version-diff-added { color: #187a32; }
+#versionDiffArea .version-diff-removed { color: #bd2636; }
+#versionDiffArea .version-diff-modified { color: #9b6300; }
+#versionDiffArea .version-diff-unchanged { color: #66717b; }
+#versionDiffArea .version-diff-legend span { display: inline-block; margin-right: 1rem; }
+#versionDiffArea .version-diff-table-wrap { overflow: auto; max-height: 420px; }
+#versionDiffArea .version-diff-table { table-layout: fixed; min-width: 540px; width: 100%; }
+#versionDiffArea .version-diff-table th, #versionDiffArea .version-diff-table td { overflow-wrap: anywhere; }
+#versionDiffArea .version-diff-table pre { margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow: auto; }
+@media (max-width: 767px) {
+    #versionDiffArea .version-diff-previews { grid-template-columns: minmax(0, 1fr); }
+}
 </style>
 @endpush
 
@@ -552,7 +577,9 @@
                         <!-- Compare Diff Area -->
                         <div id="versionDiffArea" class="mt-3" style="display:none;">
                             <h6>Comparison: <span id="diffVersion1Name"></span> &rarr; <span id="diffVersion2Name"></span></h6>
+                            <p id="versionDiffStatus" role="status" aria-live="polite"></p>
                             <ul id="diffSummary" class="list-unstyled"></ul>
+                            <div id="versionDiffVisual"></div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -616,5 +643,6 @@
         <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-nodes.js') }}"></script>
         <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-links.js') }}"></script>
         <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-ui.js') }}"></script>
+        <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/version-comparison.js') }}"></script>
         <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/editor-versions.js') }}"></script>
 @endsection
