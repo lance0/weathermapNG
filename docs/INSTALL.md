@@ -344,3 +344,12 @@ Chromium editing, streaming, legacy dimensions and new version capture were test
 
 This covers those source and package paths. Major distribution migrations,
 existing production hosts and general OS disaster recovery were not exercised.
+
+Unreleased `main` adds a recurring native Ubuntu 26.04 CI lane with PHP-FPM,
+nginx and the runner's MySQL. It upgrades a populated v1.15.1 plugin checkout to
+the exact candidate revision, repeats deployment, and twice restores pristine
+LibreNMS 26.10.2 Composer files before running the unmodified upstream post-pull
+routine. It checks retained data/settings/history, registration, same-account
+editor access, token JSON/embed access and static assets. This lane tests plugin
+upgrades and dependency reconstruction; full LibreNMS release transitions and OS
+maintenance remain separate qualification.
