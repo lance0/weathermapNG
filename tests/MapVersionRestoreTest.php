@@ -339,4 +339,38 @@ class MapVersionRestoreTest extends TestCase
         $this->assertSame($second->id, $this->service->getLatestVersion($map)->id);
         $this->assertSame([$second->id, $first->id], MapVersion::versions($map->id)->pluck('id')->all());
     }
+
+    #[\PHPUnit\Framework\Attributes\RunInSeparateProcess]
+    public function testVersionListsKeepTheirLimitsWhileExportCanReadAllHistory(): void
+    {
+        class_alias(VersionCreatorStub::class, 'App\\Models\\User');
+        $map = $this->graph();
+        $other = Map::create(['name' => 'other-map']);
+        $ids = [];
+        for ($i = 1; $i <= 25; $i++) {
+            $map->title = 'History ' . $i;
+            $map->save();
+            $ids[] = $this->service->createVersion($map, 'History ' . $i)->id;
+        }
+        $this->service->createVersion($other, 'Other map');
+        MapVersion::query()->update(['created_at' => '2026-01-01 00:00:00']);
+        $newest = array_reverse($ids);
+
+        $this->assertSame(array_slice($newest, 0, 10), $this->service->getVersions($map)->pluck('id')->all());
+        $this->assertSame(array_slice($newest, 0, 20), $this->service->getVersions($map, 20)->pluck('id')->all());
+        $all = $this->service->getVersions($map, null);
+        $this->assertSame($newest, $all->pluck('id')->all());
+        $this->assertSame(26, MapVersion::count(), 'Listing must not change either map history.');
+        foreach ($all as $version) {
+            $this->assertSame($map->id, $version->map_id);
+            $this->assertSame($version->name, $version->config_snapshot['map']['title']);
+            $this->assertCount(2, $version->config_snapshot['nodes']);
+            $this->assertCount(1, $version->config_snapshot['links']);
+        }
+    }
+}
+
+class VersionCreatorStub extends \Illuminate\Database\Eloquent\Model
+{
+    protected $table = 'users';
 }
