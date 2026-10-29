@@ -164,11 +164,15 @@
                         <h3>No maps yet</h3>
                         <p>Get started by creating a map from a template, importing an existing map, or building a custom topology. If the plugin is fresh, run the diagnostics page first.</p>
                         <div class="wmng-onboarding-actions">
-                            <a href="{{ url('plugin/WeathermapNG/templates') }}" class="btn btn-success btn-lg"
+                            <button type="button" class="btn btn-success btn-lg" data-toggle="modal" data-target="#createMapModal" data-create-tab="templates"
                                aria-label="Browse map templates">
                                 <i class="fas fa-th-large mr-2" aria-hidden="true"></i>Browse Templates
-                            </a>
-                            <button type="button" class="btn btn-outline-secondary btn-lg" data-toggle="modal" data-target="#createMapModal"
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-lg" id="createSampleMapBtn"
+                                    aria-label="Create a sample map from the Star Topology template">
+                                <i class="fas fa-project-diagram mr-2" aria-hidden="true"></i>Create Sample Map
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-lg" data-toggle="modal" data-target="#createMapModal" data-create-tab="custom"
                                     aria-label="Create your first map">
                                 <i class="fas fa-plus mr-2" aria-hidden="true"></i>Create Custom Map
                             </button>
