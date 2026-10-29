@@ -173,7 +173,7 @@ This release should make existing authoring workflows faster and less error-pron
   - Surface stale data, missing RRD files, and broken port associations. *(v1.12.0: admin data-integrity section in diagnostics — per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows via `MapService::getDataIntegrityIssues()` + `RrdDataService::hasRrdFile()`)*
   - ~~Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.~~
 
-- [x] **First-run onboarding** *(v1.9.0: index.blade.php empty state with links to Templates, Create Map, Import, Diagnostics, Docs)*
+- [x] **First-run onboarding** *(v1.9.0: welcome/docs/diagnostics links; unreleased: working gallery and Custom actions, deliberate named sample creation, cancellation and browser regression coverage)*
   - ~~Add a lightweight first-run state that helps users create or import their first useful map.~~
   - ~~Offer demo/sample map creation only when it will not touch production data unexpectedly.~~
   - ~~Link directly to install checks, docs, and troubleshooting from empty/error states.~~

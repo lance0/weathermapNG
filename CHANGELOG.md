@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Reject incomplete database table schemas in installation diagnostics, even when row counts are readable. Keep readable zero counts distinct from unavailable data and never repair tables during inspection.
 - Open the template gallery from the welcome screen and select the Custom tab when requested. Keep gallery cards inside the modal and cover catalog failure/retry, cancellation, sample creation, and editor loading in Chromium CI.
+- Serialize install and deploy operations sharing a LibreNMS root, plugin checkout, or Composer home. Concurrent invocations stop before dependency, Git, or database changes; Linux `flock` is required.
 
 ## [1.15.1] - 2026-10-28
 

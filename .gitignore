@@ -74,3 +74,6 @@ docker-compose.official.yml
 *.png
 !wmng.png
 !wmng-editor.png
+
+# Persistent installer lock (never delete while installers may be running)
+/.weathermapng-install.lock

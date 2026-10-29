@@ -38,6 +38,16 @@ and the final report. Any required failure exits nonzero with its step and retry
 command. From the checkout, as the same runtime user, `just install /opt/librenms`
 wraps this script; recipe arguments are positional.
 
+Unreleased `main` also requires Linux `flock` (normally supplied by `util-linux`).
+The install and deploy scripts lock the selected LibreNMS root, physical plugin
+checkout, and runtime user's Composer home before changing shared state. A
+competing invocation exits with the busy resource and a retry instruction. Wait
+for the other installer to finish; do not delete the persistent lock files.
+Coordinate LibreNMS's daily updater, manual Composer commands, and source
+replacement separately: those operations do not take these locks. This has been
+tested on local Linux filesystems, including a checkout shared by Docker bind
+mounts; it does not establish distributed or network-filesystem coordination.
+
 The supported registration contract is
 `composer config --global repositories.weathermapng` with the absolute checkout
 path, followed by `lnms plugin:add librenms/weathermapng` from the LibreNMS root.

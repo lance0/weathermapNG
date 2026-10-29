@@ -13,6 +13,7 @@ on:
     paths:
       - 'quick-install.sh'
       - 'deploy.sh'
+      - 'scripts/install-common.sh'
       - 'verify-deployment.php'
       - 'verify.php'
       - 'database/**'
@@ -37,6 +38,7 @@ on:
     paths:
       - 'quick-install.sh'
       - 'deploy.sh'
+      - 'scripts/install-common.sh'
       - 'verify-deployment.php'
       - 'verify.php'
       - 'database/**'
@@ -78,6 +80,8 @@ jobs:
         run: |
           bash -n quick-install.sh
           bash -n deploy.sh
+          bash -n scripts/install-common.sh
+          bash -n tests/install-lock-test.sh
           bash -n tests/install-failure-test.sh
           bash -n tests/install-lifecycle-test.sh
           bash -n docker/99-weathermapng.sh
@@ -223,7 +227,9 @@ jobs:
           coverage: none
 
       - name: Check required install and upgrade failures
-        run: bash tests/install-failure-test.sh
+        run: |
+          bash tests/install-failure-test.sh
+          bash tests/install-lock-test.sh
 
   weekly-librenms-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
