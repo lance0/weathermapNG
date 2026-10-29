@@ -65,6 +65,11 @@ jobs:
       - name: Exercise first-run onboarding in Chromium
         run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/onboarding-browser.cjs
 
+      - name: Check bounded topology renderer and gallery previews
+        run: |
+          node tests/topology-preview-test.cjs
+          NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/topology-preview-browser.cjs
+
       - name: Exercise editor, viewer updates, and token navigation in Chromium
         run: NODE_PATH="$RUNNER_TEMP/wmng-browser/node_modules" node tests/embed-auth-browser.cjs
 
