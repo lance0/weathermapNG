@@ -304,7 +304,8 @@ On unreleased `main`, restore returns `422` when a snapshot cannot be safely
 applied, with `success: false` and a redacted message. The map and history remain
 unchanged. A successful restore returns the fresh map and adds a pre-restore
 checkpoint plus a restored-state version; prior saved versions are retained.
-The history response uses `display_limit` for the newest 20 displayed entries
+The history response uses `display_limit` for the newest 20 displayed entries,
+retains `max_versions` as a compatibility alias for that display limit,
 and reports manual retention, without automatic cleanup or conflict detection.
 
 
