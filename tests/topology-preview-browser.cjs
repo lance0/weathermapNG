@@ -5,6 +5,7 @@ const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright-core');
 const base = process.argv[2] || 'http://localhost:8000';
 const prefix = `wmng-preview-${randomBytes(6).toString('hex')}`;
+const quotedTitle = 'Quoted" onfocus="window.wmngPreviewInjected=1" data-probe="';
 const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-dev', 'php', '-r', `
     require '/opt/librenms/vendor/autoload.php';
     $app = require '/opt/librenms/bootstrap/app.php';
@@ -32,7 +33,11 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
                     Illuminate\\Support\\Facades\\DB::table('wmng_links')->insert(['map_id'=>$map->id, 'src_node_id'=>$ids[$shape === 'a-chain' ? $i%99 : 0], 'dst_node_id'=>$ids[1+$i%99]]);
                 }
             }
-            return ['user'=>$user->user_id, 'username'=>$user->username, 'password'=>$password, 'maps'=>$maps];
+            $template = LibreNMS\\Plugins\\WeathermapNG\\Models\\MapTemplate::create([
+                'name'=>'${prefix}-quoted', 'title'=>${JSON.stringify(quotedTitle)},
+                'width'=>800, 'height'=>600, 'config'=>['default_nodes'=>[], 'default_links'=>[]], 'is_built_in'=>false,
+            ]);
+            return ['user'=>$user->user_id, 'username'=>$user->username, 'password'=>$password, 'maps'=>$maps, 'template'=>$template->id];
         }));
     `));
     let browser;
@@ -77,6 +82,13 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         assert.equal(await small.locator('circle').count(), 2);
         assert.equal(await star.locator('line').count(), 3);
         assert.equal(await small.locator('line').count(), 1);
+        const quoted = page.locator(`.template-card[data-template-id="${fixture.template}"]`);
+        assert.equal(await quoted.getAttribute('aria-label'), `Use template ${quotedTitle}`);
+        assert.equal(await quoted.locator('.template-card-title').innerText(), quotedTitle);
+        assert.deepEqual(await quoted.evaluate(element => element.getAttributeNames().filter(name => /^on/i.test(name))), []);
+        assert.equal(await quoted.getAttribute('data-probe'), null);
+        await quoted.focus();
+        assert.equal(await page.evaluate(() => window.wmngPreviewInjected), undefined, 'quoted title cannot execute on focus');
         assert.equal(await star.evaluate(element => element.closest('.wmng-index') !== null), true, 'modal inherits themed root');
         const wasDark = await page.locator('.wmng-index').evaluate(root => root.classList.contains('dark-theme'));
         await page.locator('.wmng-index').evaluate(root => root.classList.add('dark-theme'));
@@ -93,7 +105,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await Promise.all([page.waitForURL(new RegExp(`/editor/${fixture.maps[0].id}$`)), page.keyboard.press('Enter')]);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.deepEqual(errors, []);
-        console.log('PASS: distinct bounded map/template geometry, empty state, theme, keyboard actions, search and sort');
+        console.log('PASS: distinct bounded map/template geometry, empty state, theme, safe quoted title, keyboard actions, search and sort');
     } finally {
         await browser?.close();
         php(`
@@ -103,6 +115,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
                 Illuminate\\Support\\Facades\\DB::table('wmng_nodes')->where('map_id',$id)->delete();
                 Illuminate\\Support\\Facades\\DB::table('wmng_maps')->where('id',$id)->delete();
             }
+            LibreNMS\\Plugins\\WeathermapNG\\Models\\MapTemplate::where('id',${fixture.template})->delete();
             App\\Models\\User::findOrFail(${fixture.user})->delete();
         `);
     }
