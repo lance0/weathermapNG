@@ -21,7 +21,7 @@ class E2EInstallationWorkflowTest extends TestCase
 
     public function test_quick_install_script_checks_php_version(): void
     {
-        $scriptContent = file_get_contents(__DIR__ . '/../quick-install.sh');
+        $scriptContent = file_get_contents(__DIR__ . '/../scripts/install-common.sh');
         $this->assertStringContainsString('PHP Version:', $scriptContent);
         $this->assertStringContainsString('version_compare', $scriptContent);
     }
