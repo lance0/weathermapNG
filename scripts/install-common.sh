@@ -41,6 +41,10 @@ preflight_install_runtime() {
             exit 1
         fi
     done
+    if [ ! -f "$PLUGIN_DIR/composer.json" ] || [ ! -r "$PLUGIN_DIR/composer.json" ]; then
+        echo "Error: Plugin checkout lacks readable composer.json: $PLUGIN_DIR/composer.json" >&2
+        exit 1
+    fi
     if [ ! -x "$LIBRENMS_PATH/lnms" ]; then
         echo "Error: Selected LibreNMS lnms must be executable: $LIBRENMS_PATH/lnms" >&2
         exit 1
@@ -58,16 +62,17 @@ preflight_install_runtime() {
         "$LIBRENMS_PATH/storage/cache" "$PLUGIN_DIR/output" "$PLUGIN_DIR/output/maps" "$PLUGIN_DIR/output/cache" "$PLUGIN_DIR/output/thumbnails"; do
         require_install_writable "$directory" directory
     done
-    for file in "$PLUGIN_DIR/composer.json" "$PLUGIN_DIR/composer.lock" "$LIBRENMS_PATH/composer.json" \
-        "$LIBRENMS_PATH/composer.lock" "$composer_home/config.json"; do
+    for file in "$PLUGIN_DIR/composer.lock" "$LIBRENMS_PATH/composer.json" "$LIBRENMS_PATH/composer.lock"; do
         require_install_writable "$file" file
     done
-    if [ -e "$composer_home/auth.json" ] || [ -L "$composer_home/auth.json" ]; then
-        if [ ! -f "$composer_home/auth.json" ] || [ ! -r "$composer_home/auth.json" ]; then
-            echo "Error: Composer authentication configuration is not readable: $composer_home/auth.json" >&2
-            exit 1
+    for file in "$composer_home/config.json" "$composer_home/auth.json"; do
+        if [ -e "$file" ] || [ -L "$file" ]; then
+            if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+                echo "Error: Composer configuration is not readable: $file" >&2
+                exit 1
+            fi
         fi
-    fi
+    done
 }
 
 install_lock() {

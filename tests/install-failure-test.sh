@@ -334,6 +334,19 @@ if grep -Eq '^(composer |lnms |php database/)' "$INSTALL_LOG"; then echo 'FAIL: 
 printf '{}\n' | cmp - "$COMPOSER_HOME/config.json"
 echo 'PASS: fresh checkout path with glob characters fails before dependencies'
 
+# Fresh registry creation still works with a read-only manifest and existing credentials.
+rm "$COMPOSER_HOME/config.json"
+chmod 444 "$PLUGIN/composer.json"
+chmod 400 "$COMPOSER_HOME/auth.json"
+cp "$PLUGIN/composer.json" "$WORK/manifest.before"
+: > "$INSTALL_LOG"
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1 || { cat "$WORK/output" >&2; exit 1; }
+grep -q 'Installation complete' "$WORK/output"
+grep -q '^composer config --global repositories.weathermapng' "$INSTALL_LOG"
+cmp "$WORK/manifest.before" "$PLUGIN/composer.json"
+cmp "$WORK/auth.before" "$COMPOSER_HOME/auth.json"
+echo 'PASS: fresh registration accepts read-only plugin manifest and credentials'
+
 # A real local remote has a pending fast-forward throughout every failed preflight.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 rm "$FAKE_BIN/git"
@@ -363,7 +376,6 @@ assert_upgrade_refused() {
     observed_head=$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)
     [ "$observed_head" = "$before" ] || { echo "FAIL: failed preflight advanced HEAD from $before to $observed_head" >&2; exit 1; }
     [ "$(cat "$PLUGIN/source-marker")" = 'old source' ]
-    "$REAL_GIT" -C "$PLUGIN" diff --quiet
     if grep -Eq '^(composer |lnms |php (database/|artisan))' "$INSTALL_LOG"; then echo 'FAIL: failed preflight reached mutation' >&2; exit 1; fi
 }
 for file in composer.json vendor/autoload.php bootstrap/app.php artisan lnms; do
@@ -372,6 +384,15 @@ for file in composer.json vendor/autoload.php bootstrap/app.php artisan lnms; do
     mv "$WORK/saved-root-file" "$LIBRENMS_PATH/$file"
 done
 echo 'PASS: missing root files leave real Git HEAD and source untouched'
+mv "$PLUGIN/composer.json" "$WORK/saved-manifest"
+assert_upgrade_refused
+test ! -e "$PLUGIN/composer.json"
+mv "$WORK/saved-manifest" "$PLUGIN/composer.json"
+chmod 000 "$PLUGIN/composer.json"
+assert_upgrade_refused
+grep -q 'readable composer.json' "$WORK/output"
+chmod 444 "$PLUGIN/composer.json"
+echo 'PASS: missing or unreadable plugin manifest leaves real Git HEAD untouched'
 chmod 644 "$LIBRENMS_PATH/lnms"
 assert_upgrade_refused
 grep -q 'must be executable' "$WORK/output"
@@ -397,12 +418,17 @@ for directory in "$PLUGIN" "$LIBRENMS_PATH" "$COMPOSER_HOME" "$PLUGIN/vendor/com
     grep -q 'writable directory' "$WORK/output"
     chmod 755 "$directory"
 done
-for file in "$LIBRENMS_PATH/composer.json" "$COMPOSER_HOME/config.json"; do
-    chmod 444 "$file"
+chmod 444 "$LIBRENMS_PATH/composer.json"
+assert_upgrade_refused
+grep -q 'writable file' "$WORK/output"
+chmod 644 "$LIBRENMS_PATH/composer.json"
+for file in "$COMPOSER_HOME/config.json" "$COMPOSER_HOME/auth.json"; do
+    chmod 000 "$file"
     assert_upgrade_refused
-    grep -q 'writable file' "$WORK/output"
-    chmod 644 "$file"
+    grep -q 'not readable' "$WORK/output"
+    chmod 400 "$file"
 done
+chmod 600 "$COMPOSER_HOME/config.json"
 chmod 555 "$WORK/locked-parent"
 COMPOSER_HOME="$WORK/locked-parent/new/nested" assert_upgrade_refused
 test ! -e "$WORK/locked-parent/new"
@@ -413,7 +439,10 @@ assert_upgrade_refused
 grep -q 'repositories.weathermapng' "$WORK/output"
 repository_config "$COMPOSER_HOME/config.json" "$PLUGIN"
 echo 'PASS: conflicting registration is refused under locks before the real Git fast-forward'
+chmod 444 "$PLUGIN/composer.json" "$COMPOSER_HOME/config.json"
 chmod 400 "$COMPOSER_HOME/auth.json"
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+"$REAL_GIT" -C "$PLUGIN" diff --quiet
 : > "$INSTALL_LOG"
 bash "$PLUGIN/deploy.sh" > "$WORK/output" 2>&1
 [ "$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)" = "$after" ]
@@ -421,7 +450,10 @@ bash "$PLUGIN/deploy.sh" > "$WORK/output" 2>&1
 [ "$(grep -c '^runtime-preflight$' "$INSTALL_LOG")" -eq 2 ]
 grep -q 'Installation complete' "$WORK/output"
 cmp "$WORK/auth.before" "$COMPOSER_HOME/auth.json"
-echo 'PASS: valid tracked upgrade fast-forwards, rechecks runtime, and accepts read-only credentials'
+cmp "$WORK/manifest.before" "$PLUGIN/composer.json"
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+if grep -q '^composer config --global' "$INSTALL_LOG"; then echo 'FAIL: read-only compatible registry was rewritten' >&2; exit 1; fi
+echo 'PASS: valid tracked upgrade rechecks runtime and preserves read-only manifest, registry, and credentials'
 "$REAL_GIT" -C "$PLUGIN" checkout -q --detach "$before"
 bash "$PLUGIN/deploy.sh" > "$WORK/output" 2>&1
 [ "$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)" = "$before" ]
