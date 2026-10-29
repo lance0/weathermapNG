@@ -340,8 +340,8 @@ function renderTemplates(templates) {
     templates.forEach(template => {
         const categorySlug = String(template.category || 'custom').replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'custom';
         const categoryClass = 'category-' + categorySlug;
-        const nodeCount = template.config?.default_nodes?.length || 0;
-        const linkCount = template.config?.default_links?.length || 0;
+        const nodeCount = Array.isArray(template.config?.default_nodes) ? template.config.default_nodes.length : 0;
+        const linkCount = Array.isArray(template.config?.default_links) ? template.config.default_links.length : 0;
 
         const card = document.createElement('div');
         card.className = 'col-md-6 col-lg-4';

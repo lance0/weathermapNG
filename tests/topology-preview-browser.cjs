@@ -37,7 +37,11 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
                 'name'=>'${prefix}-quoted', 'title'=>${JSON.stringify(quotedTitle)},
                 'width'=>800, 'height'=>600, 'config'=>['default_nodes'=>[], 'default_links'=>[]], 'is_built_in'=>false,
             ]);
-            return ['user'=>$user->user_id, 'username'=>$user->username, 'password'=>$password, 'maps'=>$maps, 'template'=>$template->id];
+            $malformed = LibreNMS\\Plugins\\WeathermapNG\\Models\\MapTemplate::create([
+                'name'=>'${prefix}-malformed', 'title'=>'Malformed nested config', 'width'=>800, 'height'=>600,
+                'config'=>['default_nodes'=>['length'=>'not a count'], 'default_links'=>['length'=>2]], 'is_built_in'=>false,
+            ]);
+            return ['user'=>$user->user_id, 'username'=>$user->username, 'password'=>$password, 'maps'=>$maps, 'template'=>$template->id, 'malformed'=>$malformed->id];
         }));
     `));
     let browser;
@@ -89,11 +93,19 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         assert.equal(await quoted.getAttribute('data-probe'), null);
         await quoted.focus();
         assert.equal(await page.evaluate(() => window.wmngPreviewInjected), undefined, 'quoted title cannot execute on focus');
+        const malformed = page.locator(`.template-card[data-template-id="${fixture.malformed}"]`);
+        assert.equal(await malformed.locator('svg').count(), 0);
+        assert.equal(await malformed.locator('.topology-preview-note').innerText(), 'No topology');
+        assert.equal(await malformed.locator('.template-card-meta .badge-light').count(), 0, 'non-array nested config has no invented counts');
         assert.equal(await star.evaluate(element => element.closest('.wmng-index') !== null), true, 'modal inherits themed root');
-        const wasDark = await page.locator('.wmng-index').evaluate(root => root.classList.contains('dark-theme'));
-        await page.locator('.wmng-index').evaluate(root => root.classList.add('dark-theme'));
-        await page.waitForFunction(() => getComputedStyle(document.querySelector('.template-card')).backgroundColor === 'rgb(44, 49, 54)');
-        await page.locator('.wmng-index').evaluate((root, dark) => root.classList.toggle('dark-theme', dark), wasDark);
+        // LibreNMS applySiteStyle toggles html.dark; its CSS and our observer handle propagation.
+        const wasDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+        try {
+            await page.evaluate(() => document.documentElement.classList.add('dark'));
+            await page.waitForFunction(() => getComputedStyle(document.querySelector('.template-card')).backgroundColor === 'rgb(44, 49, 54)');
+        } finally {
+            await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), wasDark);
+        }
         const cancelled = new Promise(resolve => page.once('dialog', async dialog => { await dialog.dismiss(); resolve(); }));
         await star.focus();
         await page.keyboard.press('Enter');
@@ -105,7 +117,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await Promise.all([page.waitForURL(new RegExp(`/editor/${fixture.maps[0].id}$`)), page.keyboard.press('Enter')]);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.deepEqual(errors, []);
-        console.log('PASS: distinct bounded map/template geometry, empty state, theme, safe quoted title, keyboard actions, search and sort');
+        console.log('PASS: distinct bounded map/template geometry, empty state, theme, safe quoted title/malformed config, keyboard actions, search and sort');
     } finally {
         await browser?.close();
         php(`
@@ -115,7 +127,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
                 Illuminate\\Support\\Facades\\DB::table('wmng_nodes')->where('map_id',$id)->delete();
                 Illuminate\\Support\\Facades\\DB::table('wmng_maps')->where('id',$id)->delete();
             }
-            LibreNMS\\Plugins\\WeathermapNG\\Models\\MapTemplate::where('id',${fixture.template})->delete();
+            LibreNMS\\Plugins\\WeathermapNG\\Models\\MapTemplate::whereIn('id',[${fixture.template},${fixture.malformed}])->delete();
             App\\Models\\User::findOrFail(${fixture.user})->delete();
         `);
     }
