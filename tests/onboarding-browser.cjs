@@ -31,6 +31,14 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         const page = await browser.newPage();
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));
+        const modalAction = async (event, action) => {
+            await page.evaluate(event => {
+                window.wmngModalEvent = null;
+                $('#createMapModal').one(event, () => { window.wmngModalEvent = event; });
+            }, event);
+            await action();
+            await page.waitForFunction(event => window.wmngModalEvent === event, event);
+        };
         await page.goto(`${base}/plugin/WeathermapNG`);
         assert.ok(new URL(page.url()).pathname.endsWith('/login'));
         await page.locator('[name=username]').fill(fixture.username);
@@ -45,7 +53,7 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.getByRole('link', { name: 'Read installation and recovery documentation' }).count().then(n => assert.equal(n, 1));
 
         await page.route('**/plugin/WeathermapNG/templates', route => route.fulfill({ status: 503, body: '{}' }));
-        await page.getByRole('button', { name: 'Browse map templates' }).click();
+        await modalAction('shown.bs.modal', () => page.getByRole('button', { name: 'Browse map templates' }).click());
         await page.locator('#templatesPane.active').waitFor();
         await page.locator('#templatesError').waitFor({ state: 'visible' });
         assert.equal(count(), 0);
@@ -53,14 +61,12 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.locator('#templatesError a').click();
         await page.locator('#templatesGrid [data-template-id]').first().waitFor();
         assert.ok(new URL(page.url()).pathname.endsWith('/WeathermapNG'));
-        await page.keyboard.press('Escape');
-        await page.locator('#createMapModal').waitFor({ state: 'hidden' });
+        await modalAction('hidden.bs.modal', () => page.keyboard.press('Escape'));
         assert.equal(count(), 0);
 
-        await page.getByRole('button', { name: 'Create your first map' }).click();
+        await modalAction('shown.bs.modal', () => page.getByRole('button', { name: 'Create your first map' }).click());
         await page.locator('#customPane.active').waitFor();
-        await page.getByRole('button', { name: 'Cancel' }).first().click();
-        await page.locator('#createMapModal').waitFor({ state: 'hidden' });
+        await modalAction('hidden.bs.modal', () => page.getByRole('button', { name: 'Cancel' }).first().click());
         assert.equal(count(), 0);
 
         page.once('dialog', dialog => dialog.dismiss());
