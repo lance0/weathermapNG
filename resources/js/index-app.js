@@ -22,6 +22,10 @@ if (window.WMNG && typeof WMNG.ensureUiHelpers === 'function') {
     if (window.WMNG && typeof WMNG.observeTheme === 'function') {
         WMNG.observeTheme('.wmng-index');
     }
+document.querySelectorAll('[data-topology-preview]').forEach(container => {
+    WMNG.TopologyPreview.render(container, JSON.parse(container.dataset.topologyPreview));
+});
+
 let pendingDeleteMapId = null;
 
 function getCsrfToken() {
@@ -336,16 +340,14 @@ function renderTemplates(templates) {
     templates.forEach(template => {
         const categorySlug = String(template.category || 'custom').replace(/[^a-z0-9_-]/gi, '').toLowerCase() || 'custom';
         const categoryClass = 'category-' + categorySlug;
-        const nodeCount = template.config?.default_nodes?.length || 0;
-        const linkCount = template.config?.default_links?.length || 0;
+        const nodeCount = Array.isArray(template.config?.default_nodes) ? template.config.default_nodes.length : 0;
+        const linkCount = Array.isArray(template.config?.default_links) ? template.config.default_links.length : 0;
 
         const card = document.createElement('div');
         card.className = 'col-md-6 col-lg-4';
         card.innerHTML = `
             <button type="button" class="template-card" data-template-id="${escapeHtml(String(template.id))}" aria-label="Use template ${escapeHtml(template.title || template.name)}">
-                <span class="template-card-icon">
-                    <i class="${escapeHtml(template.icon || 'fas fa-map')}"></i>
-                </span>
+                <span class="topology-preview template-topology-preview"></span>
                 <span class="template-card-title">${escapeHtml(template.title || template.name)}</span>
                 <span class="template-card-desc">${escapeHtml(template.description || '')}</span>
                 <span class="template-card-meta">
@@ -359,6 +361,7 @@ function renderTemplates(templates) {
                 </span>
             </button>
         `;
+        WMNG.TopologyPreview.render(card.querySelector('.topology-preview'), WMNG.TopologyPreview.templateGraph(template));
         grid.appendChild(card);
     });
 }
@@ -418,9 +421,9 @@ function createMapFromTemplate(templateId, mapName) {
 }
 
 function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return String(text ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[character]));
 }
 
 // Load templates when modal opens

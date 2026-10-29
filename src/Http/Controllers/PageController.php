@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 use Illuminate\Support\Facades\Redirect;
-use LibreNMS\Plugins\WeathermapNG\Models\Map;
+use LibreNMS\Plugins\WeathermapNG\Services\TopologyPreview;
 use Exception;
 
 class PageController extends Controller
@@ -21,10 +21,7 @@ class PageController extends Controller
             return redirect()->route('weathermapng.install');
         }
 
-        // Get all maps with counts using Eloquent for proper model features
-        $maps = Map::withCount(['nodes', 'links'])->orderBy('name')->get();
-
-        return view('WeathermapNG::index', compact('maps'));
+        return view('WeathermapNG::index', TopologyPreview::loadMaps());
     }
 
     /**
