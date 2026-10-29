@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Offer deliberate, named sample-map creation from the first-run welcome screen using the existing Star Topology template. Canceling leaves the installation empty; creation stays disabled until the request finishes.
 - Show actual map and template topology previews in the gallery, with empty states and a bounded overview for larger maps. Preserve keyboard actions, search, sorting and theme inheritance.
+- Add a native Ubuntu/PHP-FPM upgrade CI lane with populated data, runtime-user Composer registration, repeat deployment, and two unmodified upstream post-pull dependency reconstructions.
 
 ### Fixed
 - Reject incomplete database table schemas in installation diagnostics, even when row counts are readable. Keep readable zero counts distinct from unavailable data and never repair tables during inspection.

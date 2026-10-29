@@ -84,6 +84,7 @@ jobs:
           bash -n tests/install-lock-test.sh
           bash -n tests/install-failure-test.sh
           bash -n tests/install-lifecycle-test.sh
+          bash -n tests/native-install-test.sh
           bash -n docker/99-weathermapng.sh
           bash -n tests/install-test.sh
           bash -n tests/docker-test.sh
@@ -230,6 +231,58 @@ jobs:
         run: |
           bash tests/install-failure-test.sh
           bash tests/install-lock-test.sh
+
+  native-upgrade:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    name: Native VM Upgrade
+
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Prepare exact revision bundle
+        run: |
+          set -euo pipefail
+          git fetch --force origin tag v1.15.1
+          test "$(git rev-parse 'v1.15.1^{commit}')" = 38830b0db55bc0f40f3c8fa981ccc24d6723bb8f
+          git update-ref refs/heads/candidate HEAD
+          git bundle create /tmp/wmng-candidate.bundle refs/heads/candidate refs/tags/v1.15.1
+          chmod 644 /tmp/wmng-candidate.bundle
+          cp tests/integration_lifecycle_fixture.php /tmp/wmng-native-fixture.php
+          chmod 644 /tmp/wmng-native-fixture.php
+          printf '%s\n' "$(git rev-parse HEAD)" > /tmp/wmng-candidate-sha
+
+      - name: Qualify native upgrade and upstream reconstruction
+        run: |
+          sudo bash tests/native-install-test.sh "$(cat /tmp/wmng-candidate-sha)" \
+            /tmp/wmng-candidate.bundle /tmp/wmng-native-fixture.php \
+            "$RUNNER_TEMP/wmng-native-evidence"
+
+      - name: Preserve redacted evidence
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/wmng-native-evidence" ]; then
+            sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/wmng-native-evidence"
+          fi
+
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-upgrade-evidence
+          if-no-files-found: ignore
+          path: |
+            ${{ runner.temp }}/wmng-native-evidence/*.log
+            ${{ runner.temp }}/wmng-native-evidence/*-report.json
+            ${{ runner.temp }}/wmng-native-evidence/*-snapshot.json
+            ${{ runner.temp }}/wmng-native-evidence/*-http.json
+            ${{ runner.temp }}/wmng-native-evidence/*-result.txt
+            ${{ runner.temp }}/wmng-native-evidence/*-status.txt
+            ${{ runner.temp }}/wmng-native-evidence/revisions.txt
+            ${{ runner.temp }}/wmng-native-evidence/runtime-versions.txt
 
   weekly-librenms-smoke:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
