@@ -300,6 +300,13 @@ Version routes are registered in `routes/web.php` under the `web` + `auth` middl
 | Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
 | Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
 
+On unreleased `main`, restore returns `422` when a snapshot cannot be safely
+applied, with `success: false` and a redacted message. The map and history remain
+unchanged. A successful restore returns the fresh map and adds a pre-restore
+checkpoint plus a restored-state version; prior saved versions are retained.
+The history response uses `display_limit` for the newest 20 displayed entries
+and reports manual retention, without automatic cleanup or conflict detection.
+
 
 ## Webhooks
 

@@ -59,12 +59,8 @@ Implemented foundation:
 - Service/controller code for saving, restoring, listing, comparing, deleting, and exporting versions.
 - Retain snapshots of nodes, links, and map settings.
 
-Removed in v1.7.0 (broken backend, routes not registered):
-
-- Editor UI hooks for version actions (buttons, modals, and inline JS removed from editor).
-- Auto-save support from the editor flow (dead code removed — referenced non-existent elements).
-
-Before documenting version-history endpoints as public API, verify they are registered in `routes/web.php` and covered by route tests.
+Version routes and the editor's Version History modal have been registered since
+v1.8.0. Mutation endpoints and version-history reads require an administrator.
 
 ## Map Version Data
 
@@ -95,6 +91,20 @@ The following features are implemented:
 - Delete individual versions.
 - Compare two versions: shows added/removed/modified node and link IDs.
 - Export all versions for a map as JSON.
+
+## Safe Restoration on Unreleased Main
+
+Restoring validates the snapshot and its references before changing the map. One
+transaction saves a **Before restore** checkpoint, restores the selected snapshot,
+and saves a **Restored version** entry. Existing saved versions remain unchanged.
+Restore the checkpoint to recover the state that the operation replaced. Invalid
+snapshots return a safe error; database failures roll back the map and new history.
+
+New snapshots include complete options, description, parent map, node metadata
+and legacy canvas dimensions. Older snapshots restore only the fields they
+recorded; omitted historical settings are not guessed. History remains until
+manually deleted; the list displays the newest 20 entries. Coordinate restores
+with active editors: concurrent editing is not a shared, conflict-aware session.
 
 ## Planned Versioning Work
 
