@@ -3,6 +3,11 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Reject incomplete database table schemas in installation diagnostics, even when row counts are readable. Keep readable zero counts distinct from unavailable data and never repair tables during inspection.
+
 ## [1.15.1] - 2026-10-28
 
 ### Fixed
