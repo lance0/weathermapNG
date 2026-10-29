@@ -49,9 +49,9 @@ report() {
     # PHP variables are intentionally literal.
     # shellcheck disable=SC2016
     php -r '$r=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR); if (!$r["ok"] || $r["deployment"]!=="native" || !$r["checks"]["persistent_registry"]["ok"] || !$r["checks"]["composer_declaration"]["ok"]) exit(1);' "$evidence/$stage-report.json"
-    as_librenms composer config --global repositories.weathermapng --json > "$private/repository.json"
+    as_librenms composer config --global repositories --json > "$private/repository.json"
     # shellcheck disable=SC2016
-    php -r '$r=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR); exit(($r["type"]??null)==="path" && ($r["url"]??null)===$argv[2] && ($r["options"]["symlink"]??null)===true ? 0 : 1);' "$private/repository.json" "$plugin"
+    php -r '$repos=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR); $matches=array_values(array_filter($repos,fn($r)=>($r["name"]??null)==="weathermapng")); $r=$matches[0]??[]; exit(count($matches)===1 && ($r["type"]??null)==="path" && ($r["url"]??null)===$argv[2] && ($r["options"]["symlink"]??null)===true ? 0 : 1);' "$private/repository.json" "$plugin"
     # shellcheck disable=SC2016
     as_librenms php -r '$r=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR); exit(isset($r["require"]["librenms/weathermapng"]) ? 0 : 1);' "$root/composer.plugins.json"
 }
