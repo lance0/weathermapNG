@@ -43,7 +43,7 @@ function snapshotProjection(snapshot) {
                     $user = new App\\Models\\User(['username'=>'${tag}-'.$role, 'auth_type'=>'mysql', 'enabled'=>true]);
                     $user->setPassword($password); $user->save();
                     if ($role === 'admin') $user->assignRole('admin');
-                    $users[$role] = ['id'=>$user->user_id,'username'=>$user->username,'password'=>$password];
+                    $users[$role] = ['id'=>$user->user_id,'username'=>$user->username,'displayName'=>$user->realname ?: $user->username,'password'=>$password];
                 }
                 $map = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::create([
                     'name'=>'${tag}', 'title'=>'Historical HTTP title', 'description'=>'Historical description',
@@ -66,8 +66,14 @@ function snapshotProjection(snapshot) {
                 $link->update(['style'=>['width'=>7]]);
                 $current = $service->createVersion($map,'HTTP current','Before restoration',$users['admin']['id']);
                 $invalid = LibreNMS\\Plugins\\WeathermapNG\\Models\\MapVersion::create(['map_id'=>$map->id,'name'=>'HTTP malformed','config_snapshot'=>[],'created_by'=>$users['admin']['id']]);
+                for ($i=1; $i<=22; $i++) {
+                    LibreNMS\\Plugins\\WeathermapNG\\Models\\MapVersion::create(['map_id'=>$map->id,'name'=>'HTTP archive '.$i,
+                        'config_snapshot'=>$current->config_snapshot,'created_by'=>$users['admin']['id']]);
+                }
+                $other = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::create(['name'=>'${tag}-other']);
+                $otherVersion = $service->createVersion($other,'Other map version',null,$users['admin']['id']);
                 return ['users'=>$users,'map'=>$map->id,'target'=>$target->id,'targetSnapshot'=>$target->config_snapshot,
-                    'currentSnapshot'=>$current->config_snapshot,'invalid'=>$invalid->id];
+                    'currentSnapshot'=>$current->config_snapshot,'invalid'=>$invalid->id,'other'=>$other->id,'otherVersion'=>$otherVersion->id];
             }));
         `));
         const state = () => php(`
@@ -93,6 +99,27 @@ function snapshotProjection(snapshot) {
         };
         const reader = await login(fixture.users.reader);
         const admin = await login(fixture.users.admin);
+        const exportUrl = `${base}/plugin/WeathermapNG/api/maps/${fixture.map}/versions/export`;
+        const deniedExport = await reader.context.request.get(exportUrl);
+        assert.equal(deniedExport.status(),403,'non-admin history export denied');
+        assert.equal(state(),before,'denied export leaves raw map/graph/history identical');
+        const exportedResponse = await admin.context.request.get(exportUrl);
+        assert.equal(exportedResponse.status(),200);
+        const exported = (await exportedResponse.json()).export_data;
+        const exportRowsBefore = JSON.parse(before).wmng_map_versions;
+        assert.equal(exportRowsBefore.length,25);
+        assert.equal(exported.metadata.total_versions,25);
+        assert.equal(exported.metadata.exported_by,fixture.users.admin.displayName);
+        assert.equal(exported.versions.length,25,'export includes history beyond list limits');
+        const ordered = [...exportRowsBefore].sort((a,b) => b.created_at.localeCompare(a.created_at) || b.id-a.id);
+        assert.deepEqual(exported.versions.map(row => row.id),ordered.map(row => row.id));
+        for (const row of exported.versions) {
+            assert.notEqual(row.id,fixture.otherVersion,'other map history stays excluded');
+            assert.deepEqual(row.snapshot,JSON.parse(exportRowsBefore.find(saved => saved.id===row.id).config_snapshot));
+            assert.equal(row.created_by,fixture.users.admin.displayName);
+        }
+        assert.equal(state(),before,'successful export leaves raw map/graph/history identical');
+        console.log('PASS: export all 25 snapshots in order, admin-only, map-scoped and read-only');
         const post = (session,id) => session.context.request.post(`${base}/plugin/WeathermapNG/api/versions/${id}/restore`, {
             data:{}, headers:{ 'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':session.csrf },
         });
@@ -162,8 +189,8 @@ function snapshotProjection(snapshot) {
                 Illuminate\\Support\\Facades\\DB::transaction(function () {
                     Illuminate\\Support\\Facades\\DB::table('wmng_links')->where('map_id',${fixture.map})->delete();
                     Illuminate\\Support\\Facades\\DB::table('wmng_nodes')->where('map_id',${fixture.map})->delete();
-                    Illuminate\\Support\\Facades\\DB::table('wmng_map_versions')->where('map_id',${fixture.map})->delete();
-                    Illuminate\\Support\\Facades\\DB::table('wmng_maps')->where('id',${fixture.map})->delete();
+                    Illuminate\\Support\\Facades\\DB::table('wmng_map_versions')->whereIn('map_id',[${fixture.map},${fixture.other}])->delete();
+                    Illuminate\\Support\\Facades\\DB::table('wmng_maps')->whereIn('id',[${fixture.map},${fixture.other}])->delete();
                     foreach ([${fixture.users.admin.id},${fixture.users.reader.id}] as $id) App\\Models\\User::findOrFail($id)->delete();
                 });
             `);

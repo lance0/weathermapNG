@@ -106,6 +106,11 @@ recorded; omitted historical settings are not guessed. History remains until
 manually deleted; the list displays the newest 20 entries. Coordinate restores
 with active editors: concurrent editing is not a shared, conflict-aware session.
 
+On unreleased `main`, the JSON export includes every saved version for the
+selected map, independently of the list's display limit. It retains complete
+snapshots and available creator names. This export remains a map-history feature;
+follow the installation guide for full database and configuration backups.
+
 ## Visual Comparison on Unreleased Main
 
 In Version History, choose **Compare** on one version, select another, and run
