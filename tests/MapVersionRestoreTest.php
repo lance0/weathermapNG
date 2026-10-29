@@ -7,6 +7,7 @@ use Illuminate\Database\DatabaseTransactionsManager;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use LibreNMS\Plugins\WeathermapNG\Models\{Map, Node, Link, MapVersion};
 use LibreNMS\Plugins\WeathermapNG\Services\{MapVersionService, WebhookDispatcher};
@@ -284,6 +285,28 @@ class MapVersionRestoreTest extends TestCase
         $restored = (new MapVersionService($webhooks))->restoreVersion($version);
         $this->assertSame('Original', $restored->title);
         $this->assertSame(3, MapVersion::count());
+    }
+
+    public function testDeliveryAndLoggingFailuresCannotChangeCommittedRestoreResult(): void
+    {
+        $map = $this->graph();
+        $version = $this->service->createVersion($map, 'Target');
+        $map->update(['title' => 'Current']);
+        $webhooks = $this->createMock(WebhookDispatcher::class);
+        $webhooks->method('dispatch')->willThrowException(new \RuntimeException('delivery failure'));
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->exactly(2))->method('warning')->willThrowException(new \RuntimeException('logging failure'));
+        $originalLogger = Log::getFacadeRoot();
+        Log::swap($logger);
+        try {
+            $restored = (new MapVersionService($webhooks))->restoreVersion($version);
+            $this->assertSame('Original', $restored->title);
+            $this->assertSame('Original', $map->fresh()->title);
+            $this->assertSame(3, MapVersion::count());
+            $this->assertSame($version->config_snapshot, $this->service->getLatestVersion($map)->config_snapshot);
+        } finally {
+            Log::swap($originalLogger);
+        }
     }
 
     public function testSameSecondHistoryOrdersByNewestId(): void

@@ -38,8 +38,11 @@ class MapVersionService
             try {
                 $this->webhooks->dispatch('map.version_saved', $payload);
             } catch (\Throwable $e) {
-                // Delivery failure must not make a committed restore look rolled back.
-                Log::warning('WeathermapNG: version webhook delivery failed', ['map_id' => $payload['map_id']]);
+                try {
+                    Log::warning('WeathermapNG: version webhook delivery failed', ['map_id' => $payload['map_id']]);
+                } catch (\Throwable $loggingFailure) {
+                    // Delivery or logging failures cannot undo the committed restore.
+                }
             }
         });
 
