@@ -14,6 +14,7 @@ evidence=${4:?evidence directory required}
 private=$(mktemp -d)
 cleanup() {
     local result=$?
+    umask 077
     printf 'exit=%s stage=%s\n' "$result" "${stage:-preflight}" > "$evidence/exit-status.txt"
     echo "native upgrade test exit=$result stage=${stage:-preflight}"
     rm -rf "$private"
@@ -33,6 +34,7 @@ as_librenms() { sudo -u librenms -H "$@"; }
 logged() {
     local label=$1 result=0
     shift
+    (umask 077; : > "$evidence/$label.log")
     "$@" > "$evidence/$label.log" 2>&1 || result=$?
     printf '%s exit=%s\n' "$label" "$result" >> "$evidence/commands-status.txt"
     return "$result"
@@ -52,10 +54,15 @@ report() {
     as_librenms php -r '$r=json_decode(file_get_contents($argv[1]),true,512,JSON_THROW_ON_ERROR); exit(isset($r["require"]["librenms/weathermapng"]) ? 0 : 1);' "$root/composer.plugins.json"
 }
 check_stage() {
+    umask 077
     test "$(as_librenms git -C "$root" rev-parse HEAD)" = "$core_sha"
     test "$(as_librenms git -C "$plugin" rev-parse HEAD)" = "$1"
     test "$(as_librenms id -un)" = librenms
     test "$(as_librenms printenv HOME)" = "$root"
+    systemctl is-active --quiet "php$phpver-fpm" nginx
+    ps -eo user=,args= | awk '$1=="librenms" && $0 ~ /php-fpm: pool librenms/ {found=1} END {exit !found}'
+    sudo -u www-data test -r "$plugin/resources/js/editor-state.js"
+    sudo -u www-data test -r "$plugin/resources/css/weathermapng.css"
     fixture_run snapshot > "$evidence/$stage-snapshot.json"
     cmp "$evidence/baseline-snapshot.json" "$evidence/$stage-snapshot.json"
     fixture_run check < "$private/state.json" > "$evidence/$stage-fixture.log"
@@ -74,15 +81,19 @@ for path,headers,marker,expected in [
     (f'/plugin/WeathermapNG/api/maps/{map_id}/json',{'Authorization':'Bearer '+token},None,200),
     (f'/plugin/WeathermapNG/embed/{map_id}',{'Authorization':'Bearer '+token},f"mapId: '{map_id}'",200),
     (f'/plugin/WeathermapNG/api/maps/{map_id}/json',{'Authorization':'Bearer invalid'},None,401),
+    ('/plugins/WeathermapNG/resources/js/editor-state.js',{},'WeathermapNG editor',200),
+    ('/plugins/WeathermapNG/resources/css/weathermapng.css',{},'WeathermapNG Styles',200),
 ]:
     request=urllib.request.Request(base+path,headers=headers)
     try:
         with urllib.request.urlopen(request,timeout=20) as response:
-            status,body=response.status,response.read()
+            status,body,mime=response.status,response.read(),response.headers.get('Content-Type','')
     except urllib.error.HTTPError as error:
-        status,body=error.code,error.read()
+        status,body,mime=error.code,error.read(),error.headers.get('Content-Type','')
     assert status==expected,(path,status,expected)
     if marker: assert marker.encode() in body,path
+    if path.endswith('.js'): assert 'javascript' in mime,path
+    if path.endswith('.css'): assert 'text/css' in mime,path
     if path.endswith('/json') and status==200:
         data=json.loads(body)
         assert data['id']==map_id and len(data['nodes'])==2 and len(data['links'])==1,path
@@ -91,9 +102,14 @@ out=Path(os.environ['EVIDENCE'])/(os.environ['STAGE']+'-http.json')
 out.write_text(json.dumps(checks,indent=2)+'\n')
 PY
     echo "PASS $stage core=$core_sha plugin=$1" | tee "$evidence/$stage-result.txt"
+    umask 022
 }
 
 stage=provision
+for file in apt.log apt-install.log core-clone.log nginx-test.log services.log bundle-verify.log baseline-snapshot.json runtime-versions.txt revisions.txt commands-status.txt; do
+    : > "$evidence/$file"
+done
+umask 022
 export DEBIAN_FRONTEND=noninteractive
 sudo systemctl start mysql
 apt-get update > "$evidence/apt.log" 2>&1
@@ -104,6 +120,7 @@ git clone --filter=blob:none --branch 26.10.2 https://github.com/librenms/libren
 test "$(git -C "$root" rev-parse HEAD)" = "$core_sha"
 db_password=$(openssl rand -hex 24)
 token=$(openssl rand -hex 24)
+umask 077
 printf '%s' "$token" > "$private/token"
 chown root:librenms "$private"
 chmod 710 "$private"
@@ -127,7 +144,9 @@ lines=[line for line in source.splitlines() if line.split('=',1)[0] not in value
 (root/'.env').chmod(0o600)
 PY
 unset db_password token
+umask 022
 chown -R librenms:librenms "$root"
+chmod 771 "$root"
 mkdir -p "$root"/{rrd,logs,bootstrap/cache,storage}
 chown -R librenms:librenms "$root"/{rrd,logs,bootstrap/cache,storage}
 setfacl -d -m g::rwx "$root"/{rrd,logs,bootstrap/cache,storage}
@@ -170,10 +189,12 @@ chmod 640 "$private/fixture.php"
 logged baseline-install as_librenms bash -euc 'cd /opt/librenms/html/plugins/WeathermapNG; ./quick-install.sh'
 systemctl restart "php$phpver-fpm"
 stage=baseline
+umask 077
 fixture_run seed > "$private/state.json"
 chown root:librenms "$private/state.json"
 chmod 640 "$private/state.json"
 fixture_run snapshot > "$evidence/baseline-snapshot.json"
+umask 022
 check_stage "$baseline_sha"
 
 stage=deploy
@@ -198,5 +219,6 @@ for stage in post-pull post-pull-repeat; do
     systemctl restart "php$phpver-fpm"
     check_stage "$candidate_sha"
 done
+umask 077
 printf 'PHP=%s Composer=%s MySQL=%s\n' "$(php -r 'echo PHP_VERSION;')" "$(composer --version --no-ansi)" "$(mysql --version)" > "$evidence/runtime-versions.txt"
 printf 'core=%s\nbaseline=%s\ncandidate=%s\n' "$core_sha" "$baseline_sha" "$candidate_sha" > "$evidence/revisions.txt"
