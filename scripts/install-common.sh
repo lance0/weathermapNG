@@ -89,13 +89,43 @@ prepare_install_repository() {
             if (!is_object($repositories) && !is_array($repositories)) {
                 throw new RuntimeException("repositories must be an object or array");
             }
-            $repositories = (array) $repositories;
-            if (!array_key_exists("weathermapng", $repositories)) {
+            $managed = [];
+            foreach ((array) $repositories as $name => $entry) {
+                if ($name === "weathermapng") {
+                    $managed[] = $entry;
+                } elseif (is_object($entry) && ($entry->name ?? null) === "weathermapng") {
+                    $managed[] = $entry;
+                } elseif (is_object($entry) && property_exists($entry, "weathermapng")) {
+                    $managed[] = $entry->weathermapng;
+                }
+            }
+            if (count($managed) > 1) {
+                throw new RuntimeException("multiple managed entries exist");
+            }
+            if (!$managed) {
                 continue;
             }
-            $repository = $repositories["weathermapng"];
+            $repository = $managed[0];
             if (!is_object($repository) || ($repository->type ?? null) !== "path"
-                || !is_string($repository->url ?? null) || realpath($repository->url) !== $argv[3]) {
+                || !is_string($repository->url ?? null)
+                || (isset($repository->name) && $repository->name !== "weathermapng")) {
+                throw new RuntimeException("managed entry is not a path repository for the selected checkout");
+            }
+            $path = $repository->url;
+            if (strpbrk($path, "*?{}") !== false) {
+                throw new RuntimeException("managed path contains a wildcard; set it to the selected checkout explicitly");
+            }
+            if (str_starts_with($path, "~/")) {
+                $home = getenv("HOME") ?: (function_exists("posix_getpwuid") ? (posix_getpwuid(posix_getuid())["dir"] ?? false) : false);
+                if ($home === false) throw new RuntimeException("cannot resolve home directory in managed path");
+                $path = $home . substr($path, 1);
+            } elseif (preg_match("~^\\$([A-Za-z0-9_]+)(.*)$~", $path, $match)
+                || preg_match("~^%([A-Za-z0-9_]+)%(.*)$~", $path, $match)) {
+                $value = getenv($match[1]);
+                if ($value === false) throw new RuntimeException("managed path environment variable is unset");
+                $path = $value . $match[2];
+            }
+            if (realpath($path) !== $argv[3]) {
                 throw new RuntimeException("managed entry is not a path repository for the selected checkout");
             }
             if ($index === 0) {
