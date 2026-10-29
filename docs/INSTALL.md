@@ -202,6 +202,14 @@ and verify editor/embed access. To follow `main` deliberately, clone with
 fast-forward the host checkout and recreate the Docker app. `main` can contain
 unreleased changes.
 
+On unreleased `main`, deploy checks the selected runtime's files, PHP extensions,
+required commands and known destination permissions before changing Git source.
+It checks Composer repository ownership under the installer locks before pulling,
+then the selected new installer checks its own requirements again. Correct a
+reported preflight problem and retry from the same checkout. These checks cannot
+predict requirements introduced by unseen source, dependency-solving failures or
+disk exhaustion, and do not provide rollback after later installation steps.
+
 ## Diagnostics and targeted recovery
 
 Run the read-only report as the runtime user from the plugin checkout:

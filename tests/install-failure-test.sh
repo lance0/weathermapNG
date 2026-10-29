@@ -9,7 +9,7 @@ if [ "$(id -u)" -eq 0 ]; then
 fi
 printf 'Installer fixture UID: %s\n' "$(id -u)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'chmod -R u+rwX "$WORK"; rm -rf "$WORK"' EXIT
 PLUGIN="$WORK/plugin source"
 export COMPOSER_HOME="$WORK/composer-home"
 export LIBRENMS_PATH="$WORK/selected root's app"
@@ -68,7 +68,16 @@ EOF
 cat > "$FAKE_BIN/php" <<'EOF'
 #!/bin/bash
 printf 'php %s\n' "$*" >> "$INSTALL_LOG"
-if [ "${1:-}" = -r ]; then exec "$REAL_PHP" "$@"; fi
+if [ "${1:-}" = -r ]; then
+    if [[ "$2" == *version_compare* ]]; then
+        echo runtime-preflight >> "$INSTALL_LOG"
+        case "${FAIL_STAGE:-}" in
+            php-version) echo "PHP 8.2+ required" >&2; exit 41;;
+            php-extension) echo "Missing PHP extension: gd" >&2; exit 42;;
+        esac
+    fi
+    exec "$REAL_PHP" "$@"
+fi
 case "${FAIL_STAGE:-}:${1:-}:${2:-}" in
     schema:database/setup.php:*|discovery:artisan:package:discover) exit 23;;
 esac
@@ -195,7 +204,7 @@ chmod 000 "$COMPOSER_HOME/config.json"
 : > "$INSTALL_LOG"
 if bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1; then echo 'FAIL: unreadable global configuration accepted' >&2; exit 1; fi
 chmod 600 "$COMPOSER_HOME/config.json"
-grep -q 'repositories.weathermapng' "$WORK/output"
+grep -q 'config.json' "$WORK/output"
 if grep -q '^composer ' "$INSTALL_LOG"; then echo 'FAIL: unreadable configuration reached Composer' >&2; exit 1; fi
 cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
 echo 'PASS: unreadable global configuration is preserved and refused'
@@ -346,3 +355,130 @@ grep -q 'move it to a plain path' "$WORK/output"
 if grep -Eq '^(composer |lnms |php database/)' "$INSTALL_LOG"; then echo 'FAIL: glob-like checkout reached dependency mutation' >&2; exit 1; fi
 printf '{}\n' | cmp - "$COMPOSER_HOME/config.json"
 echo 'PASS: fresh checkout path with glob characters fails before dependencies'
+
+# Fresh registry creation still works with a read-only manifest and existing credentials.
+rm "$COMPOSER_HOME/config.json"
+chmod 444 "$PLUGIN/composer.json"
+chmod 400 "$COMPOSER_HOME/auth.json"
+cp "$PLUGIN/composer.json" "$WORK/manifest.before"
+: > "$INSTALL_LOG"
+bash "$PLUGIN/quick-install.sh" > "$WORK/output" 2>&1 || { cat "$WORK/output" >&2; exit 1; }
+grep -q 'Installation complete' "$WORK/output"
+grep -q '^composer config --global repositories.weathermapng' "$INSTALL_LOG"
+cmp "$WORK/manifest.before" "$PLUGIN/composer.json"
+cmp "$WORK/auth.before" "$COMPOSER_HOME/auth.json"
+echo 'PASS: fresh registration accepts read-only plugin manifest and credentials'
+
+# A real local remote has a pending fast-forward throughout every failed preflight.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+rm "$FAKE_BIN/git"
+REAL_GIT=$(command -v git)
+cp "$SOURCE/.gitignore" "$PLUGIN/.gitignore"
+printf 'old source\n' > "$PLUGIN/source-marker"
+"$REAL_GIT" init -q --initial-branch=main "$PLUGIN"
+"$REAL_GIT" -C "$PLUGIN" add quick-install.sh deploy.sh scripts composer.json database verify-deployment.php .gitignore source-marker
+"$REAL_GIT" -C "$PLUGIN" -c user.name=Fixture -c user.email=fixture@localhost -c commit.gpgSign=false commit -qm old
+"$REAL_GIT" init -q --bare --initial-branch=main "$WORK/origin.git"
+"$REAL_GIT" -C "$PLUGIN" remote add origin "$WORK/origin.git"
+"$REAL_GIT" -C "$PLUGIN" push -qu origin main
+"$REAL_GIT" clone -q --branch main "$WORK/origin.git" "$WORK/new-source"
+printf 'new source\n' > "$WORK/new-source/source-marker"
+"$REAL_GIT" -C "$WORK/new-source" add source-marker
+"$REAL_GIT" -C "$WORK/new-source" -c user.name=Fixture -c user.email=fixture@localhost -c commit.gpgSign=false commit -qm new
+"$REAL_GIT" -C "$WORK/new-source" push -q origin main
+before=$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)
+after=$("$REAL_GIT" -C "$WORK/new-source" rev-parse HEAD)
+assert_upgrade_refused() {
+    local observed_head
+    : > "$INSTALL_LOG"
+    if PATH="${1:-$PATH}" /bin/bash "$PLUGIN/deploy.sh" > "$WORK/output" 2>&1; then
+        echo 'FAIL: invalid upgrade preflight accepted' >&2; exit 1
+    fi
+    grep -q 'Error:' "$WORK/output"
+    observed_head=$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)
+    [ "$observed_head" = "$before" ] || { echo "FAIL: failed preflight advanced HEAD from $before to $observed_head" >&2; exit 1; }
+    [ "$(cat "$PLUGIN/source-marker")" = 'old source' ]
+    if grep -Eq '^(composer |lnms |php (database/|artisan))' "$INSTALL_LOG"; then echo 'FAIL: failed preflight reached mutation' >&2; exit 1; fi
+}
+for file in composer.json vendor/autoload.php bootstrap/app.php artisan lnms; do
+    mv "$LIBRENMS_PATH/$file" "$WORK/saved-root-file"
+    assert_upgrade_refused
+    mv "$WORK/saved-root-file" "$LIBRENMS_PATH/$file"
+done
+echo 'PASS: missing root files leave real Git HEAD and source untouched'
+mv "$PLUGIN/composer.json" "$WORK/saved-manifest"
+assert_upgrade_refused
+test ! -e "$PLUGIN/composer.json"
+mv "$WORK/saved-manifest" "$PLUGIN/composer.json"
+chmod 000 "$PLUGIN/composer.json"
+assert_upgrade_refused
+grep -q 'readable composer.json' "$WORK/output"
+chmod 444 "$PLUGIN/composer.json"
+echo 'PASS: missing or unreadable plugin manifest leaves real Git HEAD untouched'
+chmod 644 "$LIBRENMS_PATH/lnms"
+assert_upgrade_refused
+grep -q 'must be executable' "$WORK/output"
+chmod 755 "$LIBRENMS_PATH/lnms"
+echo 'PASS: non-executable lnms leaves real Git HEAD and source untouched'
+mkdir "$WORK/no-composer"
+for tool in dirname id php; do ln -s "$(command -v "$tool")" "$WORK/no-composer/$tool"; done
+assert_upgrade_refused "$WORK/no-composer"
+grep -q 'unavailable: composer' "$WORK/output"
+echo 'PASS: missing Composer leaves real Git HEAD and source untouched'
+for stage in php-version php-extension; do
+    FAIL_STAGE="$stage" assert_upgrade_refused
+    grep -Eq 'PHP 8.2\+ required|Missing PHP extension: gd' "$WORK/output"
+done
+echo 'PASS: PHP version and extension rejection leave real Git HEAD and source untouched'
+if [ "$(/usr/bin/id -u)" -eq 0 ]; then
+    echo 'FAIL: permission regressions must run as an unprivileged user' >&2; exit 1
+fi
+mkdir -p "$PLUGIN/vendor/composer" "$LIBRENMS_PATH/vendor/composer" "$WORK/locked-parent"
+for directory in "$PLUGIN" "$LIBRENMS_PATH" "$COMPOSER_HOME" "$PLUGIN/vendor/composer" "$LIBRENMS_PATH/vendor/composer" "$PLUGIN/output/cache"; do
+    chmod 555 "$directory"
+    assert_upgrade_refused
+    grep -q 'writable directory' "$WORK/output"
+    chmod 755 "$directory"
+done
+chmod 444 "$LIBRENMS_PATH/composer.json"
+assert_upgrade_refused
+grep -q 'writable file' "$WORK/output"
+chmod 644 "$LIBRENMS_PATH/composer.json"
+for file in "$COMPOSER_HOME/config.json" "$COMPOSER_HOME/auth.json"; do
+    chmod 000 "$file"
+    assert_upgrade_refused
+    grep -q 'not readable' "$WORK/output"
+    chmod 400 "$file"
+done
+chmod 600 "$COMPOSER_HOME/config.json"
+chmod 555 "$WORK/locked-parent"
+COMPOSER_HOME="$WORK/locked-parent/new/nested" assert_upgrade_refused
+test ! -e "$WORK/locked-parent/new"
+chmod 755 "$WORK/locked-parent"
+echo 'PASS: real unprivileged permission failures leave Git/source unchanged without mkdir probes'
+repository_config "$COMPOSER_HOME/config.json" "$WORK/other-plugin"
+assert_upgrade_refused
+grep -q 'repositories.weathermapng' "$WORK/output"
+repository_config "$COMPOSER_HOME/config.json" "$PLUGIN"
+echo 'PASS: conflicting registration is refused under locks before the real Git fast-forward'
+chmod 444 "$PLUGIN/composer.json" "$COMPOSER_HOME/config.json"
+chmod 400 "$COMPOSER_HOME/auth.json"
+cp "$COMPOSER_HOME/config.json" "$WORK/global.before"
+"$REAL_GIT" -C "$PLUGIN" diff --quiet
+: > "$INSTALL_LOG"
+bash "$PLUGIN/deploy.sh" > "$WORK/output" 2>&1
+[ "$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)" = "$after" ]
+[ "$(cat "$PLUGIN/source-marker")" = 'new source' ]
+[ "$(grep -c '^runtime-preflight$' "$INSTALL_LOG")" -eq 2 ]
+grep -q 'Installation complete' "$WORK/output"
+cmp "$WORK/auth.before" "$COMPOSER_HOME/auth.json"
+cmp "$WORK/manifest.before" "$PLUGIN/composer.json"
+cmp "$WORK/global.before" "$COMPOSER_HOME/config.json"
+if grep -q '^composer config --global' "$INSTALL_LOG"; then echo 'FAIL: read-only compatible registry was rewritten' >&2; exit 1; fi
+echo 'PASS: valid tracked upgrade rechecks runtime and preserves read-only manifest, registry, and credentials'
+"$REAL_GIT" -C "$PLUGIN" checkout -q --detach "$before"
+bash "$PLUGIN/deploy.sh" > "$WORK/output" 2>&1
+[ "$("$REAL_GIT" -C "$PLUGIN" rev-parse HEAD)" = "$before" ]
+grep -q 'Detached checkout' "$WORK/output"
+grep -q 'Installation complete' "$WORK/output"
+echo 'PASS: detached real Git reinstall retains the selected commit'

@@ -17,19 +17,11 @@ fi
 
 step=preflight
 trap 'result=$?; printf "Error: %s failed (exit %s).\nRetry as the LibreNMS user: cd %q && LIBRENMS_PATH=%q ./quick-install.sh\n" "$step" "$result" "$PLUGIN_DIR" "$LIBRENMS_PATH" >&2; exit "$result"' ERR
-for file in composer.json vendor/autoload.php bootstrap/app.php artisan lnms; do
-    if [ ! -r "$LIBRENMS_PATH/$file" ]; then
-        echo "Error: Selected LibreNMS installation lacks readable $file. Set LIBRENMS_PATH to the intended installation." >&2
-        exit 1
-    fi
-done
-[ -w "$PLUGIN_DIR" ]
-command -v composer >/dev/null
-php -r 'if (version_compare(PHP_VERSION, "8.2.0", "<")) { fwrite(STDERR, "PHP 8.2+ required\n"); exit(1); } foreach (["gd", "json", "pdo", "mbstring"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing PHP extension: $extension\n"); exit(1); } } echo "PHP Version: " . PHP_VERSION . "\n";'
-
-step='acquiring installer locks'
 # shellcheck source=scripts/install-common.sh
 source "$PLUGIN_DIR/scripts/install-common.sh"
+preflight_install_runtime
+
+step='acquiring installer locks'
 acquire_install_locks
 
 step='checking Composer repository ownership'

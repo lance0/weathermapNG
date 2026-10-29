@@ -1,6 +1,80 @@
 #!/bin/bash
 # Shared by deploy.sh and quick-install.sh after dropping root privileges.
 
+resolve_composer_home() {
+    local composer_home xdg_home
+    # Composer config can write files even when asked only to read home.
+    composer_home=${COMPOSER_HOME:-}
+    if [ -z "$composer_home" ]; then
+        : "${HOME:?HOME or COMPOSER_HOME must be set}"
+        composer_home="$HOME/.composer"
+        if [ -d /etc/xdg ] || [ -n "$(compgen -e XDG_)" ]; then
+            xdg_home="${XDG_CONFIG_HOME:-$HOME/.config}/composer"
+            if [ -d "$xdg_home" ] || [ ! -d "$composer_home" ]; then composer_home=$xdg_home; fi
+        fi
+    fi
+    printf '%s\n' "$composer_home"
+}
+
+require_install_writable() {
+    local path=$1 kind=$2 parent
+    if [ -e "$path" ] || [ -L "$path" ]; then
+        if [ "$kind" = directory ]; then
+            if [ -d "$path" ] && [ -w "$path" ] && [ -x "$path" ]; then return; fi
+        elif [ -f "$path" ] && [ -r "$path" ] && [ -w "$path" ]; then
+            return
+        fi
+    else
+        parent=$(dirname "$path")
+        while [ ! -e "$parent" ] && [ ! -L "$parent" ]; do parent=$(dirname "$parent"); done
+        if [ -d "$parent" ] && [ -w "$parent" ] && [ -x "$parent" ]; then return; fi
+    fi
+    printf 'Error: Installer needs a writable %s at %s; check its type and permissions, or its existing parent if missing.\n' "$kind" "$path" >&2
+    exit 1
+}
+
+preflight_install_runtime() {
+    local file directory composer_home executable
+    for file in composer.json vendor/autoload.php bootstrap/app.php artisan lnms; do
+        if [ ! -f "$LIBRENMS_PATH/$file" ] || [ ! -r "$LIBRENMS_PATH/$file" ]; then
+            echo "Error: Selected LibreNMS installation lacks readable $file. Set LIBRENMS_PATH to the intended installation." >&2
+            exit 1
+        fi
+    done
+    if [ ! -f "$PLUGIN_DIR/composer.json" ] || [ ! -r "$PLUGIN_DIR/composer.json" ]; then
+        echo "Error: Plugin checkout lacks readable composer.json: $PLUGIN_DIR/composer.json" >&2
+        exit 1
+    fi
+    if [ ! -x "$LIBRENMS_PATH/lnms" ]; then
+        echo "Error: Selected LibreNMS lnms must be executable: $LIBRENMS_PATH/lnms" >&2
+        exit 1
+    fi
+    for executable in composer php; do
+        if ! command -v "$executable" >/dev/null; then
+            echo "Error: Required installer command is unavailable: $executable. Install it for the LibreNMS user and retry." >&2
+            exit 1
+        fi
+    done
+    php -r 'if (version_compare(PHP_VERSION, "8.2.0", "<")) { fwrite(STDERR, "PHP 8.2+ required\n"); exit(1); } foreach (["gd", "json", "pdo", "mbstring"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing PHP extension: $extension\n"); exit(1); } } echo "PHP Version: " . PHP_VERSION . "\n";'
+    composer_home=$(resolve_composer_home)
+    for directory in "$PLUGIN_DIR" "$LIBRENMS_PATH" "$composer_home" \
+        "$PLUGIN_DIR/vendor" "$PLUGIN_DIR/vendor/composer" "$LIBRENMS_PATH/vendor" "$LIBRENMS_PATH/vendor/composer" \
+        "$LIBRENMS_PATH/storage/cache" "$PLUGIN_DIR/output" "$PLUGIN_DIR/output/maps" "$PLUGIN_DIR/output/cache" "$PLUGIN_DIR/output/thumbnails"; do
+        require_install_writable "$directory" directory
+    done
+    for file in "$PLUGIN_DIR/composer.lock" "$LIBRENMS_PATH/composer.json" "$LIBRENMS_PATH/composer.lock"; do
+        require_install_writable "$file" file
+    done
+    for file in "$composer_home/config.json" "$composer_home/auth.json"; do
+        if [ -e "$file" ] || [ -L "$file" ]; then
+            if [ ! -f "$file" ] || [ ! -r "$file" ]; then
+                echo "Error: Composer configuration is not readable: $file" >&2
+                exit 1
+            fi
+        fi
+    done
+}
+
 install_lock() {
     local variable=$1 resource=$2 file=$3 fd=${!1:-} previous saved_umask
     # Reuse only inherited descriptors for this inode, never a claimed "held" flag.
@@ -30,7 +104,7 @@ install_lock() {
 }
 
 acquire_install_locks() {
-    local composer_home xdg_home saved_umask
+    local composer_home saved_umask
     local -a install_lock_fds=()
     # Only exec preserves ownership; forked children must contend on fresh descriptors.
     if [ "${WEATHERMAPNG_LOCK_OWNER_PID:-}" != "$BASHPID" ]; then
@@ -41,16 +115,7 @@ acquire_install_locks() {
         exit 1
     fi
     LIBRENMS_PATH=$(cd "$LIBRENMS_PATH" && pwd -P)
-    # Composer's config command can write config/auth files even when reading home.
-    composer_home=${COMPOSER_HOME:-}
-    if [ -z "$composer_home" ]; then
-        : "${HOME:?HOME or COMPOSER_HOME must be set}"
-        composer_home="$HOME/.composer"
-        if [ -d /etc/xdg ] || [ -n "$(compgen -e XDG_)" ]; then
-            xdg_home="${XDG_CONFIG_HOME:-$HOME/.config}/composer"
-            if [ -d "$xdg_home" ] || [ ! -d "$composer_home" ]; then composer_home=$xdg_home; fi
-        fi
-    fi
+    composer_home=$(resolve_composer_home)
     saved_umask=$(umask)
     umask 077
     if ! mkdir -p "$LIBRENMS_PATH/storage/cache" "$composer_home"; then

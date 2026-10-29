@@ -12,12 +12,16 @@ if [ "$(id -u)" -eq 0 ]; then
     echo 'Error: Run deploy.sh as the LibreNMS user, not root.' >&2
     exit 1
 fi
-step='checking source checkout'
-trap 'result=$?; printf "Error: %s failed; existing installation was not reinstalled.\nResolve the checkout/upstream error, then retry as the LibreNMS user: cd %q && LIBRENMS_PATH=%q ./deploy.sh\n" "$step" "$PLUGIN_DIR" "$LIBRENMS_PATH" >&2; exit "$result"' ERR
-step='acquiring installer locks'
+step=preflight
+trap 'result=$?; printf "Error: %s failed; existing installation was not reinstalled.\nResolve the preflight or checkout/upstream error, then retry as the LibreNMS user: cd %q && LIBRENMS_PATH=%q ./deploy.sh\n" "$step" "$PLUGIN_DIR" "$LIBRENMS_PATH" >&2; exit "$result"' ERR
 # shellcheck source=scripts/install-common.sh
 source "$PLUGIN_DIR/scripts/install-common.sh"
+preflight_install_runtime
+
+step='acquiring installer locks'
 acquire_install_locks
+step='checking Composer repository ownership'
+prepare_install_repository >/dev/null
 
 cd "$PLUGIN_DIR"
 if [ -e .git ]; then

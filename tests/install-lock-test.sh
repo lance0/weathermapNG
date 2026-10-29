@@ -199,8 +199,8 @@ echo 'PASS: termination releases locks after the in-flight command exits'
 echo 'PASS: coincident lock inodes are deduplicated and caller umask is retained'
 # Hide flock while retaining only commands needed before lock acquisition.
 mkdir "$WORK/no-flock"
-for tool in dirname id; do ln -s "$(command -v "$tool")" "$WORK/no-flock/$tool"; done
-if PATH="$WORK/no-flock" LIBRENMS_PATH="$WORK/a/root" /bin/bash "$WORK/a/plugin/deploy.sh" > "$WORK/missing.out" 2>&1; then fail 'missing flock accepted'; fi
+for tool in dirname id composer php; do ln -s "$(command -v "$tool")" "$WORK/no-flock/$tool"; done
+if PATH="$WORK/no-flock" COMPOSER_HOME="$WORK/a/home" LIBRENMS_PATH="$WORK/a/root" /bin/bash "$WORK/a/plugin/deploy.sh" > "$WORK/missing.out" 2>&1; then fail 'missing flock accepted'; fi
 grep -q 'flock is required' "$WORK/missing.out" || fail 'missing flock lacked actionable diagnostic'
 echo 'PASS: missing flock fails before mutation'
 

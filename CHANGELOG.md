@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Export complete saved map history instead of silently stopping at ten versions. Keep normal lists bounded and include available creator/exporter names.
 - Escape quoted template titles safely in gallery attributes and handle malformed nested template configuration without inventing counts.
 - Refuse conflicting Composer repository ownership before dependency changes. Preserve compatible object/list entries and path aliases, and retain the legacy local lookup until registration succeeds.
+- Check the selected runtime and known permissions before tracked upgrades advance Git. Share the install/deploy preflight, preserve valid read-only inputs, and recheck the selected new source before installation.
 
 ## [1.15.1] - 2026-10-28
 
