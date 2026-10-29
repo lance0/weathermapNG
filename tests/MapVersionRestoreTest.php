@@ -20,6 +20,10 @@ class MapVersionRestoreTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+        if (!extension_loaded('pdo_sqlite')) {
+            $this->markTestSkipped('pdo_sqlite extension not available; restore behavior is covered by the MariaDB integration suite.');
+        }
         $app = Facade::getFacadeApplication();
         $capsule = new Capsule($app);
         $capsule->addConnection(['driver' => 'sqlite', 'database' => ':memory:', 'foreign_key_constraints' => true]);
