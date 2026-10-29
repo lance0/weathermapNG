@@ -60,10 +60,93 @@ acquire_install_locks() {
     fi
     umask "$saved_umask"
     composer_home=$(cd "$composer_home" && pwd -P)
+    INSTALL_COMPOSER_HOME=$composer_home
     # An explicit relative home must stay the same across installer directory changes.
     if [ -n "${COMPOSER_HOME:-}" ]; then export COMPOSER_HOME=$composer_home; fi
     install_lock WEATHERMAPNG_ROOT_LOCK_FD 'LibreNMS installation' "$LIBRENMS_PATH/storage/cache/.weathermapng-install.lock"
     install_lock WEATHERMAPNG_CHECKOUT_LOCK_FD 'plugin checkout' "$PLUGIN_DIR/.weathermapng-install.lock"
     install_lock WEATHERMAPNG_COMPOSER_LOCK_FD 'Composer home' "$composer_home/.weathermapng-install.lock"
     export WEATHERMAPNG_LOCK_OWNER_PID=$BASHPID
+}
+
+prepare_install_repository() {
+    php -r '
+    try {
+        $file = $argv[3];
+        if (strpbrk($argv[3], "*?{}[]") !== false) {
+            throw new RuntimeException("selected checkout path contains glob characters; move it to a plain path before retrying");
+        }
+        chdir($argv[2]);
+        $globalExists = false;
+        foreach ([$argv[1] . "/config.json", $argv[2] . "/composer.json"] as $index => $file) {
+            if ($index === 0 && !file_exists($file) && !is_link($file)) {
+                continue;
+            }
+            if (!is_file($file) || !is_readable($file) || ($contents = @file_get_contents($file)) === false) {
+                throw new RuntimeException("configuration is not readable");
+            }
+            $config = json_decode($contents, false, 512, JSON_THROW_ON_ERROR);
+            if (!$config instanceof stdClass) {
+                throw new RuntimeException("configuration must be a JSON object");
+            }
+            $repositories = property_exists($config, "repositories") ? $config->repositories : new stdClass;
+            if (!is_object($repositories) && !is_array($repositories)) {
+                throw new RuntimeException("repositories must be an object or array");
+            }
+            $managed = [];
+            foreach ((array) $repositories as $name => $entry) {
+                if ($name === "weathermapng") {
+                    $managed[] = $entry;
+                } elseif (is_object($entry) && ($entry->name ?? null) === "weathermapng") {
+                    $managed[] = $entry;
+                } elseif (is_object($entry) && property_exists($entry, "weathermapng")) {
+                    $managed[] = $entry->weathermapng;
+                }
+            }
+            if (count($managed) > 1) {
+                throw new RuntimeException("multiple managed entries exist");
+            }
+            if (!$managed) {
+                continue;
+            }
+            $repository = $managed[0];
+            if (!is_object($repository) || ($repository->type ?? null) !== "path"
+                || !is_string($repository->url ?? null)
+                || (isset($repository->name) && $repository->name !== "weathermapng")) {
+                throw new RuntimeException("managed entry is not a path repository for the selected checkout");
+            }
+            $path = $repository->url;
+            if (strpbrk($path, "*?{}[]") !== false) {
+                throw new RuntimeException("managed path contains glob characters; set it to a plain checkout path explicitly");
+            }
+            if (str_starts_with($path, "~/")) {
+                $home = getenv("HOME") ?: (function_exists("posix_getpwuid") ? (posix_getpwuid(posix_getuid())["dir"] ?? false) : false);
+                if ($home === false) throw new RuntimeException("cannot resolve home directory in managed path");
+                $path = $home . substr($path, 1);
+            } elseif (preg_match("~^\\$([A-Za-z0-9_]+)(.*)$~", $path, $match)
+                || preg_match("~^%([A-Za-z0-9_]+)%(.*)$~", $path, $match)) {
+                $value = getenv($match[1]);
+                if ($value === false) throw new RuntimeException("managed path environment variable is unset");
+                $path = $value . $match[2];
+            }
+            if (realpath($path) !== $argv[3]) {
+                throw new RuntimeException("managed entry is not a path repository for the selected checkout");
+            }
+            if ($index === 0) {
+                $globalExists = true;
+            }
+        }
+        if (!$globalExists) {
+            $file = $argv[1] . "/config.json";
+            if ((file_exists($file) || is_link($file)) && !is_writable($file)) {
+                throw new RuntimeException("global configuration is not writable for repository registration");
+            }
+            echo json_encode(["type" => "path", "url" => $argv[3], "options" => ["symlink" => true]], JSON_THROW_ON_ERROR);
+        }
+    } catch (Throwable $error) {
+        fwrite(STDERR, "Error: Refusing to change repositories.weathermapng in " . $file . ": " . $error->getMessage()
+            . ". Inspect that entry and use its existing checkout or deliberately correct the configuration before retrying.\n");
+        exit(1);
+    }
+    ' "$INSTALL_COMPOSER_HOME" "$LIBRENMS_PATH" "$PLUGIN_DIR"
 }
