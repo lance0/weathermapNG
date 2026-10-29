@@ -7,6 +7,7 @@ const { chromium } = require('playwright-core');
 const base = process.argv[2] || 'http://localhost:8000';
 const tag = randomBytes(6).toString('hex');
 const name = `wmng-onboarding-${tag}`;
+const customName = `${name}-custom`;
 const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-dev', 'php', '-r', `
     require '/opt/librenms/vendor/autoload.php';
     $app = require '/opt/librenms/bootstrap/app.php';
@@ -25,6 +26,14 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         $user->assignRole('admin');
         echo json_encode(['id' => $user->user_id, 'username' => $user->username, 'password' => $password]);
     `));
+    const deleteFixtureMap = fixtureName => php(`
+        foreach (LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::where('name', '${fixtureName}')->get() as $map) {
+            $map->links()->delete();
+            LibreNMS\\Plugins\\WeathermapNG\\Models\\MapVersion::where('map_id', $map->id)->delete();
+            $map->nodes()->delete();
+            $map->delete();
+        }
+    `);
     let browser;
     try {
         browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH });
@@ -73,6 +82,51 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
 
         await modalAction('shown.bs.modal', () => page.getByRole('button', { name: 'Create your first map' }).click());
         await page.locator('#customPane.active').waitFor();
+        await page.locator('#map-name').fill('');
+        const customPost = response => new URL(response.url()).pathname.endsWith('/plugin/WeathermapNG/map') && response.request().method() === 'POST';
+        const invalidResponse = page.waitForResponse(customPost);
+        await page.locator('#createMapSubmitBtn').click();
+        const invalid = await invalidResponse;
+        assert.equal(invalid.status(), 422);
+        assert.match(invalid.headers()['content-type'], /application\/json/);
+        const validation = await invalid.json();
+        assert.ok(validation.errors?.name?.includes('Map name is required'));
+        await page.locator('.wmng-toast-error').filter({ hasText: 'Map name is required' }).waitFor({ state: 'visible' });
+        await page.locator('#createMapSubmitBtn:not([disabled])').waitFor();
+        assert.equal(await page.locator('#createMapModal').isVisible(), true);
+        assert.equal(count(), 0);
+
+        await page.locator('#map-name').fill(customName);
+        await page.locator('#map-width').fill('960');
+        await page.locator('#map-height').fill('640');
+        const customResponse = page.waitForResponse(customPost);
+        await page.locator('#createMapSubmitBtn').click();
+        const custom = await customResponse;
+        assert.equal(custom.status(), 200);
+        assert.match(custom.headers()['content-type'], /application\/json/);
+        assert.equal(custom.request().headers()['accept'], 'application/json');
+        assert.equal(custom.request().headers()['x-requested-with'], 'XMLHttpRequest');
+        const customData = await custom.json();
+        assert.equal(customData.success, true);
+        assert.equal(customData.map.name, customName);
+        const customId = Number(customData.map.id);
+        assert.ok(Number.isSafeInteger(customId) && customId > 0);
+        await page.waitForURL(url => url.pathname.endsWith(`/editor/${customId}`));
+        await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
+        assert.deepEqual(await page.evaluate(() => ({
+            name: document.getElementById('map-name').value,
+            width: WMNG.EditorState.mapWidth,
+            height: WMNG.EditorState.mapHeight,
+        })), { name: customName, width: 960, height: 640 });
+        assert.equal(count(), 1);
+        await page.goto(`${base}/plugin/WeathermapNG`);
+        deleteFixtureMap(customName);
+        assert.equal(count(), 0);
+        await page.reload();
+        await page.getByText('No maps yet').waitFor();
+
+        await modalAction('shown.bs.modal', () => page.getByRole('button', { name: 'Create your first map' }).click());
+        await page.locator('#customPane.active').waitFor();
         await modalAction('hidden.bs.modal', () => page.getByRole('button', { name: 'Cancel' }).first().click());
         assert.equal(count(), 0);
 
@@ -113,17 +167,12 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.goto(`${base}/plugin/WeathermapNG`);
         assert.equal(await page.getByText('No maps yet').count(), 0);
         assert.deepEqual(errors, []);
-        console.log('PASS: empty onboarding, modal tabs, cancel safety, named sample, editor graph, and welcome removal');
+        console.log('PASS: empty onboarding, validation recovery, custom JSON creation, modal tabs, cancel safety, named sample, editor graph, and welcome removal');
     } finally {
         await browser?.close();
+        deleteFixtureMap(customName);
+        deleteFixtureMap(name);
         php(`
-            $map = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::where('name', '${name}')->first();
-            if ($map) {
-                $map->links()->delete();
-                LibreNMS\\Plugins\\WeathermapNG\\Models\\MapVersion::where('map_id', $map->id)->delete();
-                $map->nodes()->delete();
-                $map->delete();
-            }
             App\\Models\\User::findOrFail(${fixture.id})->delete();
         `);
     }
