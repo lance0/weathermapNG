@@ -1,6 +1,6 @@
 # Install, upgrade, and recover WeathermapNG
 
-This is the canonical guide for **v1.15.1**. Use the tagged release for a stable
+This is the canonical guide for **v1.16.0**. Use the tagged release for a stable
 installation; following `main` is an explicit development choice. WeathermapNG is
 a LibreNMS v2 Composer-discovered plugin, served at `/plugin/WeathermapNG`.
 
@@ -18,7 +18,7 @@ Open a shell as the LibreNMS user, with that user's normal home:
 sudo -u librenms -H bash
 export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins"
-git clone --branch v1.15.1 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.16.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 ./quick-install.sh
 php verify-deployment.php --json
@@ -38,7 +38,7 @@ and the final report. Any required failure exits nonzero with its step and retry
 command. From the checkout, as the same runtime user, `just install /opt/librenms`
 wraps this script; recipe arguments are positional.
 
-Unreleased `main` also requires Linux `flock` (normally supplied by `util-linux`).
+v1.16.0 also requires Linux `flock` (normally supplied by `util-linux`).
 The install and deploy scripts lock the selected LibreNMS root, physical plugin
 checkout, and runtime user's Composer home before changing shared state. A
 competing invocation exits with the busy resource and a retry instruction. Wait
@@ -57,7 +57,7 @@ key, preserving unrelated repositories. LibreNMS records the requirement in
 runtime user/home so the repository remains discoverable. Do not replace this
 flow with a root-only `composer require` or manual database inserts.
 
-On unreleased `main`, installation refuses an existing managed repository entry
+In v1.16.0, installation refuses an existing managed repository entry
 that selects another checkout, has an unsupported type, or contains ambiguous
 glob paths. Use the existing checkout, or back up and deliberately correct only
 the `weathermapng` entry in the runtime user's Composer configuration before
@@ -71,7 +71,7 @@ After success, log in to LibreNMS and open `/plugin/WeathermapNG`, then open an
 existing map in the editor and embed viewer. CLI success cannot verify PHP-FPM
 opcode freshness or authenticated browser access.
 
-On unreleased `main`, an empty index also offers **Create Sample Map**. Enter a
+In v1.16.0, an empty index also offers **Create Sample Map**. Enter a
 unique name to create the device-free Star Topology example, then associate its
 nodes and links with your devices and ports in the editor. Canceling creates no
 data. **Browse Templates**, **Create Custom Map**, and import remain available.
@@ -81,7 +81,7 @@ data. **Browse Templates**, **Create Custom Map**, and import remain available.
 From a host checkout of the selected release:
 
 ```bash
-git clone --branch v1.15.1 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.16.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 # Match ownership to PUID/PGID in the Compose file (defaults: 1000:1000).
 sudo chown -R 1000:1000 .
@@ -175,8 +175,8 @@ export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins/WeathermapNG"
 git diff --quiet
 git diff --cached --quiet
-git fetch origin tag v1.15.1
-git checkout --detach v1.15.1
+git fetch origin tag v1.16.0
+git checkout --detach v1.16.0
 ./deploy.sh
 exit
 ```
@@ -202,7 +202,7 @@ and verify editor/embed access. To follow `main` deliberately, clone with
 fast-forward the host checkout and recreate the Docker app. `main` can contain
 unreleased changes.
 
-On unreleased `main`, deploy checks the selected runtime's files, PHP extensions,
+In v1.16.0, deploy checks the selected runtime's files, PHP extensions,
 required commands and known destination permissions before changing Git source.
 It checks Composer repository ownership under the installer locks before pulling,
 then the selected new installer checks its own requirements again. Correct a
@@ -221,7 +221,7 @@ LIBRENMS_PATH=/opt/librenms php verify-deployment.php --json
 The admin diagnostics page `/plugin/WeathermapNG/diagnostics` provides the same
 redacted report. It checks the selected root's requirement/registry, actual loaded
 provider and runtime routes, plugin enablement, database/table access, required
-extensions, and read/write permissions. Unreleased `main` also checks the required
+extensions, and read/write permissions. v1.16.0 also checks the required
 columns on each runtime table: a readable zero count alone does not establish a
 usable schema. Unavailable counts are `null`; an empty
 table is zero. It does not repair files, expose configuration values, or establish
@@ -363,7 +363,7 @@ Chromium editing, streaming, legacy dimensions and new version capture were test
 This covers those source and package paths. Major distribution migrations,
 existing production hosts and general OS disaster recovery were not exercised.
 
-Unreleased `main` adds a recurring native Ubuntu 26.04 CI lane with PHP-FPM,
+v1.16.0 adds a recurring native Ubuntu 26.04 CI lane with PHP-FPM,
 nginx and the runner's MySQL. It upgrades a populated v1.15.1 plugin checkout to
 the exact candidate revision, repeats deployment, and twice restores pristine
 LibreNMS 26.10.2 Composer files before running the unmodified upstream post-pull
