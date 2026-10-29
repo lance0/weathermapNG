@@ -137,6 +137,10 @@ prepare_install_repository() {
             }
         }
         if (!$globalExists) {
+            $file = $argv[1] . "/config.json";
+            if ((file_exists($file) || is_link($file)) && !is_writable($file)) {
+                throw new RuntimeException("global configuration is not writable for repository registration");
+            }
             echo json_encode(["type" => "path", "url" => $argv[3], "options" => ["symlink" => true]], JSON_THROW_ON_ERROR);
         }
     } catch (Throwable $error) {
