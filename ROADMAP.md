@@ -155,7 +155,7 @@ These improvements shipped in v1.7.0. The bulk of the work was reliability, safe
 
 This release should make existing authoring workflows faster and less error-prone before adding major visualization features.
 
-- [x] **Version Comparison** *(activated dormant backend v1.8.0)*
+- [x] **Version Comparison** *(routes/history activated v1.8.0; unreleased: side-by-side topology, before/after field details, explicit legacy availability and read-only browser regressions)*
   - Registered version routes in `routes/web.php` and built editor UI: save-version button, version list modal, restore confirmation, compare diff view.
   - Fixed dormant backend bugs: `json_decode()` TypeError on cast array in compare/show/export, `captureSnapshot()` wrong field names (`database_id` → `device_id`, removed nonexistent `link.meta`), `restoreVersion()` now does true rollback with `forceCreate` preserving original IDs, `destroy()` now deletes only the selected version, `compareVersions()` returns flat lists.
   - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store.
@@ -509,7 +509,7 @@ Want to help? Check out:
 ### Priority Areas
 
 1. **Operator workflows**: Click-through navigation to LibreNMS device pages, RRD graph hover popups, device status-based node icons — the #1 gaps vs legacy weathermap tools.
-2. **Editor productivity**: Version comparison (dormant backend ready to activate), bulk operations, per-map default styling.
+2. **Editor productivity**: Bulk operations and per-map default styling.
 3. **Map scale**: Nested maps / drill-down hierarchy for multi-scale networks, NOC wall/kiosk mode.
 4. **Performance**: Large map rendering (viewport culling, particle throttling) and live update efficiency.
 5. **Discovery**: LLDP/CDP topology, custom metrics (CPU/memory/latency), alerts click-through.
