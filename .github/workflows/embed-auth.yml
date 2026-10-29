@@ -45,6 +45,9 @@ jobs:
           docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_embed_auth_test.php
           docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_install_report_test.php
 
+      - name: Verify recoverable version restores on MariaDB
+        run: docker exec -u librenms librenms-dev php /opt/librenms/html/plugins/WeathermapNG/tests/integration_version_test.php
+
       - name: Qualify populated legacy schema upgrades in a scratch database
         run: bash tests/install-upgrade-test.sh
 
