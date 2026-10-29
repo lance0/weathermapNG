@@ -32,7 +32,7 @@ test -r "$fixture"
 # Runtime commands must not inherit the runner's potentially private workspace.
 cd /
 
-as_librenms() { sudo -u librenms -H "$@"; }
+as_librenms() { sudo -u librenms -H env -u XDG_CONFIG_HOME -u XDG_CACHE_HOME -u COMPOSER_HOME "$@"; }
 logged() {
     local label=$1 result=0
     shift
@@ -153,7 +153,9 @@ mkdir -p "$root"/{rrd,logs,bootstrap/cache,storage}
 chown -R librenms:librenms "$root"/{rrd,logs,bootstrap/cache,storage}
 setfacl -d -m g::rwx "$root"/{rrd,logs,bootstrap/cache,storage}
 setfacl -R -m g::rwx "$root"/{rrd,logs,bootstrap/cache,storage}
-logged core-install as_librenms bash -euc 'cd /opt/librenms; ./scripts/composer_wrapper.php install --no-dev --no-interaction; php artisan key:generate --force; ./lnms migrate --force --no-interaction --seed'
+logged core-composer as_librenms bash -euc 'cd /opt/librenms; composer install --no-dev --no-interaction --no-progress'
+logged core-key as_librenms bash -euc 'cd /opt/librenms; php artisan key:generate --force'
+logged core-migrate as_librenms bash -euc 'cd /opt/librenms; ./lnms migrate --force --no-interaction --seed'
 phpver=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
 for mode in cli fpm; do printf 'date.timezone=UTC\n' > "/etc/php/$phpver/$mode/conf.d/99-native-timezone.ini"; done
 sed -e 's/^\[www\]/[librenms]/' -e 's/^user = .*/user = librenms/' -e 's/^group = .*/group = librenms/' -e 's|^listen = .*|listen = /run/php-fpm-librenms.sock|' "/etc/php/$phpver/fpm/pool.d/www.conf" > "/etc/php/$phpver/fpm/pool.d/librenms.conf"
