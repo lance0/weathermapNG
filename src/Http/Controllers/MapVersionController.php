@@ -33,6 +33,7 @@ class MapVersionController extends Controller
             'versions' => $versions,
             'latest_version' => $this->mapVersionService->getLatestVersion($map),
             'total_versions' => count($versions),
+            'max_versions' => 20,
             'display_limit' => 20,
             'retention_policy' => 'until manually deleted',
             'backup_enabled' => true,

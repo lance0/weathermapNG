@@ -32,18 +32,23 @@ step='acquiring installer locks'
 source "$PLUGIN_DIR/scripts/install-common.sh"
 acquire_install_locks
 
+step='checking Composer repository ownership'
+repository=$(prepare_install_repository)
+
 step='Composer install'
 cd "$PLUGIN_DIR"
 composer install --no-dev --optimize-autoloader --no-interaction
 
 step='persistent Composer repository registration'
-repository=$(php -r 'echo json_encode(["type"=>"path", "url"=>$argv[1], "options"=>["symlink"=>true]], JSON_THROW_ON_ERROR);' "$PLUGIN_DIR")
-composer config --global repositories.weathermapng "$repository"
+if [ -n "$repository" ]; then
+    composer config --global repositories.weathermapng "$repository"
+fi
 cd "$LIBRENMS_PATH"
-# The daily updater resets root composer.json; the scoped global lookup survives that reset.
-composer config --unset repositories.weathermapng
 step='LibreNMS plugin registration'
 ./lnms plugin:add librenms/weathermapng '*' --no-interaction
+step='legacy Composer repository migration'
+# Retain the local lookup on registration failure; daily updates use the global entry.
+composer config --unset repositories.weathermapng
 step='package discovery'
 php artisan package:discover --no-interaction
 

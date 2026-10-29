@@ -160,6 +160,8 @@ function snapshotProjection(snapshot) {
         const historyResponse = await admin.context.request.get(`${base}/plugin/WeathermapNG/api/maps/${fixture.map}/versions`);
         assert.equal(historyResponse.status(),200);
         const history = await historyResponse.json();
+        assert.equal(history.display_limit, 20);
+        assert.equal(history.max_versions, history.display_limit, 'retain the existing display-limit field for API consumers');
         assert.equal(history.latest_version.id,resultVersion.id);
         for (const row of history.versions.filter(row=>added.some(addedRow=>addedRow.id===row.id))) {
             assert.equal(Number(row.creator.user_id),fixture.users.admin.id);
