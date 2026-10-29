@@ -21,6 +21,7 @@ use LibreNMS\Plugins\WeathermapNG\Models\Node;
 use LibreNMS\Plugins\WeathermapNG\Models\Link;
 use LibreNMS\Plugins\WeathermapNG\Services\MapVersionService;
 use Illuminate\Support\Collection;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use LibreNMS\Plugins\WeathermapNG\Services\WebhookDispatcher;
 
@@ -37,16 +38,22 @@ function assert_true($cond, string $msg): void {
 }
 
 $ownedMapIds = [];
-$cleanup = function () use (&$ownedMapIds) {
+$ownedUser = null;
+$cleanup = function () use (&$ownedMapIds, &$ownedUser) {
     foreach ($ownedMapIds as $id) {
         MapVersion::where('map_id', $id)->delete();
         Link::where('map_id', $id)->delete();
         Node::where('map_id', $id)->delete();
         Map::whereKey($id)->delete();
     }
+    $ownedUser?->delete();
 };
 
 try {
+    $ownedUser = new User(['username' => 'wmng-version-' . bin2hex(random_bytes(8)), 'auth_type' => 'mysql', 'enabled' => true]);
+    $ownedUser->setPassword(bin2hex(random_bytes(16)));
+    $ownedUser->save();
+
     // Create a temporary map with minimal nodes/links
     $map = Map::create([
         'name' => 'integration-test-map-' . bin2hex(random_bytes(8)),
@@ -83,7 +90,7 @@ try {
     $svc = new MapVersionService($webhooks);
 
     // --- Test 1: createVersion succeeds and sets created_at ---
-    $v1 = $svc->createVersion($map, 'integration-test-1', 'first test', 1);
+    $v1 = $svc->createVersion($map, 'integration-test-1', 'first test', $ownedUser->user_id);
     assert_true($v1 instanceof MapVersion, 'createVersion returns MapVersion instance');
     assert_true($v1->id > 0, 'createVersion assigns an id');
     assert_true($v1->created_at !== null, 'createVersion sets created_at');
@@ -112,10 +119,10 @@ try {
     // --- Test 5: creator relation works with user_id ---
     $creator = $v1->creator;
     assert_true($creator !== null, 'creator relation resolves to a User');
-    assert_true($creator->username === 'admin', 'creator is the admin user');
+    assert_true($creator?->user_id === $ownedUser->user_id && $creator?->username === $ownedUser->username, 'creator resolves to the owned fixture user');
 
     // --- Test 6: create second version and compare ---
-    $v2 = $svc->createVersion($map, 'integration-test-2', 'second test', 1);
+    $v2 = $svc->createVersion($map, 'integration-test-2', 'second test', $ownedUser->user_id);
     $diff = $svc->compareVersions($v1, $v2);
     assert_true(is_array($diff), 'compareVersions returns an array');
     assert_true(isset($diff['nodes_added']), 'diff has nodes_added');
@@ -133,7 +140,7 @@ try {
     assert_true(!$remaining->contains('id', $v2->id), 'deleteVersion removes v2');
 
     // --- Test 8: restoreVersion creates a true rollback ---
-    $v3 = $svc->createVersion($map, 'integration-test-3', 'rollback test', 1);
+    $v3 = $svc->createVersion($map, 'integration-test-3', 'rollback test', $ownedUser->user_id);
     $nodeCountBefore = $map->nodes()->count();
     $linkCountBefore = $map->links()->count();
 

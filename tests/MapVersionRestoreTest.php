@@ -130,6 +130,23 @@ class MapVersionRestoreTest extends TestCase
         }
     }
 
+    public function testCompleteOptionsValidateDimensionsAndBackgroundWithoutUiBounds(): void
+    {
+        $map = $this->graph();
+        $snapshot = $this->service->createVersion($map, 'Valid')->config_snapshot;
+        foreach (['width' => [[], 'bad', '1e999'], 'height' => [[], 'bad'], 'background' => [[], false]] as $field => $values) {
+            foreach ($values as $value) {
+                $invalid = $snapshot;
+                $invalid['map']['options'][$field] = $value;
+                $this->rejectSnapshot($map, $invalid);
+            }
+        }
+        $options = ['width' => null, 'height' => '90000.5', 'background' => null];
+        $snapshot['map']['options'] = $options;
+        $version = MapVersion::create(['map_id' => $map->id, 'config_snapshot' => $snapshot]);
+        $this->assertSame($options, $this->service->restoreVersion($version)->options);
+    }
+
     public function testCompleteSnapshotRestoresAllConfigurationAndKeepsRecoverableHistory(): void
     {
         $map = $this->graph();

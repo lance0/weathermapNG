@@ -124,6 +124,15 @@ class MapVersionService
         if (isset($data['options']) && !is_array($data['options'])) {
             $invalid();
         }
+        foreach (['width', 'height'] as $field) {
+            if (isset($data['options'][$field])
+                && (!is_numeric($data['options'][$field]) || !is_finite((float) $data['options'][$field]))) {
+                $invalid();
+            }
+        }
+        if (isset($data['options']['background']) && !is_string($data['options']['background'])) {
+            $invalid();
+        }
         if (isset($data['parent_map_id'])) {
             $this->validateMapReference($data['parent_map_id']);
             $seen = [(int) $map->id => true];
