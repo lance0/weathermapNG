@@ -47,6 +47,16 @@ for (const el of descendants(root)) {
 const legacy = snapshot();
 delete legacy.map.options;
 let rows = build(response(legacy, snapshot([], [], { tags: null }))).rows;
+const bothLegacy = draw(response(legacy, structuredClone(legacy)));
+assert.equal(bothLegacy.result.totalRows, 0, 'identical unavailable fields are not fake changes');
+const availability = descendants(bothLegacy.root).filter(el => el.className?.includes('version-diff-availability'));
+assert.equal(availability.length, 2, 'both historical panes disclose unavailable fields');
+for (const note of availability) {
+    for (const label of ['options', 'description', 'parent map', 'stored width', 'stored height']) assert.ok(note.textContent.includes(label));
+}
+const completeNull = snapshot([], [], null);
+Object.assign(completeNull.map, { description: null, parent_map_id: null, raw_width: 800, raw_height: 600 });
+assert.equal(descendants(draw(response(completeNull, completeNull)).root).filter(el => el.className?.includes('version-diff-availability')).length, 0, 'recorded null values are available');
 const tag = rows.find(row => row.field === 'tags');
 assert.equal(tag.before.message, 'Unavailable — not recorded in this version');
 assert.equal(tag.after.value, null);

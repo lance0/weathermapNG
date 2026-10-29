@@ -159,6 +159,12 @@
         const figure = element('figure', undefined, 'version-diff-pane');
         const versionName = graph.version.name || `Version ${graph.version.id}`;
         figure.appendChild(element('figcaption', `${direction}: ${versionName}`, 'font-weight-bold'));
+        const missing = [['options', 'options'], ['description', 'description'], ['parent_map_id', 'parent map'],
+            ['raw_width', 'stored width'], ['raw_height', 'stored height']]
+            .filter(([field]) => !own(graph.snapshot.map, field)).map(([, label]) => label);
+        if (missing.length) {
+            figure.appendChild(element('p', `Unavailable — not recorded in this version: ${missing.join(', ')}.`, 'small version-diff-availability'));
+        }
         const view = graph.preview;
         const svg = svgElement('svg', { viewBox: '0 0 480 240', role: 'img', 'aria-label': `${direction} topology: ${versionName}` });
         for (const link of view.links) {

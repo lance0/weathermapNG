@@ -56,14 +56,14 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
                 $after['map']['options']['tags'] = ['new'];
                 unset($after['map']['options']['removeMe']);
                 $legacy = $before;
-                unset($legacy['map']['options'], $legacy['map']['description'], $legacy['map']['parent_map_id']);
+                unset($legacy['map']['options'], $legacy['map']['description'], $legacy['map']['parent_map_id'], $legacy['map']['raw_width'], $legacy['map']['raw_height']);
                 $nullOptions = $before;
                 $nullOptions['map']['options'] = null;
                 $empty = $before;
                 $empty['nodes'] = []; $empty['links'] = [];
                 $versions = [];
                 foreach (['before'=>['Before snapshot',$before], 'after'=>['After <img src=x onerror="window.__versionDiffXss=true">',$after],
-                    'legacy'=>['Legacy snapshot',$legacy], 'null'=>['Recorded null options',$nullOptions],
+                    'legacy'=>['Legacy snapshot',$legacy], 'legacy2'=>['Another legacy snapshot',$legacy], 'null'=>['Recorded null options',$nullOptions],
                     'empty'=>['Empty snapshot',$empty], 'empty2'=>['Another empty snapshot',$empty]] as $key => [$name,$snapshot]) {
                     $version = LibreNMS\\Plugins\\WeathermapNG\\Models\\MapVersion::create(['map_id'=>$map->id,'name'=>$name,'config_snapshot'=>$snapshot,'created_by'=>$user->user_id]);
                     $versions[$key] = ['id'=>$version->id,'name'=>$name];
@@ -144,10 +144,18 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
 
         await compare('after', 'before');
         assert.equal(await page.locator(`#versionDiffVisual .version-diff-pane:nth-child(2) .version-diff-added[data-id="${fixture.nodes[2]}"]`).count(), 1);
+        await compare('legacy', 'legacy2');
+        assert.equal(await page.locator('#versionDiffVisual .version-diff-availability').count(), 2);
+        for (const note of await page.locator('#versionDiffVisual .version-diff-availability').allTextContents()) {
+            for (const label of ['options', 'description', 'parent map', 'stored width', 'stored height']) assert.ok(note.includes(label));
+        }
+        assert.equal(await page.locator('#versionDiffVisual tbody tr').count(), 0, 'identical missing fields are not fake changes');
+        assert.ok((await page.locator('#versionDiffVisual .version-diff-limit').textContent()).startsWith('Showing 0 of 0 field differences.'));
         await compare('legacy', 'after');
         details = await rows();
         assert.ok(details.some(row => row[1] === 'tags' && row[2] === 'Unavailable — not recorded in this version' && row[0] === 'Map option (unavailable)'));
         await compare('null', 'before');
+        assert.equal(await page.locator('#versionDiffVisual .version-diff-availability').count(), 0, 'recorded null remains available');
         assert.ok((await rows()).some(row => row[1] === 'options' && row[2] === 'null'));
         await compare('empty', 'empty2');
         assert.equal(await page.locator('#versionDiffVisual .version-diff-node').count(), 0);
