@@ -49,12 +49,12 @@ class MapVersion extends Model
             ->orderBy('id', 'desc');
     }
 
-    public function scopeVersions($query, $mapId, $limit = 10)
+    public function scopeVersions($query, $mapId, ?int $limit = 10)
     {
-        return $query->where('map_id', $mapId)
+        $query->where('map_id', $mapId)
             ->orderBy('created_at', 'desc')
-            ->orderBy('id', 'desc')
-            ->limit($limit);
+            ->orderBy('id', 'desc');
+        return $limit === null ? $query : $query->limit($limit);
     }
 
 }

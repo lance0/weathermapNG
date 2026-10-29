@@ -160,7 +160,7 @@ class MapVersionController extends Controller
     {
         $this->requireAdmin();
         $map = Map::findOrFail($mapId);
-        $versions = $this->mapVersionService->getVersions($map);
+        $versions = $this->mapVersionService->getVersions($map, null);
 
         return response()->json([
             'success' => true,
@@ -178,7 +178,7 @@ class MapVersionController extends Controller
                         'description' => $version->description,
                         'created_at' => $version->created_at->toIso8601String(),
                         'created_at_human' => $version->created_at_human,
-                        'created_by' => $version->creator?->name ?? 'Unknown',
+                        'created_by' => $version->creator?->realname ?: ($version->creator?->username ?: 'Unknown'),
                         'snapshot' => $version->config_snapshot,
                     ];
                 })->toArray(),

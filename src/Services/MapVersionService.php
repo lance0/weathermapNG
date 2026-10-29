@@ -212,7 +212,7 @@ class MapVersionService
         $version->delete();
     }
 
-    public function getVersions(Map $map, int $limit = 10): \Illuminate\Support\Collection
+    public function getVersions(Map $map, ?int $limit = 10): \Illuminate\Support\Collection
     {
         return MapVersion::with('creator')->versions($map->id, $limit)->get();
     }
