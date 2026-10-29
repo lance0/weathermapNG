@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Validate saved map versions before restoring, preserve the replaced state as a checkpoint, and record the restored state atomically. Capture complete settings in new snapshots, retain old history, return safe validation errors, and send version webhooks only after commit.
 - Escape quoted template titles safely in gallery attributes and handle malformed nested template configuration without inventing counts.
 - Refuse conflicting Composer repository ownership before dependency changes. Preserve compatible object/list entries and path aliases, and retain the legacy local lookup until registration succeeds.
+- Check the selected runtime and known permissions before tracked upgrades advance Git. Share the install/deploy preflight, preserve valid read-only inputs, and recheck the selected new source before installation.
 
 ## [1.15.1] - 2026-10-28
 
