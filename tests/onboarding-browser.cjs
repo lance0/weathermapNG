@@ -60,8 +60,15 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await page.unroute('**/plugin/WeathermapNG/templates');
         await page.locator('#templatesError a').click();
         await page.locator('#templatesGrid [data-template-id]').first().waitFor();
+        assert.equal(await page.evaluate(() => {
+            const dialog = document.getElementById('createMapDialog').getBoundingClientRect();
+            return [...document.querySelectorAll('#templatesGrid > div')].every(card => {
+                const bounds = card.getBoundingClientRect();
+                return bounds.left >= dialog.left && bounds.right <= dialog.right;
+            });
+        }), true, 'Template cards must fit inside the modal');
         assert.ok(new URL(page.url()).pathname.endsWith('/WeathermapNG'));
-        await modalAction('hidden.bs.modal', () => page.keyboard.press('Escape'));
+        await modalAction('hidden.bs.modal', () => page.locator('#createMapModal .modal-header .close').click());
         assert.equal(count(), 0);
 
         await modalAction('shown.bs.modal', () => page.getByRole('button', { name: 'Create your first map' }).click());

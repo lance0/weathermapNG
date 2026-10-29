@@ -314,7 +314,7 @@ function loadTemplates() {
         renderTemplates(templatesData);
         templatesLoaded = true;
         loading.style.display = 'none';
-        grid.style.display = 'flex';
+        grid.style.display = 'block';
     })
     .catch(err => {
         console.error('Templates load error:', err);
