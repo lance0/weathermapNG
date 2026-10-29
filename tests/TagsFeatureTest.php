@@ -60,7 +60,10 @@ class TagsFeatureTest extends TestCase
     public function test_index_view_has_onboarding_links(): void
     {
         $this->assertStringContainsString('wmng-onboarding-actions', $this->indexView);
-        $this->assertStringContainsString("href=\"{{ url('plugin/WeathermapNG/templates') }}\"", $this->indexView);
+        $this->assertStringContainsString('data-create-tab="templates"', $this->indexView);
+        $this->assertStringContainsString('data-create-tab="custom"', $this->indexView);
+        $this->assertStringContainsString('id="createSampleMapBtn"', $this->indexView);
+        $this->assertStringContainsString("template.name === 'star-topology'", $this->indexView);
         $this->assertStringContainsString("href=\"{{ url('plugin/WeathermapNG/diagnostics') }}\"", $this->indexView);
         $this->assertStringContainsString("data-target=\"#importMapModal\"", $this->indexView);
     }
