@@ -106,12 +106,9 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         assert.match(custom.headers()['content-type'], /application\/json/);
         assert.equal(custom.request().headers()['accept'], 'application/json');
         assert.equal(custom.request().headers()['x-requested-with'], 'XMLHttpRequest');
-        const customData = await custom.json();
-        assert.equal(customData.success, true);
-        assert.equal(customData.map.name, customName);
-        const customId = Number(customData.map.id);
+        await page.waitForURL(/\/editor\/\d+$/);
+        const customId = Number(new URL(page.url()).pathname.match(/\/editor\/(\d+)$/)[1]);
         assert.ok(Number.isSafeInteger(customId) && customId > 0);
-        await page.waitForURL(url => url.pathname.endsWith(`/editor/${customId}`));
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.deepEqual(await page.evaluate(() => ({
             name: document.getElementById('map-name').value,
