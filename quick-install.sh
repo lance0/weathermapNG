@@ -27,6 +27,11 @@ done
 command -v composer >/dev/null
 php -r 'if (version_compare(PHP_VERSION, "8.2.0", "<")) { fwrite(STDERR, "PHP 8.2+ required\n"); exit(1); } foreach (["gd", "json", "pdo", "mbstring"] as $extension) { if (!extension_loaded($extension)) { fwrite(STDERR, "Missing PHP extension: $extension\n"); exit(1); } } echo "PHP Version: " . PHP_VERSION . "\n";'
 
+step='acquiring installer locks'
+# shellcheck source=scripts/install-common.sh
+source "$PLUGIN_DIR/scripts/install-common.sh"
+acquire_install_locks
+
 step='Composer install'
 cd "$PLUGIN_DIR"
 composer install --no-dev --optimize-autoloader --no-interaction

@@ -38,6 +38,16 @@ and the final report. Any required failure exits nonzero with its step and retry
 command. From the checkout, as the same runtime user, `just install /opt/librenms`
 wraps this script; recipe arguments are positional.
 
+Unreleased `main` also requires Linux `flock` (normally supplied by `util-linux`).
+The install and deploy scripts lock the selected LibreNMS root, physical plugin
+checkout, and runtime user's Composer home before changing shared state. A
+competing invocation exits with the busy resource and a retry instruction. Wait
+for the other installer to finish; do not delete the persistent lock files.
+Coordinate LibreNMS's daily updater, manual Composer commands, and source
+replacement separately: those operations do not take these locks. This has been
+tested on local Linux filesystems, including a checkout shared by Docker bind
+mounts; it does not establish distributed or network-filesystem coordination.
+
 The supported registration contract is
 `composer config --global repositories.weathermapng` with the absolute checkout
 path, followed by `lnms plugin:add librenms/weathermapng` from the LibreNMS root.
@@ -50,6 +60,11 @@ flow with a root-only `composer require` or manual database inserts.
 After success, log in to LibreNMS and open `/plugin/WeathermapNG`, then open an
 existing map in the editor and embed viewer. CLI success cannot verify PHP-FPM
 opcode freshness or authenticated browser access.
+
+On unreleased `main`, an empty index also offers **Create Sample Map**. Enter a
+unique name to create the device-free Star Topology example, then associate its
+nodes and links with your devices and ports in the editor. Canceling creates no
+data. **Browse Templates**, **Create Custom Map**, and import remain available.
 
 ## Docker stable installation
 
@@ -188,7 +203,9 @@ LIBRENMS_PATH=/opt/librenms php verify-deployment.php --json
 The admin diagnostics page `/plugin/WeathermapNG/diagnostics` provides the same
 redacted report. It checks the selected root's requirement/registry, actual loaded
 provider and runtime routes, plugin enablement, database/table access, required
-extensions, and read/write permissions. Unavailable counts are `null`; an empty
+extensions, and read/write permissions. Unreleased `main` also checks the required
+columns on each runtime table: a readable zero count alone does not establish a
+usable schema. Unavailable counts are `null`; an empty
 table is zero. It does not repair files, expose configuration values, or establish
 web worker freshness/authenticated HTTP access. From the checkout under the runtime user,
 `just verify-deployment /opt/librenms --json` wraps the checker.

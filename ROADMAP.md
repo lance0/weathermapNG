@@ -74,7 +74,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - ~~Add reduced-motion handling for flow animations.~~ *(v1.7.5)*
 
 - [x] **Index and template gallery polish** *(v1.7.8: escaped template card innerHTML, delegated listener replaces inline onclick, sanitized category class slug, fixed template creation 403/redirect; v1.13.0: Data Center, WAN/MPLS, Campus, and Branch Office built-in templates added to all three seed paths)*
-  - Replace decorative map-card preview art with real thumbnails or a compact rendered preview. *(deferred)*
+  - ~~Replace decorative map-card art with real previews.~~ *(unreleased: map and template SVG topology, bounded per-map loading, empty/overview labels, keyboard and theme regression coverage)*
   - ~~Convert clickable `div` cards into proper button/link structures.~~ *(v1.7.8: template cards already use `<button>`, replaced inline onclick with delegated listener)*
   - Preserve current search, sort, badges, and map metadata. *(preserved)*
 
@@ -173,7 +173,7 @@ This release should make existing authoring workflows faster and less error-pron
   - Surface stale data, missing RRD files, and broken port associations. *(v1.12.0: admin data-integrity section in diagnostics — per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows via `MapService::getDataIntegrityIssues()` + `RrdDataService::hasRrdFile()`)*
   - ~~Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.~~
 
-- [x] **First-run onboarding** *(v1.9.0: index.blade.php empty state with links to Templates, Create Map, Import, Diagnostics, Docs)*
+- [x] **First-run onboarding** *(v1.9.0: welcome/docs/diagnostics links; unreleased: working gallery and Custom actions, deliberate named sample creation, cancellation and browser regression coverage)*
   - ~~Add a lightweight first-run state that helps users create or import their first useful map.~~
   - ~~Offer demo/sample map creation only when it will not touch production data unexpectedly.~~
   - ~~Link directly to install checks, docs, and troubleshooting from empty/error states.~~

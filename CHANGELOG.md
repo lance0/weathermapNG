@@ -3,6 +3,18 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Offer deliberate, named sample-map creation from the first-run welcome screen using the existing Star Topology template. Canceling leaves the installation empty; creation stays disabled until the request finishes.
+- Show actual map and template topology previews in the gallery, with empty states and a bounded overview for larger maps. Preserve keyboard actions, search, sorting and theme inheritance.
+
+### Fixed
+- Reject incomplete database table schemas in installation diagnostics, even when row counts are readable. Keep readable zero counts distinct from unavailable data and never repair tables during inspection.
+- Open the template gallery from the welcome screen and select the Custom tab when requested. Keep gallery cards inside the modal and cover catalog failure/retry, cancellation, sample creation, and editor loading in Chromium CI.
+- Serialize install and deploy operations sharing a LibreNMS root, plugin checkout, or Composer home. Concurrent invocations stop before dependency, Git, or database changes; Linux `flock` is required.
+- Escape quoted template titles safely in gallery attributes and handle malformed nested template configuration without inventing counts.
+
 ## [1.15.1] - 2026-10-28
 
 ### Fixed
