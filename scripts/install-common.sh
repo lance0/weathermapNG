@@ -32,6 +32,10 @@ install_lock() {
 acquire_install_locks() {
     local composer_home xdg_home saved_umask
     local -a install_lock_fds=()
+    # Only exec preserves ownership; forked children must contend on fresh descriptors.
+    if [ "${WEATHERMAPNG_LOCK_OWNER_PID:-}" != "$BASHPID" ]; then
+        unset WEATHERMAPNG_ROOT_LOCK_FD WEATHERMAPNG_CHECKOUT_LOCK_FD WEATHERMAPNG_COMPOSER_LOCK_FD
+    fi
     if ! command -v flock >/dev/null; then
         echo 'Error: flock is required to serialize installers; install util-linux and retry.' >&2
         exit 1
@@ -61,4 +65,5 @@ acquire_install_locks() {
     install_lock WEATHERMAPNG_ROOT_LOCK_FD 'LibreNMS installation' "$LIBRENMS_PATH/storage/cache/.weathermapng-install.lock"
     install_lock WEATHERMAPNG_CHECKOUT_LOCK_FD 'plugin checkout' "$PLUGIN_DIR/.weathermapng-install.lock"
     install_lock WEATHERMAPNG_COMPOSER_LOCK_FD 'Composer home' "$composer_home/.weathermapng-install.lock"
+    export WEATHERMAPNG_LOCK_OWNER_PID=$BASHPID
 }

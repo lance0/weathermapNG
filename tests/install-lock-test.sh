@@ -129,20 +129,52 @@ for forged in true 99999 0; do
     echo "PASS: forged/stale descriptor $forged cannot bypass locks"
 done
 unset WEATHERMAPNG_ROOT_LOCK_FD WEATHERMAPNG_CHECKOUT_LOCK_FD WEATHERMAPNG_COMPOSER_LOCK_FD
-# An open descriptor for the correct inode is not proof that the caller holds a lock.
-exec {unlocked_fd}>>"$WORK/a/root/storage/cache/.weathermapng-install.lock"
-export WEATHERMAPNG_ROOT_LOCK_FD=$unlocked_fd
+# Forked children inherit real held descriptors, but must acquire their own locks.
+cat > "$WORK/inherited.sh" <<'CHILD'
+#!/bin/bash
+set -euo pipefail
+source "$1/scripts/install-common.sh"
+WORK=$2
+PLUGIN_DIR="$WORK/a/plugin"
+export LIBRENMS_PATH="$WORK/a/root" COMPOSER_HOME="$WORK/a/home"
+acquire_install_locks
+children=()
+for child in 1 2; do
+    LIBRENMS_PATH=$4 COMPOSER_HOME=$5 bash "$3/quick-install.sh" > "$WORK/child-$child.out" 2>&1 &
+    children+=("$!")
+done
+for child in "${children[@]}"; do
+    status=0
+    wait "$child" || status=$?
+    printf '%s\n' "$status" >> "$WORK/inherited.status"
+done
+CHILD
+for shared in all checkout home; do
+    plugin="$WORK/b/plugin" root="$WORK/b/root" home="$WORK/b/home"
+    case "$shared" in
+        all) plugin="$WORK/a/plugin"; root="$WORK/a/root"; home="$WORK/a/home";;
+        checkout) plugin="$WORK/a/plugin";;
+        home) home="$WORK/a/home";;
+    esac
+    : > "$WORK/inherited.status"
+    : > "$WORK/contender.log"
+    INSTALL_LOG="$WORK/contender.log" timeout 10 bash "$WORK/inherited.sh" "$SOURCE" "$WORK" "$plugin" "$root" "$home" || fail 'inherited descriptor probe timed out'
+    if grep -qx 0 "$WORK/inherited.status"; then fail "child reused parent-held $shared descriptor"; fi
+    for child in 1 2; do grep -q 'Cannot lock' "$WORK/child-$child.out" || fail 'child missed contention diagnostic'; done
+    [ ! -s "$WORK/contender.log" ] || fail 'child reached mutation with parent-held descriptors'
+    echo "PASS: forked siblings contend on parent-held $shared resources"
+done
+# Matching owner metadata and inode still require a real successful flock.
 start_holder quick-install.sh "$WORK/a/plugin" "$WORK/a/root" "$WORK/a/home"
-# Reopen to obtain a different open-file description from the holder's inherited one.
-exec {unlocked_fd}>&-
-exec {unlocked_fd}>>"$WORK/a/root/storage/cache/.weathermapng-install.lock"
-export WEATHERMAPNG_ROOT_LOCK_FD=$unlocked_fd
-contender quick-install.sh "$WORK/a/plugin" "$WORK/a/root" "$WORK/a/home"
+: > "$WORK/contender.log"
+CONTENDER_STATUS=0
+# Variables expand in the child shell.
+# shellcheck disable=SC2016
+INSTALL_LOG="$WORK/contender.log" LIBRENMS_PATH="$WORK/a/root" COMPOSER_HOME="$WORK/a/home" \
+    timeout 10 bash -c 'exec {fd}>>"$LIBRENMS_PATH/storage/cache/.weathermapng-install.lock"; export WEATHERMAPNG_ROOT_LOCK_FD=$fd WEATHERMAPNG_LOCK_OWNER_PID=$BASHPID; exec bash "$1/quick-install.sh"' bash "$WORK/a/plugin" > "$WORK/contender.out" 2>&1 || CONTENDER_STATUS=$?
 expect_blocked
 release_holder
-exec {unlocked_fd}>&-
-unset WEATHERMAPNG_ROOT_LOCK_FD
-echo 'PASS: matching but unlocked inherited descriptor still acquires a real lock'
+echo 'PASS: matching owner and unlocked inherited descriptor still acquires a real lock'
 start_holder quick-install.sh "$WORK/a/plugin" "$WORK/a/root" "$WORK/a/home"
 printf 'fail\n' >&"$release_fd"
 if wait "$HOLDER"; then fail 'injected failure succeeded'; fi
