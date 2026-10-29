@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compare saved versions with side-by-side topology views and before/after field details. Highlight node/link changes, show map configuration changes, and distinguish unrecorded historical fields from recorded null values.
 
 ### Fixed
+- Request JSON when creating a custom map so successful submissions open the editor. Show safe validation feedback and keep the form usable after errors; cover invalid submissions and custom dimensions in Chromium CI.
 - Reject incomplete database table schemas in installation diagnostics, even when row counts are readable. Keep readable zero counts distinct from unavailable data and never repair tables during inspection.
 - Open the template gallery from the welcome screen and select the Custom tab when requested. Keep gallery cards inside the modal and cover catalog failure/retry, cancellation, sample creation, and editor loading in Chromium CI.
 - Serialize install and deploy operations sharing a LibreNMS root, plugin checkout, or Composer home. Concurrent invocations stop before dependency, Git, or database changes; Linux `flock` is required.
