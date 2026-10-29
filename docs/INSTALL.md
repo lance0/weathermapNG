@@ -61,6 +61,11 @@ After success, log in to LibreNMS and open `/plugin/WeathermapNG`, then open an
 existing map in the editor and embed viewer. CLI success cannot verify PHP-FPM
 opcode freshness or authenticated browser access.
 
+On unreleased `main`, an empty index also offers **Create Sample Map**. Enter a
+unique name to create the device-free Star Topology example, then associate its
+nodes and links with your devices and ports in the editor. Canceling creates no
+data. **Browse Templates**, **Create Custom Map**, and import remain available.
+
 ## Docker stable installation
 
 From a host checkout of the selected release:
