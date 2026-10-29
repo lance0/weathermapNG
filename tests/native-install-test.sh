@@ -27,7 +27,6 @@ test "$(id -u)" -eq 0
 test "$(ps -p 1 -o comm=)" = systemd
 test ! -e /.dockerenv
 test ! -e "$root"
-git bundle verify "$bundle" >/dev/null
 test -r "$fixture"
 
 as_librenms() { sudo -u librenms -H "$@"; }
@@ -161,6 +160,7 @@ systemctl restart "php$phpver-fpm" nginx
 mkdir -p "$root/html/plugins/WeathermapNG"
 chown -R librenms:librenms "$root/html/plugins"
 as_librenms git -C "$plugin" init -q
+as_librenms git -C "$plugin" bundle verify "$bundle" > "$evidence/bundle-verify.log" 2>&1
 as_librenms git -C "$plugin" fetch -q "$bundle" refs/tags/v1.15.1 refs/heads/candidate
 as_librenms git -C "$plugin" checkout -q --detach "$baseline_sha"
 test "$(as_librenms git -C "$plugin" rev-parse HEAD)" = "$baseline_sha"
