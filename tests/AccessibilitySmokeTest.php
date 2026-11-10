@@ -44,7 +44,7 @@ class AccessibilitySmokeTest extends TestCase
         );
     }
 
-    public function pageProvider(): array
+    public static function pageProvider(): array
     {
         return [
             ['index'],
