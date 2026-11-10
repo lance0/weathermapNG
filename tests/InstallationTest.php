@@ -43,7 +43,6 @@ class InstallationTest extends TestCase
         // Use reflection to test private method
         $reflection = new \ReflectionClass($plugin);
         $method = $reflection->getMethod('checkRequirements');
-        $method->setAccessible(true);
 
         $requirements = $method->invoke($plugin);
         $this->assertIsArray($requirements);
@@ -58,7 +57,6 @@ class InstallationTest extends TestCase
         // Use reflection to test private method
         $reflection = new \ReflectionClass($plugin);
         $method = $reflection->getMethod('getDefaultConfig');
-        $method->setAccessible(true);
 
         $config = $method->invoke($plugin);
         $this->assertIsArray($config);

@@ -15,7 +15,6 @@ class LinkServiceTest extends TestCase
     {
         $service = new LinkService();
         $reflection = new \ReflectionMethod($service, 'validateLinkData');
-        $reflection->setAccessible(true);
         $reflection->invoke($service, $data);
     }
 

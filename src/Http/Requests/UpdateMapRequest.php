@@ -43,9 +43,12 @@ class UpdateMapRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $title = trim((string) $this->input('title', ''));
+        $background = trim((string) $this->input('background', ''));
+
         $this->merge([
-            'title' => trim($this->input('title', '')),
-            'background' => trim($this->input('background', '')),
+            'title' => $title === '' ? null : $title,
+            'background' => $background === '' ? null : $background,
         ]);
     }
 }
