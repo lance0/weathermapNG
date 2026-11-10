@@ -241,15 +241,35 @@ class MapService
             }
         }
 
-        if (!$data || !isset($data['nodes']) || !isset($data['links'])) {
+        if (!$data || !isset($data['nodes'], $data['links']) || !is_array($data['nodes']) || !is_array($data['links'])) {
             throw new \InvalidArgumentException('Invalid map file format: missing nodes or links');
+        }
+
+        foreach (['nodes', 'links'] as $section) {
+            foreach ($data[$section] as $entry) {
+                if (!is_array($entry)) {
+                    throw new \InvalidArgumentException("Invalid map file format: {$section} must contain objects");
+                }
+            }
         }
 
         try {
             $map = DB::transaction(function () use ($data, $validated) {
-                $options = $data['options'] ?? [];
-                if (empty($options)) {
-                    $options = ['width' => 800, 'height' => 600, 'background' => '#ffffff'];
+                $incomingOptions = is_array($data['options'] ?? null) ? $data['options'] : [];
+                $allowedOptionKeys = ['width', 'height', 'background', 'tags', 'default_node_style', 'default_link_style'];
+                $options = array_merge(
+                    ['width' => 800, 'height' => 600, 'background' => '#ffffff'],
+                    array_intersect_key($incomingOptions, array_flip($allowedOptionKeys))
+                );
+
+                foreach (['width', 'height'] as $dimension) {
+                    $options[$dimension] = is_numeric($options[$dimension])
+                        ? min(4096, max(100, (int) $options[$dimension]))
+                        : ($dimension === 'width' ? 800 : 600);
+                }
+
+                if (!is_string($options['background'] ?? null) || !preg_match('/^#[0-9a-fA-F]{6}$/', $options['background'])) {
+                    $options['background'] = '#ffffff';
                 }
 
                 $map = Map::create([

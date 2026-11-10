@@ -19,7 +19,6 @@ class PureFunctionsTest extends TestCase
     private function convertStatus($status): string
     {
         $reflection = new \ReflectionMethod(Node::class, 'convertStatusToString');
-        $reflection->setAccessible(true);
         $node = (new \ReflectionClass(Node::class))->newInstanceWithoutConstructor();
         return $reflection->invoke($node, $status);
     }
@@ -51,7 +50,6 @@ class PureFunctionsTest extends TestCase
         $reflection = new \ReflectionClass(Link::class);
         $link = $reflection->newInstanceWithoutConstructor();
         $prop = $reflection->getProperty('attributes');
-        $prop->setAccessible(true);
         $prop->setValue($link, ['bandwidth_bps' => $bps]);
 
         return $link->getBandwidthFormattedAttribute();
@@ -77,7 +75,6 @@ class PureFunctionsTest extends TestCase
     {
         $tool = new RRDTool();
         $reflection = new \ReflectionMethod(RRDTool::class, $method);
-        $reflection->setAccessible(true);
         return $reflection->invoke($tool, ...$args);
     }
 
@@ -124,14 +121,12 @@ class PureFunctionsTest extends TestCase
     public function test_sanitize_context_masks_sensitive_keys(): void
     {
         $reflection = new \ReflectionMethod(Logger::class, 'sanitizeContext');
-        $reflection->setAccessible(true);
 
         // Logger has a private constructor (singleton). Bypass it.
         $logger = (new \ReflectionClass(Logger::class))
             ->newInstanceWithoutConstructor();
         // Ensure the masking config branch is active.
         $configProp = (new \ReflectionClass(Logger::class))->getProperty('config');
-        $configProp->setAccessible(true);
         $configProp->setValue($logger, ['security' => ['mask_sensitive_data' => true]]);
 
         $context = [

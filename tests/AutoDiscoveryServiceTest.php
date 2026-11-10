@@ -82,7 +82,6 @@ class AutoDiscoveryServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('createLinkKey');
-        $method->setAccessible(true);
 
         // Same pair should give same key regardless of order
         $key1 = $method->invoke($this->service, 5, 10);
@@ -96,7 +95,6 @@ class AutoDiscoveryServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('createLinkKey');
-        $method->setAccessible(true);
 
         $key = $method->invoke($this->service, 7, 7);
         $this->assertEquals('7-7', $key);

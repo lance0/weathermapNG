@@ -132,7 +132,7 @@ class HealthController
             return [
                 'driver' => config('cache.default'),
                 'status' => 'error',
-                'message' => $e->getMessage()
+                'message' => 'cache unavailable'
             ];
         }
     }

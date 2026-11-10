@@ -70,7 +70,6 @@ class RRDToolTest extends TestCase
                   "1700000300: 1500 2500\n";
 
         $ref = new \ReflectionMethod($this->rrdTool, 'parseLastRow');
-        $ref->setAccessible(true);
         $row = $ref->invoke($this->rrdTool, $output);
 
         $this->assertIsArray($row);
@@ -81,4 +80,60 @@ class RRDToolTest extends TestCase
     // Note: Full RRD testing requires actual RRD files and rrdtool binary
     // These basic tests verify the class structure and error handling
     // Comprehensive testing would require test RRD files and rrdtool installation
+
+    private function parseOutput(string $output, string $metric): array
+    {
+        $method = (new \ReflectionClass($this->rrdTool))->getMethod('parseRRDOutput');
+
+        return $method->invoke($this->rrdTool, $output, $metric);
+    }
+
+    /** @test */
+    public function parses_values_when_header_includes_timestamp_column()
+    {
+        $output = <<<'RRD'
+            timestamp traffic_in traffic_out
+            1750000000: 1000 2000
+            1750000060: 1500 2500
+            RRD;
+
+        $this->assertSame([
+            ['timestamp' => 1750000000, 'value' => 1000.0],
+            ['timestamp' => 1750000060, 'value' => 1500.0],
+        ], $this->parseOutput($output, 'traffic_in'));
+    }
+
+    /** @test */
+    public function skips_unknown_values_when_header_includes_timestamp_column()
+    {
+        $output = <<<'RRD'
+            timestamp traffic_in
+            1750000000: 1000
+            1750000060: U
+            1750000120: nan
+            1750000180: 1700
+            RRD;
+
+        $values = $this->parseOutput($output, 'traffic_in');
+
+        $this->assertCount(2, $values);
+        $this->assertSame(1000.0, $values[0]['value']);
+        $this->assertSame(1700.0, $values[1]['value']);
+    }
+
+    /** @test */
+    public function last_row_parser_aligns_values_without_timestamp_column()
+    {
+        $output = <<<'RRD'
+            timestamp traffic_in traffic_out
+            1750000000: 1000 2000
+            1750000060: 1500 2500
+            RRD;
+
+        $method = (new \ReflectionClass($this->rrdTool))->getMethod('parseLastRow');
+        $row = $method->invoke($this->rrdTool, $output);
+
+        $this->assertSame('1500', $row['traffic_in']);
+        $this->assertSame('2500', $row['traffic_out']);
+    }
 }

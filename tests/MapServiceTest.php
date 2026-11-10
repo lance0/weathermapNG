@@ -18,7 +18,6 @@ class MapServiceTest extends TestCase
     {
         $service = new MapService(new WebhookDispatcher());
         $reflection = new \ReflectionMethod($service, 'mergeMapOptions');
-        $reflection->setAccessible(true);
         return $reflection->invoke($service, $current, $new);
     }
 

@@ -28,7 +28,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('normalizeSeverity');
-        $method->setAccessible(true);
         return $method->invoke($this->service, $input);
     }
 
@@ -101,7 +100,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('maxSeverity');
-        $method->setAccessible(true);
         return $method->invoke($this->service, $a, $b);
     }
 
@@ -163,7 +161,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('buildAlertsByDevice');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->service, [], [1, 2, 3]);
 
@@ -178,7 +175,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('buildAlertsByDevice');
-        $method->setAccessible(true);
 
         $alerts = [
             ['device_id' => 1, 'severity' => 1],
@@ -198,7 +194,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('buildAlertsByDevice');
-        $method->setAccessible(true);
 
         $alerts = [
             ['device_id' => 999, 'severity' => 3],
@@ -215,7 +210,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('buildAlertsByPort');
-        $method->setAccessible(true);
 
         $result = $method->invoke($this->service, [], [10, 20]);
 
@@ -228,7 +222,6 @@ class AlertServiceTest extends TestCase
     {
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('buildAlertsByPort');
-        $method->setAccessible(true);
 
         $alerts = [
             ['port_id' => 10, 'severity' => 'warning'],

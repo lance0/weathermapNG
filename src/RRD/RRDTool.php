@@ -90,6 +90,11 @@ class RRDTool
 
             if (!$headerParsed && strpos($line, ':') === false) {
                 $headers = preg_split('/\s+/', $line);
+
+                if (isset($headers[0]) && in_array(strtolower($headers[0]), ['timestamp', 'time'], true)) {
+                    array_shift($headers);
+                }
+
                 $metricIndex = $this->getMetricIndex($metric, $headers);
                 $headerParsed = true;
                 continue;
@@ -255,6 +260,11 @@ class RRDTool
 
             if (!$headerParsed && strpos($line, ':') === false) {
                 $headers = preg_split('/\s+/', $line);
+
+                if (isset($headers[0]) && in_array(strtolower($headers[0]), ['timestamp', 'time'], true)) {
+                    array_shift($headers);
+                }
+
                 $headerParsed = true;
                 continue;
             }

@@ -73,7 +73,6 @@ class MapModelTest extends TestCase
 
         // Set options via reflection
         $prop = $reflection->getProperty('attributes');
-        $prop->setAccessible(true);
         $prop->setValue($map, ['options' => json_encode(['tags' => [' core ', '', 'WAN', null, 123]])]);
 
         $tags = $method->invoke($map);
@@ -87,7 +86,6 @@ class MapModelTest extends TestCase
         $map = $reflection->newInstanceWithoutConstructor();
 
         $prop = $reflection->getProperty('attributes');
-        $prop->setAccessible(true);
         $prop->setValue($map, ['options' => json_encode(['tags' => ['core', 'Core', 'CORE', 'wan']])]);
 
         $tags = $method->invoke($map);
@@ -108,7 +106,6 @@ class MapModelTest extends TestCase
         $map = $reflection->newInstanceWithoutConstructor();
 
         $prop = $reflection->getProperty('attributes');
-        $prop->setAccessible(true);
         $prop->setValue($map, ['options' => json_encode(['width' => 800])]);
 
         $this->assertSame([], $method->invoke($map));
@@ -121,7 +118,6 @@ class MapModelTest extends TestCase
         $map = $reflection->newInstanceWithoutConstructor();
 
         $prop = $reflection->getProperty('attributes');
-        $prop->setAccessible(true);
         $prop->setValue($map, ['options' => json_encode([
             'default_node_style' => ['color' => '#123456', 'label_color' => '#abcdef'],
         ])]);
@@ -136,7 +132,6 @@ class MapModelTest extends TestCase
         $map = $reflection->newInstanceWithoutConstructor();
 
         $prop = $reflection->getProperty('attributes');
-        $prop->setAccessible(true);
         $prop->setValue($map, ['options' => json_encode([
             'default_link_style' => ['color' => '#333333', 'width' => 3.5, 'via_style' => 'curved'],
         ])]);

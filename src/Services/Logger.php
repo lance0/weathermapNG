@@ -112,6 +112,13 @@ class Logger
             return new StreamHandler('php://stdout', $this->getLogLevel());
         }
 
+        // Fall back to stderr when the configured log directory is not writable
+        // (containers, read-only installs, or missing /var/log/librenms).
+        $directory = dirname($output);
+        if (!is_dir($directory) || !is_writable($directory)) {
+            return new StreamHandler('php://stderr', $this->getLogLevel());
+        }
+
         // Use rotating file handler if rotation is enabled
         if ($this->config['rotation']['enabled'] ?? true) {
             return new RotatingFileHandler(

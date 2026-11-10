@@ -82,9 +82,11 @@ class CreateMapRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $title = trim((string) $this->input('title', ''));
+
         $this->merge([
             'name' => trim($this->input('name', '')),
-            'title' => trim($this->input('title', '')),
+            'title' => $title === '' ? null : $title,
         ]);
     }
 }
