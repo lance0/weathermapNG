@@ -50,11 +50,21 @@ class NodeServiceTest extends TestCase
     private function makeMap(bool $mapHasNodes): Map
     {
         $map = $this->createStub(Map::class);
-        $relation = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['exists', 'delete'])
-            ->getMock();
-        $relation->method('exists')->willReturn($mapHasNodes);
-        $relation->method('delete')->willReturn(0);
+        $relation = new class($mapHasNodes) {
+            public function __construct(private bool $exists)
+            {
+            }
+
+            public function exists(): bool
+            {
+                return $this->exists;
+            }
+
+            public function delete(): int
+            {
+                return 0;
+            }
+        };
         $map->method('nodes')->willReturn($relation);
         return $map;
     }
