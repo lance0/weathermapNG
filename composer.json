@@ -16,7 +16,7 @@
     "ext-json": "*",
     "ext-mbstring": "*",
     "librenms/plugin-interfaces": "^1.0",
-    "symfony/process": "^7.0"
+    "symfony/process": "^7.0 || ^8.1"
   },
   "autoload": {
     "psr-4": {
