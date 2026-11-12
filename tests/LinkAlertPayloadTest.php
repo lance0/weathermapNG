@@ -33,9 +33,11 @@ class LinkAlertPayloadTest extends TestCase
             102 => ['count' => 1, 'severity' => 'critical'],
         ]);
 
-        $this->assertSame(['count' => 3, 'severity' => 'critical'], $alerts);
-        $this->assertArrayNotHasKey('alert_count', $alerts);
-        $this->assertArrayNotHasKey('alert_severity', $alerts);
+        $this->assertSame(3, $alerts['count']);
+        $this->assertSame('critical', $alerts['severity']);
+        // Compatibility aliases for consumers written against the old payload.
+        $this->assertSame(3, $alerts['alert_count']);
+        $this->assertSame('critical', $alerts['alert_severity']);
     }
 
     public function test_returns_empty_when_no_port_has_alerts(): void

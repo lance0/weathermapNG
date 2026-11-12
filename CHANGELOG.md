@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-12
+
+### Upgrade notes
+
+No manual migration or configuration change is required.
+
+- Use the normal update path: select the release and run `deploy.sh`, or recreate the Docker app. `database/setup.php` adds `wmng_map_favorites` idempotently; existing maps, nodes, links, templates, saved versions, settings and the `plugins` row are untouched.
+- If an install skips the update, maps still render; favorite clicks return HTTP 503 with the setup command until the new table exists.
+- The live/SSE `alerts.links` payload now uses `count`/`severity` (the keys the embed reads) and retains `alert_count`/`alert_severity` as aliases, so external consumers are not broken.
+- `database/schema.sql` was removed. It was an unreferenced, stale manual fallback; use `php database/setup.php`.
+- Invalid per-node style values are dropped instead of rejecting the whole map save. Valid existing data is unchanged.
+
 ### Added
 - Style individual nodes with fill color, label color, shape (circle, square, diamond, triangle) and size, and copy the selected node's style to every multi-selected node in one undoable action. The same overrides render in the editor, the embed view and the SVG export; invalid values are rejected on save.
 - Export the embed view as a static SVG document next to the existing PNG export. Links honor via points and curve style, nodes honor device shapes plus per-node overrides, labels are XML-escaped, and the output is deterministic for a given map.
@@ -20,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve every node `meta` key on editor save, node apply, duplicate and JSON export. Previously only `interface_id` survived, which discarded `sub_map_id`, tooltips and per-node style.
 
 ### Fixed
-- Render link alert badges again: the API emitted `alert_count`/`alert_severity` while the embed read `count`/`severity`, so port alerts never showed on links. Both node and link alerts now use `{count, severity}`, with a regression test.
+- Render link alert badges again: the API emitted `alert_count`/`alert_severity` while the embed read `count`/`severity`, so port alerts never showed on links. Both node and link alerts now expose `{count, severity}`, with the old `alert_*` keys retained as aliases and a regression test.
 - Normalize per-node style meta before validation and on every write path (save, import, node PATCH, version snapshot). A stored or imported value like `color: "red"` used to fail the next whole-map save with a 422 the editor could not explain; it is now dropped, while unknown meta keys survive.
 - Draw straight-link labels and alert badges at the real midpoint instead of the destination node.
 - Export SVG links and labels that match the map: link strokes follow utilization colors, percent labels need no stored bandwidth (demo maps), curved labels sit on the drawn curve, labels carry the canvas halo, and the export follows the Metric selector.

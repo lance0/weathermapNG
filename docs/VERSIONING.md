@@ -26,7 +26,7 @@ These sources must agree on every release:
 
 | Source | Requirement |
 |--------|-------------|
-| `VERSION` | Canonical version string, one line, for example `1.16.0`. |
+| `VERSION` | Canonical version string, one line, for example `1.17.0`. |
 | `composer.json` | The `"version"` field equals `VERSION` exactly. |
 | `CHANGELOG.md` | Contains `## [<version>] - <YYYY-MM-DD>` for the release. |
 | `README.md` | Version badge and tagged install example match the release. |

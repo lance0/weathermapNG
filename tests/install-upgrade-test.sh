@@ -63,7 +63,7 @@ if ($phase === 'break') {
     exit;
 }
 if ($phase === 'assert') {
-    foreach (['wmng_maps','wmng_nodes','wmng_links','wmng_map_versions','wmng_map_templates'] as $table) {
+    foreach (['wmng_maps','wmng_nodes','wmng_links','wmng_map_versions','wmng_map_templates','wmng_map_favorites'] as $table) {
         if (!$schema::hasTable($table)) { throw new RuntimeException('Missing table'); }
     }
     foreach (['title','parent_map_id'] as $column) {
@@ -74,7 +74,7 @@ if ($phase === 'assert') {
     exit;
 }
 $tables = ['wmng_maps','wmng_nodes','wmng_links'];
-if ($phase === 'full') { $tables = array_merge($tables,['wmng_map_versions','wmng_map_templates']); }
+if ($phase === 'full') { $tables = array_merge($tables,['wmng_map_versions','wmng_map_templates','wmng_map_favorites']); }
 $result = [];
 foreach ($tables as $table) {
     $rows = $db::table($table)->orderBy('id')->get()->map(fn($row)=>(array)$row)->all();

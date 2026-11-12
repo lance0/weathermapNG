@@ -131,8 +131,9 @@ device or metrics are disabled in config. `traffic.source` is `ports`, `device`,
 holds an entry for every node backed by a device, with `count` and `severity`
 (`warning`, `critical`, or `severe`; `count: 0` when clear).
 `alerts.links` lists only links with port alerts, keyed by link ID, with
-`count`, `severity`, and the link's `in_bps`, `out_bps`, and
-`pct`.
+`count`, `severity`, and the link's `in_bps`, `out_bps`, and `pct`. For
+backward compatibility these entries also carry `alert_count` and
+`alert_severity` with the same values; new code should use `count`/`severity`.
 
 ### Map JSON payload
 

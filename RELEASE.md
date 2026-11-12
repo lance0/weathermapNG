@@ -111,7 +111,7 @@ release preflight, or the Release workflow:
 
 | Source | Requirement |
 |--------|-------------|
-| `VERSION` | Canonical version string, one line (for example `1.16.0`). |
+| `VERSION` | Canonical version string, one line (for example `1.17.0`). |
 | `composer.json` | The `"version"` field equals `VERSION` exactly. |
 | `CHANGELOG.md` | Contains `## [<version>] - <YYYY-MM-DD>` matching `VERSION`. |
 | Git tag | `v<version>` matches `VERSION`; the Release workflow checks this. |

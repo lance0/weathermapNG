@@ -2,10 +2,10 @@
 
 Where WeathermapNG is going, what already ships, and what remains open.
 
-Current release: **v1.16.0**. Last reviewed v1.16.0 (2026-11-12) against the
+Current release: **v1.17.0**. Last reviewed v1.17.0 (2026-11-12) against the
 LibreNMS plugin architecture, the network weathermap landscape, the LibreNMS API
-surface (LLDP/CDP, health, alerts, RRD), and a codebase audit. Unreleased work
-on `main` is listed under [Unreleased](CHANGELOG.md#unreleased).
+surface (LLDP/CDP, health, alerts, RRD), and a codebase audit. Changes after the
+tag are listed under [Unreleased](CHANGELOG.md#unreleased) in the changelog.
 
 ## Contents
 
@@ -14,11 +14,11 @@ on `main` is listed under [Unreleased](CHANGELOG.md#unreleased).
 | [Current status](#current-status) | Shipped feature set, plus unreleased work on `main` |
 | [Roadmap principles](#roadmap-principles) | How work is prioritized |
 | [Open work](#open-work) | Future and long-term items; all unshipped |
-| [Completed by version](#completed-by-version) | Shipped history from v1.1.x to v1.16.0 |
+| [Completed by version](#completed-by-version) | Shipped history from v1.1.x to v1.17.0 |
 | [Contributing](#contributing) | Where help is useful |
 | [Feedback](#feedback) | Where to file ideas |
 
-## Current Status: v1.16.0 (Stable) <a id="current-status"></a>
+## Current Status: v1.17.0 (Stable) <a id="current-status"></a>
 
 Stable. The core install, editor, rendering, and map-management workflows are in
 place, with the hardening and operator features below.
@@ -50,15 +50,11 @@ Shipped:
 - Gallery previews of real map and template topology
 - Composer path package install flow for LibreNMS
 - Weekly/manual install CI, upgrade lanes, and idempotent registration cleanup
-
-Unreleased on `main`:
-
 - Per-node style overrides (fill, label color, shape, size) with one-undo bulk
   apply, plus Ctrl/Cmd+A and bulk delete
 - Per-user map favorites with an index star toggle and filter
 - Static SVG export of the embed view
-- Screenshot comparison in CI, with committed baselines at 480×800, 768×1024,
-  and 1920×1080
+- Screenshot comparison in CI at 480×800, 768×1024, and 1920×1080
 - Particle budget tiers above 150 and 300 links (1500-particle cap) and
   secondary-label hiding below 0.6 zoom
 
@@ -144,6 +140,23 @@ These ideas are parked until the core product feels polished and maintainable.
 Shipped work, newest first. Summaries for v1.13.0 and later condense
 [CHANGELOG.md](CHANGELOG.md); earlier sections keep the detail recorded when the
 work landed.
+
+### v1.17.0
+
+- [x] **Per-node styles**: fill, label color, shape, and size overrides stored
+  in node `meta`, rendered in the editor, embed view, and SVG export, with
+  one-undo bulk apply and size-aware editor bounds.
+- [x] **Per-user favorites**: `wmng_map_favorites`, star toggle, count badge,
+  and Favorites filter; not admin-gated because it changes only the caller's row.
+- [x] **SVG export**: deterministic static document matching on-screen metric
+  labels, utilization colors, curve anchors, and node styles.
+- [x] **Render degradation**: particle tiers and a 1500-particle cap, secondary
+  labels hidden below 0.6 zoom, and a resize repaint fix.
+- [x] **Screenshot comparison in CI** across three viewports, with hardened
+  masking, blank-canvas and styled-node checks, and committed baselines.
+- [x] **Documentation sweep**: task-first README/docs index, verified API route
+  table, current behavior in INSTALL/DEPLOYMENT/PERFORMANCE/VERSIONING/ROADMAP,
+  plus SECURITY and KNOWN_ISSUES, with a link/anchor test in CI.
 
 ### v1.16.0
 
