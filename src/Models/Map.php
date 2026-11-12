@@ -22,6 +22,30 @@ class Map extends Model
         return $this->hasMany(Link::class);
     }
 
+    /** Per-user favorite rows for this map. */
+    public function favorites()
+    {
+        return $this->hasMany(MapFavorite::class);
+    }
+
+    /**
+     * Restrict the query to maps favorited by one user. A null user (guest or
+     * missing session) matches nothing rather than every row with user_id NULL.
+     */
+    public function scopeFavoritedBy($query, ?int $userId)
+    {
+        if ($userId === null) {
+            return $query->whereIn($this->getTable() . '.id', []);
+        }
+
+        return $query->whereExists(function ($sub) use ($userId) {
+            $sub->select(DB::raw(1))
+                ->from('wmng_map_favorites')
+                ->whereColumn('wmng_map_favorites.map_id', 'wmng_maps.id')
+                ->where('wmng_map_favorites.user_id', $userId);
+        });
+    }
+
     /** Parent map (for nested maps / drill-down hierarchy). */
     public function parentMap()
     {

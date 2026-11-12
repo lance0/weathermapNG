@@ -3,6 +3,31 @@
 All notable changes to WeathermapNG will be documented in this file.
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Style individual nodes with fill color, label color, shape (circle, square, diamond, triangle) and size, and copy the selected node's style to every multi-selected node in one undoable action. The same overrides render in the editor, the embed view and the SVG export; invalid values are rejected on save.
+- Export the embed view as a static SVG document next to the existing PNG export. Links honor via points and curve style, nodes honor device shapes plus per-node overrides, labels are XML-escaped, and the output is deterministic for a given map.
+- Favorite maps per user from the index with a star toggle, a favorites count badge and a Favorites filter. Favorites are per-user and available to every authenticated user, not only admins.
+- Compare index, editor and embed screenshots at 480×800, 768×1024 and 1920×1080 in CI, with committed baselines, a canvas-only tolerance and diff artifacts on failure. Every pure Node regression suite also runs in CI now.
+
+### Changed
+- Bound flow-animation cost on large maps: particle density drops in tiers above 150 and 300 links and the whole map stays at or below 1500 particles. Below 0.6 zoom the embed hides secondary node text (traffic total and CPU/MEM) while keeping node labels.
+- Editor shortcuts now include Ctrl/Cmd+A (select all nodes) and Delete/Backspace bulk delete, and stay inactive while a dialog is open.
+- Preserve every node `meta` key on editor save, node apply, duplicate and JSON export. Previously only `interface_id` survived, which discarded `sub_map_id`, tooltips and per-node style.
+
+### Fixed
+- Redraw the editor canvas after a container resize. Resizing the canvas buffer cleared it and nothing repainted, so a resized editor could render blank until the next interaction.
+- Normalize node `meta` to an object before writing style keys, so rows that stored an empty PHP array (`[]`) no longer swallow their per-node style.
+- Allow `symfony/process` 7.x and 8.x and upgrade the dev suite to PHPUnit 11.5, so the package installs and tests on PHP 8.2 hosts.
+- Upload CI artifacts with `actions/upload-artifact` v7.
+- Accept a blank optional map title or background as absent on create and update instead of failing validation.
+- Import only known map options (width, height, background, tags, default node and link styles), clamp dimensions to the editor range, reject non-object nodes/links, and fall back to a white background for invalid colors.
+- Read per-interface RRD values when `rrdtool fetch` prints a `timestamp`/`time` column in the header, in both the interface and device metric parsers.
+- Write logs to stderr when the configured log directory is missing or read-only, instead of dropping them.
+- Stop returning cache exception details from the authenticated detailed health endpoint.
+- Remove the stale `database/schema.sql` manual fallback, which lacked the `title`, `parent_map_id`, template and version tables and could not support a working install.
+
 ## [1.16.0] - 2026-10-28
 
 ### Added

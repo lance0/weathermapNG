@@ -9,7 +9,7 @@ php artisan route:list | grep -iE 'weathermap|wmng'
 
 ## Authentication & Authorization
 
-All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, a LibreNMS `level >= 10`, or `hasRole('admin')` and otherwise `abort(403)`.
+All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin except the per-user favorite toggle. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, a LibreNMS `level >= 10`, or `hasRole('admin')` and otherwise `abort(403)`.
 
 ### Public probe routes (no auth)
 
@@ -23,9 +23,13 @@ These sit outside the `auth` group and are intentionally minimal so they can bac
 
 `GET` map index/show/editor/view/embed/json/live/sse/export and `GET templates` index/show. None of these call `requireAdmin()`. Admin-only reads: device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports` — they expose device IPs and topology data), map version endpoints (list/show/compare/export), and `/health/detailed`, `/health/stats`, `/metrics`. Token-auth variant: `embed`, `json`, `live`, and `sse` are also reachable without a session using a Bearer token / `?token=` when `WEATHERMAPNG_EMBED_TOKEN` is set (see [docs/EMBED.md](EMBED.md#embed-api-token-auth)).
 
+### Per-user favorites (any authenticated user)
+
+`POST /plugin/WeathermapNG/map/{map}/favorite` is the only write route that is not admin-gated. It toggles a favorite for the session user, so it must stay inside the `auth` group but must not call `requireAdmin()`. It only reads and writes that user's own row in `wmng_map_favorites`.
+
 ### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, `level >= 10`, or `hasRole('admin')`)
 
-Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at the top of the controller action and `abort(403)` for non-admins. This covers all map CRUD, node CRUD, link CRUD, template CRUD, full-map save, import, auto-discovery, and the install runner. The `GET /plugin/WeathermapNG/install` UI is authenticated (it sits in the `auth` group); its `POST` counterpart is admin-only.
+Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at the top of the controller action and `abort(403)` for non-admins. This covers all map CRUD, node CRUD, link CRUD, template CRUD, full-map save, import, auto-discovery, and the install runner. The single exception is the per-user favorite toggle (`POST /map/{map}/favorite`), which any authenticated user may call. The `GET /plugin/WeathermapNG/install` UI is authenticated (it sits in the `auth` group); its `POST` counterpart is admin-only.
 
 ## Page Routes
 
@@ -130,6 +134,19 @@ The `json` endpoint and `export?format=json` both return the serialized map mode
 | `breadcrumb` | array | Chain from the root ancestor to the current map, inclusive. Each entry is `{id, name, title}`. Empty only when the map is itself the root. |
 | `sub_map_id` (per-node) | int\|null | If set, clicking this node in the embed view navigates to the sub-map with this ID, preserving query params. `null` means no drill-down. Stored in the node's `meta` JSON. |
 
+### Per-node style fields
+
+Nodes render their device-type shape and status color by default. Four optional keys in each node's `meta` JSON override that, in the editor, the embed view, and the SVG export (`map` saves include them; the API returns them unchanged):
+
+| Key | Values | Effect |
+|-----|--------|--------|
+| `meta.color` | `#RRGGBB` | Node fill, replacing the status/device color. |
+| `meta.label_color` | `#RRGGBB` | Label text color, replacing the theme/default label color. |
+| `meta.shape` | `circle`, `square`, `diamond`, `triangle` | Shape override, replacing the device-type shape derived from the label. |
+| `meta.size` | 6–40 | World-unit radius. Without `shape`, the natural shape scales by `size / 10` (embed/SVG) or `size / 12` (editor circle). |
+
+`POST /api/maps/{map}/save` validates those keys (hex colors, the four shape names, numeric 6–40) and drops invalid values instead of storing them. Every other `meta` key — `interface_id`, `sub_map_id`, `tooltip` — is preserved verbatim. The editor's node sidebar edits the same fields and can copy one node's style onto every multi-selected node (`Apply style to all selected`).
+
 ## Export (GET /api/maps/{map}/export)
 
 Pass `format` as a query parameter:
@@ -169,6 +186,8 @@ Required fields:
   "message": "Map imported successfully"
 }
 ```
+
+Imported map options are narrowed to the supported set — `width`, `height`, `background`, `tags`, `default_node_style`, `default_link_style`. Other keys in the file are dropped. Width and height are clamped to 100–4096 (defaults 800×600) and an unparseable `background` becomes `#ffffff`. Every entry in `nodes` and `links` must be an object; otherwise the import is rejected with HTTP 400.
 
 ## Client URL parameters
 
@@ -216,6 +235,28 @@ Typical response:
   "redirect": "https://librenms/plugin/WeathermapNG/editor/1"
 }
 ```
+
+## Favorite Route
+
+| Auth | Method | Path | Purpose |
+|------|--------|------|---------|
+| Any authenticated user | `POST` | `/plugin/WeathermapNG/map/{map}/favorite` | Toggle the current user's favorite of a map |
+
+The toggle is scoped to the session user, so two users can favorite the same map independently. The `(user_id, map_id)` unique key makes the call safe to repeat: a concurrent double request cannot create duplicate favorites. Favorite rows are removed automatically when the map is deleted.
+
+Successful response:
+
+```json
+{
+  "success": true,
+  "favorited": true,
+  "count": 3
+}
+```
+
+`favorited` is the state after the toggle, and `count` is the number of users who have favorited that map. The index page renders the star state and per-map count from `TopologyPreview::loadMaps()` with two batched queries for the whole page (never one query per card).
+
+Failure responses use the standard error shape: HTTP 401 with `{"success": false, "message": "Authentication required"}` when the request has no session user, and HTTP 500 with a generic message when the write fails (details are logged, not returned).
 
 ## Node Routes
 

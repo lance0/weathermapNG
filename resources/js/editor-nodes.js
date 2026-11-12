@@ -10,6 +10,159 @@
  * render functions are global function declarations and resolve at runtime.
  */
 var S = window.WMNG.EditorState;
+const NODE_STYLE_META_KEYS = ['color', 'label_color', 'shape', 'size'];
+
+/**
+ * Nodes loaded from older/imported rows can carry `meta: []` (PHP encodes an
+ * empty PHP array as a JSON list). Writing named style keys onto that array
+ * would serialize as "[]" and silently drop them, so every read/write path
+ * coerces non-object meta to a plain object first.
+ */
+function nodeMetaObject(node) {
+    if (!node) return {};
+    if (!node.meta || typeof node.meta !== 'object' || Array.isArray(node.meta)) {
+        node.meta = {};
+    }
+    return node.meta;
+}
+
+const NODE_STYLE_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+// One undo snapshot per continuous style gesture (e.g. dragging the color
+// picker fires many `input` events); reset on change/selection switch.
+let activeNodeStyleEdit = null;
+
+/** Effective default colors used when a node has no per-node override. */
+function getEffectiveNodeStyleDefaults() {
+    const defaultNodeStyle = getDefaultNodeStyle();
+    const isDarkTheme = document.querySelector('.editor-container.dark-theme') !== null;
+    return {
+        color: defaultNodeStyle.color || '#28a745',
+        label_color: defaultNodeStyle.label_color || (isDarkTheme ? '#f8f9fa' : '#212529'),
+    };
+}
+
+/**
+ * Apply a single style meta edit to the anchor node: snapshot for undo,
+ * update the node, mark the map dirty and re-render. An empty value removes
+ * the override so the node falls back to its device/default style.
+ */
+function updateNodeStyle(node, key, value) {
+    if (!node) return;
+    const editToken = node.id + ':' + key;
+    if (activeNodeStyleEdit !== editToken) {
+        saveState();
+        activeNodeStyleEdit = editToken;
+    }
+    const meta = nodeMetaObject(node);
+    if (value === null || value === undefined || value === '') {
+        delete meta[key];
+    } else {
+        meta[key] = value;
+    }
+    markUnsaved();
+    renderEditor();
+    renderNodesList();
+    updateApplyStyleButton();
+}
+
+function updateNodeSize(node, rawValue) {
+    if (!node) return;
+    if (rawValue === '') {
+        updateNodeStyle(node, 'size', null);
+        return;
+    }
+    const size = parseFloat(rawValue);
+    if (!isFinite(size)) return;
+    updateNodeStyle(node, 'size', Math.max(6, Math.min(40, size)));
+}
+
+/** Populate the Style group from the selected node (and rebind handlers). */
+function populateNodeStyleControls(node) {
+    const color = document.getElementById('node-prop-color');
+    const labelColor = document.getElementById('node-prop-label-color');
+    const shape = document.getElementById('node-prop-shape');
+    const size = document.getElementById('node-prop-size');
+    const meta = nodeMetaObject(node);
+    const defaults = getEffectiveNodeStyleDefaults();
+    activeNodeStyleEdit = null;
+
+    if (color) {
+        color.value = (typeof meta.color === 'string' && NODE_STYLE_HEX_PATTERN.test(meta.color))
+            ? meta.color : defaults.color;
+        color.oninput = function () { updateNodeStyle(node, 'color', this.value); };
+        color.onchange = function () { activeNodeStyleEdit = null; };
+    }
+    if (labelColor) {
+        labelColor.value = (typeof meta.label_color === 'string' && NODE_STYLE_HEX_PATTERN.test(meta.label_color))
+            ? meta.label_color : defaults.label_color;
+        labelColor.oninput = function () { updateNodeStyle(node, 'label_color', this.value); };
+        labelColor.onchange = function () { activeNodeStyleEdit = null; };
+    }
+    if (shape) {
+        shape.value = NODE_STYLE_SHAPES.indexOf(meta.shape) >= 0 ? meta.shape : '';
+        shape.onchange = function () {
+            updateNodeStyle(node, 'shape', this.value || null);
+            activeNodeStyleEdit = null;
+        };
+    }
+    if (size) {
+        size.value = (meta.size !== undefined && meta.size !== null && isFinite(Number(meta.size)))
+            ? Number(meta.size) : '';
+        size.oninput = function () { updateNodeSize(node, this.value); };
+        size.onchange = function () { activeNodeStyleEdit = null; };
+    }
+
+    updateApplyStyleButton();
+}
+
+/** Drop every per-node style override, restoring device/default rendering. */
+function resetSelectedNodeStyle() {
+    const node = S.selectedNode;
+    if (!node) return;
+    saveState();
+    const meta = nodeMetaObject(node);
+    NODE_STYLE_META_KEYS.forEach(key => { delete meta[key]; });
+    markUnsaved();
+    populateNodeProperties(node);
+    renderEditor();
+    renderNodesList();
+}
+
+/**
+ * Copy the anchor node's full style (color/label_color/shape/size) onto every
+ * other selected node in one undo step. Missing anchor keys clear the target
+ * override so all selected nodes match the anchor.
+ */
+function applyStyleToSelected() {
+    const anchor = S.selectedNode;
+    if (!anchor || S.selectedNodes.length <= 1) return;
+
+    const anchorMeta = nodeMetaObject(anchor);
+    const style = {};
+    NODE_STYLE_META_KEYS.forEach(key => {
+        if (anchorMeta[key] !== undefined && anchorMeta[key] !== null && anchorMeta[key] !== '') {
+            style[key] = anchorMeta[key];
+        }
+    });
+
+    saveState();
+    S.selectedNodes.forEach(node => {
+        const meta = nodeMetaObject(node);
+        NODE_STYLE_META_KEYS.forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(style, key)) {
+                meta[key] = style[key];
+            } else {
+                delete meta[key];
+            }
+        });
+    });
+
+    markUnsaved();
+    renderEditor();
+    renderNodesList();
+    updateApplyStyleButton();
+    WMNGToast.success('Style applied to ' + S.selectedNodes.length + ' nodes', { duration: 1500 });
+}
 
 function addNode() {
     if (!S.canvas) return;
@@ -94,6 +247,8 @@ function populateNodeProperties(node) {
     // Show/hide View Device button based on current selection
     const viewBtn = document.getElementById('node-view-device-btn');
     if (viewBtn) viewBtn.style.display = node.deviceId ? 'inline-block' : 'none';
+
+    populateNodeStyleControls(node);
 }
 
 function openNodeDeviceAutocomplete() {
@@ -160,7 +315,13 @@ function saveSelectedNode() {
     const label = document.getElementById('node-prop-label').value.trim();
     const deviceId = document.getElementById('node-prop-device').value || null;
     const ifaceId = document.getElementById('node-prop-interface').value || null;
-    const payload = { label: label, device_id: deviceId ? parseInt(deviceId, 10) : null, meta: { interface_id: ifaceId ? parseInt(ifaceId, 10) : null } };
+    const payload = {
+        label: label,
+        device_id: deviceId ? parseInt(deviceId, 10) : null,
+        // Merge the loaded meta so unknown keys (style overrides, sub_map_id,
+        // tooltip, ...) survive the PATCH — the server replaces meta wholesale.
+        meta: { ...nodeMetaObject(S.selectedNode), interface_id: ifaceId ? parseInt(ifaceId, 10) : null },
+    };
     fetch(S.uris.map + '/' + S.mapId + '/node/' + S.selectedNode.dbId, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() }, body: JSON.stringify(payload)
     }).then(r => {
@@ -173,6 +334,7 @@ function saveSelectedNode() {
             S.selectedNode.label = label;
             S.selectedNode.deviceId = payload.device_id;
             S.selectedNode.interfaceId = payload.meta.interface_id;
+            S.selectedNode.meta = payload.meta;
             renderEditor();
         } else {
             WMNGToast.error('Failed to save node: ' + (d.message || 'Unknown error'), { duration: 3000 });
@@ -300,6 +462,16 @@ function selectNodeByIndex(idx, additive) {
     }
 }
 
+function selectAllNodes() {
+    if (!S.nodes.length) return;
+    S.selectedNodes = S.nodes.slice();
+    S.selectedNode = S.nodes[0];
+    populateNodeProperties(S.selectedNode);
+    updateToolbarState();
+    renderNodesList();
+    renderEditor();
+}
+
 function deleteNodeByIndex(idx) {
     if (idx >= 0 && idx < S.nodes.length) {
         const node = S.nodes[idx];
@@ -344,6 +516,7 @@ function duplicateSelectedNode() {
         y: Math.min(S.mapHeight - 12, S.selectedNode.y + 30),
         deviceId: S.selectedNode.deviceId,
         interfaceId: S.selectedNode.interfaceId,
+        meta: JSON.parse(JSON.stringify(nodeMetaObject(S.selectedNode))),
     };
 
     S.nodes.push(newNode);

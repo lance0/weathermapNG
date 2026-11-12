@@ -41,6 +41,10 @@ class SaveMapRequest extends FormRequest
             'nodes.*.y' => 'nullable|numeric|min:0|max:10000',
             'nodes.*.device_id' => 'nullable|integer',
             'nodes.*.meta' => 'nullable|array',
+            'nodes.*.meta.color' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'nodes.*.meta.label_color' => 'nullable|string|max:20|regex:/^#[0-9a-fA-F]{6}$/',
+            'nodes.*.meta.shape' => 'nullable|string|in:circle,square,diamond,triangle',
+            'nodes.*.meta.size' => 'nullable|numeric|min:6|max:40',
 
             'links' => 'present|array|max:2000',
             'links.*.src_node_id' => 'nullable',
@@ -86,6 +90,11 @@ class SaveMapRequest extends FormRequest
             'options.default_link_style.width.min' => 'Default link width must be at least 0.5',
             'options.default_link_style.width.max' => 'Default link width must not exceed 20',
             'options.default_link_style.via_style.in' => 'Default link style must be straight, angled, or curved',
+            'nodes.*.meta.color.regex' => 'Node fill color must be a valid hex color (e.g., #28a745)',
+            'nodes.*.meta.label_color.regex' => 'Node label color must be a valid hex color',
+            'nodes.*.meta.shape.in' => 'Node shape must be circle, square, diamond, or triangle',
+            'nodes.*.meta.size.min' => 'Node size must be at least 6',
+            'nodes.*.meta.size.max' => 'Node size must not exceed 40',
             'links.*.style.color.regex' => 'Link style color must be a valid hex color',
             'links.*.style.width.min' => 'Link width must be at least 0.5',
             'links.*.style.width.max' => 'Link width must not exceed 20',
@@ -138,7 +147,14 @@ class SaveMapRequest extends FormRequest
         });
     }
 
-    public function sanitize(array $data): array
+    /**
+     * Sanitize the validated payload.
+     *
+     * `$rawNodes` is the unvalidated `nodes` input: `validated()` drops nested
+     * keys that have no rules, so the caller passes the raw nodes for their
+     * meta keys to survive. When omitted, only the validated meta is used.
+     */
+    public function sanitize(array $data, ?array $rawNodes = null): array
     {
         foreach (['title', 'name'] as $key) {
             if (isset($data[$key]) && is_string($data[$key])) {
@@ -175,6 +191,12 @@ class SaveMapRequest extends FormRequest
         }
 
         if (!empty($data['nodes']) && is_array($data['nodes'])) {
+            // `validated()` only returns keys that have rules, so nested meta
+            // keys without rules (sub_map_id, tooltip, ...) are dropped before
+            // sanitize() sees them. Merge the raw request meta back in, then
+            // narrow only the style keys.
+            $rawNodes = $rawNodes ?? [];
+
             foreach ($data['nodes'] as $i => $node) {
                 if (!is_array($node)) {
                     continue;
@@ -182,6 +204,14 @@ class SaveMapRequest extends FormRequest
                 if (isset($node['label']) && is_string($node['label'])) {
                     $data['nodes'][$i]['label'] = NodeLabelNormalizer::normalizeOrThrow($node['label']);
                 }
+                $rawMeta = (is_array($rawNodes) && isset($rawNodes[$i]['meta']) && is_array($rawNodes[$i]['meta']))
+                    ? $rawNodes[$i]['meta']
+                    : [];
+                $meta = array_merge(
+                    $rawMeta,
+                    (isset($node['meta']) && is_array($node['meta'])) ? $node['meta'] : []
+                );
+                $data['nodes'][$i]['meta'] = self::sanitizeNodeMeta($meta);
             }
         }
 
@@ -225,6 +255,49 @@ class SaveMapRequest extends FormRequest
         }
 
         return $data;
+    }
+
+    /**
+     * Sanitize a node's meta payload against the per-node style allowlist.
+     *
+     * Only color, label_color, shape and size are style keys; every other
+     * meta key (interface_id, sub_map_id, tooltip, ...) is preserved
+     * untouched so unknown metadata survives save/duplicate/version flows.
+     * Invalid style values are dropped rather than stored.
+     */
+    private static function sanitizeNodeMeta(array $meta): array
+    {
+        $styleKeys = ['color', 'label_color', 'shape', 'size'];
+        $out = $meta;
+        foreach ($styleKeys as $key) {
+            unset($out[$key]);
+        }
+
+        $style = [];
+        foreach (['color', 'label_color'] as $key) {
+            if (isset($meta[$key]) && is_string($meta[$key])) {
+                $value = strtolower(strip_tags(trim($meta[$key])));
+                if (preg_match('/^#[0-9a-f]{6}$/', $value)) {
+                    $style[$key] = $value;
+                }
+            }
+        }
+
+        if (isset($meta['shape']) && is_string($meta['shape'])) {
+            $shape = strtolower(strip_tags(trim($meta['shape'])));
+            if (in_array($shape, ['circle', 'square', 'diamond', 'triangle'], true)) {
+                $style['shape'] = $shape;
+            }
+        }
+
+        if (isset($meta['size']) && is_numeric($meta['size'])) {
+            $size = (float) $meta['size'];
+            if ($size >= 6 && $size <= 40) {
+                $style['size'] = $size;
+            }
+        }
+
+        return $out + $style;
     }
 
     protected function prepareForValidation(): void

@@ -6,6 +6,10 @@
 function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 const CFG = window.WMNG.EmbedConfig || {};
+// Pure render helpers (node style contract, particle budget, label
+// degradation) and the static SVG exporter. Loaded before this file by
+// embed.blade.php; the guards keep a missing module from breaking the map.
+const svgExport = (window.WMNG && window.WMNG.SvgExport) || null;
 function embedUrl(path) {
     const url = new URL(path, window.location.origin);
     if (CFG.embedToken) url.searchParams.set('token', CFG.embedToken);
@@ -177,6 +181,8 @@ function embedUrl(path) {
             if (ms) { ms.value = currentMetric; ms.addEventListener('change', () => { currentMetric = ms.value; renderLegend(); staticDirty = true; renderMap(); }); }
             const ex = document.getElementById('export-png');
             if (ex) ex.addEventListener('click', exportPNG);
+            const exSvg = document.getElementById('export-svg');
+            if (exSvg) exSvg.addEventListener('click', exportSVG);
             if (navEnabled) initNavControls();
         } else {
             showError(mapData.error || 'Failed to load map');
@@ -551,23 +557,34 @@ function embedUrl(path) {
     function drawNode(node) {
         const x = (node.position?.x ?? node.x) || 0;
         const y = (node.position?.y ?? node.y) || 0;
-        const nodeType = getNodeType(node);
+        // meta.shape / meta.size override the device-type shape; meta.color is
+        // already applied by getNodeColor() and meta.label_color below.
+        const metaStyle = (svgExport && typeof svgExport.nodeStyle === 'function')
+            ? svgExport.nodeStyle(node.meta)
+            : {};
+        const nodeType = metaStyle.shape || getNodeType(node);
         const color = getNodeColor(node);
         const radius = 10; // Base radius for hit testing and badges
+        const shapeScale = metaStyle.size ? svgExport.sizeScale(metaStyle.size) : 1;
+        const visualRadius = radius * shapeScale;
         const status = node.status || 'unknown';
 
+        // Draw the shape around the origin so meta.size can scale any shape
+        // without duplicating its geometry.
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(shapeScale, shapeScale);
         ctx.fillStyle = color;
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 / shapeScale;
 
-        // Draw shape based on device type
-        if (nodeType === 'router') {
+        if (nodeType === 'router' || nodeType === 'diamond') {
             // Diamond
             ctx.beginPath();
-            ctx.moveTo(x, y - 10);
-            ctx.lineTo(x + 10, y);
-            ctx.lineTo(x, y + 10);
-            ctx.lineTo(x - 10, y);
+            ctx.moveTo(0, -10);
+            ctx.lineTo(10, 0);
+            ctx.lineTo(0, 10);
+            ctx.lineTo(-10, 0);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
@@ -575,57 +592,72 @@ function embedUrl(path) {
             // Rounded rectangle (horizontal)
             const w = 18, h = 10, r = 3;
             ctx.beginPath();
-            ctx.moveTo(x - w/2 + r, y - h/2);
-            ctx.lineTo(x + w/2 - r, y - h/2);
-            ctx.quadraticCurveTo(x + w/2, y - h/2, x + w/2, y - h/2 + r);
-            ctx.lineTo(x + w/2, y + h/2 - r);
-            ctx.quadraticCurveTo(x + w/2, y + h/2, x + w/2 - r, y + h/2);
-            ctx.lineTo(x - w/2 + r, y + h/2);
-            ctx.quadraticCurveTo(x - w/2, y + h/2, x - w/2, y + h/2 - r);
-            ctx.lineTo(x - w/2, y - h/2 + r);
-            ctx.quadraticCurveTo(x - w/2, y - h/2, x - w/2 + r, y - h/2);
+            ctx.moveTo(-w/2 + r, -h/2);
+            ctx.lineTo(w/2 - r, -h/2);
+            ctx.quadraticCurveTo(w/2, -h/2, w/2, -h/2 + r);
+            ctx.lineTo(w/2, h/2 - r);
+            ctx.quadraticCurveTo(w/2, h/2, w/2 - r, h/2);
+            ctx.lineTo(-w/2 + r, h/2);
+            ctx.quadraticCurveTo(-w/2, h/2, -w/2, h/2 - r);
+            ctx.lineTo(-w/2, -h/2 + r);
+            ctx.quadraticCurveTo(-w/2, -h/2, -w/2 + r, -h/2);
             ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else if (nodeType === 'square') {
+            ctx.beginPath();
+            ctx.rect(-8, -8, 16, 16);
             ctx.fill();
             ctx.stroke();
         } else if (nodeType === 'server') {
             // Tall rectangle (server rack style)
             ctx.beginPath();
-            ctx.rect(x - 7, y - 12, 14, 24);
+            ctx.rect(-7, -12, 14, 24);
             ctx.fill();
             ctx.stroke();
             // Rack lines
             ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1;
+            ctx.lineWidth = 1 / shapeScale;
             ctx.beginPath();
-            ctx.moveTo(x - 5, y - 6); ctx.lineTo(x + 5, y - 6);
-            ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y);
-            ctx.moveTo(x - 5, y + 6); ctx.lineTo(x + 5, y + 6);
+            ctx.moveTo(-5, -6); ctx.lineTo(5, -6);
+            ctx.moveTo(-5, 0); ctx.lineTo(5, 0);
+            ctx.moveTo(-5, 6); ctx.lineTo(5, 6);
             ctx.stroke();
             ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1.5 / shapeScale;
         } else if (nodeType === 'firewall') {
             // Shield shape
             ctx.beginPath();
-            ctx.moveTo(x, y - 12);
-            ctx.lineTo(x + 10, y - 6);
-            ctx.lineTo(x + 10, y + 4);
-            ctx.quadraticCurveTo(x + 10, y + 12, x, y + 14);
-            ctx.quadraticCurveTo(x - 10, y + 12, x - 10, y + 4);
-            ctx.lineTo(x - 10, y - 6);
+            ctx.moveTo(0, -12);
+            ctx.lineTo(10, -6);
+            ctx.lineTo(10, 4);
+            ctx.quadraticCurveTo(10, 12, 0, 14);
+            ctx.quadraticCurveTo(-10, 12, -10, 4);
+            ctx.lineTo(-10, -6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        } else if (nodeType === 'triangle') {
+            ctx.beginPath();
+            ctx.moveTo(0, -11);
+            ctx.lineTo(10, 8);
+            ctx.lineTo(-10, 8);
             ctx.closePath();
             ctx.fill();
             ctx.stroke();
         } else {
             // Default: circle
             ctx.beginPath();
-            ctx.arc(x, y, 10, 0, 2 * Math.PI);
+            ctx.arc(0, 0, 10, 0, 2 * Math.PI);
             ctx.fill();
             ctx.stroke();
         }
+        ctx.restore();
         // Static status-based rings (drawn on main canvas).
         // Warning nodes (up but CPU/MEM high): yellow dashed ring.
         if (isWarningNode(node)) {
             ctx.beginPath();
-            ctx.arc(x, y, radius + 5, 0, 2 * Math.PI);
+            ctx.arc(x, y, visualRadius + 5, 0, 2 * Math.PI);
             ctx.strokeStyle = 'rgba(255, 193, 7, 0.7)';
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 3]);
@@ -635,7 +667,7 @@ function embedUrl(path) {
         // Unknown nodes: subtle gray dashed outline.
         else if (status === 'unknown') {
             ctx.beginPath();
-            ctx.arc(x, y, radius + 4, 0, 2 * Math.PI);
+            ctx.arc(x, y, visualRadius + 4, 0, 2 * Math.PI);
             ctx.strokeStyle = 'rgba(108, 117, 125, 0.5)';
             ctx.lineWidth = 1.5;
             ctx.setLineDash([2, 2]);
@@ -644,41 +676,49 @@ function embedUrl(path) {
         }
 
         // Node label
-        ctx.fillStyle = defaultNodeStyle.label_color || '#000';
+        ctx.fillStyle = metaStyle.label_color || defaultNodeStyle.label_color || '#000';
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
-        const labelY = (nodeType === 'server') ? y - 18 : y - 16;
+        const labelY = y - ((nodeType === 'server') ? 18 : 16) * shapeScale;
         ctx.fillText(node.label || node.id, x, labelY);
 
-        // Aggregate traffic indicator: node.current_value is sum_bps
-        // (in_bps + out_bps across attached links). The "Σ " prefix
-        // signals it's a total, not a single direction; the tooltip
-        // breaks down In/Out/Sum and shows the source.
-        if (node.current_value !== null && node.current_value !== undefined) {
-            ctx.font = '10px Arial';
-            ctx.fillStyle = '#666';
-            const value = humanBits(node.current_value);
-            if (value) {
-                ctx.fillText('Σ ' + value, x, y + radius + 15);
+        // Secondary text (Σ traffic aggregate + CPU/MEM) is dropped when the
+        // map is zoomed out past readability; node labels stay visible and
+        // link labels are unaffected.
+        const secondaryLabels = (svgExport && typeof svgExport.showSecondaryLabels === 'function')
+            ? svgExport.showSecondaryLabels(userScale)
+            : userScale >= 0.6;
+        if (secondaryLabels) {
+            // Aggregate traffic indicator: node.current_value is sum_bps
+            // (in_bps + out_bps across attached links). The "Σ " prefix
+            // signals it's a total, not a single direction; the tooltip
+            // breaks down In/Out/Sum and shows the source.
+            if (node.current_value !== null && node.current_value !== undefined) {
+                ctx.font = '10px Arial';
+                ctx.fillStyle = '#666';
+                const value = humanBits(node.current_value);
+                if (value) {
+                    ctx.fillText('Σ ' + value, x, y + visualRadius + 15);
+                }
             }
-        }
 
-        // Node CPU/mem utilization line (when present and enabled).
-        if (nodeMetricsEnabled && node.metrics && (node.metrics.cpu != null || node.metrics.mem != null)) {
-            ctx.font = '9px Arial';
-            ctx.fillStyle = '#888';
-            let metricText = '';
-            if (node.metrics.cpu != null) metricText += 'CPU ' + Math.max(0, Math.min(100, Math.round(node.metrics.cpu))) + '%';
-            if (node.metrics.mem != null) {
-                metricText += (metricText ? '  ' : '') + 'MEM ' + Math.max(0, Math.min(100, Math.round(node.metrics.mem))) + '%';
+            // Node CPU/mem utilization line (when present and enabled).
+            if (nodeMetricsEnabled && node.metrics && (node.metrics.cpu != null || node.metrics.mem != null)) {
+                ctx.font = '9px Arial';
+                ctx.fillStyle = '#888';
+                let metricText = '';
+                if (node.metrics.cpu != null) metricText += 'CPU ' + Math.max(0, Math.min(100, Math.round(node.metrics.cpu))) + '%';
+                if (node.metrics.mem != null) {
+                    metricText += (metricText ? '  ' : '') + 'MEM ' + Math.max(0, Math.min(100, Math.round(node.metrics.mem))) + '%';
+                }
+                if (metricText) ctx.fillText(metricText, x, y + visualRadius + 26);
             }
-            if (metricText) ctx.fillText(metricText, x, y + radius + 26);
         }
 
         // Alert badge (if any)
         if (node.alerts && node.alerts.count > 0) {
-            const bx = x + radius - 3;
-            const by = y - radius + 3;
+            const bx = x + visualRadius - 3;
+            const by = y - visualRadius + 3;
             ctx.beginPath();
             ctx.arc(bx, by, 5, 0, Math.PI * 2);
             const sev = (node.alerts.severity || 'warning');
@@ -690,7 +730,7 @@ function embedUrl(path) {
         }
 
         // store geometry for hover
-        nodeGeoms.push({ x, y, r: radius, node });
+        nodeGeoms.push({ x, y, r: visualRadius, node });
     }
 
     // Draw a pulsing red ring around down nodes on the overlay canvas.
@@ -951,6 +991,22 @@ function embedUrl(path) {
             octx.setLineDash([]);
         }
     }
+    // The particle budget only depends on the map's link count, so memoize it
+    // instead of rebuilding the object for every link on every frame.
+    let particleBudgetCache = { linkCount: -1, budget: null };
+    function particleBudgetForMap() {
+        const linkCount = Array.isArray(mapData.links) ? mapData.links.length : 0;
+        if (particleBudgetCache.linkCount !== linkCount || !particleBudgetCache.budget) {
+            particleBudgetCache = {
+                linkCount,
+                budget: (svgExport && typeof svgExport.particleBudget === 'function')
+                    ? svgExport.particleBudget(linkCount)
+                    : { multiplier: 1, perLinkCap: 1500 }
+            };
+        }
+        return particleBudgetCache.budget;
+    }
+
     function drawFlowParticles(link, x1, y1, x2, y2, pct, pathPoints, drawCtx) {
         const live = link.live || {};
         const inBps = live.in_bps || 0;
@@ -963,23 +1019,29 @@ function embedUrl(path) {
         if (length === 0) return;
         
         const relativeFlow = pct ? pct / 100 : 0.5;
-        const particleCount = Math.max(1, Math.floor((length / 50) * relativeFlow * particleDensity));
+        const requested = Math.max(1, Math.floor((length / 50) * relativeFlow * particleDensity));
+        // Map-wide particle budget: density shrinks as the map's link count
+        // grows, and perLinkCap keeps the total across the map under the hard
+        // cap. The user's Density/Speed controls still apply to `requested`.
+        const budget = particleBudgetForMap();
+        const particleCount = Math.min(budget.perLinkCap, Math.max(1, Math.floor(requested * budget.multiplier)));
+        if (particleCount <= 0) return;
         const speedFactor = 0.5 + (relativeFlow * 1.5) * particleSpeed;
         
         const linkId = `${link.id || (x1 + '-' + y1 + '-' + x2 + '-' + y2)}`;
         
         if (!particles[linkId]) {
-            particles[linkId] = {
-                forward: [],
-                backward: [],
-                inRatio: inBps / (inBps + outBps + 0.001),
-                outRatio: outBps / (inBps + outBps + 0.001)
-            };
+            const totalBps = inBps + outBps + 0.001;
+            // forward + backward never exceed particleCount, so the map-wide
+            // cap holds even when both directions are active.
+            const forwardCount = outBps > 0 ? Math.round(particleCount * (outBps / totalBps)) : 0;
+            const backwardCount = inBps > 0 ? particleCount - forwardCount : 0;
+            particles[linkId] = { forward: [], backward: [] };
             
-            if (outBps > 0) {
-                for (let i = 0; i < particleCount * particles[linkId].outRatio; i++) {
+            if (forwardCount > 0) {
+                for (let i = 0; i < forwardCount; i++) {
                     particles[linkId].forward.push({
-                        progress: (i / particleCount),
+                        progress: (i / forwardCount),
                         speed: speedFactor * (0.8 + Math.random() * 0.4),
                         size: 2 + Math.random() * 2,
                         opacity: 0.6 + Math.random() * 0.4
@@ -987,10 +1049,10 @@ function embedUrl(path) {
                 }
             }
             
-            if (inBps > 0) {
-                for (let i = 0; i < particleCount * particles[linkId].inRatio; i++) {
+            if (backwardCount > 0) {
+                for (let i = 0; i < backwardCount; i++) {
                     particles[linkId].backward.push({
-                        progress: (i / particleCount),
+                        progress: (i / backwardCount),
                         speed: speedFactor * (0.8 + Math.random() * 0.4),
                         size: 2 + Math.random() * 2,
                         opacity: 0.6 + Math.random() * 0.4
@@ -1473,6 +1535,32 @@ function embedUrl(path) {
             a.download = `weathermap-${mapId}.png`;
             a.click();
         } catch (e) { console.error('Export failed', e); }
+    }
+
+    function exportSVG() {
+        try {
+            if (!svgExport || typeof svgExport.build !== 'function') {
+                console.error('SVG export is unavailable');
+                return;
+            }
+            // mapData carries the live values applied by applyLiveUpdate();
+            // the server-rendered EmbedData.liveData seeds the first export
+            // before any live update has landed.
+            const svg = svgExport.build(mapData, mapDataIn.liveData || null, {
+                colors: WMNG_CONFIG.colors,
+                thresholds: WMNG_CONFIG.thresholds,
+                link_style: WMNG_CONFIG.link_style,
+                scale: scale
+            });
+            const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `weathermap-${mapId}.svg`;
+            a.click();
+            // Revoke on a later tick so the download can start.
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch (e) { console.error('SVG export failed', e); }
     }
 
     let pollTimer = null;

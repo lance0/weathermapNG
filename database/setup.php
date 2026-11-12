@@ -395,6 +395,20 @@ try {
             echo "✓ Created table 'wmng_map_versions'\n";
         }
 
+        // Create map favorites table (per-user favorites)
+        if (!Schema::hasTable('wmng_map_favorites')) {
+            Schema::create('wmng_map_favorites', function (Blueprint $t) {
+                $t->id();
+                $t->unsignedBigInteger('user_id');
+                $t->index('user_id');
+                $t->unsignedBigInteger('map_id');
+                $t->foreign('map_id')->references('id')->on('wmng_maps')->onDelete('cascade');
+                $t->unique(['user_id', 'map_id']);
+                $t->timestamps();
+            });
+            echo "✓ Created table 'wmng_map_favorites'\n";
+        }
+
         // Create map templates table
         if (!Schema::hasTable('wmng_map_templates')) {
             Schema::create('wmng_map_templates', function (Blueprint $t) {

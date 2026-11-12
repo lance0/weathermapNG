@@ -80,4 +80,34 @@ class EditorPropertiesTest extends TestCase
         $this->assertStringContainsString("heightInput.addEventListener('input'", $resizeBlock);
         $this->assertStringContainsString('markUnsaved()', $resizeBlock);
     }
+
+    public function test_node_style_controls_update_anchor_and_push_undo(): void
+    {
+        $content = editor_source();
+
+        $this->assertStringContainsString('function populateNodeStyleControls(node)', $content);
+        $this->assertStringContainsString("color.oninput = function () { updateNodeStyle(node, 'color', this.value); };", $content);
+        $this->assertStringContainsString("labelColor.oninput = function () { updateNodeStyle(node, 'label_color', this.value); };", $content);
+        $this->assertStringContainsString("updateNodeStyle(node, 'shape', this.value || null)", $content);
+        $this->assertStringContainsString("size.oninput = function () { updateNodeSize(node, this.value); };", $content);
+
+        $updateBlock = substr($content, strpos($content, 'function updateNodeStyle(node, key, value)'), 600);
+        foreach (['saveState()', 'markUnsaved()', 'renderEditor()', 'renderNodesList()'] as $call) {
+            $this->assertStringContainsString($call, $updateBlock, "style edits must call $call");
+        }
+        $this->assertStringContainsString('populateNodeStyleControls(node);', $content);
+    }
+
+    public function test_apply_style_to_selected_copies_full_style_in_one_undo_step(): void
+    {
+        $content = editor_source();
+
+        $applyBlock = substr($content, strpos($content, 'function applyStyleToSelected()'), 2400);
+        $this->assertStringContainsString('saveState()', $applyBlock);
+        $this->assertStringContainsString('NODE_STYLE_META_KEYS.forEach', $applyBlock);
+        $this->assertStringContainsString('nodeMetaObject(anchor)', $applyBlock);
+        $this->assertStringContainsString("delete meta[key]", $applyBlock);
+        $this->assertStringContainsString('WMNGToast.success', $applyBlock);
+        $this->assertStringContainsString('S.selectedNodes.length <= 1', $applyBlock);
+    }
 }

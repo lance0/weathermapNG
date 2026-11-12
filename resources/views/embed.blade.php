@@ -66,6 +66,7 @@
                 </select>
             </label>
             <button type="button" id="export-png" class="btn btn-light btn-sm" aria-label="Export map as PNG" title="Export PNG">Export PNG</button>
+            <button type="button" id="export-svg" class="btn btn-light btn-sm" aria-label="Export map as SVG" title="Export SVG">Export SVG</button>
         </div>
         <div id="legend" class="embed-legend">
             <div class="embed-legend-title">Legend</div>
@@ -110,6 +111,7 @@
             liveData: @json($liveData ?? []),
         };
     </script>
+    <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/svg-export.js') }}"></script>
     <script src="{{ \LibreNMS\Plugins\WeathermapNG\Asset::url('js/embed-app.js') }}"></script>
 </body>
 </html>

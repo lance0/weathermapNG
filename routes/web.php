@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\RenderController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapController;
+use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapFavoriteController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapLinkController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapNodeController;
 use LibreNMS\Plugins\WeathermapNG\Http\Controllers\MapTemplateController;
@@ -39,6 +40,9 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::delete('plugin/WeathermapNG/map/{map}/node/{node}', [MapNodeController::class, 'delete'])->name('weathermapng.node.delete');
     Route::delete('plugin/WeathermapNG/map/{map}/link/{link}', [MapLinkController::class, 'delete'])->name('weathermapng.link.delete');
     Route::post('plugin/WeathermapNG/map/{map}/link', [MapLinkController::class, 'create'])->name('weathermapng.link.create');
+
+    // Per-user favorites: any authenticated user, no admin gate.
+    Route::post('plugin/WeathermapNG/map/{map}/favorite', [MapFavoriteController::class, 'toggle'])->name('weathermapng.map.favorite');
 
     // Map versioning
     Route::get('plugin/WeathermapNG/api/maps/{map}/versions', [MapVersionController::class, 'index'])->name('weathermapng.versions.index');

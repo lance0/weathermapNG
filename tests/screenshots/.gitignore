@@ -1,0 +1,3 @@
+# Reviewed visual baselines are committed artefacts, so lift the repository
+# wide `*.png` ignore rule for this directory only.
+!*.png

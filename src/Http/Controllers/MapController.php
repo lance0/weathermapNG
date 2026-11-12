@@ -61,7 +61,7 @@ class MapController
             // on node labels, so it can throw InvalidArgumentException on
             // an empty-after-strip label (e.g. "<b></b>"). Keep it inside
             // the try so that surfaces as 422, not a 500.
-            $validatedData = $request->sanitize($request->validated());
+            $validatedData = $request->sanitize($request->validated(), (array) $request->input('nodes', []));
             $this->mapService->saveMap($map, $validatedData);
             return response()->json([
                 'success' => true,

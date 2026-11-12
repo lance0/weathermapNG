@@ -37,6 +37,15 @@ setup:
 test:
     {{VENDOR_BIN}}/phpunit --no-coverage
 
+# Run every pure Node regression suite (tests/*-test.cjs)
+test-js:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for f in tests/*-test.cjs; do
+        echo "=== $f ==="
+        node "$f"
+    done
+
 # Run one test class: just test-one LegacyConfServiceTest
 test-one name:
     {{VENDOR_BIN}}/phpunit tests/{{name}}.php
@@ -45,7 +54,7 @@ test-one name:
 test-integration:
     #!/usr/bin/env bash
     set -euo pipefail
-    for t in tests/integration_savemaprequest_test.php tests/integration_node_label_invariant_test.php tests/integration_version_test.php tests/integration_embed_auth_test.php tests/integration_install_report_test.php; do
+    for t in tests/integration_savemaprequest_test.php tests/integration_node_label_invariant_test.php tests/integration_version_test.php tests/integration_embed_auth_test.php tests/integration_install_report_test.php tests/integration_favorites_test.php; do
         echo "=== $t ==="
         docker exec -u librenms librenms-dev bash -c "cd /opt/librenms/html/plugins/WeathermapNG && php $t"
     done
@@ -268,6 +277,15 @@ test-install-local INSTALL_DIR="/opt/librenms":
 # Render index/editor/embed screenshots. OUTDIR override is an env var.
 visual URL="http://localhost:18080":
     bash tests/screenshot-check.sh "{{URL}}" "${OUTDIR:-output/screenshots}"
+
+# Compare index/editor/embed renders against tests/screenshots/*.png.
+# Needs playwright-core on NODE_PATH (CI installs it beside the browser).
+visual-compare URL="http://localhost:8000":
+    node tests/screenshot-compare.cjs "{{URL}}"
+
+# Regenerate the tests/screenshots baselines; review the PNGs before committing.
+visual-baseline URL="http://localhost:8000":
+    UPDATE_SCREENSHOTS=1 node tests/screenshot-compare.cjs "{{URL}}"
 
 # Inspect a selected LibreNMS installation (pass --json for a support report)
 verify-deployment LIBRENMS_PATH="/opt/librenms" *args:

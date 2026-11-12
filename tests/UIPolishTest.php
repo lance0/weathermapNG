@@ -49,6 +49,26 @@ class UIPolishTest extends TestCase
         }
     }
 
+    public function test_editor_node_style_controls_have_visible_labels(): void
+    {
+        $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');
+
+        foreach (['node-prop-color', 'node-prop-label-color', 'node-prop-shape', 'node-prop-size'] as $id) {
+            $this->assertMatchesRegularExpression(
+                '/<label[^>]*\bfor="' . preg_quote($id, '/') . '"/',
+                $content,
+                "style control $id needs a visible <label for>"
+            );
+        }
+
+        $this->assertMatchesRegularExpression(
+            '/<button[^>]*type="button"[^>]*id="apply-style-selected-btn"[^>]*aria-label="/',
+            $content,
+            'bulk style button must be a named button'
+        );
+        $this->assertStringContainsString('id="node-prop-style-reset-btn"', $content);
+    }
+
     public function test_editor_theme_detection_has_no_debug_logging_or_head_observer(): void
     {
         $content = file_get_contents(__DIR__ . '/../resources/views/editor.blade.php');

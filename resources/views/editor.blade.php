@@ -376,6 +376,43 @@
                         <option value="">No interface</option>
                     </select>
                 </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="node-prop-color">Fill Color</label>
+                    <input type="color" class="form-control form-control-sm" id="node-prop-color"
+                           value="#28a745" aria-label="Node fill color">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="node-prop-label-color">Label Color</label>
+                    <input type="color" class="form-control form-control-sm" id="node-prop-label-color"
+                           value="#212529" aria-label="Node label color">
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="node-prop-shape">Shape</label>
+                    <select class="form-control form-control-sm" id="node-prop-shape">
+                        <option value="">Device default</option>
+                        <option value="circle">Circle</option>
+                        <option value="square">Square</option>
+                        <option value="diamond">Diamond</option>
+                        <option value="triangle">Triangle</option>
+                    </select>
+                </div>
+                <div class="form-group mb-2">
+                    <label class="form-label" for="node-prop-size">Size (6–40)</label>
+                    <input type="number" class="form-control form-control-sm" id="node-prop-size"
+                           min="6" max="40" step="1" placeholder="Auto" aria-label="Node size">
+                </div>
+                <div class="form-group mb-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm btn-block"
+                            id="apply-style-selected-btn" onclick="applyStyleToSelected()"
+                            aria-label="Apply this node's style to all selected nodes" disabled>
+                        Apply style to all selected (1)
+                    </button>
+                    <button type="button" class="btn btn-link btn-sm px-0"
+                            id="node-prop-style-reset-btn" onclick="resetSelectedNodeStyle()"
+                            aria-label="Reset node style to device default">
+                        Reset style to device default
+                    </button>
+                </div>
                 <div class="btn-group btn-group-sm d-flex">
                     <button type="button" class="btn btn-primary" onclick="saveSelectedNode()" aria-label="Apply node changes"><i class="fas fa-check"></i> Apply</button>
                     <button type="button" class="btn btn-secondary" onclick="duplicateSelectedNode()" title="Duplicate" aria-label="Duplicate selected node"><i class="fas fa-copy"></i></button>

@@ -21,7 +21,9 @@ class PageController extends Controller
             return redirect()->route('weathermapng.install');
         }
 
-        return view('WeathermapNG::index', TopologyPreview::loadMaps());
+        return view('WeathermapNG::index', TopologyPreview::loadMaps(
+            auth()->id() === null ? null : (int) auth()->id()
+        ));
     }
 
     /**
