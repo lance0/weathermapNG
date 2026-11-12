@@ -178,10 +178,11 @@ function initCanvasResizeValidation() {
 }
 
 function validateAndApplyCanvasResize(newWidth, newHeight) {
-    const nodeRadius = 12;
-    const outOfBounds = S.nodes.filter(n =>
-        n.x > newWidth - nodeRadius || n.y > newHeight - nodeRadius
-    );
+    // Each node is clamped by its own radius (meta.size can exceed 12).
+    const outOfBounds = S.nodes.filter(n => {
+        const r = getNodeRadius(n);
+        return n.x < r || n.y < r || n.x > newWidth - r || n.y > newHeight - r;
+    });
 
     const applyCanvasResize = () => {
         S.mapWidth = newWidth;
@@ -204,8 +205,9 @@ function validateAndApplyCanvasResize(newWidth, newHeight) {
             'btn-primary',
             function () {
                 outOfBounds.forEach(node => {
-                    node.x = Math.min(node.x, newWidth - nodeRadius);
-                    node.y = Math.min(node.y, newHeight - nodeRadius);
+                    const r = getNodeRadius(node);
+                    node.x = Math.max(r, Math.min(node.x, newWidth - r));
+                    node.y = Math.max(r, Math.min(node.y, newHeight - r));
                 });
                 applyCanvasResize();
             },
@@ -222,15 +224,35 @@ function initKeyboardShortcuts() {
     document.addEventListener('keydown', handleKeyDown);
 }
 
+function isEditorModalOpen() {
+    if (typeof S.pendingEditorConfirmAction === 'function' || typeof S.pendingEditorCancelAction === 'function') {
+        return true;
+    }
+    // LibreNMS ships Bootstrap 4 + jQuery, which marks an open dialog with
+    // `.in` (not Bootstrap 5's `.show`). Match both so shortcuts never fire
+    // while a dialog is up.
+    return document.querySelector('.modal.in, .modal.show') !== null;
+}
+
 function handleKeyDown(event) {
-    // Ignore if user is typing in an input
-    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+    const target = event.target;
+    const tag = target && target.tagName;
+    // Ignore if user is typing in an input or editing rich text
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (target && target.isContentEditable)) {
         return;
     }
 
     const key = event.key.toLowerCase();
     const ctrl = event.ctrlKey || event.metaKey;
     const shift = event.shiftKey;
+
+    // Ctrl+A: select all nodes (never while a dialog is open)
+    if (ctrl && key === 'a') {
+        if (isEditorModalOpen()) return;
+        event.preventDefault();
+        selectAllNodes();
+        return;
+    }
 
     // Ctrl+S: Save map
     if (ctrl && key === 's') {
@@ -253,11 +275,19 @@ function handleKeyDown(event) {
         return;
     }
 
-    // Delete/Backspace: Delete selected node
-    if ((key === 'delete' || key === 'backspace') && S.selectedNode) {
-        event.preventDefault();
-        deleteSelectedNode();
-        return;
+    // Delete/Backspace: bulk delete the current selection (or single node)
+    if (key === 'delete' || key === 'backspace') {
+        if (isEditorModalOpen()) return;
+        if (S.selectedNodes.length > 1) {
+            event.preventDefault();
+            bulkDeleteSelected();
+            return;
+        }
+        if (S.selectedNode) {
+            event.preventDefault();
+            deleteSelectedNode();
+            return;
+        }
     }
 
     // Escape: Deselect / Cancel link mode / exit multi-select
@@ -284,11 +314,11 @@ function handleKeyDown(event) {
     if (nodesToNudge.length > 0 && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         event.preventDefault();
         const amount = shift ? 10 : 1;
-        const nodeRadius = 12;
 
         saveState(); // Save for undo before moving
 
         for (const n of nodesToNudge) {
+            const nodeRadius = getNodeRadius(n);
             switch (key) {
                 case 'arrowup':
                     n.y = Math.max(nodeRadius, n.y - amount);
@@ -418,6 +448,7 @@ function loadMapData(id) {
                 deviceName: node.device_name || null,
                 status: node.status || null,
                 interfaceId: node.meta?.interface_id || null,
+                meta: (node.meta && typeof node.meta === 'object' && !Array.isArray(node.meta)) ? node.meta : {},
             }));
 
             S.links = (data.links || []).map(link => ({
@@ -735,7 +766,7 @@ function saveMap() {
             x: n.x,
             y: n.y,
             device_id: n.deviceId || null,
-            meta: { interface_id: n.interfaceId || null },
+            meta: { ...((n.meta && typeof n.meta === 'object' && !Array.isArray(n.meta)) ? n.meta : {}), interface_id: n.interfaceId || null },
         })),
         links: S.links.map(l => ({
             src_node_id: l.srcId,
@@ -851,7 +882,7 @@ function exportJson() {
             x: n.x,
             y: n.y,
             device_id: n.deviceId || null,
-            meta: { interface_id: n.interfaceId || null }
+            meta: { ...((n.meta && typeof n.meta === 'object' && !Array.isArray(n.meta)) ? n.meta : {}), interface_id: n.interfaceId || null }
         })),
         links: S.links.map(l => ({
             src: l.srcId,
@@ -910,6 +941,17 @@ function updateToolbarState() {
     if (duplicateBtn) duplicateBtn.disabled = !hasSelection;
     if (deleteBtn) deleteBtn.disabled = !hasSelection;
     if (bulkDeleteBtn) bulkDeleteBtn.disabled = S.selectedNodes.length === 0;
+    updateApplyStyleButton();
+}
+
+// Enable the bulk style control only when more than one node is selected.
+function updateApplyStyleButton() {
+    const btn = document.getElementById('apply-style-selected-btn');
+    if (!btn) return;
+    const count = S.selectedNodes.length;
+    btn.disabled = count <= 1 || !S.selectedNode;
+    btn.textContent = `Apply style to all selected (${count})`;
+    btn.setAttribute('aria-label', `Apply this node's style to all ${count} selected nodes`);
 }
 
 // Toggle rubber-band / multi-select mode. In this mode plain canvas clicks

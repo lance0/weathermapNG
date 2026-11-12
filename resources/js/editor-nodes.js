@@ -10,6 +10,190 @@
  * render functions are global function declarations and resolve at runtime.
  */
 var S = window.WMNG.EditorState;
+const NODE_STYLE_META_KEYS = ['color', 'label_color', 'shape', 'size'];
+
+/**
+ * Nodes loaded from older/imported rows can carry `meta: []` (PHP encodes an
+ * empty PHP array as a JSON list). Writing named style keys onto that array
+ * would serialize as "[]" and silently drop them, so every read/write path
+ * coerces non-object meta to a plain object first.
+ */
+function nodeMetaObject(node) {
+    if (!node) return {};
+    if (!node.meta || typeof node.meta !== 'object' || Array.isArray(node.meta)) {
+        node.meta = {};
+    }
+    return node.meta;
+}
+
+const NODE_STYLE_HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
+// One undo snapshot per continuous style gesture (e.g. dragging the color
+// picker fires many `input` events); reset on change/selection switch.
+let activeNodeStyleEdit = null;
+
+/** Effective default colors used when a node has no per-node override. */
+function getEffectiveNodeStyleDefaults() {
+    const defaultNodeStyle = getDefaultNodeStyle();
+    const isDarkTheme = document.querySelector('.editor-container.dark-theme') !== null;
+    return {
+        color: defaultNodeStyle.color || '#28a745',
+        label_color: defaultNodeStyle.label_color || (isDarkTheme ? '#f8f9fa' : '#212529'),
+    };
+}
+
+/**
+ * Apply a single style meta edit to the anchor node: snapshot for undo,
+ * update the node, mark the map dirty and re-render. An empty value removes
+ * the override so the node falls back to its device/default style.
+ */
+function updateNodeStyle(node, key, value) {
+    if (!node) return;
+    const editToken = node.id + ':' + key;
+    if (activeNodeStyleEdit !== editToken) {
+        saveState();
+        activeNodeStyleEdit = editToken;
+    }
+    const meta = nodeMetaObject(node);
+    if (value === null || value === undefined || value === '') {
+        delete meta[key];
+    } else {
+        meta[key] = value;
+    }
+    markUnsaved();
+    renderEditor();
+    renderNodesList();
+    updateApplyStyleButton();
+}
+
+function updateNodeSize(node, rawValue) {
+    if (!node) return null;
+    if (rawValue === '') {
+        updateNodeStyle(node, 'size', null);
+        return null;
+    }
+    const size = parseFloat(rawValue);
+    if (!isFinite(size)) return null;
+    const clamped = Math.max(6, Math.min(40, size));
+    updateNodeStyle(node, 'size', clamped);
+    return clamped;
+}
+
+/** Populate the Style group from the selected node (and rebind handlers). */
+function populateNodeStyleControls(node) {
+    const color = document.getElementById('node-prop-color');
+    const labelColor = document.getElementById('node-prop-label-color');
+    const shape = document.getElementById('node-prop-shape');
+    const size = document.getElementById('node-prop-size');
+    const resetBtn = document.getElementById('node-prop-style-reset-btn');
+
+    if (!node) {
+        // No selection: the controls must not accept edits that would be
+        // silently discarded (they used to stay enabled and show the change).
+        [color, labelColor, shape, size, resetBtn].forEach(el => {
+            if (!el) return;
+            el.disabled = true;
+            el.oninput = null;
+            el.onchange = null;
+        });
+        updateApplyStyleButton();
+        return;
+    }
+
+    [color, labelColor, shape, size, resetBtn].forEach(el => { if (el) el.disabled = false; });
+
+    const meta = nodeMetaObject(node);
+    const defaults = getEffectiveNodeStyleDefaults();
+    activeNodeStyleEdit = null;
+
+    if (color) {
+        color.value = (typeof meta.color === 'string' && NODE_STYLE_HEX_PATTERN.test(meta.color))
+            ? meta.color : defaults.color;
+        color.oninput = function () { updateNodeStyle(node, 'color', this.value); };
+        color.onchange = function () { activeNodeStyleEdit = null; };
+    }
+    if (labelColor) {
+        labelColor.value = (typeof meta.label_color === 'string' && NODE_STYLE_HEX_PATTERN.test(meta.label_color))
+            ? meta.label_color : defaults.label_color;
+        labelColor.oninput = function () { updateNodeStyle(node, 'label_color', this.value); };
+        labelColor.onchange = function () { activeNodeStyleEdit = null; };
+    }
+    if (shape) {
+        shape.value = NODE_STYLE_SHAPES.indexOf(meta.shape) >= 0 ? meta.shape : '';
+        shape.onchange = function () {
+            updateNodeStyle(node, 'shape', this.value || null);
+            activeNodeStyleEdit = null;
+        };
+    }
+    if (size) {
+        const storedSize = Number(meta.size);
+        // Only show a value the renderer actually honours; stale out-of-range
+        // values (0, 45) render at the default radius and must not look active.
+        size.value = (meta.size !== undefined && meta.size !== null && isFinite(storedSize)
+            && storedSize >= 6 && storedSize <= 40) ? storedSize : '';
+        size.oninput = function () { updateNodeSize(node, this.value); };
+        size.onchange = function () {
+            // Commit the clamped value so the box never disagrees with the model.
+            const clamped = updateNodeSize(node, this.value);
+            if (clamped !== null && Number(this.value) !== clamped) this.value = String(clamped);
+            activeNodeStyleEdit = null;
+        };
+    }
+
+    updateApplyStyleButton();
+}
+
+/** Drop every per-node style override, restoring device/default rendering. */
+function resetSelectedNodeStyle() {
+    const node = S.selectedNode;
+    if (!node) return;
+    const meta = nodeMetaObject(node);
+    const hadStyle = NODE_STYLE_META_KEYS.some(key => Object.prototype.hasOwnProperty.call(meta, key));
+    if (hadStyle) {
+        saveState();
+        NODE_STYLE_META_KEYS.forEach(key => { delete meta[key]; });
+        markUnsaved();
+        populateNodeProperties(node);
+        renderEditor();
+        renderNodesList();
+    }
+}
+
+/**
+ * Copy the anchor node's full style (color/label_color/shape/size) onto every
+ * other selected node in one undo step. Missing anchor keys clear the target
+ * override so all selected nodes match the anchor.
+ */
+function applyStyleToSelected() {
+    const anchor = S.selectedNode;
+    if (!anchor || S.selectedNodes.length <= 1) return;
+
+    const anchorMeta = nodeMetaObject(anchor);
+    const style = {};
+    NODE_STYLE_META_KEYS.forEach(key => {
+        if (anchorMeta[key] !== undefined && anchorMeta[key] !== null && anchorMeta[key] !== '') {
+            style[key] = anchorMeta[key];
+        }
+    });
+
+    saveState();
+    S.selectedNodes.forEach(node => {
+        const meta = nodeMetaObject(node);
+        NODE_STYLE_META_KEYS.forEach(key => {
+            if (Object.prototype.hasOwnProperty.call(style, key)) {
+                meta[key] = style[key];
+            } else {
+                delete meta[key];
+            }
+        });
+    });
+
+    markUnsaved();
+    renderEditor();
+    renderNodesList();
+    updateApplyStyleButton();
+    activeNodeStyleEdit = null;
+    WMNGToast.success('Style applied to ' + S.selectedNodes.length + ' nodes', { duration: 1500 });
+}
 
 function addNode() {
     if (!S.canvas) return;
@@ -63,6 +247,7 @@ function populateNodeProperties(node) {
 
     if (!node) {
         if (card) card.style.display = 'none';
+        populateNodeStyleControls(null);
         return;
     }
 
@@ -94,6 +279,8 @@ function populateNodeProperties(node) {
     // Show/hide View Device button based on current selection
     const viewBtn = document.getElementById('node-view-device-btn');
     if (viewBtn) viewBtn.style.display = node.deviceId ? 'inline-block' : 'none';
+
+    populateNodeStyleControls(node);
 }
 
 function openNodeDeviceAutocomplete() {
@@ -157,11 +344,21 @@ function loadInterfacesForNode(node) {
 
 function saveSelectedNode() {
     if (!S.selectedNode || !S.mapId || !S.selectedNode.dbId) return;
+    // Capture the node being saved: the user can select another node before the
+    // PATCH resolves, and the response must not be applied to the new selection
+    // (that used to overwrite its meta and label).
+    const node = S.selectedNode;
     const label = document.getElementById('node-prop-label').value.trim();
     const deviceId = document.getElementById('node-prop-device').value || null;
     const ifaceId = document.getElementById('node-prop-interface').value || null;
-    const payload = { label: label, device_id: deviceId ? parseInt(deviceId, 10) : null, meta: { interface_id: ifaceId ? parseInt(ifaceId, 10) : null } };
-    fetch(S.uris.map + '/' + S.mapId + '/node/' + S.selectedNode.dbId, {
+    const payload = {
+        label: label,
+        device_id: deviceId ? parseInt(deviceId, 10) : null,
+        // Merge the loaded meta so unknown keys (style overrides, sub_map_id,
+        // tooltip, ...) survive the PATCH — the server replaces meta wholesale.
+        meta: { ...nodeMetaObject(node), interface_id: ifaceId ? parseInt(ifaceId, 10) : null },
+    };
+    fetch(S.uris.map + '/' + S.mapId + '/node/' + node.dbId, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() }, body: JSON.stringify(payload)
     }).then(r => {
         if (!r.ok) {
@@ -169,14 +366,21 @@ function saveSelectedNode() {
         }
         return r.json();
     }).then(d => {
-        if (d.success) {
-            S.selectedNode.label = label;
-            S.selectedNode.deviceId = payload.device_id;
-            S.selectedNode.interfaceId = payload.meta.interface_id;
-            renderEditor();
-        } else {
+        if (!d.success) {
             WMNGToast.error('Failed to save node: ' + (d.message || 'Unknown error'), { duration: 3000 });
+            return;
         }
+        // The node may have been deleted or undone in the meantime.
+        if (S.nodes.indexOf(node) < 0) return;
+        node.label = label;
+        node.deviceId = payload.device_id;
+        node.interfaceId = payload.meta.interface_id;
+        node.meta = payload.meta;
+        if (S.selectedNode === node) populateNodeProperties(node);
+        renderEditor();
+        renderNodesList();
+    }).catch(err => {
+        WMNGToast.error('Failed to save node: ' + err.message, { duration: 3000 });
     });
 }
 
@@ -300,6 +504,16 @@ function selectNodeByIndex(idx, additive) {
     }
 }
 
+function selectAllNodes() {
+    if (!S.nodes.length) return;
+    S.selectedNodes = S.nodes.slice();
+    S.selectedNode = S.nodes[0];
+    populateNodeProperties(S.selectedNode);
+    updateToolbarState();
+    renderNodesList();
+    renderEditor();
+}
+
 function deleteNodeByIndex(idx) {
     if (idx >= 0 && idx < S.nodes.length) {
         const node = S.nodes[idx];
@@ -340,10 +554,11 @@ function duplicateSelectedNode() {
         id: `node-${Date.now()}`,
         dbId: null,
         label: S.selectedNode.label + ' (copy)',
-        x: Math.min(S.mapWidth - 12, S.selectedNode.x + 30),
-        y: Math.min(S.mapHeight - 12, S.selectedNode.y + 30),
+        x: Math.min(S.mapWidth - getNodeRadius(S.selectedNode), S.selectedNode.x + 30),
+        y: Math.min(S.mapHeight - getNodeRadius(S.selectedNode), S.selectedNode.y + 30),
         deviceId: S.selectedNode.deviceId,
         interfaceId: S.selectedNode.interfaceId,
+        meta: JSON.parse(JSON.stringify(nodeMetaObject(S.selectedNode))),
     };
 
     S.nodes.push(newNode);

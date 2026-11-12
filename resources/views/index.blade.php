@@ -69,6 +69,10 @@
                         @endif
                     @endforeach
                 </select>
+                <select class="form-control" id="map-favorites-filter" aria-label="Filter by favorites">
+                    <option value="">All maps</option>
+                    <option value="favorites">Favorites only</option>
+                </select>
             </div>
         </div>
 
@@ -95,7 +99,8 @@
                      data-nodes="{{ $map->nodes_count ?? $map->nodes()->count() }}"
                      data-links="{{ $map->links_count ?? $map->links()->count() }}"
                      data-size="{{ ($map->width ?? 0) * ($map->height ?? 0) }}"
-                     data-tags="{{ json_encode($map->tags) }}">
+                     data-tags="{{ json_encode($map->tags) }}"
+                     data-favorited="{{ $map->favorited ? '1' : '0' }}">
                     <div class="map-card">
                         <div class="map-card-preview">
                             <div class="topology-preview" data-topology-preview="{{ json_encode($previews[$map->id]) }}"></div>
@@ -118,6 +123,12 @@
                                     <i class="fas fa-link" aria-hidden="true"></i>
                                     {{ $map->links_count ?? $map->links()->count() }} links
                                 </span>
+                                <span class="map-stat-badge map-favorite-count{{ $map->favorite_count === 0 ? ' is-zero' : '' }}" data-favorite-count
+                                      title="{{ $map->favorite_count }} {{ $map->favorite_count === 1 ? 'user has' : 'users have' }} favorited this map"
+                                      aria-label="{{ $map->favorite_count }} {{ $map->favorite_count === 1 ? 'user has' : 'users have' }} favorited this map">
+                                    <i class="fas fa-star" aria-hidden="true"></i>
+                                    <span class="map-favorite-count-value">{{ $map->favorite_count }}</span>
+                                </span>
                             </div>
                             @if(count($map->tags) > 0)
                                 <div class="map-tags" aria-label="Map tags">
@@ -132,6 +143,14 @@
                             </div>
                         </div>
                         <div class="map-card-actions">
+                            <button type="button" class="map-card-action favorite {{ $map->favorited ? 'is-favorited' : '' }}"
+                                    title="{{ $map->favorited ? 'Unfavorite' : 'Favorite' }} map"
+                                    data-action="toggle-favorite" data-map-id="{{ $map->id }}"
+                                    data-map-name="{{ $map->name }}"
+                                    aria-pressed="{{ $map->favorited ? 'true' : 'false' }}"
+                                    aria-label="{{ $map->favorited ? 'Unfavorite' : 'Favorite' }} {{ $map->name }}">
+                                <i class="{{ $map->favorited ? 'fas' : 'far' }} fa-star" aria-hidden="true"></i>
+                            </button>
                             <a href="{{ url('plugin/WeathermapNG/embed/' . $map->id) }}"
                                class="map-card-action" target="_blank" rel="noopener noreferrer" title="View map"
                                aria-label="View map {{ $map->name }}">
@@ -201,9 +220,9 @@
                 <i class="fas fa-search" aria-hidden="true"></i>
             </div>
             <h3>No matching maps</h3>
-            <p>Try a different search term or clear the filter.</p>
-            <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('map-search').value=''; document.getElementById('map-search').dispatchEvent(new Event('input'));" aria-label="Clear search filter">
-                Clear Search
+            <p>Try a different search term or clear the filters.</p>
+            <button type="button" class="btn btn-outline-secondary" id="clear-map-filters" aria-label="Clear search, tag and favorite filters">
+                Clear Filters
             </button>
         </div>
     </div>

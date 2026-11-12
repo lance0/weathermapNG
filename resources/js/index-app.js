@@ -193,6 +193,83 @@ document.addEventListener('click', function(e) {
     deleteMap(btn.dataset.mapId, btn.dataset.mapName);
 });
 
+// ===== Per-user Favorites =====
+function applyFavoriteState(button, favorited, count) {
+    const mapName = button.dataset.mapName || '';
+    button.setAttribute('aria-pressed', favorited ? 'true' : 'false');
+    button.setAttribute('aria-label', (favorited ? 'Unfavorite ' : 'Favorite ') + mapName);
+    button.setAttribute('title', (favorited ? 'Unfavorite' : 'Favorite') + ' map');
+    button.classList.toggle('is-favorited', favorited);
+    const icon = button.querySelector('i');
+    if (icon) {
+        icon.classList.toggle('fas', favorited);
+        icon.classList.toggle('far', !favorited);
+    }
+    const card = button.closest('.map-card-col');
+    if (!card) return;
+    card.dataset.favorited = favorited ? '1' : '0';
+    const badge = card.querySelector('[data-favorite-count]');
+    const value = badge ? badge.querySelector('.map-favorite-count-value') : null;
+    if (badge && value) {
+        value.textContent = String(count);
+        const countLabel = count + (count === 1 ? ' user has' : ' users have') + ' favorited this map';
+        badge.setAttribute('aria-label', countLabel);
+        badge.setAttribute('title', countLabel);
+        badge.classList.toggle('is-zero', count === 0);
+    }
+}
+
+function toggleFavorite(button) {
+    // Ignore re-clicks while a request is in flight so a double-click cannot
+    // race two toggles into an unexpected final state.
+    if (!button || button.dataset.pending === '1') return;
+    const mapId = button.dataset.mapId;
+    if (!mapId) return;
+
+    const wasFavorited = button.getAttribute('aria-pressed') === 'true';
+    const card = button.closest('.map-card-col');
+    const value = card ? card.querySelector('.map-favorite-count-value') : null;
+    const previousCount = value ? (parseInt(value.textContent, 10) || 0) : 0;
+    const optimisticCount = Math.max(0, previousCount + (wasFavorited ? -1 : 1));
+
+    // Optimistic UI: flip immediately, roll back if the server rejects it.
+    applyFavoriteState(button, !wasFavorited, optimisticCount);
+    button.dataset.pending = '1';
+    document.dispatchEvent(new CustomEvent('wmng:favorites-changed'));
+
+    fetch(`${WMNG_INDEX_URLS.map}/${encodeURIComponent(mapId)}/favorite`, {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': getCsrfToken(),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json().catch(() => ({})).then(data => {
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'HTTP ' + response.status);
+        }
+        return data;
+    }))
+    .then(data => {
+        applyFavoriteState(button, !!data.favorited, Number(data.count) || 0);
+    })
+    .catch(error => {
+        applyFavoriteState(button, wasFavorited, previousCount);
+        WMNGToast.error('Could not update favorite: ' + escapeHtml(error.message));
+    })
+    .finally(() => {
+        delete button.dataset.pending;
+        document.dispatchEvent(new CustomEvent('wmng:favorites-changed'));
+    });
+}
+
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-action="toggle-favorite"]');
+    if (!btn) return;
+    toggleFavorite(btn);
+});
+
 // Delegated listener for template cards (replaces inline onclick)
 document.addEventListener('click', function(e) {
     const card = e.target.closest('[data-template-id]');
@@ -224,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('map-search');
     const filterSelect = document.getElementById('map-filter');
     const tagFilter = document.getElementById('map-tag-filter');
+    const favoritesFilter = document.getElementById('map-favorites-filter');
     const container = document.getElementById('maps-container');
     if (!searchInput || !filterSelect || !container) return;
 
@@ -264,13 +342,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function applyFilter() {
         const query = searchInput.value.trim().toLowerCase();
         const selectedTag = tagFilter ? tagFilter.value.trim().toLowerCase() : '';
+        const favoritesOnly = favoritesFilter ? favoritesFilter.value === 'favorites' : false;
         let visible = 0;
 
         cards.forEach(card => {
             const text = `${card.dataset.name} ${card.dataset.title}`;
             const textMatch = text.includes(query);
             const tagMatch = !selectedTag || getCardTags(card).includes(selectedTag);
-            const isMatch = textMatch && tagMatch;
+            const favoriteMatch = !favoritesOnly || card.dataset.favorited === '1';
+            const isMatch = textMatch && tagMatch && favoriteMatch;
             card.style.display = isMatch ? '' : 'none';
             if (isMatch) visible += 1;
         });
@@ -287,6 +367,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     if (tagFilter) {
         tagFilter.addEventListener('change', applyFilter);
+    }
+    if (favoritesFilter) {
+        favoritesFilter.addEventListener('change', applyFilter);
+    }
+    // The star toggle updates card state in place; keep the filter honest.
+    document.addEventListener('wmng:favorites-changed', applyFilter);
+    const clearFilters = document.getElementById('clear-map-filters');
+    if (clearFilters) {
+        clearFilters.addEventListener('click', () => {
+            searchInput.value = '';
+            if (tagFilter) tagFilter.value = '';
+            if (favoritesFilter) favoritesFilter.value = '';
+            applyFilter();
+            searchInput.focus();
+        });
     }
 
     sortCards(filterSelect.value);

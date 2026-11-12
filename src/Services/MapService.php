@@ -177,7 +177,7 @@ class MapService
                 'x' => isset($nodeData['x']) && is_numeric($nodeData['x']) ? (float) $nodeData['x'] : 0,
                 'y' => isset($nodeData['y']) && is_numeric($nodeData['y']) ? (float) $nodeData['y'] : 0,
                 'device_id' => isset($nodeData['device_id']) && is_numeric($nodeData['device_id']) ? (int) $nodeData['device_id'] : null,
-                'meta' => is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : [],
+                'meta' => NodeMetaNormalizer::sanitize(is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : []),
             ]);
 
             $clientKey = $nodeData['id'] ?? $nodeData['node_id'] ?? $nodeData['_id'] ?? (string)$index;
@@ -255,22 +255,7 @@ class MapService
 
         try {
             $map = DB::transaction(function () use ($data, $validated) {
-                $incomingOptions = is_array($data['options'] ?? null) ? $data['options'] : [];
-                $allowedOptionKeys = ['width', 'height', 'background', 'tags', 'default_node_style', 'default_link_style'];
-                $options = array_merge(
-                    ['width' => 800, 'height' => 600, 'background' => '#ffffff'],
-                    array_intersect_key($incomingOptions, array_flip($allowedOptionKeys))
-                );
-
-                foreach (['width', 'height'] as $dimension) {
-                    $options[$dimension] = is_numeric($options[$dimension])
-                        ? min(4096, max(100, (int) $options[$dimension]))
-                        : ($dimension === 'width' ? 800 : 600);
-                }
-
-                if (!is_string($options['background'] ?? null) || !preg_match('/^#[0-9a-fA-F]{6}$/', $options['background'])) {
-                    $options['background'] = '#ffffff';
-                }
+                $options = $this->normalizeImportOptions(is_array($data['options'] ?? null) ? $data['options'] : []);
 
                 $map = Map::create([
                     'name' => $validated['name'],
@@ -292,6 +277,39 @@ class MapService
         }
     }
 
+
+    /**
+     * Narrow imported map options to the keys the editor and renderer read.
+     *
+     * Anything else in an uploaded file (including stale keys such as
+     * `background_image`) is dropped, so an import cannot smuggle arbitrary
+     * JSON into `wmng_maps.options`. Dimensions are clamped to the same
+     * 100–4096 range the map forms enforce, and an unparseable background
+     * falls back to white rather than being stored verbatim.
+     *
+     * @param array<string,mixed> $incoming
+     * @return array<string,mixed>
+     */
+    private function normalizeImportOptions(array $incoming): array
+    {
+        $allowedOptionKeys = ['width', 'height', 'background', 'tags', 'default_node_style', 'default_link_style'];
+        $options = array_merge(
+            ['width' => 800, 'height' => 600, 'background' => '#ffffff'],
+            array_intersect_key($incoming, array_flip($allowedOptionKeys))
+        );
+
+        foreach (['width' => 800, 'height' => 600] as $dimension => $default) {
+            $options[$dimension] = is_numeric($options[$dimension])
+                ? min(4096, max(100, (int) $options[$dimension]))
+                : $default;
+        }
+
+        if (!is_string($options['background'] ?? null) || !preg_match('/^#[0-9a-fA-F]{6}$/', $options['background'])) {
+            $options['background'] = '#ffffff';
+        }
+
+        return $options;
+    }
 
     /**
      * Produce a per-map data-integrity report for the admin diagnostics screen.

@@ -11,6 +11,7 @@
 - Metric selector: `percent`, `in`, `out`, `sum`
 - Legend showing threshold bands and current metric
 - Export PNG button (client-side)
+- Export SVG button (client-side, static vector snapshot with node/link labels)
 - Node status badges and link utilization labels
 - Alert badges: red/yellow badges on nodes and links for active LibreNMS alerts
 - **Via points**: Links with `style.via_points` render as multi-segment paths; `style.via_style` controls curve style (straight/angled/curved)
@@ -59,7 +60,22 @@
 
 ## Export
 
-- PNG export composites background + overlay into a downloadable image
+- **PNG** composites the background and both canvases (including animated flow particles) into a downloadable `weathermap-<mapId>.png`.
+- **SVG** builds a standalone, static vector document from the current map data and live values:
+  - `weathermap-<mapId>.svg` downloads via a Blob (`image/svg+xml`); no server round-trip and no external assets, scripts, or `foreignObject` content.
+  - `viewBox` matches the map dimensions (default 800×600), with a background rect from `map.background`.
+  - Links honor `style.via_points` / `style.via_style` (`straight`, `angled`, `curved`) and `style.color` / `style.width`; without an explicit color the stroke follows utilization thresholds. The label follows the selected metric (percent by default) and is included only when live traffic data exists; curved labels sit on the sampled curve and carry the same white halo as the canvas.
+  - Nodes follow the per-node style contract (`meta.color`, `meta.label_color`, `meta.shape`, `meta.size`) and otherwise the embed device-type shapes (router diamond, switch, server, firewall shield, circle) with status colors.
+  - All labels are XML-escaped and the output is deterministic for the same map and live data.
+
+## Degradation & Performance
+
+The embed view degrades rendering work instead of the frame rate on large or busy maps:
+
+- **Particle budget**: the per-link particle count keeps the map-wide total at or below **1500** particles. Density scales with the map's link count — full density up to 150 links, half above 150, quarter above 300 — and each link's allowance is `1500 / linkCount`. Above 1500 links the flow animation is skipped rather than exceeding the cap. The Flow, Particle Density, and Particle Speed controls still apply on top of this budget.
+- **Zoomed-out labels**: below a user zoom of **0.6** nodes keep their name label but drop secondary text (the `Σ` traffic aggregate and the CPU/MEM line). Link labels are unaffected. Zoom back in to restore them.
+- **`?metrics=0`**: hides the CPU/MEM secondary line on nodes (also controlled by the `show_node_metrics` config); node names and traffic totals stay visible.
+- **Reduced motion**: when the OS prefers reduced motion, flow particles start disabled (use the Flow button to enable them) and dash-mode animation offsets stop advancing. The static map remains fully readable.
 
 ## Kiosk / NOC Wall Mode
 

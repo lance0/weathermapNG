@@ -91,4 +91,66 @@ class MapServiceTest extends TestCase
         $this->assertArrayNotHasKey('width', $filtered);
         $this->assertArrayNotHasKey('malicious_key', $filtered);
     }
+
+    private function invokeImportOptions(array $incoming): array
+    {
+        $service = new MapService(new WebhookDispatcher());
+        $method = new \ReflectionMethod($service, 'normalizeImportOptions');
+
+        return $method->invoke($service, $incoming);
+    }
+
+    public function test_import_drops_unsupported_option_keys(): void
+    {
+        // A file from another install (or an older export) can carry keys this
+        // plugin never reads; storing them would let an upload write arbitrary
+        // JSON into wmng_maps.options.
+        $options = $this->invokeImportOptions([
+            'width' => 1200,
+            'height' => 900,
+            'background' => '#102030',
+            'tags' => ['wan', 'core'],
+            'default_node_style' => ['color' => '#ff0000'],
+            'background_image' => '/etc/passwd',
+            'unknown' => ['nested' => true],
+        ]);
+
+        $this->assertSame(1200, $options['width']);
+        $this->assertSame(900, $options['height']);
+        $this->assertSame('#102030', $options['background']);
+        $this->assertSame(['wan', 'core'], $options['tags']);
+        $this->assertSame(['color' => '#ff0000'], $options['default_node_style']);
+        $this->assertArrayNotHasKey('background_image', $options);
+        $this->assertArrayNotHasKey('unknown', $options);
+    }
+
+    public function test_import_clamps_dimensions_and_rejects_non_numeric_sizes(): void
+    {
+        $this->assertSame(100, $this->invokeImportOptions(['width' => 5])['width']);
+        $this->assertSame(4096, $this->invokeImportOptions(['height' => 99999])['height']);
+        // 4096.9 truncates to 4096 rather than rounding past the ceiling.
+        $this->assertSame(4096, $this->invokeImportOptions(['width' => 4096.9])['width']);
+
+        $fallback = $this->invokeImportOptions(['width' => 'auto', 'height' => null]);
+        $this->assertSame(800, $fallback['width']);
+        $this->assertSame(600, $fallback['height']);
+    }
+
+    public function test_import_falls_back_to_white_for_invalid_background(): void
+    {
+        foreach (['red', '#fff', '#12345', '', ['#ffffff'], null] as $invalid) {
+            $this->assertSame('#ffffff', $this->invokeImportOptions(['background' => $invalid])['background'], 'invalid background: ' . var_export($invalid, true));
+        }
+
+        // Case is preserved for a valid value; shorthand hex is not supported by
+        // the map forms either, so it never round-trips as a color.
+        $this->assertSame('#ABCDEF', $this->invokeImportOptions(['background' => '#ABCDEF'])['background']);
+    }
+
+    public function test_import_defaults_when_options_are_missing_or_listed(): void
+    {
+        $defaults = ['width' => 800, 'height' => 600, 'background' => '#ffffff'];
+        $this->assertSame($defaults, $this->invokeImportOptions([]));
+        $this->assertSame($defaults, $this->invokeImportOptions(['#ffffff', 1200]));
+    }
 }

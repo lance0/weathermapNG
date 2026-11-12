@@ -18,6 +18,9 @@ The plugin is usable today for production-oriented network map visualization, wi
 - Embeddable views with navigation bar and NOC wall / kiosk mode with map cycling
 - Operational diagnostics page for administrators with data-integrity checks
 - Map tags, filtering, and first-run onboarding
+- Per-user map favorites with an index star/filter
+- Per-node style overrides (fill, label color, shape, size) with bulk apply
+- Static SVG export of the embed view
 - Per-map default styles for nodes and links
 - Demo mode for testing
 - Device-type node icons: router, switch, server, firewall
@@ -96,7 +99,7 @@ These are patch-level improvements unless they require new user-facing behavior.
   - Preserve existing delete, restore, cleanup, resize, and undo-aware editor behavior after confirmation.
   - Route editor save errors through toast feedback instead of browser alerts.
 
-- [x] **Validation coverage** *(v1.13.0: AccessibilitySmokeTest — 12 plain-PHPUnit cases covering aria-labels on icon-only controls, focus outline preservation, accessible form labels, lang/layout inheritance, canvas text alternative; screenshot capture tool tests/screenshot-check.sh + `just visual` for index/editor/embed at 480/768/1920 px with a degenerate-capture guard; `justfile` added as thin facades over the whole validation flow)*
+- [x] **Validation coverage** *(v1.13.0: AccessibilitySmokeTest — 12 plain-PHPUnit cases covering aria-labels on icon-only controls, focus outline preservation, accessible form labels, lang/layout inheritance, canvas text alternative; screenshot capture tool tests/screenshot-check.sh + `just visual` for index/editor/embed at 480/768/1920 px with a degenerate-capture guard; `justfile` added as thin facades over the whole validation flow; unreleased: `tests/screenshot-compare.cjs` + committed baselines now compare index/editor/embed at 480×800, 768×1024 and 1920×1080 in CI, and every pure Node suite runs in the embed-auth job)*
 
 - [x] **Release readiness checklist**
   - Document the exact pre-release validation flow: Composer validate, PHPUnit, install CI, smoke install, changelog, tag, release notes.
@@ -164,7 +167,7 @@ This release should make existing authoring workflows faster and less error-pron
 - [x] **Bulk Operations** *(v1.12.0: multi-select via shift/ctrl-click + rubber-band marquee, bulk delete with undo, group drag, group keyboard nudge)*
   - ~~Select multiple nodes/links (rubber-band, shift-click, ctrl-click).~~ *(v1.12.0)*
   - ~~Bulk delete.~~ *(v1.12.0)*
-  - Bulk style changes (apply to all selected). *(deferred)*
+  - ~~Bulk style changes (apply same fill color/label color/shape/size to all selected).~~ *(unreleased: node `meta` style overrides, editor Style panel, one-undo "Apply style to all selected", Ctrl/Cmd+A and Delete/Backspace bulk delete)*
   - ~~Preserve undo/redo support for bulk edits.~~ *(v1.12.0)*
 
 - [x] **Operational diagnostics** *(v1.9.0: diagnostics.blade.php + route + HealthController — install status, route registration, writable paths, version metadata, LibreNMS compatibility)*
@@ -247,7 +250,7 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
 - [x] **Large map performance** *(v1.11.0: canvas layer separation, RAF pause on zero traffic, minimap decoupled from animation loop, nodeById O(1) lookup, O(N×L)→O(L) node→links index, batch link validation; v1.12.0: viewport culling — `renderMap`/`renderOverlay`/`renderEditor` skip nodes outside the visible world rect and links whose segment AABB misses it, with a 24px margin)*
   - ~~Set practical performance budgets for node/link counts.~~ *(v1.11.0: performance budgets shipped)*
   - ~~Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.~~ *(v1.11.0: canvas layer separation eliminates 60fps full-canvas redraws; RAF pauses on zero traffic; minimap decoupled from animation loop)*
-  - ~~Graceful degradation controls: viewport culling (only draw visible nodes/links), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold.~~ *(v1.12.0: viewport culling shipped in embed `renderMap`/`renderOverlay` and editor `renderEditor`)*
+  - ~~Graceful degradation controls: viewport culling (only draw visible nodes/links), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold.~~ *(v1.12.0: viewport culling shipped in embed `renderMap`/`renderOverlay` and editor `renderEditor`; unreleased: particle density tiers above 150/300 links with a 1500-particle map cap, and secondary node text hidden below 0.6 zoom)*
   - *Canvas 2D is appropriate for 1-300 nodes with these optimizations. No engine migration needed until v2.0.0.*
 
 - [x] **CLI tools for map management** *(v1.11.0: 4 Artisan commands registered via ServiceProvider — `lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`; verified live in Docker)*
@@ -260,9 +263,9 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
   - ~~Add optional API token auth for non-session access (NOC dashboards, external systems).~~ *(v1.14.0: `EmbedTokenAuth` middleware, constant-time compare, routes outside the session groups)*
   - *Enables Grafana iframe panels, custom NOC walls, and status page integration without iframe hacks.* *(delivered; Grafana IFrame panel setup documented)*
 
-- [ ] **Map Organization favorites** *(deferred from v1.8.0)*
-  - Per-user favorites (requires user_id mapping table or column).
-  - Saved views per user.
+- [x] **Map Organization favorites** *(unreleased: `wmng_map_favorites` table, per-user star toggle + count badge + Favorites filter on the index; the toggle is available to any authenticated user, not just admins)*
+  - ~~Per-user favorites (requires user_id mapping table or column).~~ *(unreleased)*
+  - Saved views per user. *(still open)*
 
 ### v1.10.0 - Maintenance & Dead Code Removal (shipped)
 
@@ -317,7 +320,8 @@ This release closes the biggest gaps vs legacy weathermap tools and native Libre
 
 - [ ] **Export Formats**
   - ~~High-resolution PNG~~ *(done: exists in embed view via `canvas.toDataURL`)*
-  - SVG export.
+  - ~~SVG export.~~ *(unreleased: deterministic static SVG of the authored map via `resources/js/svg-export.js`, `Export SVG` button in the embed controls; honors node/link styles, device shapes, labels and escaped text)*
+  - High-resolution PNG (2x/4x) scaling remains open.
   - PDF export.
   - Visio/draw.io format if there is enough demand.
 

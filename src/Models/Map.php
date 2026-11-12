@@ -4,6 +4,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use LibreNMS\Plugins\WeathermapNG\Services\NodeMetaNormalizer;
 use Illuminate\Support\Facades\Log;
 
 class Map extends Model
@@ -20,6 +21,30 @@ class Map extends Model
     public function links()
     {
         return $this->hasMany(Link::class);
+    }
+
+    /** Per-user favorite rows for this map. */
+    public function favorites()
+    {
+        return $this->hasMany(MapFavorite::class);
+    }
+
+    /**
+     * Restrict the query to maps favorited by one user. A null user (guest or
+     * missing session) matches nothing rather than every row with user_id NULL.
+     */
+    public function scopeFavoritedBy($query, ?int $userId)
+    {
+        if ($userId === null) {
+            return $query->whereIn($this->getTable() . '.id', []);
+        }
+
+        return $query->whereExists(function ($sub) use ($userId) {
+            $sub->select(DB::raw(1))
+                ->from('wmng_map_favorites')
+                ->whereColumn('wmng_map_favorites.map_id', 'wmng_maps.id')
+                ->where('wmng_map_favorites.user_id', $userId);
+        });
     }
 
     /** Parent map (for nested maps / drill-down hierarchy). */
@@ -207,7 +232,7 @@ class Map extends Model
                 'x' => isset($nodeData['x']) && is_numeric($nodeData['x']) ? (float) $nodeData['x'] : 0,
                 'y' => isset($nodeData['y']) && is_numeric($nodeData['y']) ? (float) $nodeData['y'] : 0,
                 'device_id' => isset($nodeData['device_id']) && is_numeric($nodeData['device_id']) ? (int) $nodeData['device_id'] : null,
-                'meta' => is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : [],
+                'meta' => NodeMetaNormalizer::sanitize(is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : []),
             ]);
 
             $clientKey = $nodeData['id'] ?? $nodeData['node_id'] ?? $nodeData['_id'] ?? (string) $index;

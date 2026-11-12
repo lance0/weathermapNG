@@ -51,8 +51,14 @@ function initCanvas() {
         // Set the canvas buffer to display size × DPR for crisp text.
         // The world coordinate system stays at S.mapWidth × S.mapHeight;
         // renderEditor scales the context to map world→buffer.
-        S.canvas.width = Math.round(dispW * dpr);
-        S.canvas.height = Math.round(dispH * dpr);
+        //
+        // Assigning canvas.width/height resets the drawing surface, so only
+        // touch them when the size actually changed; callers that resize after
+        // a paint must redraw (the ResizeObserver below does).
+        const nextW = Math.round(dispW * dpr);
+        const nextH = Math.round(dispH * dpr);
+        if (S.canvas.width !== nextW) S.canvas.width = nextW;
+        if (S.canvas.height !== nextH) S.canvas.height = nextH;
         S.canvas.style.width = dispW + 'px';
         S.canvas.style.height = dispH + 'px';
     }
@@ -62,7 +68,14 @@ function initCanvas() {
         let rafId = null;
         new ResizeObserver(() => {
             if (rafId) return; // coalesce bursts into one rAF
-            rafId = requestAnimationFrame(() => { rafId = null; fitCanvasToWrap(); });
+            rafId = requestAnimationFrame(() => {
+                rafId = null;
+                fitCanvasToWrap();
+                // A buffer resize clears the canvas; without this the editor
+                // renders blank until the next interaction (observed at 480px
+                // and 768px viewports in the screenshot comparison suite).
+                renderEditor();
+            });
         }).observe(wrap);
     }
 
@@ -269,7 +282,9 @@ function handleMouseMove(event) {
 
     if (!S.isDragging || !S.selectedNode || !S.canvas) return;
     const { x, y } = getCanvasPoint(event);
-    const nodeRadius = 12;
+    // Clamp against each node's own radius: meta.size can be larger than the
+    // old fixed 12px, and clamping with 12 let big nodes hang off the canvas.
+    const nodeRadius = getNodeRadius(S.selectedNode);
     // Calculate new position for the anchor (dragged) node
     let newX = x - S.dragOffset.x;
     let newY = y - S.dragOffset.y;
@@ -294,8 +309,9 @@ function handleMouseMove(event) {
     const dy = newY - S.selectedNode.y;
     const group = (S.selectedNodes.length > 0) ? S.selectedNodes : [S.selectedNode];
     for (const n of group) {
-        n.x = Math.max(nodeRadius, Math.min(S.mapWidth - nodeRadius, n.x + dx));
-        n.y = Math.max(nodeRadius, Math.min(S.mapHeight - nodeRadius, n.y + dy));
+        const r = getNodeRadius(n);
+        n.x = Math.max(r, Math.min(S.mapWidth - r, n.x + dx));
+        n.y = Math.max(r, Math.min(S.mapHeight - r, n.y + dy));
     }
     renderEditor();
 }
@@ -347,8 +363,8 @@ function handleMouseUp(event) {
 }
 
 function getNodeAt(x, y) {
-    const radius = 12;
     return S.nodes.find(node => {
+        const radius = getNodeRadius(node);
         const dx = x - node.x;
         const dy = y - node.y;
         return Math.sqrt(dx * dx + dy * dy) <= radius;
@@ -366,26 +382,86 @@ function getNodeColor(node) {
     return '#6c757d';  // unknown
 }
 
+const NODE_STYLE_SHAPES = ['circle', 'square', 'diamond', 'triangle'];
+const NODE_STYLE_HEX = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * World-unit radius for a node: meta.size (6..40) when present, otherwise
+ * the editor's natural circle radius (12). Natural shapes scale by size/12.
+ */
+function getNodeRadius(node) {
+    const size = Number((node && node.meta && node.meta.size));
+    if (isFinite(size) && size >= 6 && size <= 40) return size;
+    return 12;
+}
+
+/** Resolved per-node style: meta overrides fall back to status/device defaults. */
+function getNodeStyle(node) {
+    const meta = (node && node.meta) || {};
+    const defaultNodeStyle = getDefaultNodeStyle();
+    const isDarkTheme = document.querySelector('.editor-container.dark-theme') !== null;
+    return {
+        radius: getNodeRadius(node),
+        shape: NODE_STYLE_SHAPES.indexOf(meta.shape) >= 0 ? meta.shape : 'circle',
+        color: (typeof meta.color === 'string' && NODE_STYLE_HEX.test(meta.color))
+            ? meta.color
+            : (node.status ? getNodeColor(node) : (defaultNodeStyle.color || '#28a745')),
+        labelColor: (typeof meta.label_color === 'string' && NODE_STYLE_HEX.test(meta.label_color))
+            ? meta.label_color
+            : (defaultNodeStyle.label_color || (isDarkTheme ? '#f8f9fa' : '#212529')),
+        isDarkTheme,
+    };
+}
+
+/** Trace the node outline for a shape, centered on node.x/node.y. */
+function traceNodeShape(ctx, node, radius, shape) {
+    ctx.beginPath();
+    if (shape === 'square') {
+        // Embed/SVG draw 16x16 at size 10; match that footprint (0.8 * radius
+        // half-extent) instead of a 2*radius square, which rendered 25% larger.
+        const half = radius * 0.8;
+        ctx.rect(node.x - half, node.y - half, half * 2, half * 2);
+    } else if (shape === 'diamond') {
+        ctx.moveTo(node.x, node.y - radius);
+        ctx.lineTo(node.x + radius, node.y);
+        ctx.lineTo(node.x, node.y + radius);
+        ctx.lineTo(node.x - radius, node.y);
+        ctx.closePath();
+    } else if (shape === 'triangle') {
+        ctx.moveTo(node.x, node.y - radius);
+        ctx.lineTo(node.x + radius * 0.866, node.y + radius * 0.5);
+        ctx.lineTo(node.x - radius * 0.866, node.y + radius * 0.5);
+        ctx.closePath();
+    } else {
+        ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+    }
+}
+
 function drawNode(node) {
     const ctx = S.ctx;
-    const radius = 12;
-    const defaultNodeStyle = getDefaultNodeStyle();
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+    const style = getNodeStyle(node);
+    const radius = style.radius;
+    traceNodeShape(ctx, node, radius, style.shape);
 
-    // Color based on state: link start (orange), selected (blue), normal (default or green)
-    if (S.linkMode && S.linkStart === node) {
-        ctx.fillStyle = '#fd7e14'; // Orange for link start
-    } else if (S.selectedNodes.indexOf(node) >= 0 || node === S.selectedNode) {
-        ctx.fillStyle = '#0d6efd'; // Blue for selected
-    } else {
-        ctx.fillStyle = node.status ? getNodeColor(node) : (defaultNodeStyle.color || '#28a745');
-    }
+    // Fill shows the node's real style (meta.color/status/default) so the
+    // Style panel has live feedback; selection is drawn as a ring below
+    // instead of replacing the fill. Link-start keeps the orange highlight.
+    ctx.fillStyle = (S.linkMode && S.linkStart === node) ? '#fd7e14' : style.color;
     ctx.fill();
 
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    // Selection ring (blue), drawn outside the node like the down/warning rings.
+    if ((S.selectedNodes.indexOf(node) >= 0 || node === S.selectedNode)
+        && !(S.linkMode && S.linkStart === node)) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = '#0d6efd';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
 
     // Draw pulsing ring for link start node
     if (S.linkMode && S.linkStart === node) {
@@ -408,17 +484,17 @@ function drawNode(node) {
     }
 
     // Use theme-aware text color for labels with shadow for readability
-    const isDarkTheme = document.querySelector('.editor-container.dark-theme') !== null;
+    const isDarkTheme = style.isDarkTheme;
     ctx.font = '12px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
 
     // Add text shadow/outline for better readability
     ctx.strokeStyle = isDarkTheme ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)';
     ctx.lineWidth = 3;
-    ctx.strokeText(node.label || 'Node', node.x, node.y - 18);
+    ctx.strokeText(node.label || 'Node', node.x, node.y - (radius + 6));
 
-    ctx.fillStyle = defaultNodeStyle.label_color || (isDarkTheme ? '#f8f9fa' : '#212529');
-    ctx.fillText(node.label || 'Node', node.x, node.y - 18);
+    ctx.fillStyle = style.labelColor;
+    ctx.fillText(node.label || 'Node', node.x, node.y - (radius + 6));
 }
 
 function drawLink(link) {
@@ -492,7 +568,7 @@ function renderEditor() {
     const defaultLinkStyle = getDefaultLinkStyle();
     // Viewport culling: skip nodes/links entirely outside the visible world
     // rect so pan/zoom on large maps doesn't draw off-screen content.
-    const vMargin = 24 / S.viewScale;
+    const vMargin = 44 / S.viewScale; // covers the max meta.size radius (40) + ring
     const vLeft = (0 - S.viewOffsetX) / S.viewScale - vMargin;
     const vRight = (S.mapWidth - S.viewOffsetX) / S.viewScale + vMargin;
     const vTop = (0 - S.viewOffsetY) / S.viewScale - vMargin;
