@@ -56,6 +56,11 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         await Promise.all([page.waitForURL(url => !url.pathname.endsWith('/login')), page.locator('button[type=submit]').click()]);
         await page.goto(`${base}/plugin/WeathermapNG`);
         const cards = fixture.maps.map(map => page.locator(`.map-card-col[data-name="${map.name}"]`));
+        // The preview SVG is built client-side after DOMContentLoaded; wait for
+        // the renderer to produce either a preview or its note before counting.
+        for (const card of cards) {
+            await card.locator('.topology-preview svg, .topology-preview .topology-preview-note').first().waitFor({ state: 'attached' });
+        }
         for (const card of cards.slice(0,2)) {
             assert.equal(await card.locator('svg circle').count(), 100, 'per-map MariaDB node cap');
             assert.equal(await card.locator('svg line').count(), 150, 'per-map MariaDB link cap');
