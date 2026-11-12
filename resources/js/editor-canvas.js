@@ -282,7 +282,9 @@ function handleMouseMove(event) {
 
     if (!S.isDragging || !S.selectedNode || !S.canvas) return;
     const { x, y } = getCanvasPoint(event);
-    const nodeRadius = 12;
+    // Clamp against each node's own radius: meta.size can be larger than the
+    // old fixed 12px, and clamping with 12 let big nodes hang off the canvas.
+    const nodeRadius = getNodeRadius(S.selectedNode);
     // Calculate new position for the anchor (dragged) node
     let newX = x - S.dragOffset.x;
     let newY = y - S.dragOffset.y;
@@ -307,8 +309,9 @@ function handleMouseMove(event) {
     const dy = newY - S.selectedNode.y;
     const group = (S.selectedNodes.length > 0) ? S.selectedNodes : [S.selectedNode];
     for (const n of group) {
-        n.x = Math.max(nodeRadius, Math.min(S.mapWidth - nodeRadius, n.x + dx));
-        n.y = Math.max(nodeRadius, Math.min(S.mapHeight - nodeRadius, n.y + dy));
+        const r = getNodeRadius(n);
+        n.x = Math.max(r, Math.min(S.mapWidth - r, n.x + dx));
+        n.y = Math.max(r, Math.min(S.mapHeight - r, n.y + dy));
     }
     renderEditor();
 }
@@ -414,7 +417,10 @@ function getNodeStyle(node) {
 function traceNodeShape(ctx, node, radius, shape) {
     ctx.beginPath();
     if (shape === 'square') {
-        ctx.rect(node.x - radius, node.y - radius, radius * 2, radius * 2);
+        // Embed/SVG draw 16x16 at size 10; match that footprint (0.8 * radius
+        // half-extent) instead of a 2*radius square, which rendered 25% larger.
+        const half = radius * 0.8;
+        ctx.rect(node.x - half, node.y - half, half * 2, half * 2);
     } else if (shape === 'diamond') {
         ctx.moveTo(node.x, node.y - radius);
         ctx.lineTo(node.x + radius, node.y);
@@ -437,21 +443,25 @@ function drawNode(node) {
     const radius = style.radius;
     traceNodeShape(ctx, node, radius, style.shape);
 
-    // Color based on state: link start (orange), selected (blue), then
-    // meta.color override, then status/device default. Selection highlight
-    // wins while editing so the selection stays visible.
-    if (S.linkMode && S.linkStart === node) {
-        ctx.fillStyle = '#fd7e14'; // Orange for link start
-    } else if (S.selectedNodes.indexOf(node) >= 0 || node === S.selectedNode) {
-        ctx.fillStyle = '#0d6efd'; // Blue for selected
-    } else {
-        ctx.fillStyle = style.color;
-    }
+    // Fill shows the node's real style (meta.color/status/default) so the
+    // Style panel has live feedback; selection is drawn as a ring below
+    // instead of replacing the fill. Link-start keeps the orange highlight.
+    ctx.fillStyle = (S.linkMode && S.linkStart === node) ? '#fd7e14' : style.color;
     ctx.fill();
 
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    // Selection ring (blue), drawn outside the node like the down/warning rings.
+    if ((S.selectedNodes.indexOf(node) >= 0 || node === S.selectedNode)
+        && !(S.linkMode && S.linkStart === node)) {
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, radius + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = '#0d6efd';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+    }
 
     // Draw pulsing ring for link start node
     if (S.linkMode && S.linkStart === node) {

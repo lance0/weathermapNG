@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use Throwable;
 
@@ -31,6 +32,15 @@ class MapFavoriteController extends Controller
 
         $userId = (int) $userId;
         $mapId = (int) $map->getKey();
+
+        // Installs upgraded without re-running database/setup.php still render
+        // the index; say what to do instead of a generic 500 on every click.
+        if (!Schema::hasTable('wmng_map_favorites')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Favorites are unavailable until the plugin database tables are upgraded. Run database/setup.php from the plugin directory.',
+            ], 503);
+        }
 
         try {
             $favorited = DB::transaction(function () use ($userId, $mapId) {

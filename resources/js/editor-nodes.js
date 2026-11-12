@@ -66,14 +66,16 @@ function updateNodeStyle(node, key, value) {
 }
 
 function updateNodeSize(node, rawValue) {
-    if (!node) return;
+    if (!node) return null;
     if (rawValue === '') {
         updateNodeStyle(node, 'size', null);
-        return;
+        return null;
     }
     const size = parseFloat(rawValue);
-    if (!isFinite(size)) return;
-    updateNodeStyle(node, 'size', Math.max(6, Math.min(40, size)));
+    if (!isFinite(size)) return null;
+    const clamped = Math.max(6, Math.min(40, size));
+    updateNodeStyle(node, 'size', clamped);
+    return clamped;
 }
 
 /** Populate the Style group from the selected node (and rebind handlers). */
@@ -82,6 +84,23 @@ function populateNodeStyleControls(node) {
     const labelColor = document.getElementById('node-prop-label-color');
     const shape = document.getElementById('node-prop-shape');
     const size = document.getElementById('node-prop-size');
+    const resetBtn = document.getElementById('node-prop-style-reset-btn');
+
+    if (!node) {
+        // No selection: the controls must not accept edits that would be
+        // silently discarded (they used to stay enabled and show the change).
+        [color, labelColor, shape, size, resetBtn].forEach(el => {
+            if (!el) return;
+            el.disabled = true;
+            el.oninput = null;
+            el.onchange = null;
+        });
+        updateApplyStyleButton();
+        return;
+    }
+
+    [color, labelColor, shape, size, resetBtn].forEach(el => { if (el) el.disabled = false; });
+
     const meta = nodeMetaObject(node);
     const defaults = getEffectiveNodeStyleDefaults();
     activeNodeStyleEdit = null;
@@ -106,10 +125,18 @@ function populateNodeStyleControls(node) {
         };
     }
     if (size) {
-        size.value = (meta.size !== undefined && meta.size !== null && isFinite(Number(meta.size)))
-            ? Number(meta.size) : '';
+        const storedSize = Number(meta.size);
+        // Only show a value the renderer actually honours; stale out-of-range
+        // values (0, 45) render at the default radius and must not look active.
+        size.value = (meta.size !== undefined && meta.size !== null && isFinite(storedSize)
+            && storedSize >= 6 && storedSize <= 40) ? storedSize : '';
         size.oninput = function () { updateNodeSize(node, this.value); };
-        size.onchange = function () { activeNodeStyleEdit = null; };
+        size.onchange = function () {
+            // Commit the clamped value so the box never disagrees with the model.
+            const clamped = updateNodeSize(node, this.value);
+            if (clamped !== null && Number(this.value) !== clamped) this.value = String(clamped);
+            activeNodeStyleEdit = null;
+        };
     }
 
     updateApplyStyleButton();
@@ -119,13 +146,16 @@ function populateNodeStyleControls(node) {
 function resetSelectedNodeStyle() {
     const node = S.selectedNode;
     if (!node) return;
-    saveState();
     const meta = nodeMetaObject(node);
-    NODE_STYLE_META_KEYS.forEach(key => { delete meta[key]; });
-    markUnsaved();
-    populateNodeProperties(node);
-    renderEditor();
-    renderNodesList();
+    const hadStyle = NODE_STYLE_META_KEYS.some(key => Object.prototype.hasOwnProperty.call(meta, key));
+    if (hadStyle) {
+        saveState();
+        NODE_STYLE_META_KEYS.forEach(key => { delete meta[key]; });
+        markUnsaved();
+        populateNodeProperties(node);
+        renderEditor();
+        renderNodesList();
+    }
 }
 
 /**
@@ -161,6 +191,7 @@ function applyStyleToSelected() {
     renderEditor();
     renderNodesList();
     updateApplyStyleButton();
+    activeNodeStyleEdit = null;
     WMNGToast.success('Style applied to ' + S.selectedNodes.length + ' nodes', { duration: 1500 });
 }
 
@@ -216,6 +247,7 @@ function populateNodeProperties(node) {
 
     if (!node) {
         if (card) card.style.display = 'none';
+        populateNodeStyleControls(null);
         return;
     }
 
@@ -312,6 +344,10 @@ function loadInterfacesForNode(node) {
 
 function saveSelectedNode() {
     if (!S.selectedNode || !S.mapId || !S.selectedNode.dbId) return;
+    // Capture the node being saved: the user can select another node before the
+    // PATCH resolves, and the response must not be applied to the new selection
+    // (that used to overwrite its meta and label).
+    const node = S.selectedNode;
     const label = document.getElementById('node-prop-label').value.trim();
     const deviceId = document.getElementById('node-prop-device').value || null;
     const ifaceId = document.getElementById('node-prop-interface').value || null;
@@ -320,9 +356,9 @@ function saveSelectedNode() {
         device_id: deviceId ? parseInt(deviceId, 10) : null,
         // Merge the loaded meta so unknown keys (style overrides, sub_map_id,
         // tooltip, ...) survive the PATCH — the server replaces meta wholesale.
-        meta: { ...nodeMetaObject(S.selectedNode), interface_id: ifaceId ? parseInt(ifaceId, 10) : null },
+        meta: { ...nodeMetaObject(node), interface_id: ifaceId ? parseInt(ifaceId, 10) : null },
     };
-    fetch(S.uris.map + '/' + S.mapId + '/node/' + S.selectedNode.dbId, {
+    fetch(S.uris.map + '/' + S.mapId + '/node/' + node.dbId, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': getCsrfToken() }, body: JSON.stringify(payload)
     }).then(r => {
         if (!r.ok) {
@@ -330,15 +366,21 @@ function saveSelectedNode() {
         }
         return r.json();
     }).then(d => {
-        if (d.success) {
-            S.selectedNode.label = label;
-            S.selectedNode.deviceId = payload.device_id;
-            S.selectedNode.interfaceId = payload.meta.interface_id;
-            S.selectedNode.meta = payload.meta;
-            renderEditor();
-        } else {
+        if (!d.success) {
             WMNGToast.error('Failed to save node: ' + (d.message || 'Unknown error'), { duration: 3000 });
+            return;
         }
+        // The node may have been deleted or undone in the meantime.
+        if (S.nodes.indexOf(node) < 0) return;
+        node.label = label;
+        node.deviceId = payload.device_id;
+        node.interfaceId = payload.meta.interface_id;
+        node.meta = payload.meta;
+        if (S.selectedNode === node) populateNodeProperties(node);
+        renderEditor();
+        renderNodesList();
+    }).catch(err => {
+        WMNGToast.error('Failed to save node: ' + err.message, { duration: 3000 });
     });
 }
 
@@ -512,8 +554,8 @@ function duplicateSelectedNode() {
         id: `node-${Date.now()}`,
         dbId: null,
         label: S.selectedNode.label + ' (copy)',
-        x: Math.min(S.mapWidth - 12, S.selectedNode.x + 30),
-        y: Math.min(S.mapHeight - 12, S.selectedNode.y + 30),
+        x: Math.min(S.mapWidth - getNodeRadius(S.selectedNode), S.selectedNode.x + 30),
+        y: Math.min(S.mapHeight - getNodeRadius(S.selectedNode), S.selectedNode.y + 30),
         deviceId: S.selectedNode.deviceId,
         interfaceId: S.selectedNode.interfaceId,
         meta: JSON.parse(JSON.stringify(nodeMetaObject(S.selectedNode))),

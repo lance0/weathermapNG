@@ -3,7 +3,6 @@
 namespace LibreNMS\Plugins\WeathermapNG\Services;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use LibreNMS\Plugins\WeathermapNG\Models\Map;
 use LibreNMS\Plugins\WeathermapNG\Models\MapFavorite;
 
@@ -47,8 +46,11 @@ class TopologyPreview
         $mapIds = $maps->pluck('id')->map(fn($id) => (int) $id)->all();
 
         // Installs upgraded without re-running database/setup.php still render
-        // the index; favorites stay empty until the table exists.
-        if ($mapIds === [] || !Schema::hasTable('wmng_map_favorites')) {
+        // the index; favorites stay empty until the table exists. Resolve the
+        // schema through the model's connection so this works with whatever
+        // connection the caller booted (including the isolated test Capsule).
+        $schema = (new MapFavorite())->getConnection()->getSchemaBuilder();
+        if ($mapIds === [] || !$schema->hasTable('wmng_map_favorites')) {
             foreach ($maps as $map) {
                 $map->setAttribute('favorite_count', 0);
                 $map->setAttribute('favorited', false);

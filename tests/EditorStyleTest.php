@@ -139,7 +139,7 @@ class EditorStyleTest extends TestCase
         // Empty PHP arrays decode as [] ; every payload path coerces that (and
         // any other non-object) to a plain object before spreading style keys.
         $this->assertStringContainsString("meta: { ...((n.meta && typeof n.meta === 'object' && !Array.isArray(n.meta)) ? n.meta : {}), interface_id: n.interfaceId || null }", $content);
-        $this->assertStringContainsString('meta: { ...nodeMetaObject(S.selectedNode), interface_id: ifaceId', $content);
+        $this->assertStringContainsString('meta: { ...nodeMetaObject(node), interface_id: ifaceId', $content);
         $this->assertStringContainsString('meta: JSON.parse(JSON.stringify(nodeMetaObject(S.selectedNode)))', $content);
         $this->assertStringContainsString("meta: (node.meta && typeof node.meta === 'object' && !Array.isArray(node.meta)) ? node.meta : {}", $content);
         $this->assertStringContainsString('function nodeMetaObject(node)', $content);
@@ -153,11 +153,13 @@ class EditorStyleTest extends TestCase
         $this->assertStringContainsString('function getNodeStyle(node)', $content);
         $this->assertStringContainsString("NODE_STYLE_SHAPES = ['circle', 'square', 'diamond', 'triangle']", $content);
         $this->assertStringContainsString('traceNodeShape(ctx, node, radius, style.shape)', $content);
-        $this->assertStringContainsString('ctx.fillStyle = style.color;', $content);
+        $this->assertStringContainsString("ctx.fillStyle = (S.linkMode && S.linkStart === node) ? '#fd7e14' : style.color;", $content);
         $this->assertStringContainsString('ctx.fillStyle = style.labelColor;', $content);
-        // Highlight wins while the node is selected/link-start.
-        $selectionBlock = substr($content, strpos($content, 'function drawNode(node)'), 700);
-        $this->assertStringContainsString('ctx.fillStyle = \'#0d6efd\'', $selectionBlock);
+        // Selection is a ring, not a fill override: the Style panel must show
+        // its colour while the node is selected.
+        $selectionBlock = substr($content, strpos($content, 'function drawNode(node)'), 1200);
+        $this->assertStringContainsString("ctx.strokeStyle = '#0d6efd'", $selectionBlock);
+        $this->assertStringNotContainsString("ctx.fillStyle = '#0d6efd'", $selectionBlock);
     }
 
     public function test_editor_ctrl_a_and_bulk_delete_are_guarded(): void

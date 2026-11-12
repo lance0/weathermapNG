@@ -61,8 +61,45 @@ const linkPath = svg.match(/<path d="M 10 20 L 100 200 L 300 400"[^>]*\/>/);
 assert.ok(linkPath, 'angled via path includes start, via point and end');
 assert.ok(linkPath[0].includes('stroke="#ff0000"'), 'link style color wins');
 assert.ok(linkPath[0].includes('stroke-width="4"'), 'link style width wins');
-assert.ok(svg.includes('1.00 Gb/s'), 'bandwidth label rendered when live data has a value');
+assert.ok(svg.includes('>50%</text>'), 'link label matches the canvas default (percent)');
+assert.equal(svg.includes('1.00 Gb/s'), false, 'export no longer prints configured bandwidth instead of live metric');
 assert.equal(svg.includes('500.00 Mb/s'), false, 'link without live traffic gets no label');
+
+// The exported label follows the selected metric, exactly like the canvas.
+assert.ok(build(map, live, { metric: 'in' }).includes('>500.00 Mb/s</text>'), 'metric=in exports inbound');
+assert.ok(build(map, live, { metric: 'out' }).includes('>400.00 Mb/s</text>'), 'metric=out exports outbound');
+assert.ok(build(map, live, { metric: 'sum' }).includes('>900.00 Mb/s</text>'), 'metric=sum exports both directions');
+assert.equal(build(map, live, { metric: 'in', show_bandwidth: false }).includes('500.00 Mb/s'), false, 'show_bandwidth=false hides rate labels');
+assert.equal(build(map, live, { show_percentages: false }).includes('>50%</text>'), false, 'show_percentages=false hides percent labels');
+// A label can be exported when the live payload carries the percentage and
+// bandwidth even though the stored link has no bandwidth_bps (demo maps).
+const demoLink = {
+    width: 800, height: 600,
+    nodes: [{ id: 1, label: 'a', x: 0, y: 0 }, { id: 2, label: 'b', x: 400, y: 0 }],
+    links: [{ id: 7, src: 1, dst: 2 }],
+};
+const demoLive = { links: { 7: { in_bps: 4e8, out_bps: 3e8, pct: 70 } } };
+assert.ok(build(demoLink, demoLive).includes('>70%</text>'), 'percent label needs no stored bandwidth');
+const demoRate = build(demoLink, demoLive, { metric: 'in' });
+assert.ok(demoRate.includes('>400.00 Mb/s</text>'), 'rate label comes from live payload');
+
+// Utilization colours the stroke when the link has no explicit style colour.
+const utilSvg = build(demoLink, { links: { 7: { in_bps: 9e8, out_bps: 1e8, pct: 90 } } });
+assert.ok(/stroke="#dc3545"/.test(utilSvg), 'pct above the critical threshold paints the critical colour');
+
+// Curved labels anchor on the sampled curve, not the chord between via points.
+const curveMap = {
+    width: 800, height: 600,
+    nodes: [{ id: 1, label: 'a', x: 66, y: 753 }, { id: 2, label: 'b', x: 645, y: 30 }],
+    links: [{ id: 9, src: 1, dst: 2, bandwidth_bps: 1e9, style: { via_points: [{ x: 655, y: 31 }], via_style: 'curved' } }],
+};
+const curveSvg = build(curveMap, { links: { 9: { in_bps: 5e8, out_bps: 4e8, pct: 50 } } });
+const curveText = curveSvg.match(/<text x="([-0-9.]+)" y="([-0-9.]+)"[^>]*>50%<\/text>/);
+assert.ok(curveText, 'curved link exports its label');
+const chordMid = { x: (66 + 645) / 2, y: (753 + 30) / 2 };
+assert.ok(Math.hypot(Number(curveText[1]) - chordMid.x, Number(curveText[2]) - chordMid.y) > 20,
+    `label sits on the curve, not the chord (got ${curveText[1]},${curveText[2]})`);
+
 // Curved links render bezier commands and fall back to the configured default color.
 const curved = svg.match(/<path d="M 300 400 [^"]*C [^"]*"[^>]*\/>/);
 assert.ok(curved, 'curved via_style samples into C commands');
@@ -91,11 +128,11 @@ const custom = build({ ...map, width: 0, height: undefined, background: 'blue' }
 assert.ok(custom.includes('viewBox="0 0 800 600"'), 'invalid dimensions fall back to 800x600');
 assert.ok(custom.includes('fill="#ffffff"/>'), 'invalid background falls back to #ffffff');
 assert.ok(custom.includes('fill="#00ff00"'), 'options.colors override status colors');
-assert.equal(custom.includes('1.00 Gb/s'), false, 'options.labels=false drops link labels');
+assert.equal(custom.includes('>50%</text>'), false, 'options.labels=false drops link labels');
 assert.equal(custom.includes('Σ '), false, 'options.labels=false drops traffic labels');
 assert.ok(custom.includes('>core-router</text>'), 'node labels stay');
-const bytes = build(map, live, { scale: 'bytes' });
-assert.ok(bytes.includes('125.00 MB/s'), 'bytes scale honoured');
+const bytes = build(map, live, { scale: 'bytes', metric: 'sum' });
+assert.ok(bytes.includes('112.50 MB/s'), 'bytes scale honoured for rate labels');
 
 // Configured colors.link_normal fills in when neither the link nor the map
 // has a default color; a two-point straight link has no via_points.

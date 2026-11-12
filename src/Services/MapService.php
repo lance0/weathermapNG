@@ -177,7 +177,7 @@ class MapService
                 'x' => isset($nodeData['x']) && is_numeric($nodeData['x']) ? (float) $nodeData['x'] : 0,
                 'y' => isset($nodeData['y']) && is_numeric($nodeData['y']) ? (float) $nodeData['y'] : 0,
                 'device_id' => isset($nodeData['device_id']) && is_numeric($nodeData['device_id']) ? (int) $nodeData['device_id'] : null,
-                'meta' => is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : [],
+                'meta' => NodeMetaNormalizer::sanitize(is_array($nodeData['meta'] ?? null) ? $nodeData['meta'] : []),
             ]);
 
             $clientKey = $nodeData['id'] ?? $nodeData['node_id'] ?? $nodeData['_id'] ?? (string)$index;

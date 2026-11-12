@@ -279,8 +279,11 @@ color: var(--idx-action-text-hover);
 text-decoration: none;
 }
 .map-card-action.danger:hover { color: #dc3545; }
-.map-card-action.favorite.is-favorited { color: #f5b301; }
-.map-card-action.favorite.is-favorited:hover { color: #d99e00; }
+/* #a06a00 holds ~4.6:1 on white (the previous gold was 1.85:1). */
+.map-card-action.favorite.is-favorited { color: #a06a00; }
+.map-card-action.favorite.is-favorited:hover { color: #7a5000; }
+.wmng-index.dark-theme .map-card-action.favorite.is-favorited { color: #f5b301; }
+.wmng-index.dark-theme .map-card-action.favorite.is-favorited:hover { color: #ffc83d; }
 .map-card-action + .map-card-action {
 border-left: 1px solid var(--idx-card-border);
 }

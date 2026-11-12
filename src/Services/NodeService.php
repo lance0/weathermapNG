@@ -18,7 +18,7 @@ class NodeService
             'x' => $data['x'] ?? 0,
             'y' => $data['y'] ?? 0,
             'device_id' => $data['device_id'] ?? null,
-            'meta' => $data['meta'] ?? [],
+            'meta' => NodeMetaNormalizer::sanitize(is_array($data['meta'] ?? null) ? $data['meta'] : []),
         ]);
     }
 
@@ -28,6 +28,9 @@ class NodeService
 
         if (array_key_exists('label', $data)) {
             $data['label'] = NodeLabelNormalizer::normalizeOrThrow($data['label']);
+        }
+        if (array_key_exists('meta', $data)) {
+            $data['meta'] = NodeMetaNormalizer::sanitize(is_array($data['meta']) ? $data['meta'] : []);
         }
 
         $node->fill($data);

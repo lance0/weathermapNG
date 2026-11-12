@@ -409,8 +409,8 @@
                     </button>
                     <button type="button" class="btn btn-link btn-sm px-0"
                             id="node-prop-style-reset-btn" onclick="resetSelectedNodeStyle()"
-                            aria-label="Reset node style to device default">
-                        Reset style to device default
+                            aria-label="Reset node style to map default">
+                        Reset style to map default
                     </button>
                 </div>
                 <div class="btn-group btn-group-sm d-flex">

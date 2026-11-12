@@ -33,7 +33,7 @@ class TopologyPreviewTest extends TestCase
             }
             $db->enableQueryLog();
             $result = TopologyPreview::loadMaps();
-            $this->assertCount(3, $db->getQueryLog(), 'one map/count query plus two bounded relation queries');
+            $this->assertCount(4, $db->getQueryLog(), 'favorites schema probe plus one map/count query plus two bounded relation queries');
             foreach ([1,2] as $id) {
                 $map = $result['maps']->firstWhere('id', $id);
                 $preview = $result['previews'][$id];
@@ -52,7 +52,7 @@ class TopologyPreviewTest extends TestCase
             $db->table('wmng_maps')->insert(['id' => 3, 'name' => 'empty']);
             $db->flushQueryLog();
             $result = TopologyPreview::loadMaps();
-            $this->assertCount(3, $db->getQueryLog());
+            $this->assertCount(4, $db->getQueryLog());
             $this->assertSame(['nodes' => [], 'links' => [], 'capped' => false], $result['previews'][3]);
             $this->assertSame(0, $result['maps']->firstWhere('id', 3)->nodes_count);
             // Only the three expected queries are allowed; no device/port tables are provisioned.

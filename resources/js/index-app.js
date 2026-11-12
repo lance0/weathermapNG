@@ -371,6 +371,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // The star toggle updates card state in place; keep the filter honest.
     document.addEventListener('wmng:favorites-changed', applyFilter);
+    const clearFilters = document.getElementById('clear-map-filters');
+    if (clearFilters) {
+        clearFilters.addEventListener('click', () => {
+            searchInput.value = '';
+            if (tagFilter) tagFilter.value = '';
+            if (favoritesFilter) favoritesFilter.value = '';
+            applyFilter();
+            searchInput.focus();
+        });
+    }
 
     sortCards(filterSelect.value);
     applyFilter();

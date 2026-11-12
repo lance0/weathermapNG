@@ -5,6 +5,7 @@ namespace LibreNMS\Plugins\WeathermapNG\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 use LibreNMS\Plugins\WeathermapNG\Services\NodeLabelNormalizer;
+use LibreNMS\Plugins\WeathermapNG\Services\NodeMetaNormalizer;
 
 class SaveMapRequest extends FormRequest
 {
@@ -267,37 +268,7 @@ class SaveMapRequest extends FormRequest
      */
     private static function sanitizeNodeMeta(array $meta): array
     {
-        $styleKeys = ['color', 'label_color', 'shape', 'size'];
-        $out = $meta;
-        foreach ($styleKeys as $key) {
-            unset($out[$key]);
-        }
-
-        $style = [];
-        foreach (['color', 'label_color'] as $key) {
-            if (isset($meta[$key]) && is_string($meta[$key])) {
-                $value = strtolower(strip_tags(trim($meta[$key])));
-                if (preg_match('/^#[0-9a-f]{6}$/', $value)) {
-                    $style[$key] = $value;
-                }
-            }
-        }
-
-        if (isset($meta['shape']) && is_string($meta['shape'])) {
-            $shape = strtolower(strip_tags(trim($meta['shape'])));
-            if (in_array($shape, ['circle', 'square', 'diamond', 'triangle'], true)) {
-                $style['shape'] = $shape;
-            }
-        }
-
-        if (isset($meta['size']) && is_numeric($meta['size'])) {
-            $size = (float) $meta['size'];
-            if ($size >= 6 && $size <= 40) {
-                $style['size'] = $size;
-            }
-        }
-
-        return $out + $style;
+        return NodeMetaNormalizer::sanitize($meta);
     }
 
     protected function prepareForValidation(): void
@@ -306,6 +277,21 @@ class SaveMapRequest extends FormRequest
             if ($this->has($key) && is_string($this->input($key))) {
                 $this->merge([$key => trim($this->input($key))]);
             }
+        }
+
+        // Validation runs before sanitize(), so a stale/imported style value
+        // ("red", "#fff", size 45) would reject the whole save even though the
+        // sanitizer is written to drop it. Normalize meta first: invalid style
+        // keys disappear here, unknown keys stay, and the rules only ever see
+        // clean values.
+        $nodes = $this->input('nodes');
+        if (is_array($nodes)) {
+            foreach ($nodes as $index => $node) {
+                if (is_array($node) && isset($node['meta']) && is_array($node['meta'])) {
+                    $nodes[$index]['meta'] = NodeMetaNormalizer::sanitize($node['meta']);
+                }
+            }
+            $this->merge(['nodes' => $nodes]);
         }
     }
 }

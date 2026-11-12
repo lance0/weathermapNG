@@ -219,9 +219,9 @@
                 <i class="fas fa-search" aria-hidden="true"></i>
             </div>
             <h3>No matching maps</h3>
-            <p>Try a different search term or clear the filter.</p>
-            <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('map-search').value=''; document.getElementById('map-search').dispatchEvent(new Event('input'));" aria-label="Clear search filter">
-                Clear Search
+            <p>Try a different search term or clear the filters.</p>
+            <button type="button" class="btn btn-outline-secondary" id="clear-map-filters" aria-label="Clear search, tag and favorite filters">
+                Clear Filters
             </button>
         </div>
     </div>

@@ -738,7 +738,13 @@ function embedUrl(path) {
     function drawNodePulse(node, octx) {
         const x = (node.position?.x ?? node.x) || 0;
         const y = (node.position?.y ?? node.y) || 0;
-        const radius = 10;
+        // Follow the same meta.size scale as the node shape; the old fixed
+        // radius drew the "down" pulse inside large nodes.
+        const pulseStyle = (svgExport && typeof svgExport.nodeStyle === 'function')
+            ? svgExport.nodeStyle(node.meta)
+            : {};
+        const pulseScale = pulseStyle.size && svgExport ? svgExport.sizeScale(pulseStyle.size) : 1;
+        const radius = 10 * pulseScale;
         const phase = reducedMotion ? 0 : animTick * 0.1;
         const pulseRadius = radius + 4 + 3 * Math.sin(phase);
         octx.beginPath();
@@ -822,7 +828,14 @@ function embedUrl(path) {
     }
 
     function getPathMidpoint(points) {
-        if (points.length === 2) return points[1];
+        // A plain two-point link used to return the DESTINATION, so labels and
+        // alert badges sat on the target node instead of the link midpoint.
+        if (points.length === 2) {
+            return {
+                x: (points[0].x + points[1].x) / 2,
+                y: (points[0].y + points[1].y) / 2,
+            };
+        }
         let totalLen = 0;
         const segs = [];
         for (let i = 1; i < points.length; i++) {
@@ -1550,7 +1563,12 @@ function embedUrl(path) {
                 colors: WMNG_CONFIG.colors,
                 thresholds: WMNG_CONFIG.thresholds,
                 link_style: WMNG_CONFIG.link_style,
-                scale: scale
+                scale: scale,
+                // Match the on-screen labels: the current metric and the same
+                // show_percentages/show_bandwidth switches the canvas uses.
+                metric: currentMetric,
+                show_percentages: WMNG_CONFIG.show_percentages,
+                show_bandwidth: WMNG_CONFIG.show_bandwidth
             });
             const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
             const url = URL.createObjectURL(blob);

@@ -162,8 +162,38 @@
         }
     }
 
-    function textElement(value, x, y, fontSize, fill) {
-        return `<text x="${formatNumber(x)}" y="${formatNumber(y)}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize}" fill="${fill}">${escapeXml(value)}</text>`;
+    function textElement(value, x, y, fontSize, fill, halo) {
+        const stroke = halo ? ` stroke="${halo}" stroke-width="3" paint-order="stroke" stroke-linejoin="round"` : '';
+        return `<text x="${formatNumber(x)}" y="${formatNumber(y)}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize}" fill="${fill}"${stroke}>${escapeXml(value)}</text>`;
+    }
+
+    // Catmull-Rom sampling for curved links: labels must sit on the drawn
+    // curve, not on the straight chord between via points (same approach as
+    // the canvas renderer's densePathPoints()).
+    function densePoints(points, viaStyle) {
+        if (viaStyle !== 'curved' || points.length <= 2) return points;
+        const steps = 24;
+        const dense = [points[0]];
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(0, i - 1)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(points.length - 1, i + 2)];
+            const cp1x = p1.x + (p2.x - p0.x) / 6;
+            const cp1y = p1.y + (p2.y - p0.y) / 6;
+            const cp2x = p2.x - (p3.x - p1.x) / 6;
+            const cp2y = p2.y - (p3.y - p1.y) / 6;
+            for (let step = 1; step <= steps; step++) {
+                const t = step / steps;
+                const t2 = t * t, t3 = t2 * t;
+                const mt = 1 - t, mt2 = mt * mt, mt3 = mt2 * mt;
+                dense.push({
+                    x: mt3 * p1.x + 3 * mt2 * t * cp1x + 3 * mt * t2 * cp2x + t3 * p2.x,
+                    y: mt3 * p1.y + 3 * mt2 * t * cp1y + 3 * mt * t2 * cp2y + t3 * p2.y,
+                });
+            }
+        }
+        return dense;
     }
 
     function humanRate(bits, units) {
@@ -329,21 +359,59 @@
         const points = linkPoints(link, source, target);
         const defaults = options.default_link_style && typeof options.default_link_style === 'object' ? options.default_link_style : {};
         const viaStyle = linkViaStyle(link, defaults, options);
+        const live = linkLive(link, liveData);
+        const bandwidth = finiteNumber(
+            link.bandwidth_bps !== undefined && link.bandwidth_bps !== null ? link.bandwidth_bps
+                : (link.bandwidth !== undefined && link.bandwidth !== null ? link.bandwidth : live.bandwidth),
+            null
+        );
+        const inBps = finiteNumber(live.in_bps, 0) || 0;
+        const outBps = finiteNumber(live.out_bps, 0) || 0;
+        const presetPct = finiteNumber(live.pct, null);
+        const pct = presetPct !== null ? presetPct
+            : ((Math.max(inBps, outBps) && bandwidth) ? (Math.max(inBps, outBps) / bandwidth) * 100 : null);
         const configured = hexColor(options.colors && options.colors.link_normal, DEFAULT_LINK_COLOR);
-        const stroke = hexColor(link.style && link.style.color,
-            hexColor(defaults.color, hexColor(options.default_link_color, configured)));
+        const thresholds = Array.isArray(options.thresholds) ? options.thresholds : [50, 80, 95];
+        const utilColor = (() => {
+            if (pct === null) return hexColor(defaults.color, configured);
+            if (pct >= (finiteNumber(thresholds[1], 80))) return hexColor(options.colors && options.colors.link_critical, '#dc3545');
+            if (pct >= (finiteNumber(thresholds[0], 50))) return hexColor(options.colors && options.colors.link_warning, '#ffc107');
+            return hexColor(options.colors && options.colors.link_normal, DEFAULT_LINK_COLOR);
+        })();
+        // Match the canvas: an explicit link color wins, otherwise utilization
+        // colors the stroke instead of the configured default.
+        const stroke = hexColor(link.style && link.style.color, null)
+            || (live && Object.keys(live).length ? utilColor : hexColor(defaults.color, configured));
         const width = linkWidth(link, defaults, options);
         parts.push(`<path d="${pathData(points, viaStyle)}" fill="none" stroke="${stroke}" stroke-width="${formatNumber(width)}" stroke-linecap="round" stroke-linejoin="round"/>`);
 
         if (options.labels === false) return;
-        const live = linkLive(link, liveData);
         if (!hasLiveValue(live)) return;
-        const bandwidth = finiteNumber(link.bandwidth_bps !== undefined ? link.bandwidth_bps : link.bandwidth, null);
-        if (bandwidth === null || bandwidth <= 0) return;
-        const label = humanRate(bandwidth, options.scale);
+
+        // Mirror the on-canvas label: percent by default, otherwise the
+        // selected metric (in/out/sum) in bits or bytes. The old version always
+        // printed the configured bandwidth, so exports disagreed with the map.
+        const metric = options.metric || 'percent';
+        const metricBps = metric === 'in' ? inBps
+            : metric === 'out' ? outBps
+            : metric === 'sum' ? ((inBps + outBps) || null)
+            : (Math.max(inBps, outBps) || null);
+
+        let label = null;
+        if (metric === 'percent') {
+            if (options.show_percentages === false) return;
+            if (pct === null) return;
+            label = Math.round(Math.max(0, Math.min(100, pct))) + '%';
+        } else {
+            if (options.show_bandwidth === false) return;
+            if (metricBps === null || metricBps <= 0) return;
+            label = humanRate(metricBps, options.scale);
+        }
         if (!label) return;
-        const mid = midpoint(points);
-        parts.push(textElement(label, mid.x, mid.y - 5, 11, '#111111'));
+
+        // Label sits on the drawn curve; the white halo matches the canvas.
+        const mid = midpoint(densePoints(points, viaStyle));
+        parts.push(textElement(label, mid.x, mid.y - 5, 11, '#111111', '#ffffff'));
     }
 
     function renderNode(node, liveData, options, parts) {
@@ -420,6 +488,7 @@
         shapeInsets,
         showSecondaryLabels,
         particleBudget,
+        densePoints,
     };
 
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

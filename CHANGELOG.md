@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Style individual nodes with fill color, label color, shape (circle, square, diamond, triangle) and size, and copy the selected node's style to every multi-selected node in one undoable action. The same overrides render in the editor, the embed view and the SVG export; invalid values are rejected on save.
 - Export the embed view as a static SVG document next to the existing PNG export. Links honor via points and curve style, nodes honor device shapes plus per-node overrides, labels are XML-escaped, and the output is deterministic for a given map.
 - Favorite maps per user from the index with a star toggle, a favorites count badge and a Favorites filter. Favorites are per-user and available to every authenticated user, not only admins.
-- Compare index, editor and embed screenshots at 480×800, 768×1024 and 1920×1080 in CI, with committed baselines, a canvas-only tolerance and diff artifacts on failure. Every pure Node regression suite also runs in CI now.
+- Compare index, editor and embed screenshots at 480×800, 768×1024 and 1920×1080 in CI, with committed baselines, diffs on failure, and every pure Node regression suite. The comparator now uses a fixed fixture name, tighter channel/pixel budgets, compares UI chrome over the canvases, fails blank map canvases, asserts the fixture's styled node is painted, and runs the favorites integration suite in the same job.
 
 ### Changed
 - Bound flow-animation cost on large maps: particle density drops in tiers above 150 and 300 links and the whole map stays at or below 1500 particles. Below 0.6 zoom the embed hides secondary node text (traffic total and CPU/MEM) while keeping node labels.
@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve every node `meta` key on editor save, node apply, duplicate and JSON export. Previously only `interface_id` survived, which discarded `sub_map_id`, tooltips and per-node style.
 
 ### Fixed
+- Normalize per-node style meta before validation and on every write path (save, import, node PATCH, version snapshot). A stored or imported value like `color: "red"` used to fail the next whole-map save with a 422 the editor could not explain; it is now dropped, while unknown meta keys survive.
+- Draw straight-link labels and alert badges at the real midpoint instead of the destination node.
+- Export SVG links and labels that match the map: link strokes follow utilization colors, percent labels need no stored bandwidth (demo maps), curved labels sit on the drawn curve, labels carry the canvas halo, and the export follows the Metric selector.
+- Scale the embed's "down" pulse ring with `meta.size` instead of drawing it inside large nodes.
+- Keep the editor selection visible as a ring rather than replacing the node fill, so the Style panel previews its color while the node is selected. Style controls are disabled with no selection, the Size field shows the clamped value, Reset only creates undo history when a style exists, and the reset copy says "map default".
 - Redraw the editor canvas after a container resize. Resizing the canvas buffer cleared it and nothing repainted, so a resized editor could render blank until the next interaction.
 - Normalize node `meta` to an object before writing style keys, so rows that stored an empty PHP array (`[]`) no longer swallow their per-node style.
 - Allow `symfony/process` 7.x and 8.x and upgrade the dev suite to PHPUnit 11.5, so the package installs and tests on PHP 8.2 hosts.

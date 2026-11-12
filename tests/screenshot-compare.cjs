@@ -7,9 +7,10 @@
 //   --update  write the baselines instead of comparing (UPDATE_SCREENSHOTS=1
 //             is the CI/environment spelling of the same switch)
 //
-// A capture fails only when more than 1.5% of pixels differ AND at least one
-// differing pixel lies outside a <canvas> region: the demo/live traffic data
-// tints the canvases slowly over time, so canvas-only drift is expected.
+// Capture rules: outside the map canvases, a capture may differ in at most
+// 0.5% of pixels and only by a small channel delta. Inside the canvases,
+// demo/live traffic drifts slightly; that budget is 1%. A separate content
+// check fails a blank map canvas, because a blank render can be < 1% pixels.
 const { randomBytes } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } = require('node:fs');
@@ -24,11 +25,19 @@ const baselineDir = join(__dirname, 'screenshots');
 const diffDir = join(resolve(__dirname, '..'), 'output', 'screenshot-diff');
 const VIEWPORTS = [[480, 800], [768, 1024], [1920, 1080]];
 // Fraction of bytes that may differ per channel before a pixel counts.
-const CHANNEL_TOLERANCE = 12;
+const CHANNEL_TOLERANCE = 4;
 // Fraction of the whole capture that may differ without failing.
-const MAX_DIFF_RATIO = 0.015;
+const MAX_DIFF_RATIO = 0.005;
+// Canvas pixels still get a budget: animated traffic/text drifts a little, but
+// a broken map render must fail. Observed drift is ~0.4%; a blank embed canvas
+// measures 4-7%, and a blank editor canvas is caught by the content check.
+const MAX_CANVAS_DIFF_RATIO = 0.01;
 
+// A random map name would be rendered on the index card and in the editor
+// header, so every capture would differ from its baseline. Randomize only the
+// disposable username.
 const tag = `wmng-visual-${randomBytes(6).toString('hex')}`;
+const fixtureName = 'wmng-visual-fixture';
 const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-dev', 'php', '-r', `
     require '/opt/librenms/vendor/autoload.php';
     $app = require '/opt/librenms/bootstrap/app.php';
@@ -164,16 +173,20 @@ function encodePng({ width, height, pixels }) {
     ]);
 }
 
-// Marks every pixel inside one of the canvas rectangles (viewport pixels).
-function canvasMask(rects, width, height) {
+// Marks map pixels inside the canvas rectangles and clears UI regions drawn on
+// top of them (nav bar, controls, legend, minimap), so chrome regressions are
+// still compared even on the full-bleed embed page.
+function canvasMask(rects, holes, width, height) {
     const mask = new Uint8Array(width * height);
-    for (const rect of rects) {
+    const fillRect = (rect, value) => {
         const top = Math.max(0, Math.floor(rect.y));
         const bottom = Math.min(height, Math.ceil(rect.y + rect.h));
         const left = Math.max(0, Math.floor(rect.x));
         const right = Math.min(width, Math.ceil(rect.x + rect.w));
-        for (let y = top; y < bottom; y++) mask.fill(1, y * width + left, y * width + right);
-    }
+        for (let y = top; y < bottom; y++) mask.fill(value, y * width + left, y * width + right);
+    };
+    rects.forEach(rect => fillRect(rect, 1));
+    holes.forEach(rect => fillRect(rect, 0));
     return mask;
 }
 
@@ -188,6 +201,8 @@ function comparePng(referencePath, capture, mask) {
     const diff = Buffer.from(reference.pixels);
     let differing = 0;
     let outside = 0;
+    let inside = 0;
+    let canvasPixels = 0;
     for (let index = 0; index < total; index++) {
         const offset = index * 4;
         const delta = Math.max(
@@ -196,9 +211,10 @@ function comparePng(referencePath, capture, mask) {
             Math.abs(reference.pixels[offset + 2] - capture.pixels[offset + 2]),
             Math.abs(reference.pixels[offset + 3] - capture.pixels[offset + 3]),
         );
+        if (mask[index]) canvasPixels++;
         if (delta <= CHANNEL_TOLERANCE) continue;
         differing++;
-        if (!mask[index]) outside++;
+        if (mask[index]) inside++; else outside++;
         diff[offset] = 220;
         diff[offset + 1] = 20;
         diff[offset + 2] = 20;
@@ -210,18 +226,28 @@ function comparePng(referencePath, capture, mask) {
         diff,
         differing,
         outside,
+        inside,
         ratio: total ? differing / total : 0,
+        insideRatio: canvasPixels ? inside / canvasPixels : 0,
     };
 }
 
 // ------------------------------------------------------------------ fixture
 const fixtureSql = `
     Illuminate\\Support\\Facades\\DB::transaction(function () {
+        // The map name is rendered (index card + editor header), so it must be
+        // stable across runs; clear a previous fixture if one survived.
+        foreach (LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::where('name', '${fixtureName}')->get() as $old) {
+            $old->links()->delete();
+            LibreNMS\\Plugins\\WeathermapNG\\Models\\MapVersion::where('map_id', $old->id)->delete();
+            $old->nodes()->delete();
+            $old->delete();
+        }
         $password = bin2hex(random_bytes(16));
         $user = new App\\Models\\User(['username'=>'${tag}', 'auth_type'=>'mysql', 'enabled'=>true]);
         $user->setPassword($password); $user->save(); $user->assignRole('admin');
         $map = LibreNMS\\Plugins\\WeathermapNG\\Models\\Map::create([
-            'name'=>'${tag}', 'title'=>'Visual regression fixture',
+            'name'=>'${fixtureName}', 'title'=>'Visual regression fixture',
             'options'=>['width'=>960, 'height'=>640, 'background'=>'#ffffff'],
         ]);
         $points = [
@@ -235,6 +261,7 @@ const fixtureSql = `
                 'map_id'=>$map->id, 'label'=>$label, 'x'=>$x, 'y'=>$y,
             ]);
         }
+        $nodes[0]->update(['meta'=>['color'=>'#aa3300', 'shape'=>'square', 'size'=>18]]);
         $links = [];
         foreach ([[0,1,1000000000],[0,2,1000000000],[1,3,1000000000],[2,4,100000000],[3,4,100000000]] as [$from,$to,$bandwidth]) {
             $links[] = LibreNMS\\Plugins\\WeathermapNG\\Models\\Link::create([
@@ -291,6 +318,20 @@ async function settle(page, name) {
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+const elementRects = (page, selectors) => page.evaluate(selectors => {
+    const ratio = window.devicePixelRatio || 1;
+    return selectors.flatMap(selector => [...document.querySelectorAll(selector)].map(element => {
+        const bounds = element.getBoundingClientRect();
+        if (bounds.width <= 0 || bounds.height <= 0) return null;
+        return {
+            x: Math.max(0, bounds.left) * ratio,
+            y: Math.max(0, bounds.top) * ratio,
+            w: Math.max(0, Math.min(window.innerWidth, bounds.right) - Math.max(0, bounds.left)) * ratio,
+            h: Math.max(0, Math.min(window.innerHeight, bounds.bottom) - Math.max(0, bounds.top)) * ratio,
+        };
+    }).filter(Boolean));
+}, selectors);
+
 const canvasRects = page => page.evaluate(() => {
     const ratio = window.devicePixelRatio || 1;
     const width = window.innerWidth;
@@ -307,6 +348,40 @@ const canvasRects = page => page.evaluate(() => {
         };
     }).filter(rect => rect.w > 0 && rect.h > 0);
 });
+
+// A blank canvas can be only a few hundred differing pixels, so also assert
+// that the map layer actually contains content and the fixture's styled node
+// (#aa3300 square) was painted. This catches "map renders nothing" regressions
+// that a pixel ratio alone would miss.
+const assertMapCanvasContent = async (page, name) => {
+    const stats = await page.evaluate(() => {
+        const canvas = document.getElementById('map-canvas') || document.querySelector('canvas');
+        if (!canvas) return null;
+        const ctx = canvas.getContext('2d');
+        const { width, height } = canvas;
+        const data = ctx.getImageData(0, 0, width, height).data;
+        const colors = new Set();
+        let nonBg = 0;
+        let styled = 0;
+        const bg = [data[0], data[1], data[2], data[3]];
+        for (let i = 0; i < data.length; i += 4 * 3) {
+            const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+            if (a > 0) colors.add(`${r},${g},${b}`);
+            if (a > 0 && (Math.abs(r - bg[0]) > 8 || Math.abs(g - bg[1]) > 8 || Math.abs(b - bg[2]) > 8)) nonBg++;
+            if (a > 0 && Math.abs(r - 0xaa) <= 10 && Math.abs(g - 0x33) <= 10 && b <= 10) styled++;
+        }
+        return { width, height, colors: colors.size, nonBg, styled };
+    });
+    if (!stats || stats.width < 10 || stats.height < 10) {
+        throw new Error(`${name}: map canvas is missing or has no drawing surface`);
+    }
+    if (stats.colors < 3 || stats.nonBg < 20) {
+        throw new Error(`${name}: map canvas looks blank (${JSON.stringify(stats)})`);
+    }
+    if (stats.styled < 30) {
+        throw new Error(`${name}: per-node style meta.color was not painted (${JSON.stringify(stats)})`);
+    }
+};
 
 // -------------------------------------------------------------------- main
 let fixture;
@@ -344,7 +419,11 @@ async function main() {
                         throw new Error(`HTTP ${response.status()} for ${response.url()}`);
                     }
                     await settle(page, name);
-                    const mask = canvasMask(await canvasRects(page), width, height);
+                    if (name === 'editor' || name === 'embed') {
+                        await assertMapCanvasContent(page, name);
+                    }
+                    const holes = await elementRects(page, ['#nav-bar', '#controls', '#legend', '#minimap', '#zoom-controls']);
+                    const mask = canvasMask(await canvasRects(page), holes, width, height);
                     const shot = join(tmpdir(), `${tag}-${name}-${viewport}.png`);
                     await page.screenshot({ path: shot, animations: 'disabled', caret: 'hide' });
                     let capture;
@@ -373,7 +452,15 @@ async function main() {
                         continue;
                     }
                     const percent = (result.ratio * 100).toFixed(2);
+                    const canvasPercent = (result.insideRatio * 100).toFixed(2);
                     const confined = result.differing > 0 && result.outside === 0;
+                    if (result.insideRatio > MAX_CANVAS_DIFF_RATIO) {
+                        mkdirSync(diffDir, { recursive: true });
+                        const diffPath = join(diffDir, `${name}-${viewport}.png`);
+                        writeFileSync(diffPath, encodePng({ width: result.width, height: result.height, pixels: result.diff }));
+                        failures.push(`${name}-${viewport}: ${canvasPercent}% of background canvas pixels differ (> ${(MAX_CANVAS_DIFF_RATIO * 100).toFixed(0)}%) — map render changed; diff written to ${diffPath}`);
+                        continue;
+                    }
                     if (result.ratio > MAX_DIFF_RATIO && !confined) {
                         mkdirSync(diffDir, { recursive: true });
                         const diffPath = join(diffDir, `${name}-${viewport}.png`);
@@ -383,7 +470,7 @@ async function main() {
                     }
                     const note = result.differing === 0
                         ? 'identical'
-                        : `${percent}% differ (${result.differing}), ${confined ? 'all inside the animated canvas region' : `${result.outside} outside canvas`}`;
+                        : `${percent}% differ (${result.differing}, ${canvasPercent}% of canvas pixels), ${confined ? 'all inside the animated canvas region' : `${result.outside} outside canvas`}`;
                     console.log(`ok ${name}-${viewport}: ${note}`);
                 } catch (error) {
                     failures.push(`${name}-${viewport}: ${error.message}`);
@@ -394,6 +481,7 @@ async function main() {
         if (update) {
             for (const failure of failures) console.warn(`SKIPPED ${failure}`);
             console.log(`PASS: wrote ${written} baselines to ${baselineDir} — review the PNGs, then commit them`);
+            if (failures.length) process.exitCode = 1;
             return;
         }
         if (failures.length) {

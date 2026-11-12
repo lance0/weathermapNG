@@ -178,10 +178,11 @@ function initCanvasResizeValidation() {
 }
 
 function validateAndApplyCanvasResize(newWidth, newHeight) {
-    const nodeRadius = 12;
-    const outOfBounds = S.nodes.filter(n =>
-        n.x > newWidth - nodeRadius || n.y > newHeight - nodeRadius
-    );
+    // Each node is clamped by its own radius (meta.size can exceed 12).
+    const outOfBounds = S.nodes.filter(n => {
+        const r = getNodeRadius(n);
+        return n.x < r || n.y < r || n.x > newWidth - r || n.y > newHeight - r;
+    });
 
     const applyCanvasResize = () => {
         S.mapWidth = newWidth;
@@ -204,8 +205,9 @@ function validateAndApplyCanvasResize(newWidth, newHeight) {
             'btn-primary',
             function () {
                 outOfBounds.forEach(node => {
-                    node.x = Math.min(node.x, newWidth - nodeRadius);
-                    node.y = Math.min(node.y, newHeight - nodeRadius);
+                    const r = getNodeRadius(node);
+                    node.x = Math.max(r, Math.min(node.x, newWidth - r));
+                    node.y = Math.max(r, Math.min(node.y, newHeight - r));
                 });
                 applyCanvasResize();
             },
@@ -312,11 +314,11 @@ function handleKeyDown(event) {
     if (nodesToNudge.length > 0 && ['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
         event.preventDefault();
         const amount = shift ? 10 : 1;
-        const nodeRadius = 12;
 
         saveState(); // Save for undo before moving
 
         for (const n of nodesToNudge) {
+            const nodeRadius = getNodeRadius(n);
             switch (key) {
                 case 'arrowup':
                     n.y = Math.max(nodeRadius, n.y - amount);
