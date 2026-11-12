@@ -64,7 +64,7 @@
 - **SVG** builds a standalone, static vector document from the current map data and live values:
   - `weathermap-<mapId>.svg` downloads via a Blob (`image/svg+xml`); no server round-trip and no external assets, scripts, or `foreignObject` content.
   - `viewBox` matches the map dimensions (default 800×600), with a background rect from `map.background`.
-  - Links honor `style.via_points` / `style.via_style` (`straight`, `angled`, `curved`) and `style.color` / `style.width`; bandwidth labels are included only when live traffic data exists.
+  - Links honor `style.via_points` / `style.via_style` (`straight`, `angled`, `curved`) and `style.color` / `style.width`; without an explicit color the stroke follows utilization thresholds. The label follows the selected metric (percent by default) and is included only when live traffic data exists; curved labels sit on the sampled curve and carry the same white halo as the canvas.
   - Nodes follow the per-node style contract (`meta.color`, `meta.label_color`, `meta.shape`, `meta.size`) and otherwise the embed device-type shapes (router diamond, switch, server, firewall shield, circle) with status colors.
   - All labels are XML-escaped and the output is deterministic for the same map and live data.
 
