@@ -124,7 +124,8 @@
                                     {{ $map->links_count ?? $map->links()->count() }} links
                                 </span>
                                 <span class="map-stat-badge map-favorite-count{{ $map->favorite_count === 0 ? ' is-zero' : '' }}" data-favorite-count
-                                      aria-label="{{ $map->favorite_count }} {{ $map->favorite_count === 1 ? 'favorite' : 'favorites' }}">
+                                      title="{{ $map->favorite_count }} {{ $map->favorite_count === 1 ? 'user has' : 'users have' }} favorited this map"
+                                      aria-label="{{ $map->favorite_count }} {{ $map->favorite_count === 1 ? 'user has' : 'users have' }} favorited this map">
                                     <i class="fas fa-star" aria-hidden="true"></i>
                                     <span class="map-favorite-count-value">{{ $map->favorite_count }}</span>
                                 </span>

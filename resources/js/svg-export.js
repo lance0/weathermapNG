@@ -147,7 +147,7 @@
                 return `<rect x="-7" y="-12" width="14" height="24"${paint}/>`
                     + `<path d="M -5 -6 H 5 M -5 0 H 5 M -5 6 H 5" fill="none" stroke="#ffffff" stroke-width="${formatNumber(1 / scale)}"/>`;
             case 'square':
-                return `<rect x="-8" y="-8" width="16" height="16" rx="2"${paint}/>`;
+                return `<rect x="-8" y="-8" width="16" height="16"${paint}/>`;
             case 'switch':
                 return `<rect x="-9" y="-5" width="18" height="10" rx="3"${paint}/>`;
             case 'diamond':

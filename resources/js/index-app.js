@@ -212,7 +212,9 @@ function applyFavoriteState(button, favorited, count) {
     const value = badge ? badge.querySelector('.map-favorite-count-value') : null;
     if (badge && value) {
         value.textContent = String(count);
-        badge.setAttribute('aria-label', count + (count === 1 ? ' favorite' : ' favorites'));
+        const countLabel = count + (count === 1 ? ' user has' : ' users have') + ' favorited this map';
+        badge.setAttribute('aria-label', countLabel);
+        badge.setAttribute('title', countLabel);
         badge.classList.toggle('is-zero', count === 0);
     }
 }
