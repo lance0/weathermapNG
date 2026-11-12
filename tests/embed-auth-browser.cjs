@@ -47,10 +47,15 @@ const php = code => execFileSync('docker', ['exec', '-u', 'librenms', 'librenms-
         ]);
         assert.ok(new URL(page.url()).pathname.endsWith(`/embed/${fixture.map}`));
         assert.equal((await page.goto(`${base}/plugin/WeathermapNG`)).status(), 200);
-        const editorData = page.waitForResponse(r => r.url().endsWith(`/api/maps/${fixture.child}/json`));
+        // Read the body as soon as the response arrives. Playwright can evict
+        // the network resource by the time a later navigation/await asks for
+        // it ("No resource with given identifier found").
+        const editorData = page.waitForResponse(r => r.url().endsWith(`/api/maps/${fixture.child}/json`))
+            .then(async response => ({ status: response.status(), body: await response.json() }));
         await page.goto(`${base}/plugin/WeathermapNG/editor/${fixture.child}`);
-        assert.equal((await editorData).status(), 200);
-        assert.equal((await (await editorData).json()).id, fixture.child);
+        const editorResponse = await editorData;
+        assert.equal(editorResponse.status, 200);
+        assert.equal(editorResponse.body.id, fixture.child);
         await page.waitForFunction(() => window.WMNG?.EditorState?.mapDataLoaded);
         assert.equal(await page.evaluate(() => WMNG.EditorState.nodes.length), 1);
         const saved = page.waitForResponse(r => r.url().endsWith(`/api/maps/${fixture.child}/save`));
