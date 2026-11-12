@@ -78,7 +78,7 @@ assert.ok(app.includes("document.getElementById('export-svg')") && app.includes(
 
 // --- Docs ---
 
-assert.ok(docs.includes('Export SVG'), 'docs document the SVG export');
+assert.ok(/PNG\/SVG export/.test(docs) && /weathermap-<mapId>\.svg/.test(docs), 'docs document the PNG/SVG export');
 assert.ok(/1500/.test(docs), 'docs mention the particle cap');
 assert.ok(/0\.6/.test(docs), 'docs mention the label threshold');
 assert.ok(/metrics=0/.test(docs), 'docs mention metrics=0');

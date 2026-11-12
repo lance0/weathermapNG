@@ -1,31 +1,70 @@
 # Contributing to WeathermapNG
 
-Thanks for helping improve WeathermapNG. The project is a LibreNMS v2 plugin, so changes should be tested both as a PHP package and inside a LibreNMS plugin install when possible.
+This page explains development setup, checks, and pull request rules for the
+WeathermapNG LibreNMS plugin.
 
 ## Requirements
 
-- PHP 8.2 or newer
-- Composer
-- Git
-- Docker (required for running tests and lint — there is no PHP binary on the host; the LibreNMS image provides the matching PHP runtime)
-- LibreNMS development or test instance for UI/install validation
+| Requirement | Needed for |
+|-------------|------------|
+| PHP 8.2+ with `ext-gd`, `ext-json`, `ext-mbstring` | All PHP work and the PHPUnit suite |
+| Composer 2 | Dependency installation and metadata validation |
+| Git | Source checkout and commits |
+| Node.js | `just test-js` and the browser suites |
+| Docker with Compose | `just dev-up`, `just test-integration`, and install tests |
+| A LibreNMS instance | Manual UI, install, and upgrade validation |
+| [`just`](https://just.systems/) (optional) | The standard task runner used by CI |
 
-## Development Setup
+PHP 8.3 and 8.4 are supported; CI runs the suite on 8.2, 8.3, and 8.4, plus a
+LibreNMS Docker image for exact-runtime parity. Host PHP with `composer install`
+is the normal development path. Use the Docker image when you need to reproduce
+CI's LibreNMS runtime, not as the only way to run tooling.
 
-> The plugin runs inside LibreNMS, and there is no PHP binary on the development host. Use the LibreNMS Docker image to run PHP tooling (tests, lint, composer) so the environment matches production exactly.
+## Development setup
 
-### Local Package Setup
+Install `just` once if you want the same entrypoints CI uses:
+
+```bash
+cargo install --locked just   # or: brew install just
+```
+
+Clone and install dependencies:
 
 ```bash
 git clone https://github.com/lance0/weathermapNG.git
 cd weathermapNG
-composer install
-composer validate --no-check-publish
+just setup
 ```
 
-### Running Tests
+`just setup` installs Composer to `~/.local/bin` when it is missing, then runs
+`composer install`. Without `just`, run `composer install` directly.
 
-There is no PHP binary on the host — run the suite through the LibreNMS Docker image:
+Run the standard local gate before opening a pull request:
+
+```bash
+just check
+```
+
+| Command | Runs |
+|---------|------|
+| `just setup` | Composer install (installs Composer if absent) |
+| `just test` | `vendor/bin/phpunit --no-coverage` |
+| `just test-one MapServiceTest` | `vendor/bin/phpunit tests/MapServiceTest.php` |
+| `just test-js` | Every pure Node suite in `tests/*-test.cjs` |
+| `just lint` | `php -l` over `src`, `config`, `database`, `routes`, `bin` |
+| `just check-metadata` | `composer validate` and VERSION/composer.json/CHANGELOG alignment |
+| `just check-docs` | Required docs exist; install guidance stays aligned |
+| `just check-security` | Scans PHP sources for hardcoded secrets |
+| `just check` | `lint`, `check-metadata`, `check-docs`, `check-security`, `test` |
+
+The PHPUnit suite has 455 tests and 1760 assertions. Add tests for new behavior.
+A focused run takes one class:
+
+```bash
+just test-one MapServiceTest
+```
+
+To run the suite inside the LibreNMS image, matching CI's Docker job:
 
 ```bash
 docker run --rm --entrypoint php \
@@ -35,138 +74,76 @@ docker run --rm --entrypoint php \
   vendor/bin/phpunit --no-coverage
 ```
 
-The current suite has 394 tests, 1241 assertions, and 0 skipped tests. `just test` runs the suite directly; `just check` is the full PR gate (lint, metadata, docs, security, tests) — the same recipes CI runs. When you add a feature, add tests for it.
+## Integration and browser testing
 
-### LibreNMS Plugin Setup
-
-For manual local integration testing, install the checkout under LibreNMS:
-
-```bash
-cd /opt/librenms/html/plugins
-git clone /path/to/your/weathermapNG WeathermapNG
-cd WeathermapNG
-composer install
-
-cd /opt/librenms
-composer config repositories.weathermapng '{"type":"path","url":"html/plugins/WeathermapNG","options":{"symlink":true}}'
-composer require 'librenms/weathermapng:*' --with-dependencies
-php artisan package:discover
-
-cd /opt/librenms/html/plugins/WeathermapNG
-php database/setup.php
-
-cd /opt/librenms
-php artisan optimize:clear
-php artisan route:list | grep -iE 'weathermap|wmng'
-./lnms plugin:enable WeathermapNG
-```
-
-The Composer path package registration is required. Without it, Laravel will not discover the service provider, routes, and views reliably.
-
-## Project Structure
-
-```text
-WeathermapNG/
-├── composer.json                 # Package metadata and Laravel provider discovery
-├── VERSION                       # Release version source used by runtime/tests
-├── quick-install.sh              # Supported installer
-├── routes/web.php                # Plugin routes
-├── src/
-│   ├── WeathermapNGProvider.php  # Composer-discovered Laravel provider
-│   ├── AdminCheck.php            # Shared admin-gate trait for controllers/hooks
-│   ├── Hooks/                    # LibreNMS plugin hooks
-│   ├── Http/Controllers/         # Web/API controllers
-│   ├── Http/Requests/            # Request validation
-│   ├── Models/                   # Eloquent models
-│   ├── RRD/                      # RRD helpers
-│   └── Services/                 # Core domain/services
-├── resources/
-│   ├── views/                    # Blade views
-│   ├── js/                       # Browser-side JavaScript
-│   └── css/                      # Stylesheets
-├── database/
-│   ├── setup.php                 # Supported table setup/upgrade entrypoint
-│   ├── migrations/               # Schema history/reference
-│   └── seeds/                    # Template/demo seeders
-├── config/                       # Plugin configuration
-├── bin/                          # Optional operational scripts
-├── tests/                        # PHPUnit and install/documentation tests
-└── .github/workflows/            # CI, install validation, release validation
-```
-
-## Coding Standards
-
-- Follow PSR-12 for PHP.
-- Prefer typed parameters and return types where they make behavior clearer.
-- Keep controller actions thin and put reusable behavior in services.
-- Preserve existing LibreNMS conventions and Bootstrap 4 compatibility.
-- Use FormRequest classes for request validation when adding write endpoints.
-- Avoid broad rewrites when a focused change will solve the problem.
-
-## UI Standards
-
-- Keep the UI practical and operator-focused.
-- Preserve keyboard access and visible focus states.
-- Add accessible names to icon-only controls.
-- Test editor, embed, and index views at more than one viewport size when touching layout.
-- Prefer existing Font Awesome/Bootstrap patterns already used by LibreNMS.
-
-## Testing
-
-Run the full suite with the LibreNMS Docker image (see Development Setup):
+The integration suites talk to a live LibreNMS stack and a database. Start the
+development stack, wait for `http://localhost:8000` to respond, then run them:
 
 ```bash
-docker run --rm --entrypoint php \
-  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
-  -w /opt/librenms/html/plugins/WeathermapNG \
-  librenms/librenms:latest \
-  vendor/bin/phpunit --no-coverage
+just dev-up
+just test-integration
+just dev-stop
 ```
 
-The suite currently has 178 tests, 579 assertions, and 18 skipped tests. The skipped tests are pre-existing stubs that need a live Eloquent/DB connection and are skipped outside a full LibreNMS environment — they are not regressions. When you add a feature, add tests for it.
+`just test-integration` runs the `tests/integration_*.php` suites inside the
+`librenms-dev` container. After editing source, `just dev-sync` copies tracked
+plugin files into the container; it excludes `vendor/`, so reinstall dependencies
+there if needed.
 
-Useful focused checks:
+Visual checks render the index, editor, and embed views at 480x800, 768x1024,
+and 1920x1080:
 
 ```bash
-docker run --rm --entrypoint php \
-  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
-  -w /opt/librenms/html/plugins/WeathermapNG \
-  librenms/librenms:latest \
-  vendor/bin/phpunit tests/RoutesSmokeTest.php
+just visual http://localhost:8000
 ```
 
-## Linting
-
-There is no PHP binary on the host, so lint a file through the LibreNMS Docker image:
+`just visual` writes PNGs to `output/screenshots` and needs a Chromium-family
+binary on `PATH`. Screenshot comparison uses `playwright-core` from `NODE_PATH`;
+CI installs Playwright beside the browser and sets `NODE_PATH` for the job. A
+local equivalent:
 
 ```bash
-docker run --rm --entrypoint php \
-  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
-  -w /opt/librenms/html/plugins/WeathermapNG \
-  librenms/librenms:latest \
-  -l <file>
+npm install --no-save --prefix /tmp/wmng-browser playwright@1.62.1
+/tmp/wmng-browser/node_modules/.bin/playwright install chromium
+NODE_PATH=/tmp/wmng-browser/node_modules just visual-compare http://localhost:8000
 ```
 
-Before release-oriented changes, also validate:
+`just visual-compare` compares against `tests/screenshots/*.png`. Regenerate
+baselines only for intended visual changes, review the PNGs, then commit them:
 
 ```bash
-docker run --rm --entrypoint composer \
-  -v "$PWD":/opt/librenms/html/plugins/WeathermapNG \
-  -w /opt/librenms/html/plugins/WeathermapNG \
-  librenms/librenms:latest \
-  validate --no-check-publish
-git diff --check
+NODE_PATH=/tmp/wmng-browser/node_modules just visual-baseline http://localhost:8000
 ```
 
-## Architecture
+The plain Node suites under `just test-js` do not need Playwright.
 
-WeathermapNG is a LibreNMS v2 plugin that uses LibreNMS's hook-based architecture. The service provider is `src/WeathermapNGProvider.php` (note: `WeathermapNGServiceProvider.php` was an earlier name that has been removed — always reference `WeathermapNGProvider.php`). The provider publishes `MenuEntry` and `Settings` hooks, merges plugin config, and registers routes/views through Composer package discovery.
+## Code and UI standards
 
-## Authorization Model
+- Follow PSR-12.
+- Add parameter and return types where they make behavior clearer.
+- Keep controllers thin; put reusable behavior in `src/Services`.
+- Use FormRequest classes for write-endpoint validation.
+- Follow existing LibreNMS conventions and Bootstrap 4 / Font Awesome patterns.
+- Prefer focused changes over broad rewrites.
 
-All mutation (write) endpoints require an admin user; read endpoints are open to any authenticated user. Admin gating is implemented by the `AdminCheck` trait (`src/AdminCheck.php`), which checks `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`.
+UI changes must preserve:
 
-When you add a new mutation endpoint, import and use the trait and call `requireAdmin()` at the top of the method:
+- Keyboard access and visible focus states.
+- Accessible names on icon-only controls.
+- Readable layouts at small and large viewports; check the editor, embed, and
+  index views when layout changes.
+- Existing LibreNMS theme and component behavior.
+
+## Architecture and authorization
+
+`src/WeathermapNGProvider.php` is the Composer-discovered Laravel provider. It
+registers routes and views and publishes the `MenuEntry` and `Settings` hooks.
+Routes live in `routes/web.php`; that file is the authoritative route list.
+
+Read endpoints are open to any authenticated LibreNMS user. Every mutation
+endpoint requires an administrator. The shared `AdminCheck` trait
+(`src/AdminCheck.php`) checks `hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`.
+Use it in new write endpoints:
 
 ```php
 use LibreNMS\Plugins\WeathermapNG\AdminCheck;
@@ -183,50 +160,97 @@ class MyController extends Controller
 }
 ```
 
-`requireAdmin()` aborts with 403 if the authenticated user is not an admin. Read-only endpoints do not need this guard.
+`requireAdmin()` aborts with 403 for non-admins. Read-only endpoints do not need
+the guard.
 
-## Documentation
+## Pull requests
 
-Update docs when changing:
+1. Branch from `main` with a short descriptive name.
+2. Keep commits focused; use conventional prefixes where they fit:
+   `fix:`, `feat:`, `docs:`, `test:`, `refactor:`, `ci:`.
+3. Run `just check` and `just test-js`.
+4. Update documentation for behavior changes (see below).
+5. Open the pull request and make sure every required workflow is green.
 
-- Install, upgrade, or Composer discovery behavior
-- Routes or API payloads
-- Health/readiness/security boundaries
-- Version metadata or release flow
-- Editor, embed, or map-management workflows
-- Supported PHP/LibreNMS requirements
+Do not bump `VERSION` or `composer.json` in a feature or fix pull request.
+Version sources change only during release preparation; see
+[RELEASE.md](RELEASE.md).
 
-## Pull Request Checklist
+CI runs these workflows:
 
-- [ ] Tests pass.
-- [ ] Composer metadata validates.
-- [ ] Install or route changes include docs and smoke-test updates.
-- [ ] User-facing changes are reflected in README, INSTALL, API, or EMBED docs as appropriate.
-- [ ] Versioned releases update `VERSION`, `composer.json`, and `CHANGELOG.md` together.
-- [ ] UI changes account for keyboard access, focus states, and smaller viewports.
+| Workflow | Coverage |
+|----------|----------|
+| [CI](.github/workflows/ci.yml) | PHP lint, version metadata, PHPUnit on PHP 8.2/8.3/8.4, PHPUnit in the LibreNMS image, security scan, docs validation |
+| [Embed Authentication](.github/workflows/embed-auth.yml) | LibreNMS HTTP/browser regression, embed auth, favorites, version restore, Node suites, screenshot comparison |
+| [Installation Tests](.github/workflows/installation-tests.yml) | Installer scripts, Compose validation, install/upgrade lifecycle |
+| [Release](.github/workflows/release.yml) | On `v*` tags: full suite, version metadata, changelog extraction, GitHub release and archives |
 
-## Commit Messages
+### Documentation rule
 
-Use concise conventional-style commit messages where practical:
+Update docs in the same pull request when behavior changes:
+
+| Change | Update |
+|--------|--------|
+| Routes, auth tiers, request/response shapes | [docs/API.md](docs/API.md) |
+| Embed parameters, kiosk mode, live updates | [docs/EMBED.md](docs/EMBED.md) |
+| Install, upgrade, configuration, recovery | [docs/INSTALL.md](docs/INSTALL.md) |
+| User-facing additions and fixes | [CHANGELOG.md](CHANGELOG.md) under `## [Unreleased]` |
+| Planned work that ships | [ROADMAP.md](ROADMAP.md) |
+| Release steps or gates | [RELEASE.md](RELEASE.md) |
+
+`just check-docs` verifies required files and install-guidance literals.
+`just test-js` runs `tests/docs-links-test.cjs`, which resolves repository
+links and heading anchors, including those in `CONTRIBUTING.md` and `RELEASE.md`.
+
+## Project structure
 
 ```text
-fix: correct embed zoom controls
-docs: refresh deployment guide
-test: add version metadata guard
+WeathermapNG/
+├── composer.json                 # Package metadata and Laravel provider discovery
+├── VERSION                       # Release version source used by runtime/tests
+├── quick-install.sh              # Supported installer
+├── routes/web.php                # All plugin routes
+├── src/
+│   ├── WeathermapNGProvider.php  # Composer-discovered Laravel provider
+│   ├── AdminCheck.php            # Shared admin-gate trait
+│   ├── Console/Commands/         # Artisan commands
+│   ├── Hooks/                    # LibreNMS plugin hooks
+│   ├── Http/Controllers/         # Web, API, embed, and health controllers
+│   ├── Http/Requests/            # Request validation
+│   ├── Http/Middleware/          # Embed token authentication
+│   ├── Models/                   # Eloquent models
+│   ├── RRD/                      # RRD helpers
+│   └── Services/                 # Core domain services
+├── resources/
+│   ├── views/                    # Blade views, including hooks and install screens
+│   ├── js/                       # Editor, embed, index, SVG export, topology preview
+│   └── css/                      # Stylesheets
+├── database/
+│   ├── setup.php                 # Supported table setup/upgrade entrypoint
+│   ├── migrations/               # Schema history/reference
+│   ├── seeders/                  # Template/demo seeders
+│   └── seeds/                    # Map template seed data
+├── config/                       # Plugin configuration and environment variants
+├── bin/                          # Operational scripts (backup, poller)
+├── tests/                        # PHPUnit, integration, Node, browser, and screenshots
+│   ├── *-test.cjs                # Pure Node regression suites
+│   ├── *-browser.cjs             # Playwright browser suites
+│   └── screenshots/              # Committed visual baselines
+└── .github/workflows/            # CI, embed/browser, install, and release validation
 ```
 
-## Reporting Issues
+## Reporting issues
 
-Good bug reports include:
+Include:
 
-- WeathermapNG version
-- LibreNMS version
-- PHP version
-- Install method: native, Docker, or other
-- Relevant route output from `php artisan route:list | grep -iE 'weathermap|wmng'`
-- Logs, screenshots, or exact error text
-- Whether LibreNMS `validate.php` reports anything relevant
+- WeathermapNG version and LibreNMS version.
+- PHP version.
+- Install method: native, Docker, or other.
+- Relevant route output from
+  `php artisan route:list | grep -iE 'weathermap|wmng'`.
+- Logs, screenshots, or exact error text.
+- Whether LibreNMS `validate.php` reports anything relevant.
 
 ## License
 
-By contributing to WeathermapNG, you agree that your contributions will be licensed under the MIT License.
+Contributions are licensed under the [MIT License](LICENSE).

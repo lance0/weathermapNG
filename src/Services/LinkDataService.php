@@ -66,9 +66,11 @@ class LinkDataService
             return [];
         }
 
+        // The embed viewer reads `.count`/`.severity` on link alerts, matching
+        // the node alert shape. Keep one shape for both.
         return [
-            'alert_count' => $alertCount,
-            'alert_severity' => $maxSeverity ?? 'warning',
+            'count' => $alertCount,
+            'severity' => $maxSeverity ?: 'warning',
         ];
     }
 

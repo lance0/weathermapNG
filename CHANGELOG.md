@@ -1,6 +1,8 @@
 # Changelog
 
-All notable changes to WeathermapNG will be documented in this file.
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
@@ -12,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compare index, editor and embed screenshots at 480×800, 768×1024 and 1920×1080 in CI, with committed baselines, diffs on failure, and every pure Node regression suite. The comparator now uses a fixed fixture name, tighter channel/pixel budgets, compares UI chrome over the canvases, fails blank map canvases, asserts the fixture's styled node is painted, and runs the favorites integration suite in the same job.
 
 ### Changed
+- Documentation reorganized around tasks: README is a short front door, docs/README indexes every page, INSTALL has a path/requirements table, API has a route index with exact auth tiers, and PERFORMANCE, VERSIONING, ROADMAP, DEPLOYMENT and CONTRIBUTING now describe current behavior instead of version history. New SECURITY.md and KNOWN_ISSUES.md cover reporting, supported versions, limitations and by-design behavior. `tests/docs-links-test.cjs` fails CI on dead files, anchors, or malformed documents.
 - Bound flow-animation cost on large maps: particle density drops in tiers above 150 and 300 links and the whole map stays at or below 1500 particles. Below 0.6 zoom the embed hides secondary node text (traffic total and CPU/MEM) while keeping node labels.
 - Editor shortcuts now include Ctrl/Cmd+A (select all nodes) and Delete/Backspace bulk delete, and stay inactive while a dialog is open.
 - Preserve every node `meta` key on editor save, node apply, duplicate and JSON export. Previously only `interface_id` survived, which discarded `sub_map_id`, tooltips and per-node style.
 
 ### Fixed
+- Render link alert badges again: the API emitted `alert_count`/`alert_severity` while the embed read `count`/`severity`, so port alerts never showed on links. Both node and link alerts now use `{count, severity}`, with a regression test.
 - Normalize per-node style meta before validation and on every write path (save, import, node PATCH, version snapshot). A stored or imported value like `color: "red"` used to fail the next whole-map save with a 422 the editor could not explain; it is now dropped, while unknown meta keys survive.
 - Draw straight-link labels and alert badges at the real midpoint instead of the destination node.
 - Export SVG links and labels that match the map: link strokes follow utilization colors, percent labels need no stored bandwidth (demo maps), curved labels sit on the drawn curve, labels carry the canvas halo, and the export follows the Metric selector.

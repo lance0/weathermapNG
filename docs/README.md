@@ -3,28 +3,39 @@
 Find the page for the task at hand. The [project README](../README.md) is a
 short overview; everything else lives here.
 
-## Use WeathermapNG
+## Start here
 
 | Page | Scope |
 |------|-------|
-| [Installation](INSTALL.md) | Canonical stable native/Docker install, upgrades, configuration, diagnostics, full backup and recovery. |
-| [Embed Viewer](EMBED.md) | Iframe embedding, query parameters, kiosk/NOC mode, live updates. |
-| [API](API.md) | Every route with method, auth tier, and request/response shapes. |
+| [Installation](INSTALL.md) | Canonical stable install for native and Docker, configuration precedence, upgrades, [diagnostics](INSTALL.md#diagnostics-and-targeted-recovery), backup and recovery. |
+
+## Use
+
+| Page | Scope |
+|------|-------|
+| [Embed viewer](EMBED.md) | Iframe embedding and query parameters, live updates, kiosk/NOC wall mode, drill-down, embed tokens, PNG and SVG export. |
+| [API](API.md) | Every route with method, auth tier, and payload shape, including [health and metrics routes](API.md#health-and-metrics-routes) and the error shape. |
 
 ## Operate
 
 | Page | Scope |
 |------|-------|
-| [Deployment](DEPLOYMENT.md) | Production monitoring, rendering diagnostics, optional poller, and authorization notes. |
-| [Performance](PERFORMANCE.md) | Large-map behavior, viewport culling, benchmark method, profiling checklist. |
-| [Diagnostics](API.md#health-and-metrics-routes) | Health/readiness/liveness probes and the admin diagnostics page. |
+| [Deployment](DEPLOYMENT.md) | Production checks, public probes, [diagnostics](DEPLOYMENT.md#diagnostics), optional poller, authorization model, and compatibility. |
+| [Performance](PERFORMANCE.md) | Caching, RRD and live-data cost, browser rendering, suggested map budgets, and a profiling checklist. |
+
+## Reference
+
+| Page | Scope |
+|------|-------|
+| [Versioning](VERSIONING.md) | SemVer rules, version sources, [pre-release checks](VERSIONING.md#pre-release-checklist), and map version history, comparison, and restoration. |
+| [Known issues](../KNOWN_ISSUES.md) | Documented limitations, by-design behavior, and operational edge cases. |
+| [Security policy](../SECURITY.md) | Supported versions and how to report a vulnerability privately. |
 
 ## Project
 
 | Page | Scope |
 |------|-------|
-| [Versioning](VERSIONING.md) | SemVer rules, version sources, pre-release checks. |
-| [Release process](../RELEASE.md) | Pre-release validation flow, manual QA checklist, tagging. |
-| [Roadmap](../ROADMAP.md) | Completed work by version, planned features, non-goals. |
+| [Release process](../RELEASE.md) | Pre-release validation flow, manual QA checklist, and tagging. |
+| [Roadmap](../ROADMAP.md) | Completed work by version, planned features, and non-goals. |
 | [Changelog](../CHANGELOG.md) | Release history. |
-| [Contributing](../CONTRIBUTING.md) | Development setup, testing, pull request process. |
+| [Contributing](../CONTRIBUTING.md) | Development setup, checks, integration and browser testing, and the pull request process. |
