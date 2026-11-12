@@ -67,10 +67,14 @@ class LinkDataService
         }
 
         // The embed viewer reads `.count`/`.severity` on link alerts, matching
-        // the node alert shape. Keep one shape for both.
+        // the node alert shape. Older API consumers read `alert_count`/
+        // `alert_severity`; keep those aliases for one release so upgrades do
+        // not break external scripts.
         return [
             'count' => $alertCount,
             'severity' => $maxSeverity ?: 'warning',
+            'alert_count' => $alertCount,
+            'alert_severity' => $maxSeverity ?: 'warning',
         ];
     }
 

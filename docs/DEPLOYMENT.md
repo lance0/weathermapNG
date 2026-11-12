@@ -131,6 +131,6 @@ controllers. The route-by-route list, including the token setup, is in the
 
 | WeathermapNG | LibreNMS | PHP | Database |
 |---|---|---|---|
-| 1.16.0 | 26.10.x tested; latest stable recommended | 8.2+ (8.4 and 8.5 tested) | LibreNMS MySQL/MariaDB |
+| 1.17.0 | 26.10.x tested; latest stable recommended | 8.2+ (8.4 and 8.5 tested) | LibreNMS MySQL/MariaDB |
 
 PostgreSQL is not documented as a supported production target for this plugin.

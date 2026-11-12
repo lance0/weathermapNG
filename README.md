@@ -17,7 +17,7 @@ history, and multi-select bulk edits.
 
 ![LibreNMS latest](https://img.shields.io/badge/LibreNMS-latest-88A0CE)
 ![PHP 8.2+](https://img.shields.io/badge/PHP-8.2%2B-777BB4)
-![Version 1.16.0](https://img.shields.io/badge/version-1.16.0-0078D4)
+![Version 1.17.0](https://img.shields.io/badge/version-1.17.0-0078D4)
 
 ## Quick start
 
@@ -28,7 +28,7 @@ permit that user to create the checkout.
 sudo -u librenms -H bash
 export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins"
-git clone --branch v1.16.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.17.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 ./quick-install.sh
 php verify-deployment.php --json
@@ -97,7 +97,7 @@ administrator, except toggling your own favorite.
 | Component | Requirement |
 |-----------|-------------|
 | PHP | 8.2+ with `gd`, `json`, `pdo`, and `mbstring` |
-| LibreNMS | Latest stable. v1.16.0 is tested against LibreNMS 26.10.2 |
+| LibreNMS | Latest stable. v1.17.0 is tested against LibreNMS 26.10.2 |
 | Database | MySQL or MariaDB, as installed by LibreNMS |
 | Composer | Usable by the runtime user; plugin registration uses the `lnms` CLI |
 | RRD data | RRD files readable by the runtime user |

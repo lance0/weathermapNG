@@ -2,7 +2,7 @@
 
 Canonical guide for installing, upgrading, configuring, diagnosing, and
 recovering WeathermapNG, a LibreNMS v2 Composer-discovered plugin served at
-`/plugin/WeathermapNG`. The current tagged release is v1.16.0; `main` contains
+`/plugin/WeathermapNG`. The current tagged release is v1.17.0; `main` contains
 unreleased changes after it.
 
 ## Choose a path
@@ -49,7 +49,7 @@ Open a shell as the LibreNMS user, with that user's normal home:
 sudo -u librenms -H bash
 export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins"
-git clone --branch v1.16.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.17.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 ./quick-install.sh
 php verify-deployment.php --json
@@ -123,7 +123,7 @@ devices and ports in the editor. Canceling creates no data. **Browse Templates**
 From a host checkout of the selected release:
 
 ```bash
-git clone --branch v1.16.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
+git clone --branch v1.17.0 --depth 1 https://github.com/lance0/weathermapNG.git WeathermapNG
 cd WeathermapNG
 # Match ownership to PUID/PGID in the Compose file (defaults: 1000:1000).
 sudo chown -R 1000:1000 .
@@ -239,8 +239,8 @@ export LIBRENMS_PATH=/opt/librenms
 cd "$LIBRENMS_PATH/html/plugins/WeathermapNG"
 git diff --quiet
 git diff --cached --quiet
-git fetch origin tag v1.16.0
-git checkout --detach v1.16.0
+git fetch origin tag v1.17.0
+git checkout --detach v1.17.0
 ./deploy.sh
 exit
 ```
