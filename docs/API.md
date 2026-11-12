@@ -1,86 +1,143 @@
-# WeathermapNG API And Route Reference
+# WeathermapNG API and route reference
 
-Routes are registered through `routes/web.php` when LibreNMS discovers the Composer package provider. If routes are missing, run package discovery from the LibreNMS root and verify with:
+Every HTTP route the plugin registers, the auth tier that guards it, and the
+request/response shapes used by the editor, embed viewer, and CLI.
+
+The tables below match `routes/web.php` (47 routes). If routes are missing,
+rerun package discovery from the LibreNMS root and check the list:
 
 ```bash
 cd /opt/librenms
-php artisan route:list | grep -iE 'weathermap|wmng'
+php artisan route:list | grep -i weathermapng
 ```
 
-## Authentication & Authorization
+<a id="authentication--authorization"></a>
 
-All routes are registered inside LibreNMS `web` + `auth` middleware, so every request resolves against an authenticated LibreNMS session — except for three public probe routes. There is no per-map ownership: any authenticated user can read any map, and all write operations require an admin except the per-user favorite toggle. The admin gate is enforced in each controller via the shared `AdminCheck` trait, which accepts `hasGlobalAdmin()`, `isAdmin()`, a LibreNMS `level >= 10`, or `hasRole('admin')` and otherwise `abort(403)`.
+## Auth tiers
 
-### Public probe routes (no auth)
+| Tier | Routes | Enforced by |
+|------|--------|-------------|
+| Public | `health`, `ready`, `live` | No middleware. Payloads carry no version, path, or configuration detail. |
+| Session | Index/editor/view pages, export, template reads, favorite toggle | LibreNMS `web` + `auth`; any logged-in user. |
+| Session or embed token | `embed`, `json`, `live`, `sse` | `EmbedTokenAuth`: `Authorization: Bearer` or `?token=`, otherwise the full `web` + `auth` stack. |
+| Admin | Installer, 22 of the 23 write routes, lookups, versions, detailed health, diagnostics | `AdminCheck::requireAdmin()` → `abort(403)`. |
 
-These sit outside the `auth` group and are intentionally minimal so they can back health checks and load balancers:
+`requireAdmin()` accepts `hasGlobalAdmin()`, `isAdmin()`, a LibreNMS
+`level >= 10`, or `hasRole('admin')`.
 
-- `GET /plugin/WeathermapNG/health`
-- `GET /plugin/WeathermapNG/ready`
-- `GET /plugin/WeathermapNG/live`
+There is no per-map ownership: any logged-in user can read any map. All write
+routes require admin except the per-user [favorite toggle](#favorites).
 
-### Read routes (open to all authenticated users)
+## Route index
 
-`GET` map index/show/editor/view/embed/json/live/sse/export and `GET templates` index/show. None of these call `requireAdmin()`. Admin-only reads: device and port lookups (`GET /api/devices`, `GET /api/device/{id}/ports` — they expose device IPs and topology data), map version endpoints (list/show/compare/export), and `/health/detailed`, `/health/stats`, `/metrics`. Token-auth variant: `embed`, `json`, `live`, and `sse` are also reachable without a session using a Bearer token / `?token=` when `WEATHERMAPNG_EMBED_TOKEN` is set (see [docs/EMBED.md](EMBED.md#embed-api-token-auth)).
+| Group | Routes | Auth tier |
+|-------|--------|-----------|
+| [Pages](#pages) | 3 | Session |
+| [Installer](#installer) | 2 | Admin |
+| [Map data](#map-data) | 4 | Session or embed token |
+| [Map management](#map-management) | 5 | Admin |
+| [Nodes](#nodes) | 4 | Admin |
+| [Links](#links) | 4 | Admin |
+| [Favorites](#favorites) | 1 | Session |
+| [Lookups](#lookups) | 2 | Admin |
+| [Templates](#templates) | 6 | Session reads, admin writes |
+| [Versions](#versions) | 7 | Admin |
+| [Export and import](#export-and-import) | 2 | Session export, admin import |
+| [Health and metrics routes](#health-and-metrics-routes) | 7 | 3 public, 4 admin |
 
-### Per-user favorites (any authenticated user)
+Webhooks are outbound only; see [Webhooks](#webhooks).
 
-`POST /plugin/WeathermapNG/map/{map}/favorite` is the only write route that is not admin-gated. It toggles a favorite for the session user, so it must stay inside the `auth` group but must not call `requireAdmin()`. It only reads and writes that user's own row in `wmng_map_favorites`.
+## Pages
 
-### Admin-only routes (require `hasGlobalAdmin()`, `isAdmin()`, `level >= 10`, or `hasRole('admin')`)
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG` | Session | Map index. Redirects to the installer when the `wmng_` tables are missing. |
+| `GET` | `/plugin/WeathermapNG/editor/{map?}` | Session | Editor for one map, or a new map when `{map}` is omitted. |
+| `GET` | `/plugin/WeathermapNG/view/{map}` | Session | Redirects to the embed view. `404` when the map does not exist. |
 
-Every `POST`, `PUT`, `PATCH`, and `DELETE` endpoint calls `requireAdmin()` at the top of the controller action and `abort(403)` for non-admins. This covers all map CRUD, node CRUD, link CRUD, template CRUD, full-map save, import, auto-discovery, and the install runner. The single exception is the per-user favorite toggle (`POST /map/{map}/favorite`), which any authenticated user may call. The `GET /plugin/WeathermapNG/install` UI is authenticated (it sits in the `auth` group); its `POST` counterpart is admin-only.
+## Installer
 
-## Page Routes
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/install` | Admin | Requirements/status page. |
+| `POST` | `/plugin/WeathermapNG/install` | Admin | Run plugin activation. |
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/plugin/WeathermapNG` | Map index |
-| `GET` | `/plugin/WeathermapNG/install` | Installer UI |
-| `POST` | `/plugin/WeathermapNG/install` | Run installer |
-| `GET` | `/plugin/WeathermapNG/editor/{map?}` | Editor for an existing or new map |
-| `GET` | `/plugin/WeathermapNG/view/{map}` | Full map view |
-| `GET` | `/plugin/WeathermapNG/embed/{map}` | Embed viewer |
+Both actions call `requireAdmin()`, so the installer is not a public first-run
+page. `POST` response:
 
-## Map Data Routes
+```json
+{
+  "success": true,
+  "message": "WeathermapNG installed successfully!",
+  "redirect": "https://librenms/plugin/WeathermapNG"
+}
+```
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/plugin/WeathermapNG/api/maps/{map}/json` | Serialized map model |
-| `GET` | `/plugin/WeathermapNG/api/maps/{map}/live` | Current traffic/status payload |
-| `GET` | `/plugin/WeathermapNG/api/maps/{map}/sse` | Server-Sent Events live stream |
-| `GET` | `/plugin/WeathermapNG/api/maps/{map}/export?format=json\|conf` | Export a map (JSON or legacy `.conf`) |
-| `POST` | `/plugin/WeathermapNG/api/import` | Import a map (`.json` or `.conf`) |
-| `POST` | `/plugin/WeathermapNG/api/maps/{map}/save` | Save full editor state |
+## Map data
 
-Example live payload shape:
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/embed/{map}` | Session or embed token | HTML viewer; see [EMBED.md](EMBED.md). |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/json` | Session or embed token | Serialized map model. |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/live` | Session or embed token | Current traffic, status, metrics, and alerts. |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/sse` | Session or embed token | Server-Sent Events stream of the live payload. |
+
+The `sse` endpoint accepts two query parameters:
+
+| Parameter | Range | Default | Meaning |
+|-----------|-------|---------|---------|
+| `interval` | 1–60 | 5 | Seconds between frames. |
+| `max` | 5–600 | 300 | Seconds before the stream closes. |
+
+Frames are `data: <json>` lines with the live payload; a `: heartbeat` comment
+keeps idle proxies open.
+
+### Live payload
 
 ```json
 {
   "ts": 1738284000,
   "links": {
     "1": {
-      "in": 52428800,
-      "out": 104857600,
-      "in_perc": 33,
-      "out_perc": 67
+      "in_bps": 52428800,
+      "out_bps": 104857600,
+      "pct": 10.49,
+      "err": null
     }
   },
   "nodes": {
     "1": {
       "status": "up",
-      "alerts": {
-        "count": 0,
-        "severity": "ok"
+      "metrics": { "cpu": 12.5, "mem": 41.2 },
+      "traffic": {
+        "in_bps": 52428800,
+        "out_bps": 104857600,
+        "sum_bps": 157286400,
+        "source": "ports"
       }
     }
+  },
+  "alerts": {
+    "nodes": { "1": { "count": 2, "severity": "critical" } },
+    "links": {}
   }
 }
 ```
 
-## Map JSON Payload (GET /api/maps/{map}/json)
+`links` and `nodes` are keyed by node/link ID. `pct` is `null` when the link has
+no bandwidth or no port data; `metrics` values are `null` when the node has no
+device or metrics are disabled in config. `traffic.source` is `ports`, `device`,
+`demo`, or `none` (no traffic read). `alerts.nodes`
+holds an entry for every node backed by a device, with `count` and `severity`
+(`warning`, `critical`, or `severe`; `count: 0` when clear).
+`alerts.links` lists only links with port alerts, keyed by link ID, with
+`count`, `severity`, and the link's `in_bps`, `out_bps`, and
+`pct`.
 
-The `json` endpoint and `export?format=json` both return the serialized map model produced by `Map::toJsonModel()`. The shape carries the full node and link graph plus nested-map metadata:
+### Map JSON payload
+
+`GET /api/maps/{map}/json` and `export?format=json` both return the model
+produced by `Map::toJsonModel()`:
 
 ```json
 {
@@ -90,7 +147,7 @@ The `json` endpoint and `export?format=json` both return the serialized map mode
   "title": "Production Network Map",
   "parent_map_id": null,
   "breadcrumb": [
-    {"id": 1, "name": "root_map", "title": "Root Map"}
+    { "id": 1, "name": "production_map", "title": "Production Network Map" }
   ],
   "width": 1200,
   "height": 800,
@@ -126,90 +183,44 @@ The `json` endpoint and `export?format=json` both return the serialized map mode
 }
 ```
 
-### Nested-map fields
+Nested-map fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `parent_map_id` | int\|null | ID of the parent map in the drill-down hierarchy. `null` for a root map. |
-| `breadcrumb` | array | Chain from the root ancestor to the current map, inclusive. Each entry is `{id, name, title}`. Empty only when the map is itself the root. |
-| `sub_map_id` (per-node) | int\|null | If set, clicking this node in the embed view navigates to the sub-map with this ID, preserving query params. `null` means no drill-down. Stored in the node's `meta` JSON. |
+| Field | Type | Meaning |
+|-------|------|---------|
+| `parent_map_id` | int or null | Parent in the drill-down hierarchy. `null` for a root map. |
+| `breadcrumb` | array | Root-to-current chain, each `{id, name, title}`. |
+| `sub_map_id` (per node) | int or null | Target map for node click-through in the embed view. Stored in the node's `meta` JSON. |
 
-### Per-node style fields
+#### Per-node style fields
 
-Nodes render their device-type shape and status color by default. Four optional keys in each node's `meta` JSON override that, in the editor, the embed view, and the SVG export (`map` saves include them; the API returns them unchanged):
+Four optional keys in a node's `meta` override the default rendering in the
+editor, the embed view, and the SVG export:
 
 | Key | Values | Effect |
 |-----|--------|--------|
 | `meta.color` | `#RRGGBB` | Node fill, replacing the status/device color. |
-| `meta.label_color` | `#RRGGBB` | Label text color, replacing the theme/default label color. |
-| `meta.shape` | `circle`, `square`, `diamond`, `triangle` | Shape override, replacing the device-type shape derived from the label. |
-| `meta.size` | 6–40 | World-unit radius. Without `shape`, the natural shape scales by `size / 10` (embed/SVG) or `size / 12` (editor circle). |
+| `meta.label_color` | `#RRGGBB` | Label text color. |
+| `meta.shape` | `circle`, `square`, `diamond`, `triangle` | Shape, replacing the device-type shape derived from the label. |
+| `meta.size` | 6–40 | World-unit radius. The embed and SVG renderers scale their 10-unit shapes by `size / 10`; the editor uses the value as the circle radius (its default is 12). |
 
-`POST /api/maps/{map}/save` validates those keys (hex colors, the four shape names, numeric 6–40) and drops invalid values instead of storing them. Every other `meta` key — `interface_id`, `sub_map_id`, `tooltip` — is preserved verbatim. The editor's node sidebar edits the same fields and can copy one node's style onto every multi-selected node (`Apply style to all selected`).
+`POST /api/maps/{map}/save` and import normalize those keys: hex colors are
+lowercased, the four shape names are accepted, `size` must be numeric 6–40, and
+invalid values are dropped rather than defaulted. Every other `meta` key
+(`sub_map_id`, `interface_id`, `tooltip`) is preserved. The editor's node
+sidebar edits the same fields and offers `Apply style to all selected` for a
+multi-node selection.
 
-## Export (GET /api/maps/{map}/export)
+## Map management
 
-Pass `format` as a query parameter:
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map` | Admin | Create a map. |
+| `PUT` | `/plugin/WeathermapNG/map/{map}` | Admin | Update map metadata. |
+| `DELETE` | `/plugin/WeathermapNG/map/{map}` | Admin | Delete a map and its nodes/links. |
+| `POST` | `/plugin/WeathermapNG/map/{map}/autodiscover` | Admin | Add devices and links from LibreNMS. |
+| `POST` | `/plugin/WeathermapNG/api/maps/{map}/save` | Admin | Save full editor state. |
 
-- `?format=json` (default) — returns the JSON payload above with `Content-Disposition: attachment; filename="<name>.json"`.
-- `?format=conf` — returns legacy PHP Weathermap-style text with `Content-Type: text/plain; charset=UTF-8` and `Content-Disposition: attachment; filename="<name>.conf"`.
-
-You can also export from the CLI:
-
-```bash
-php artisan weathermapng:export 1 --format=conf
-```
-
-## Import (POST /api/import)
-
-Accepts a multipart file upload. The validator accepts mimes `json`, `txt`, and `conf` (max 10 MB). Dispatch is by file extension:
-
-- `.json` — parsed as JSON (must contain `nodes` and `links` arrays).
-- `.conf` — parsed by `LegacyConfService` into the same internal structure.
-
-Required fields:
-
-```json
-{
-  "name": "imported_map",
-  "title": "Optional display title",
-  "file": "<uploaded .json or .conf file>"
-}
-```
-
-`name` must be unique in `wmng_maps`. `title` falls back to the imported map's title, then to `name`. On success the response is:
-
-```json
-{
-  "success": true,
-  "map_id": 2,
-  "message": "Map imported successfully"
-}
-```
-
-Imported map options are narrowed to the supported set — `width`, `height`, `background`, `tags`, `default_node_style`, `default_link_style`. Other keys in the file are dropped. Width and height are clamped to 100–4096 (defaults 800×600) and an unparseable `background` becomes `#ffffff`. Every entry in `nodes` and `links` must be an object; otherwise the import is rejected with HTTP 400.
-
-## Client URL parameters
-
-`?debugDots=1|2` is a client-side embed diagnostic parameter, not an API endpoint. It overlays particle-position markers and render-pipeline state on the canvas. Omit it for normal use.
-
-## Lookup Routes (admin-only)
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/plugin/WeathermapNG/api/devices` | Device lookup for the editor (admin) |
-| `GET` | `/plugin/WeathermapNG/api/device/{id}/ports` | Ports for one LibreNMS device (admin) |
-
-## Map Management Routes
-
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/plugin/WeathermapNG/map` | Create a map |
-| `PUT` | `/plugin/WeathermapNG/map/{map}` | Update map metadata |
-| `DELETE` | `/plugin/WeathermapNG/map/{map}` | Delete a map |
-| `POST` | `/plugin/WeathermapNG/map/{map}/autodiscover` | Run current auto-discovery flow |
-
-Create map request:
+Create request (`name` is required, `alpha_dash`, and unique in `wmng_maps`):
 
 ```json
 {
@@ -220,7 +231,8 @@ Create map request:
 }
 ```
 
-Typical response:
+Response for a request that sends `Accept: application/json` (or XHR); a plain
+browser form post redirects to the editor instead:
 
 ```json
 {
@@ -228,66 +240,103 @@ Typical response:
   "map": {
     "id": 1,
     "name": "production_map",
-    "title": "Production Network Map",
-    "width": 1200,
-    "height": 800
+    "title": "Production Network Map"
   },
   "redirect": "https://librenms/plugin/WeathermapNG/editor/1"
 }
 ```
 
-## Favorite Route
+`PUT /map/{map}` accepts `title`, `width`, `height`, and `background` and
+returns `{"success": true, "map": { ... }}`. Dimensions are 100–4096;
+`background` is `#RRGGBB`.
 
-| Auth | Method | Path | Purpose |
-|------|--------|------|---------|
-| Any authenticated user | `POST` | `/plugin/WeathermapNG/map/{map}/favorite` | Toggle the current user's favorite of a map |
-
-The toggle is scoped to the session user, so two users can favorite the same map independently. The `(user_id, map_id)` unique key makes the call safe to repeat: a concurrent double request cannot create duplicate favorites. Favorite rows are removed automatically when the map is deleted.
-
-Successful response:
+Auto-discovery accepts `min_degree` (integer, default 0) and `os` (comma-
+separated OS substrings) and returns a summary message:
 
 ```json
 {
   "success": true,
-  "favorited": true,
-  "count": 3
+  "message": "Auto-discovery completed: 14 nodes, 9 links added"
 }
 ```
 
-`favorited` is the state after the toggle, and `count` is the number of users who have favorited that map. The index page renders the star state and per-map count from `TopologyPreview::loadMaps()` with two batched queries for the whole page (never one query per card).
+Full-map save requires both arrays (empty arrays are intentional clears):
 
-Failure responses use the standard error shape: HTTP 401 with `{"success": false, "message": "Authentication required"}` when the request has no session user, and HTTP 500 with a generic message when the write fails (details are logged, not returned).
+```json
+{
+  "name": "production_map",
+  "title": "Production Network Map",
+  "options": {
+    "width": 1200,
+    "height": 800,
+    "background": "#ffffff"
+  },
+  "nodes": [
+    {
+      "id": 1,
+      "label": "Core Router",
+      "x": 400,
+      "y": 300,
+      "device_id": 42,
+      "meta": { "shape": "diamond" }
+    }
+  ],
+  "links": [
+    {
+      "id": 1,
+      "src_node_id": 1,
+      "dst_node_id": 2,
+      "port_id_a": 101,
+      "port_id_b": 102,
+      "bandwidth_bps": 1000000000,
+      "style": { "via_style": "angled" }
+    }
+  ]
+}
+```
 
-## Node Routes
+Limits: 2000 nodes, 2000 links, 200 via points per link, 50 tags. A successful
+save returns `{"success": true, "message": "Map saved successfully"}`; invalid
+values are rejected with `422` before the map changes.
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/plugin/WeathermapNG/map/{map}/nodes` | Store node through collection route |
-| `POST` | `/plugin/WeathermapNG/map/{map}/node` | Create one node |
-| `PATCH` | `/plugin/WeathermapNG/map/{map}/node/{node}` | Update one node |
-| `DELETE` | `/plugin/WeathermapNG/map/{map}/node/{node}` | Delete one node |
+## Nodes
 
-Create node request:
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map/{map}/nodes` | Admin | Bulk store nodes. |
+| `POST` | `/plugin/WeathermapNG/map/{map}/node` | Admin | Create one node. |
+| `PATCH` | `/plugin/WeathermapNG/map/{map}/node/{node}` | Admin | Update one node. |
+| `DELETE` | `/plugin/WeathermapNG/map/{map}/node/{node}` | Admin | Delete one node and its links. |
+
+Create one node:
 
 ```json
 {
   "label": "Core Router",
   "x": 400,
   "y": 300,
-  "device_id": 42
+  "device_id": 42,
+  "meta": { "color": "#28a745" }
 }
 ```
 
-## Link Routes
+The response includes the stored node:
+`{"success": true, "node": { ... }}`. `PATCH` accepts any of the same fields,
+each optional. Bulk store takes `{"nodes": [ ... ]}` with `label`, `x`, `y`
+required per entry, replaces the map's whole node set, and returns
+`{"success": true}`. An empty array on a map that already has nodes returns
+`422`.
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/plugin/WeathermapNG/map/{map}/links` | Store link through collection route |
-| `POST` | `/plugin/WeathermapNG/map/{map}/link` | Create one link |
-| `PATCH` | `/plugin/WeathermapNG/map/{map}/link/{link}` | Update one link |
-| `DELETE` | `/plugin/WeathermapNG/map/{map}/link/{link}` | Delete one link |
+## Links
 
-Create link request:
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map/{map}/links` | Admin | Bulk store links. |
+| `POST` | `/plugin/WeathermapNG/map/{map}/link` | Admin | Create one link. |
+| `PATCH` | `/plugin/WeathermapNG/map/{map}/link/{link}` | Admin | Update one link. |
+| `DELETE` | `/plugin/WeathermapNG/map/{map}/link/{link}` | Admin | Delete one link. |
+
+Create one link:
 
 ```json
 {
@@ -298,70 +347,164 @@ Create link request:
   "bandwidth_bps": 1000000000,
   "style": {
     "via_style": "angled",
-    "via_points": [
-      {"x": 500, "y": 240}
-    ]
+    "via_points": [{ "x": 500, "y": 240 }]
   }
 }
 ```
 
-## Template Routes
+`src_node_id` and `dst_node_id` must exist in `wmng_nodes`. Bulk store takes
+`{"links": [ ... ]}`, requires the same source/destination keys, and replaces
+the map's whole link set. An empty array for a map that already has links fails
+rather than clearing them.
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/plugin/WeathermapNG/templates` | List templates |
-| `GET` | `/plugin/WeathermapNG/templates/{id}` | Show one template |
-| `POST` | `/plugin/WeathermapNG/templates` | Create a template |
-| `PUT` | `/plugin/WeathermapNG/templates/{id}` | Update a template |
-| `DELETE` | `/plugin/WeathermapNG/templates/{id}` | Delete a template |
-| `POST` | `/plugin/WeathermapNG/templates/{id}/create-map` | Create a map from a template |
+## Favorites
 
-## Health And Metrics Routes
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `POST` | `/plugin/WeathermapNG/map/{map}/favorite` | Session | Toggle the current user's favorite. |
 
-| Auth | Method | Path | Purpose |
-|------|--------|------|---------|
-| Public | `GET` | `/plugin/WeathermapNG/health` | Basic health |
-| Public | `GET` | `/plugin/WeathermapNG/ready` | Readiness probe |
-| Public | `GET` | `/plugin/WeathermapNG/live` | Basic liveness |
-| Admin | `GET` | `/plugin/WeathermapNG/health/detailed` | Detailed health |
-| Admin | `GET` | `/plugin/WeathermapNG/health/stats` | Plugin stats |
-| Admin | `GET` | `/plugin/WeathermapNG/metrics` | Prometheus-style metrics |
+This is the only write route open to non-admins. It inserts or deletes only the
+caller's row in `wmng_map_favorites`, so two users favorite the same map
+independently. The `(user_id, map_id)` unique key makes a repeated or
+concurrent request safe.
 
-## Version History Routes
+```json
+{
+  "success": true,
+  "favorited": true,
+  "count": 3
+}
+```
 
-Version routes are registered in `routes/web.php` under the `web` + `auth` middleware group. All version endpoints (list, show, compare, and export included) require admin via `requireAdmin()`.
+`favorited` is the state after the toggle; `count` is the number of users who
+favorited the map. Failures:
 
-| Auth | Method | Path | Purpose |
-|------|--------|------|---------|
-| Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
-| Admin | `POST` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Create a named version |
-| Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details + snapshot |
-| Admin | `POST` | `/plugin/WeathermapNG/api/versions/{versionId}/restore` | Restore map to a version |
-| Admin | `GET` | `/plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}` | Compare two versions (returns flat diff: `nodes_added`, `nodes_removed`, `nodes_modified`, `links_added`, `links_removed`, `links_modified`) |
-| Admin | `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete a single version |
-| Admin | `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
+| Status | Body | Cause |
+|--------|------|-------|
+| `401` | `{"success": false, "message": "Authentication required"}` | No session user. |
+| `503` | `{"success": false, "message": "Favorites are unavailable ..."}` | Table not created yet; run `database/setup.php`. |
+| `500` | `{"success": false, "message": "..."}` | Write failed; details are logged only. |
 
-In v1.16.0, restore returns `422` when a snapshot cannot be safely
-applied, with `success: false` and a redacted message. The map and history remain
-unchanged. A successful restore returns the fresh map and adds a pre-restore
-checkpoint plus a restored-state version; prior saved versions are retained.
-The history response uses `display_limit` for the newest 20 displayed entries,
-retains `max_versions` as a compatibility alias for that display limit,
-and reports manual retention, without automatic cleanup or conflict detection.
+Rows are removed when the map is deleted. The index page reads star state and
+counts for the whole page in two batched queries.
 
-The v1.16.0 history export includes all versions for the selected map,
-independently of list limits, with complete snapshots and available creator and
-exporter names. It remains administrator-only and does not change saved rows.
+## Lookups
 
-Comparison keeps the six existing ID-change lists and both version snapshots in
-the response. The v1.16.0 editor renders side-by-side geometry and field
-differences from that data, including explicit unavailable historical fields.
-List-shaped and ID-keyed snapshots both compare by each record's saved ID.
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/api/devices` | Admin | Device list or autocomplete. |
+| `GET` | `/plugin/WeathermapNG/api/device/{id}/ports` | Admin | Ports for one device. |
 
+Both accept `?q=` (device hostname or `sysName` for the first, port name or
+`ifIndex` for the second; case-insensitive substring). Device autocomplete
+returns nothing for queries shorter than two characters. Port responses are
+`{"device_id": 42, "ports": [ ... ]}`.
+
+## Templates
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/templates` | Session | List templates. |
+| `GET` | `/plugin/WeathermapNG/templates/{id}` | Session | Show one template. |
+| `POST` | `/plugin/WeathermapNG/templates` | Admin | Create a template. |
+| `PUT` | `/plugin/WeathermapNG/templates/{id}` | Admin | Update title/description. |
+| `DELETE` | `/plugin/WeathermapNG/templates/{id}` | Admin | Delete a template. |
+| `POST` | `/plugin/WeathermapNG/templates/{id}/create-map` | Admin | Create a map from a template. |
+
+Create accepts `name` (required), `title`, `description`, `width`, `height`,
+`icon`, `category`, and `config`, and returns `201` with the stored template.
+`create-map` requires the template config to hold `default_nodes` and
+`default_links` arrays, and requires `{"name": "<new map>"}`; it returns `201`
+with the new map. Built-in templates return `403` on update and delete.
+
+## Versions
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Admin | Newest 20 versions plus retention flags. |
+| `POST` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Admin | Save a named version (`name`, optional `description`). |
+| `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Admin | Version metadata and snapshot. |
+| `POST` | `/plugin/WeathermapNG/api/versions/{versionId}/restore` | Admin | Restore the map. |
+| `GET` | `/plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}` | Admin | Flat diff between two versions. |
+| `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Admin | Delete one version. |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Admin | Every version with full snapshots. |
+
+Restore returns `422` with `success: false` when a snapshot cannot be safely
+applied; the map and history are unchanged. A successful restore returns the
+fresh map plus the restored version and adds a pre-restore checkpoint. Compare
+returns `nodes_added`, `nodes_removed`, `nodes_modified`, `links_added`,
+`links_removed`, and `links_modified`, with both versions. List responses use
+`display_limit` for the newest-20 window and keep `max_versions` as an alias.
+Comparison of versions from different maps returns `422`.
+
+## Export and import
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/export` | Session | Export as JSON (default) or legacy `.conf`. |
+| `POST` | `/plugin/WeathermapNG/api/import` | Admin | Import a `.json` or `.conf` file. |
+
+Export sets an attachment filename based on the map name:
+
+- `?format=json` returns the [map JSON payload](#map-json-payload) with
+  `Content-Disposition: attachment; filename="<name>.json"`.
+- `?format=conf` returns legacy PHP Weathermap text as `text/plain;
+  charset=UTF-8` with a `.conf` filename.
+
+The same export is available from the CLI:
+
+```bash
+php artisan weathermapng:export 1 --format=conf
+```
+
+Import is a multipart upload:
+
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `file` | yes | `.json` or `.conf` file, 10 MB maximum. |
+| `name` | yes | Unique map name (`alpha_dash`, max 255). |
+| `title` | no | Display title; falls back to the file's title, then to `name`. |
+
+The validator accepts `json`, `txt`, and `conf` up to 10 MB. Dispatch is by
+file extension: `.conf` uses the legacy parser, everything else is parsed as
+JSON and must contain `nodes` and `links` arrays. Success:
+
+```json
+{
+  "success": true,
+  "map_id": 2,
+  "message": "Map imported successfully"
+}
+```
+
+Imported options are narrowed to `width`, `height`, `background`, `tags`,
+`default_node_style`, and `default_link_style`; other keys are dropped.
+Dimensions are clamped to 100–4096 (defaults 800×600) and an unparseable
+`background` becomes `#ffffff`. A non-object entry in `nodes` or `links`
+rejects the import with `400`.
+
+## Health and metrics routes
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| `GET` | `/plugin/WeathermapNG/health` | Public | `{status, timestamp}`; `503` when the database is unreachable. |
+| `GET` | `/plugin/WeathermapNG/ready` | Public | `{ready, timestamp}`; `503` with `error` when not ready. |
+| `GET` | `/plugin/WeathermapNG/live` | Public | `{alive, timestamp}`; always `200`. |
+| `GET` | `/plugin/WeathermapNG/health/detailed` | Admin | Full checks, version, timing. |
+| `GET` | `/plugin/WeathermapNG/health/stats` | Admin | Map/node/link counts, DB size, cache info. |
+| `GET` | `/plugin/WeathermapNG/metrics` | Admin | Prometheus text (`text/plain; version=0.0.4`). |
+| `GET` | `/plugin/WeathermapNG/diagnostics` | Admin | HTML installation report. |
+
+The three public probes expose no version, filesystem path, dependency, or
+configuration detail. `/metrics` exports `weathermapng_maps_total`,
+`weathermapng_nodes_total`, `weathermapng_links_total`,
+`weathermapng_memory_usage_bytes`, and `weathermapng_memory_peak_bytes`.
 
 ## Webhooks
 
-When configured, WeathermapNG POSTs a JSON payload to each webhook URL on map lifecycle events: `map.created`, `map.updated` (including editor saves), `map.deleted`, and `map.version_saved`.
+WeathermapNG POSTs a JSON body to each configured URL on map lifecycle events:
+`map.created`, `map.updated` (including editor saves), `map.deleted`, and
+`map.version_saved`.
 
 ```json
 {
@@ -373,9 +516,9 @@ When configured, WeathermapNG POSTs a JSON payload to each webhook URL on map li
 }
 ```
 
-`user` is the acting LibreNMS username, or `null` for CLI-triggered changes (poller, artisan commands).
+`user` is the acting LibreNMS username, or `null` for CLI-triggered changes.
 
-**Configuration** — settings page (Webhook URLs, one per line), or config:
+Configure URLs on the settings page (one per line) or in config:
 
 ```php
 // WEATHERMAPNG_WEBHOOK_URLS (newline-separated) or webhooks.urls (array)
@@ -385,19 +528,41 @@ When configured, WeathermapNG POSTs a JSON payload to each webhook URL on map li
 ],
 ```
 
-**Signature verification** — when `WEATHERMAPNG_WEBHOOK_SECRET` is set, each delivery carries `X-WeathermapNG-Signature: t=<unix_ts>,v1=<hex>`. The `v1` value is `HMAC-SHA256("<unix_ts>.<raw_body>", secret)`. Reject deliveries with a timestamp older than five minutes to prevent replay:
+When `WEATHERMAPNG_WEBHOOK_SECRET` is set, each delivery carries
+`X-WeathermapNG-Signature: t=<unix_ts>,v1=<hex>`, where `v1` is
+`HMAC-SHA256("<unix_ts>.<raw_body>", secret)`:
 
 ```php
-[$t, $v1] = array_map(fn($p) => explode('=', $p, 2), explode(',', $_SERVER['HTTP_X_WEATHERMAPNG_SIGNATURE']));
-assert(abs(time() - $t[1]) < 300);
-assert(hash_equals('v1=' . hash_hmac('sha256', $t[1] . '.' . $body, $secret), 'v1=' . $v1[1]));
+$parts = [];
+foreach (explode(',', $_SERVER['HTTP_X_WEATHERMAPNG_SIGNATURE'] ?? '') as $pair) {
+    [$k, $v] = array_pad(explode('=', $pair, 2), 2, '');
+    $parts[$k] = $v;
+}
+
+$expected = hash_hmac('sha256', $parts['t'] . '.' . $rawBody, $secret);
+if (abs(time() - (int) $parts['t']) > 300 || !hash_equals($expected, $parts['v1'])) {
+    http_response_code(401);
+    exit;
+}
 ```
 
-Delivery is best-effort: a 5-second timeout per URL, failures are logged and never block the map mutation that triggered them.
+Delivery is best-effort: 5-second timeout per URL, failures are logged, and
+delivery never blocks the map mutation that triggered it.
 
-## Error Shape
+## Error shape
 
-Most JSON write endpoints return a success flag and a message on errors:
+Validation failures return `422` in Laravel's standard form:
+
+```json
+{
+  "message": "The name field is required.",
+  "errors": {
+    "name": ["The name field is required."]
+  }
+}
+```
+
+Controller failures return a success flag:
 
 ```json
 {
@@ -406,4 +571,7 @@ Most JSON write endpoints return a success flag and a message on errors:
 }
 ```
 
-Validation errors may include field-level details depending on the controller/request class.
+Import content failures use `{"error": "<reason>"}` with `400`; a persistence
+failure uses `500`; upload validation uses the `422` shape above. A failed
+admin check is a `403`; an invalid embed token is a `401` with
+`{"success": false, "message": "Invalid or missing embed token."}`.

@@ -1,410 +1,367 @@
 # WeathermapNG Roadmap
 
-This document outlines the development roadmap for WeathermapNG, a network visualization plugin for LibreNMS.
+Where WeathermapNG is going, what already ships, and what remains open.
 
-*Last reviewed v1.16.0 (2026-10-28) against LibreNMS plugin architecture, network weathermap competitive landscape (PHP Weathermap, Zabbix, NagVis, PRTG, Datadog/Kentik), LibreNMS API surface (LLDP/CDP, health, alerts, RRD), and codebase audit of dormant infrastructure.*
+Current release: **v1.16.0**. Last reviewed v1.16.0 (2026-11-12) against the
+LibreNMS plugin architecture, the network weathermap landscape, the LibreNMS API
+surface (LLDP/CDP, health, alerts, RRD), and a codebase audit. Unreleased work
+on `main` is listed under [Unreleased](CHANGELOG.md#unreleased).
 
-## Current Status: v1.16.0 (Stable)
+## Contents
 
-The plugin is usable today for production-oriented network map visualization, with the core install, rendering, editor, and map management workflows in place, plus waves of performance, authorization, correctness, and operational tooling landed in v1.7.0–v1.11.0:
+| Section | Scope |
+|---------|-------|
+| [Current status](#current-status) | Shipped feature set, plus unreleased work on `main` |
+| [Roadmap principles](#roadmap-principles) | How work is prioritized |
+| [Open work](#open-work) | Future and long-term items; all unshipped |
+| [Completed by version](#completed-by-version) | Shipped history from v1.1.x to v1.16.0 |
+| [Contributing](#contributing) | Where help is useful |
+| [Feedback](#feedback) | Where to file ideas |
+
+## Current Status: v1.16.0 (Stable) <a id="current-status"></a>
+
+Stable. The core install, editor, rendering, and map-management workflows are in
+place, with the hardening and operator features below.
+
+Shipped:
 
 - Professional 3-panel map editor: toolbox, canvas, properties sidebar
 - Zoom/pan, undo/redo, keyboard shortcuts, grid snapping
 - Dark/light theme auto-detection to match LibreNMS
-- Real-time traffic visualization using LibreNMS RRD data
-- Flow animations with particle effects
-- Map versioning with editor UI (save, restore, compare, delete)
-- Server-Sent Events for live updates
+- Real-time traffic from LibreNMS RRD data, with flow animations
+- Map versioning in the editor: save, restore, compare, delete
+- Server-Sent Events for live updates, with polling fallback
 - Embeddable views with navigation bar and NOC wall / kiosk mode with map cycling
-- Operational diagnostics page for administrators with data-integrity checks
+- Nested maps and drill-down with a breadcrumb bar
+- Operational diagnostics with data-integrity checks
 - Map tags, filtering, and first-run onboarding
-- Per-user map favorites with an index star/filter
-- Per-node style overrides (fill, label color, shape, size) with bulk apply
-- Static SVG export of the embed view
 - Per-map default styles for nodes and links
-- Demo mode for testing
-- Device-type node icons: router, switch, server, firewall
-- Composer path package install flow for LibreNMS
-- Weekly/manual install CI coverage against LibreNMS
-- Idempotent LibreNMS plugin registration cleanup during reinstall
+- Demo mode with deterministic traffic
+- Device-type node icons and status rings
 - LLDP/CDP auto-discovery from LibreNMS topology data
-- Editor bulk operations: multi-select, marquee, bulk delete with undo
+- Editor bulk operations: multi-select, marquee, group drag, bulk delete with undo
 - Viewport culling for large-map pan/zoom performance
-- Node CPU/memory utilization overlay in embed view
-- RRD graph hover popups and editor click-through to LibreNMS device/port pages
+- Node CPU/memory utilization overlay in the embed view
+- RRD graph hover popups and click-through to LibreNMS device/port pages
+- CLI commands for map create/list/export/discover
+- JSON and legacy `.conf` import/export
+- Embed API token auth for sessionless consumers, with Grafana IFrame docs
+- Map lifecycle webhooks with optional HMAC signatures
+- Gallery previews of real map and template topology
+- Composer path package install flow for LibreNMS
+- Weekly/manual install CI, upgrade lanes, and idempotent registration cleanup
 
-The next phase should focus on map sharing/export workflows, additional visualization options, and continued performance hardening for very large maps.
+Unreleased on `main`:
 
----
+- Per-node style overrides (fill, label color, shape, size) with one-undo bulk
+  apply, plus Ctrl/Cmd+A and bulk delete
+- Per-user map favorites with an index star toggle and filter
+- Static SVG export of the embed view
+- Screenshot comparison in CI, with committed baselines at 480×800, 768×1024,
+  and 1920×1080
+- Particle budget tiers above 150 and 300 links (1500-particle cap) and
+  secondary-label hiding below 0.6 zoom
 
-## Roadmap Principles
+The next phase focuses on saved views, historical playback, scheduled reports,
+and the remaining export formats.
 
-1. **Polish before expansion**: Fix rough edges in the editor, embed view, accessibility, and install experience before adding large new workflows.
-2. **Protect installs**: Keep install validation, route discovery, Composer metadata, and LibreNMS compatibility covered by CI.
-3. **Stay SemVer-aware**: Patch releases fix bugs and polish existing behavior. Minor releases add user-facing capabilities. Major releases are reserved for breaking changes.
-4. **Favor operator workflows**: WeathermapNG should feel like a practical LibreNMS operations tool, not a demo canvas.
-5. **Keep old feature ideas visible**: Larger ideas remain tracked, but they should not crowd out short-term product quality.
+## Roadmap principles
 
----
-
-## Immediate Priority
-
-### v1.6.x - Product Polish & Bug Fixes
-
-These are patch-level improvements unless they require new user-facing behavior.
-
-- [x] **Embed controls cleanup**
-  - Fix malformed generated zoom button HTML in the embed view.
-  - Replace inline string-generated controls with safer DOM construction or templates.
-  - Standardize iconography with Font Awesome instead of emoji controls.
-  - Ensure all embed controls have accessible labels.
-
-- [x] **Editor accessibility pass**
-  - Add `aria-label` and explicit `type="button"` to icon-only toolbar controls.
-  - Add keyboard and focus affordances for critical editor actions.
-  - Provide useful fallback text or alternate structured editing affordances for canvas-only workflows.
-  - Remove focus outline overrides that make keyboard navigation harder.
-
-- [x] **Responsive editor layout** *(v1.7.8: CSS media queries — stacked sidebar below canvas on narrow screens, horizontal toolbox, flex-wrap topbar. Browser-tested at 768px and 1920px.)*
-  - ~~Replace fixed `calc(100vh - 120px)` assumptions with layout that works inside LibreNMS chrome.~~ *(v1.7.8)*
-  - ~~Improve sidebar behavior on smaller screens.~~ *(v1.7.8: stacks below canvas with max-height scroll)*
-  - ~~Reduce nested scrolling where possible.~~ *(v1.7.8: addressed by stacking sidebar below canvas)*
-  - ~~Keep topbar actions usable when map names or counts are long.~~ *(v1.7.8: flex-wrap)*
-
-- [x] **Embed view responsive polish** *(v1.7.5: reduced-motion; v1.7.8: CSS flex-wrap nav/controls, responsive offsets, minimap hidden on very small screens. Browser-tested at 480px.)*
-  - ~~Make the top navigation and control groups wrap, collapse, or reposition cleanly.~~ *(v1.7.8)*
-  - ~~Prevent controls, minimap, legend, and map content from overlapping on smaller embeds.~~ *(v1.7.8: responsive offsets)*
-  - ~~Add reduced-motion handling for flow animations.~~ *(v1.7.5)*
-
-- [x] **Index and template gallery polish** *(v1.7.8: escaped template card innerHTML, delegated listener replaces inline onclick, sanitized category class slug, fixed template creation 403/redirect; v1.13.0: Data Center, WAN/MPLS, Campus, and Branch Office built-in templates added to all three seed paths)*
-  - ~~Replace decorative map-card art with real previews.~~ *(v1.16.0: map and template SVG topology, bounded per-map loading, empty/overview labels, keyboard and theme regression coverage)*
-  - ~~Convert clickable `div` cards into proper button/link structures.~~ *(v1.7.8: template cards already use `<button>`, replaced inline onclick with delegated listener)*
-  - Preserve current search, sort, badges, and map metadata. *(preserved)*
-
-- [x] **Theme and UI cleanup** *(v1.7.4: narrowed MutationObserver filters; v1.7.8: extracted static inline styles to CSS classes in editor and index views; v1.13.0: embed view's 270-line style block extracted to resources/css/embed.css, ~1500 lines of inline JS extracted to resources/js/embed-app.js, and the accessibility smoke suite added — see v1.13.0 Validation coverage)*
-
-- [x] **LibreNMS hook and legacy view polish**
-  - Align hook and compatibility views with LibreNMS Bootstrap button conventions.
-  - Add safe external-link attributes and accessible labels to remaining map entry points.
-  - Remove stale legacy rendering placeholder copy in favor of live-map entry points.
-  - Replace remaining legacy map delete browser prompt with Bootstrap confirmation UI.
-
-- [x] **Settings admin polish**
-  - Replace browser alert and confirm flows with Bootstrap feedback and confirmation UI.
-  - Keep settings preview rendering text-safe.
-  - Make unavailable restore behavior explicit instead of presenting placeholder implementation copy.
-
-- [x] **Index and editor confirmation polish**
-  - Replace browser destructive-action prompts in active index and editor views with Bootstrap modals.
-  - Preserve existing delete, restore, cleanup, resize, and undo-aware editor behavior after confirmation.
-  - Route editor save errors through toast feedback instead of browser alerts.
-
-- [x] **Validation coverage** *(v1.13.0: AccessibilitySmokeTest — 12 plain-PHPUnit cases covering aria-labels on icon-only controls, focus outline preservation, accessible form labels, lang/layout inheritance, canvas text alternative; screenshot capture tool tests/screenshot-check.sh + `just visual` for index/editor/embed at 480/768/1920 px with a degenerate-capture guard; `justfile` added as thin facades over the whole validation flow; unreleased: `tests/screenshot-compare.cjs` + committed baselines now compare index/editor/embed at 480×800, 768×1024 and 1920×1080 in CI, and every pure Node suite runs in the embed-auth job)*
-
-- [x] **Release readiness checklist**
-  - Document the exact pre-release validation flow: Composer validate, PHPUnit, install CI, smoke install, changelog, tag, release notes.
-  - Keep a short manual QA checklist for editor, embed, settings, install, and upgrade paths.
-  - Define what qualifies as patch, minor, and major work for this plugin.
-
-- [x] **Upgrade safety** *(v1.7.4: added "Upgrade safety" subsection to INSTALL.md)*
-  - ~~Add explicit upgrade notes for users moving from older install methods.~~ *(v1.7.4)*
-  - ~~Verify upgrade behavior when config files, output directories, or validation tables already exist.~~ *(v1.7.4)*
-  - ~~Make failure messages actionable when Composer registration, route discovery, or database setup fails.~~ *(v1.7.4)*
-
-### v1.7.0 - Performance, Authorization & Correctness Hardening ✅
-
-These improvements shipped in v1.7.0. The bulk of the work was reliability, safety, and maintainability rather than new user-facing features.
-
-- [x] **N+1 query elimination (Wave 1 + Wave 2)**
-  - Eager-load map, node, link, and version relations instead of lazy loading.
-  - Batch per-row caches (node data, device metadata, port names) so a 50-node map goes from ~400 queries down to ~10.
-  - Covers the (now-removed) MapCacheService eager loads, NodeDevice batch loading, and LinkPortName batch resolution. MapCacheService was later deleted as dead code (zero callers); the eager-load pattern lives on in the controllers and `RrdDataService` request-local caches.
-
-- [x] **Admin-only authorization**
-  - All 24 mutation endpoints require an admin via the `AdminCheck` trait (`requireAdmin()`).
-  - Read endpoints remain open to any authenticated user.
-  - `MapPolicy` and `NodePolicy` (dead authorization stubs) were removed in favor of the central trait.
-
-- [x] **Editor accessibility pass**
-  - `aria-label` and explicit `type="button"` on icon-only toolbar controls.
-  - Focus-visible outlines preserved for keyboard navigation instead of overriding them.
-
-- [x] **`mergeMapOptions` data-loss fix**
-  - `mergeMapOptions` now preserves all option keys on save, not just `width`/`height`/`background`.
-  - Custom options are no longer silently dropped when a map is updated.
-
-- [x] **Release readiness checklist**
-  - `RELEASE.md` created with the exact pre-release validation flow and manual QA checklist.
-
-- [x] **Dead code removal**
-  - Removed `SseStreamService`, `MapDataBuilder`, `MapPolicy`, `NodePolicy`, `test_hooks.php`, `debug_plugin_web.php`, and the root `map-poller.php`.
-  - Canonical poller is now `bin/map-poller.php`.
-
-- [x] **Demo traffic deterministic**
-  - Demo mode now generates traffic from deterministic per-id sine waves instead of `rand()`, so traffic is smooth and jitter-free across renders.
-
-- [x] **Correctness fixes**
-  - `NodeService::deleteNode`: removed an `orWhere` that could delete the wrong rows.
-  - `LinkService`: added input validation for link create/update.
-  - `RenderController::import`: wrapped in a transaction so a failed import rolls back cleanly.
-  - `MapCacheService`: eager-load fixes prevent stale/missing relation data.
-  - `MapLinkController`: narrowed a broad `catch` that was swallowing real errors.
+1. **Polish before expansion**: fix rough edges in the editor, embed view,
+   accessibility, and install experience before adding large new workflows.
+2. **Protect installs**: keep install validation, route discovery, Composer
+   metadata, and LibreNMS compatibility covered by CI.
+3. **Stay SemVer-aware**: patch releases fix bugs and polish existing behavior;
+   minor releases add user-facing capabilities; major releases are reserved for
+   breaking changes.
+4. **Favor operator workflows**: WeathermapNG should feel like a practical
+   LibreNMS operations tool, not a demo canvas.
+5. **Keep larger ideas visible**: track them here without letting them crowd out
+   short-term product quality.
 
 ---
 
-## Near Term
+## Open work
 
-### v1.8.0 - Editor Workflow & Map Management
+Everything in this section is unshipped. Items move to
+[Completed by version](#completed-by-version) when they land.
 
-This release should make existing authoring workflows faster and less error-prone before adding major visualization features.
+### Future
 
-- [x] **Version Comparison** *(routes/history activated v1.8.0; v1.16.0: side-by-side topology, before/after field details, explicit legacy availability and read-only browser regressions)*
-  - Registered version routes in `routes/web.php` and built editor UI: save-version button, version list modal, restore confirmation, compare diff view.
-  - Fixed dormant backend bugs: `json_decode()` TypeError on cast array in compare/show/export, `captureSnapshot()` wrong field names (`database_id` → `device_id`, removed nonexistent `link.meta`), `restoreVersion()` now does true rollback with `forceCreate` preserving original IDs, `destroy()` now deletes only the selected version, `compareVersions()` returns flat lists.
-  - Admin gates on all mutating endpoints. `SaveMapVersionRequest` with `strip_tags()` sanitization on store.
-  - *Highest ROI v1.8.0 item — major feature with minimal new backend work.*
+- [ ] **Saved views per user** — save named index filters (tags, favorites,
+  search) per LibreNMS user. Favorites are on `main`; saved views are not
+  implemented.
+- [ ] **Historical playback** — timeline scrubber, play/pause controls, and
+  speed adjustment, using the existing `RRDTool` time-range reads.
+- [ ] **Export formats beyond PNG and SVG** — 2x/4x PNG scaling, PDF, and
+  Visio/draw.io output if demand justifies the work.
+- [ ] **Scheduled reports** — daily/weekly snapshots, email delivery, and
+  PDF/PNG generation for NOC walls, extending `bin/map-poller.php`.
+- [ ] **Metrics beyond CPU/memory** — latency (LibreNMS services API,
+  `service_type=ping`), packet loss (`service_ds` loss datasource), and custom
+  SNMP OID support if it can avoid unreliable polling.
 
-- [x] **Bulk Operations** *(v1.12.0: multi-select via shift/ctrl-click + rubber-band marquee, bulk delete with undo, group drag, group keyboard nudge)*
-  - ~~Select multiple nodes/links (rubber-band, shift-click, ctrl-click).~~ *(v1.12.0)*
-  - ~~Bulk delete.~~ *(v1.12.0)*
-  - ~~Bulk style changes (apply same fill color/label color/shape/size to all selected).~~ *(unreleased: node `meta` style overrides, editor Style panel, one-undo "Apply style to all selected", Ctrl/Cmd+A and Delete/Backspace bulk delete)*
-  - ~~Preserve undo/redo support for bulk edits.~~ *(v1.12.0)*
+### Long term
 
-- [x] **Operational diagnostics** *(v1.9.0: diagnostics.blade.php + route + HealthController — install status, route registration, writable paths, version metadata, LibreNMS compatibility)*
-  - ~~`HealthController` already has health/ready/live/detailed/stats/metrics endpoints. The diagnostics screen is a UI layer on top.~~
-  - ~~Add admin-facing diagnostics Blade view: install status, route registration, writable paths, version metadata, LibreNMS compatibility checks.~~
-  - Surface stale data, missing RRD files, and broken port associations. *(v1.12.0: admin data-integrity section in diagnostics — per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows via `MapService::getDataIntegrityIssues()` + `RrdDataService::hasRrdFile()`)*
-  - ~~Keep public health endpoints minimal and reserve sensitive detail for authenticated admins.~~
+#### v2.0.0 - Next generation
 
-- [x] **First-run onboarding** *(v1.9.0: welcome/docs/diagnostics links; v1.16.0: working gallery and Custom actions, deliberate named sample creation, cancellation and browser regression coverage)*
-  - ~~Add a lightweight first-run state that helps users create or import their first useful map.~~
-  - ~~Offer demo/sample map creation only when it will not touch production data unexpectedly.~~
-  - ~~Link directly to install checks, docs, and troubleshooting from empty/error states.~~
+These ideas are parked until the core product feels polished and maintainable.
 
-- [x] **Map Organization** *(v1.9.0: tags stored in options JSON, normalized/deduped, index tag filter dropdown, editor tag input with validation)*
-  - ~~Tags and filtering — store in existing `wmng_maps.options` JSON column, no migration needed.~~
-  - ~~Basic grouping for users with many maps.~~
-  - *Defer favorites (requires user_id mapping table) to v1.9.0.* *(still deferred — see v1.9.0 favorites)*
-
-- [x] **Per-map default styling** *(v1.9.0: editor Default Styles panel, model accessors, render-time merge, validation with allowlisted keys + hex regex)*
-  - ~~Map-level default style that propagates to all nodes/links. Change one default, restyle the entire map.~~
-  - ~~Store as `default_node_style` / `default_link_style` in the map's `options` JSON column.~~
-  - ~~Merge defaults at render time (existing `mergeMapOptions` pattern).~~
-  - *Addresses a feature operators miss from legacy weathermap tools (ranked #4 in competitive research).*
-
-- [x] **NOC wall / kiosk mode** *(v1.9.0: ?kiosk=1 hides chrome + auto-hide cursor, ?cycle=N map cycling, Esc toggle, Exit Kiosk button)*
-  - ~~Fullscreen toggle with all UI chrome hidden.~~
-  - ~~Auto-cycling between maps on a timer.~~
-  - ~~The embed view is the foundation — add cycling and fullscreen.~~
-- [x] **Frontend modularization** *(v1.8.0: wmng-common.js + ui-helpers.js extracted; v1.12.0: editor.blade.php inline JS extracted into resources/js/editor-*.js modules — `var S = window.WMNG.EditorState` shared state, no build step; v1.13.0: embed.blade.php's ~1500 lines of JS extracted into resources/js/embed-app.js with `window.WMNG.EmbedConfig`/`EmbedData` server-rendered bootstrap, and its 270-line style block into resources/css/embed.css — embed view 2062→113 lines, editor view 610 lines)*
-
-- [x] **Map Templates Gallery Refinement** *(v1.13.0: four common topology templates — Data Center, WAN/MPLS, Campus, Branch Office — added to all three seed paths: setup.php Laravel + PDO variants and the Laravel seeder; each has real node/link topology with hand-placed coordinates. Template CRUD backend pre-existing per `MapTemplateController`.)*
-
-- [x] **Validation coverage** *(v1.13.0: AccessibilitySmokeTest, screenshot-check.sh tool + `just visual`, justfile — see v1.6.x Validation coverage above for the full list)*
-
----
-
-
-## Medium Term
-### v1.9.0 - Discovery, Operator Integration & Advanced Data
-
-This release closes the biggest gaps vs legacy weathermap tools and native LibreNMS maps: click-through navigation, RRD graph hover, nested maps, and LLDP/CDP auto-discovery.
-
-- [x] **Click-through navigation** *(v1.9.0: embed view; v1.11.0: editor sidebar + RRD hover graphs)*
-  - Click a node to open the LibreNMS device page (`/device/{id}`). Nodes already store `device_id`.
-  - Click a link to open the LibreNMS interface/port page (`/device/{id}/port/{port_id}`). Links already store port data.
-  - Configurable: open in same tab, new tab, or hover tooltip with link.
-  - *Every major competitor (legacy LibreNMS weathermap, PHP Weathermap, Zabbix, NagVis) has this. LOW effort — LibreNMS routes are stable, data already stored.*
-
-- [x] **RRD graph hover popups** *(v1.11.0: embed view — hover a node/link for 300ms to show a LibreNMS RRD time-series graph image; `?graphs=0` to disable)*
-  - Hover over a node/link to see an embedded RRD time-series graph, not just a text tooltip.
-  - LibreNMS exposes graph image endpoints. Use a modern CSS/JS tooltip with embedded `<img>` or `<iframe>`.
-  - *The most beloved feature of the classic PHP Weathermap (OverLib graphs). WeathermapNG's text-only tooltips are a step back.*
-
-- [x] **Nested maps / drill-down hierarchy** *(v1.13.0: `parent_map_id` on `wmng_maps` via a hasColumn-guarded migration + all setup.php paths; `Map::parentMap`/`childMaps`/cycle-bounded `breadcrumb()`; node drill-down via `meta.sub_map_id`; `toJsonModel()` payload carries `parent_map_id`, `breadcrumb`, per-node `sub_map_id`; embed view drills down on sub-map nodes with priority over device click-through and renders a root→current breadcrumb bar. Six test cases in `NestedMapTest`.)* 
-- [x] **LLDP/CDP Auto-Discovery** *(v1.12.0: `AutoDiscoveryService::discoverAndSeedMap()` reads LibreNMS `links` table (protocol lldp/xdp/cdp), dedupes by device pair, creates missing wmng nodes + links; admin-gated autodiscover endpoint + editor trigger + `weathermapng:discover` command)*
-  - ~~Query LibreNMS `links` table for actual topology (protocol field: lldp/xdp/cdp, remote_port_id, remote_device_id).~~
-  - ~~Create accurate node/link mapping from LLDP/CDP data.~~
-  - ~~Replace unreliable ifIndex-based matching.~~
-  - ~~Keep auto-discovery optional and reviewable before creating maps.~~
-  - ~~`AutoDiscoveryService` class already referenced in `MapController` constructor.~~
-- [x] **Device status-based node icons** *(v1.11.0: embed view draws pulsing red ring for down nodes, yellow dashed ring for warning (CPU/MEM ≥ threshold), gray dashed for unknown; editor uses status-aware colors green/red/gray + dashed ring for down; `node_warning` color is admin-configurable; metrics merge from SSE fixed)*
-  - ~~Node icons reflect device up/down/warning state (green/red/pulse), not just bandwidth on links.~~ *(v1.11.0)*
-  - ~~LibreNMS device status is available. WeathermapNG nodes already store `device_id`.~~ *(v1.11.0)*
-  - ~~Partially covered by alerts integration, but the node icon itself should change, not just an overlay badge.~~ *(v1.11.0: status rings layer on top of device-type shapes)*
-
-- [x] **Custom Metrics** *(v1.12.0: CPU and memory utilization — `DeviceMetricsService` batch-queries `processors.processor_usage` and `mempools.mempool_perc` per device, `NodeDataService::buildNodeData()` attaches `metrics: {cpu, mem}` to every node in live/SSE payload; embed `drawNode()` renders a "CPU x%  MEM y%" text line below the traffic aggregate, gated by `show_node_metrics` config + `?metrics=0` URL toggle; latency/packet-loss/custom-OID remain future work)*
-  - ~~CPU and memory utilization on nodes (via LibreNMS `/health/processor` and `/health/mempool` endpoints).~~ *(v1.12.0)*
-  - Latency visualization (via LibreNMS services API — service_type=ping).
-  - Packet loss indicators (via services API — service_ds with loss datasource).
-  - Custom SNMP OID support if it can be implemented without reintroducing unreliable polling behavior.
-  - *All data sources confirmed feasible via LibreNMS API research.*
-
-- [x] **Advanced Alerts Integration** *(v1.11.0: complete)*
-  - ~~LibreNMS alert overlay~~ *(done: `AlertService` fetches device+port alerts, embed view renders alert badges with severity coloring)*
-  - ~~Alert severity indicators~~ *(done: critical=red, warning=yellow)*
-  - ~~Click-through to alert details~~ *(v1.11.0: alert badges clickable → `/device/{id}/tab=alerts/`; badge hit detection takes priority over node/link clicks)*
-  - ~~Alert history on hover~~ *(v1.11.0: `AlertService::deviceAlertHistory()` and `portAlertHistory()` query without state filter, select id/timestamp, ordered DESC; alert count+severity in hover tooltip; alerts included in initial page load)*
-  - *The roadmap previously underestimated how much alert work was already done.*
-
-- [x] **Large map performance** *(v1.11.0: canvas layer separation, RAF pause on zero traffic, minimap decoupled from animation loop, nodeById O(1) lookup, O(N×L)→O(L) node→links index, batch link validation; v1.12.0: viewport culling — `renderMap`/`renderOverlay`/`renderEditor` skip nodes outside the visible world rect and links whose segment AABB misses it, with a 24px margin)*
-  - ~~Set practical performance budgets for node/link counts.~~ *(v1.11.0: performance budgets shipped)*
-  - ~~Profile canvas rendering, live update frequency, minimap updates, and flow animation cost.~~ *(v1.11.0: canvas layer separation eliminates 60fps full-canvas redraws; RAF pauses on zero traffic; minimap decoupled from animation loop)*
-  - ~~Graceful degradation controls: viewport culling (only draw visible nodes/links), auto-reduce particle density above link-count threshold, hide secondary labels below zoom threshold.~~ *(v1.12.0: viewport culling shipped in embed `renderMap`/`renderOverlay` and editor `renderEditor`; unreleased: particle density tiers above 150/300 links with a 1500-particle map cap, and secondary node text hidden below 0.6 zoom)*
-  - *Canvas 2D is appropriate for 1-300 nodes with these optimizations. No engine migration needed until v2.0.0.*
-
-- [x] **CLI tools for map management** *(v1.11.0: 4 Artisan commands registered via ServiceProvider — `lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`; verified live in Docker)*
-  - ~~`lnms weathermapng:create-map`, `weathermapng:list-maps`, `weathermapng:export`, `weathermapng:discover`.~~ *(v1.11.0)*
-  - ~~Follow `bin/map-poller.php` bootstrap pattern for LibreNMS environment loading.~~ *(v1.11.0: uses Artisan via ServiceProvider auto-discovery — no bootstrap boilerplate needed)*
-  - ~~Enables automation and headless map management.~~ *(v1.11.0)*
-
-- [x] **External embedding API documentation** *(v1.14.0: docs/API.md + docs/EMBED.md cover the read endpoints; `WEATHERMAPNG_EMBED_TOKEN` gates embed/json/live/sse via Bearer or `?token=` for sessionless consumers — Grafana panels, NOC walls, scripts; container-verified 200/401)*
-  - ~~Document the existing `/api/maps/{map}/json` and `/api/maps/{map}/live` endpoints as a public embedding API.~~ *(v1.14.0)*
-  - ~~Add optional API token auth for non-session access (NOC dashboards, external systems).~~ *(v1.14.0: `EmbedTokenAuth` middleware, constant-time compare, routes outside the session groups)*
-  - *Enables Grafana iframe panels, custom NOC walls, and status page integration without iframe hacks.* *(delivered; Grafana IFrame panel setup documented)*
-
-- [x] **Map Organization favorites** *(unreleased: `wmng_map_favorites` table, per-user star toggle + count badge + Favorites filter on the index; the toggle is available to any authenticated user, not just admins)*
-  - ~~Per-user favorites (requires user_id mapping table or column).~~ *(unreleased)*
-  - Saved views per user. *(still open)*
-
-### v1.10.0 - Maintenance & Dead Code Removal (shipped)
-
-- [x] **Dead auto-save code removal**: removed orphaned `resources/js/versioning.js`, unreachable `MapVersionController::autoSave()`, `auto_save` config keys, and unused `SaveMapVersionRequest` auto-save validation field.
-- [x] **Dead FormRequest and cache class removal**: removed `CreateLinkRequest`, `CreateNodeRequest`, and `MapCacheService` (zero callers).
-- [x] **Node label normalization consistency**: shared `NodeLabelNormalizer` called from both `NodeService` and `SaveMapRequest` so all write paths strip tags identically.
-- [x] **Ambiguous node rate label** (issue #11): node canvas label now uses `humanBits()` formatter with `Σ` prefix and "Total (In + Out)" tooltip text.
-- [x] **Plugin settings page fix**: `Settings::authorize()` now resolves `auth()->user()`; settings form uses `settings[...]` array notation so saves persist.
-- [x] **Debug-gated per-endpoint traffic logging**: `WEATHERMAPNG_DEBUG=true` logs raw per-endpoint counters for issue #11 diagnosis.
-
-
-### v1.11.0 - RRD Hover, Click-Through, CLI, Status Icons, Alerts, Performance (shipped)
-
-- [x] **RRD graph hover popups**: Hover a node or link for 300ms to see an inline LibreNMS RRD time-series graph image. `?graphs=0` to disable; auto-disabled in kiosk mode.
-- [x] **Editor click-through**: "View Device" button in node sidebar and "View Port" button in link modal open LibreNMS pages in a new tab.
-- [x] **Dead code cleanup** (−406 lines): 25+ dead methods removed across 14 source files. Deleted root-level `WeathermapNG.php` stub.
-- [x] **Backend performance**: `DeviceDataService` N+1 fixed (preloaded `Node::$deviceCache`), `rrdtool fetch` calls halved (`getLastValues()`), kiosk query skipped when not in kiosk mode.
-- [x] **Frontend performance**: `nodeById` O(1) lookup Map, minimap decoupled from animation loop, canvas layer separation (overlay canvas for particles/dashes), RAF pause on zero traffic.
-- [x] **Map-poller bug fixes**: Broken constructor, non-existent method, missing batch preloads, file locking (`LOCK_EX`).
-- [x] **CLI commands**: 4 Artisan commands — `weathermapng:create-map`, `list-maps`, `export`, `discover`.
-- [x] **Editor device autocomplete**: Debounced search input replaces full device `<select>`. Zero backend changes — existing `/api/devices?q=` endpoint reused.
-- [x] **Editor status-aware node colors**: Green (up), red (down), gray (unknown) + dashed ring for down nodes.
-- [x] **Embed status-based node visuals**: Pulsing red ring for down nodes, yellow dashed ring for warning (CPU/MEM ≥ threshold), gray dashed for unknown. `node_warning` color admin-configurable. Metrics merge from SSE fixed.
-- [x] **Alert badge click-through**: Alert badges clickable → `/device/{id}/tab=alerts/`. Badge hit detection takes priority.
-- [x] **Alert info in tooltip + initial load**: Alert count/severity in hover tooltip. Alerts in initial page load (not just SSE).
-- [x] **AlertService history queries**: `deviceAlertHistory()` and `portAlertHistory()` without state filter, select `id`/`timestamp`, ordered DESC. 14 new tests.
-- [x] **JSON export round-trip**: `_format` version stamp, auto-fill import form from JSON, `Map::createFromJsonData()` extracted.
-- [x] **O(N×L)→O(L) node→links index** in `NodeDataService::sumPortTraffic()`.
-- [x] **Batch link validation**: `LinkService::storeLinks` pre-fetches all nodes/ports in 2 queries instead of 2L+P per-link queries.
-
-### v1.12.0 - Bulk Ops, Auto-Discovery, Culling, Metrics, Editor Hardening (shipped)
-
-- [x] **Editor bulk operations**: Multi-select via shift/ctrl-click or rubber-band marquee. Bulk delete with undo, group drag, group keyboard nudge.
-- [x] **LLDP/CDP auto-discovery**: `AutoDiscoveryService` reads LibreNMS `links` table, dedupes by device pair, creates missing nodes/links. Admin-gated endpoint + editor trigger + Artisan command.
-- [x] **Admin data-integrity diagnostics**: Per-map broken port associations, missing RRD files, orphan nodes/links, dangling rows.
-- [x] **Viewport culling**: Embed `renderMap`/`renderOverlay` and editor `renderEditor` skip off-screen nodes/links via world-rect AABB test. Curved-link bezier control points included in AABB. View rect cached per frame.
-- [x] **Node CPU/memory overlay**: "CPU x%  MEM y%" text line below each node's traffic aggregate. Gated by `show_node_metrics` config + `?metrics=0` URL toggle. Server-side metrics queries skipped when disabled.
-- [x] **Editor canvas fit**: ResizeObserver computes largest box preserving aspect ratio. Canvas buffer matches display × DPR for crisp text on high-DPI.
-- [x] **Editor coordinate system**: `S.mapWidth`/`S.mapHeight` separate world dimensions from buffer size. Pan, zoom, drag, grid, minimap, culling all use world coords.
-- [x] **Selection state consistency**: `addNode`/`duplicateNode`/`deleteNode` properly maintain `selectedNodes` alongside `selectedNode`. Group drag and nudge move all selected nodes. Snap-to-grid recalculates drag offset.
-- [x] **SSE connection management**: DB released before sleep (pool exhaustion fix), heartbeat every 15s (proxy idle-timeout fix), reconnect timer tracked and cleared on stop (phantom connection fix).
-- [x] **Embed lifecycle**: Graph popup Image objects aborted on new hover (leak fix). `visibilitychange` pauses RAF/SSE/polling when tab backgrounded (kiosk resource savings).
-- [x] **Data clamping**: CPU/mem metrics and link percentages clamped to 0–100. `LookupController` admin-gated (IP exposure fix). `linkInView` dstId fallback aligned with `drawLink`.
-
-### Future - Historical Views & Export
-
-- [ ] **Historical Playback**
-  - Timeline scrubber.
-  - Play/pause controls.
-  - Speed adjustment.
-  - Uses RRD time-range fetch via existing `RRDTool.php` class.
-
-- [ ] **Export Formats**
-  - ~~High-resolution PNG~~ *(done: exists in embed view via `canvas.toDataURL`)*
-  - ~~SVG export.~~ *(unreleased: deterministic static SVG of the authored map via `resources/js/svg-export.js`, `Export SVG` button in the embed controls; honors node/link styles, device shapes, labels and escaped text)*
-  - High-resolution PNG (2x/4x) scaling remains open.
-  - PDF export.
-  - Visio/draw.io format if there is enough demand.
-
-- [x] **Config file import/export** *(v1.11.0: JSON export with `_format` version stamp, import form auto-fills name/title from JSON, `Map::createFromJsonData()` extracted for reuse; v1.13.0: legacy `.conf` format via new `LegacyConfService` — round-trippable parser, HTTP export via `?format=conf`, CLI `--format=conf`, and import via the existing modal (extension-dispatched in `MapService::importMap`) with 9 test cases)*
-  - *Not visual export — enables portability and automation.*
-- [ ] **Scheduled Reports**
-  - Daily/weekly snapshots.
-  - Email delivery.
-  - PDF generation.
-  - Scheduled PNG/PDF snapshot generation for NOC wall displays (extend `bin/map-poller.php`).
-
-- [x] **Grafana integration** *(v1.14.0: IFrame panel setup documented in docs/EMBED.md; token auth enables sessionless embedding)*
-  - ~~Document Grafana IFrame panel setup (works today with `allow_embedding=true`).~~ *(v1.14.0)*
-  - Explore JSON data source for native Grafana panel rendering weathermap data.
-
-- [x] **Map lifecycle webhooks** *(v1.14.0: `WebhookDispatcher` on map.created/updated/deleted/version_saved with optional HMAC-SHA256 signatures; settings-form and config-file URL configuration; container-verified with receiver-side signature validation)*
-  - ~~Notify external systems (Slack, webhook) on map created/updated/deleted/version-saved.~~ *(v1.14.0)*
-  - ~~Laravel events on Eloquent model events + webhook dispatcher.~~ *(v1.14.0: direct service-level dispatch via constructor injection — simpler than model events and covers import/version paths)*
-  - *Extracted from v2.0.0 API v2 — achievable with current architecture.* *(delivered)*
-
----
-
-## Long Term
-
-### v2.0.0 - Next Generation
-
-These ideas are intentionally parked until the core product feels polished and maintainable.
-
-- [ ] **Multi-user Editing**
+- [ ] **Multi-user editing**
   - Presence indicators.
   - Conflict resolution.
   - Edit locking.
   - Per-map access control / visibility (requires user_id or role mapping on maps).
-
-- [ ] **Advanced Auto-Layout Algorithms**
+- [ ] **Advanced auto-layout algorithms**
   - Force-directed graphs.
   - Hierarchical layout.
-  - Circular layout *(from NagVis competitive analysis)*.
-  - Geographic placement from device data (LibreNMS locations table has lat/lng).
-  - Semantic zooming: auto-clustering at low zoom, drill-down at high zoom *(matches Datadog/Kentik approach)*.
-
-- [ ] **Plugin Ecosystem**
+  - Circular layout.
+  - Geographic placement from device data (LibreNMS `locations` has lat/lng).
+  - Semantic zooming: auto-clustering at low zoom, drill-down at high zoom.
+- [ ] **Plugin ecosystem**
   - Custom data source plugins.
   - Visualization plugins.
   - Export format plugins.
-
 - [ ] **API v2**
   - GraphQL support.
   - External data sources.
-
-- [ ] **WebGL Rendering Engine** *(clarified: 2D graph scale, not 3D)*
-  - Migrate from Canvas 2D to **Sigma.js + Graphology** for 10k+ node graph rendering.
-  - Keep the data model (nodes, links, live updates) unchanged — SSE/polling layer is rendering-agnostic.
-  - If 3D geographic positioning is needed, use **Three.js or deck.gl** separately.
-  - *Triggered when maps regularly exceed 300 nodes. No migration needed before that.*
-
-- [ ] **Mobile App**
+- [ ] **WebGL rendering engine** (2D graph scale, not 3D)
+  - Migrate from Canvas 2D to Sigma.js + Graphology for 10k+ node graphs.
+  - Keep the data model (nodes, links, live updates) unchanged; the SSE and
+    polling layers are rendering-agnostic.
+  - Use Three.js or deck.gl separately if 3D geographic positioning is needed.
+  - Triggered when maps regularly exceed 300 nodes. No migration is needed
+    before that.
+- [ ] **Mobile app**
   - iOS/Android companion app.
   - Push notifications for alerts.
   - Quick map viewing.
+
 ---
 
-## Completed Features
+## Completed by version
 
-### v1.7.0 ✅
+Shipped work, newest first. Summaries for v1.13.0 and later condense
+[CHANGELOG.md](CHANGELOG.md); earlier sections keep the detail recorded when the
+work landed.
 
-- [x] N+1 query elimination (Wave 1 + Wave 2): eager-loads + batch caches, ~400 → ~10 queries on a 50-node map.
-- [x] Admin-only authorization: all 24 mutation endpoints require admin via the `AdminCheck` trait.
-- [x] Editor accessibility pass: `aria-label`, `type="button"`, focus-visible outlines.
-- [x] `mergeMapOptions` data-loss fix: preserves all option keys, not just `width`/`height`/`background`.
-- [x] Release readiness checklist: `RELEASE.md` created.
-- [x] Dead code removal: `SseStreamService`, `MapDataBuilder`, `MapPolicy`, `NodePolicy`, `test_hooks.php`, `debug_plugin_web.php`, root `map-poller.php`; canonical poller is now `bin/map-poller.php`.
-- [x] Demo traffic deterministic: per-id sine waves instead of `rand()`, smooth and jitter-free.
-- [x] Correctness fixes: `NodeService::deleteNode` `orWhere`, `LinkService` validation, `RenderController` import transaction, `MapCacheService` eager loads, `MapLinkController` catch widening.
+### v1.16.0
 
-### v1.6.5
+- [x] **Version comparison UI**: side-by-side topology, before/after field
+  details, explicit unavailable legacy fields, and read-only compare.
+- [x] **Safe restore**: validate the snapshot and references, write a
+  **Before restore** checkpoint, restore atomically, and record a
+  **Restored version** entry.
+- [x] **Complete history export**: export every saved version for a map, not
+  only the displayed 20.
+- [x] **Gallery topology previews** for maps and templates, with empty states
+  and a bounded overview for larger maps.
+- [x] **First-run sample maps**: deliberate, named creation from the welcome
+  screen; canceling leaves the install empty.
+- [x] **Install and upgrade hardening**: native Ubuntu/PHP-FPM upgrade CI lane,
+  serialized install/deploy operations, stricter schema checks, and Composer
+  repository ownership checks.
+
+### v1.13.0 - v1.15.1
+
+- [x] **Common topology templates**: Data Center, WAN/MPLS, Campus, and Branch
+  Office, seeded through every install path.
+- [x] **Nested maps and drill-down**: `parent_map_id`, cycle-bounded breadcrumbs,
+  and `meta.sub_map_id` navigation in the embed view.
+- [x] **Legacy `.conf` import/export** through `LegacyConfService`, including
+  `?format=conf` and the CLI.
+- [x] **Accessibility smoke suite**, `tests/screenshot-check.sh` + `just visual`,
+  and the `justfile` task runner.
+- [x] **Embed modularization**: `embed.blade.php` reduced from 2062 to 113
+  lines; JS moved to `resources/js/embed-app.js`, styles to
+  `resources/css/embed.css`.
+- [x] **Map lifecycle webhooks** on create/update/delete/version-save, with
+  optional HMAC-SHA256 signatures.
+- [x] **Embed API token auth** for Grafana panels, NOC walls, and scripts.
+- [x] **Canonical install guide** with backup/recovery, plus the v1.15.1 legacy
+  dimension fallback for maps whose options omit width or height.
+
+### v1.12.0
+
+- [x] **Editor bulk operations**: multi-select via shift/ctrl-click or
+  rubber-band marquee, bulk delete with undo, group drag, group keyboard nudge.
+- [x] **LLDP/CDP auto-discovery**: `AutoDiscoveryService` reads the LibreNMS
+  `links` table, dedupes by device pair, and creates missing nodes and links.
+  Admin-gated endpoint, editor trigger, and Artisan command.
+- [x] **Admin data-integrity diagnostics**: broken port associations, missing
+  RRD files, orphan nodes and links, and dangling rows.
+- [x] **Viewport culling**: embed `renderMap`/`renderOverlay` and editor
+  `renderEditor` skip off-screen nodes/links via a world-rect AABB test. Curved
+  bezier control points are included. The view rect is cached per frame.
+- [x] **Node CPU/memory overlay**: CPU/MEM line below each node's traffic
+  aggregate, gated by `show_node_metrics` and `?metrics=0`. Server-side metric
+  queries are skipped when disabled.
+- [x] **Editor canvas fit**: ResizeObserver preserves aspect ratio; the canvas
+  buffer matches display × DPR.
+- [x] **Editor coordinate system**: world dimensions separate from buffer size;
+  pan, zoom, drag, grid, minimap, and culling use world coordinates.
+- [x] **Selection state consistency** across add, duplicate, delete, group drag,
+  and nudge. Snap-to-grid recalculates the drag offset.
+- [x] **SSE connection management**: DB released before sleep, 15s heartbeat,
+  and reconnect timers cleared on stop.
+- [x] **Embed lifecycle**: graph popup images aborted on new hover;
+  `visibilitychange` pauses RAF, SSE, and polling when backgrounded.
+- [x] **Data clamping and lookup gating**: CPU/memory and link percentages
+  clamped to 0-100; `LookupController` admin-gated.
+
+### v1.11.0
+
+- [x] **RRD graph hover popups**: hover a node or link for 300ms to see an
+  inline LibreNMS graph. `?graphs=0` disables; kiosk mode disables automatically.
+- [x] **Editor click-through**: "View Device" and "View Port" open LibreNMS
+  pages in a new tab.
+- [x] **Dead code cleanup** (−406 lines): 25+ dead methods across 14 source
+  files; deleted the root `WeathermapNG.php` stub.
+- [x] **Backend performance**: `DeviceDataService` N+1 fixed with preloaded
+  device cache; `rrdtool fetch` calls halved; kiosk query skipped when unused.
+- [x] **Frontend performance**: O(1) `nodeById` lookup, minimap decoupled from
+  the animation loop, canvas layer separation, RAF pause on zero traffic.
+- [x] **Map-poller fixes**: constructor, method name, batch preloads, and
+  `LOCK_EX` file locking.
+- [x] **CLI commands**: `weathermapng:create-map`, `list-maps`, `export`,
+  `discover`.
+- [x] **Editor device autocomplete**: debounced search replaces the full device
+  `<select>`; reuses `/api/devices?q=`.
+- [x] **Editor status-aware node colors**: green, red, gray, plus a dashed ring
+  for down nodes.
+- [x] **Embed status visuals**: pulsing red ring for down, yellow dashed for
+  warning (CPU/MEM threshold), gray dashed for unknown. `node_warning` is
+  admin-configurable.
+- [x] **Alert badges**: clickable badges to `/device/{id}/tab=alerts/`, with
+  hit detection ahead of node/link clicks.
+- [x] **Alert tooltip and initial load**: alert count and severity in the hover
+  tooltip; alerts included in the first page load, not only SSE.
+- [x] **Alert history queries**: `deviceAlertHistory()` and
+  `portAlertHistory()` without a state filter; 14 new tests.
+- [x] **JSON export round-trip**: `_format` version stamp, import form
+  auto-fill, `Map::createFromJsonData()`.
+- [x] **O(N×L) → O(L) node-to-links index** in `NodeDataService`.
+- [x] **Batch link validation**: `LinkService::storeLinks` pre-fetches nodes and
+  ports in two queries.
+
+### v1.10.0
+
+- [x] **Dead auto-save removal**: orphaned `resources/js/versioning.js`,
+  unreachable `MapVersionController::autoSave()`, `auto_save` config keys, and
+  the unused validation field.
+- [x] **Dead FormRequest and cache removal**: `CreateLinkRequest`,
+  `CreateNodeRequest`, and `MapCacheService` (zero callers).
+- [x] **Node label normalization**: shared `NodeLabelNormalizer` for
+  `NodeService` and `SaveMapRequest`.
+- [x] **Ambiguous node rate label** (issue #11): `humanBits()` formatter with a
+  `Σ` prefix and "Total (In + Out)" tooltip.
+- [x] **Settings page fix**: `Settings::authorize()` resolves `auth()->user()`;
+  the form uses `settings[...]` notation so saves persist.
+- [x] **Debug-gated traffic logging**: `WEATHERMAPNG_DEBUG=true` logs raw
+  per-endpoint counters for issue #11 diagnosis.
+
+### v1.9.0
+
+- [x] **Map tags and filtering**: lowercase tags in `wmng_maps.options`, index
+  tag chips and filter, normalized and deduplicated on save.
+- [x] **First-run onboarding**: welcome links to Templates, Create, Import,
+  Diagnostics, and Docs when no maps exist.
+- [x] **Per-map default styles**: node and link defaults stored in map options,
+  merged at render time, with allowlisted keys and hex validation.
+- [x] **Operational diagnostics page**: health, counts, per-check status, route
+  registration, and writable paths. Data-integrity checks followed in v1.12.0.
+- [x] **NOC wall / kiosk mode**: `?kiosk=1` hides chrome and auto-hides the
+  cursor; `?cycle=N` rotates maps; `Esc` toggles chrome.
+- [x] **Embed click-through navigation**: clicking a node opens its LibreNMS
+  device page and a link opens its port page. `?target=self` keeps navigation
+  in the same tab. Editor buttons followed in v1.11.0.
+
+### v1.8.0
+
+- [x] **Map version history activated**: registered routes and built the editor
+  UI for save, list, restore, delete, compare, and export.
+- [x] **Version backend fixes**: `json_decode()` TypeError, wrong snapshot field
+  names, upsert-only restore replaced by true rollback with ID preservation,
+  and delete-only-the-selected-version semantics.
+- [x] **Version admin gates**: `compare()`, `export()`, `store()`, and restore
+  require an admin; `SaveMapVersionRequest` sanitizes text.
+- [x] **Save validation hardening**: `SaveMapRequest` FormRequest, allowlisted
+  link style, bounded via points, and `strip_tags()` on titles and labels.
+- [x] **Health endpoint admin gates**: stats, metrics, and detailed health now
+  require an admin; public probes stay minimal.
+- [x] **Shared client helpers**: `wmng-common.js` and `ui-helpers.js`; the
+  toast/loading class-shadowing crash was fixed.
+- [x] **Dead duplicate assets removed** from the repository root.
+
+### v1.7.0
+
+- [x] **N+1 query elimination (Wave 1 + Wave 2)**: eager-load map, node, link,
+  and version relations, and batch per-row caches so a 50-node map goes from
+  ~400 queries to ~10. `MapCacheService` was later deleted as dead code; the
+  eager-load pattern lives on in the controllers and `RrdDataService`
+  request-local caches.
+- [x] **Admin-only authorization**: all mutation endpoints require an admin via
+  the `AdminCheck` trait. Reads are open to authenticated users.
+  `MapPolicy` and `NodePolicy` were removed.
+- [x] **Editor accessibility**: `aria-label` and explicit `type="button"` on
+  icon-only controls; focus-visible outlines preserved.
+- [x] **`mergeMapOptions` data-loss fix**: all option keys survive a save, not
+  only `width`/`height`/`background`.
+- [x] **Release readiness checklist**: `RELEASE.md` created.
+- [x] **Dead code removal**: `SseStreamService`, `MapDataBuilder`, `MapPolicy`,
+  `NodePolicy`, `test_hooks.php`, `debug_plugin_web.php`, and the root
+  `map-poller.php`; canonical poller is `bin/map-poller.php`.
+- [x] **Deterministic demo traffic**: per-id sine waves instead of `rand()`.
+- [x] **Correctness fixes**: `NodeService::deleteNode` `orWhere`,
+  `LinkService` validation, import transaction, eager-load fixes, and a
+  narrowed `catch` in `MapLinkController`.
+
+### v1.6.x - v1.7.8
+
+- [x] **Embed controls cleanup**: valid zoom-button HTML, safer DOM
+  construction, Font Awesome icons, accessible labels.
+- [x] **Editor accessibility pass**: labels, button types, keyboard and focus
+  affordances, and no focus-outline overrides.
+- [x] **Responsive editor layout** (v1.7.8): CSS media queries stack the sidebar
+  below the canvas on narrow screens, with a horizontal toolbox and wrapping
+  topbar. Browser-tested at 768px and 1920px.
+- [x] **Embed responsive polish** (v1.7.5, v1.7.8): wrapping nav and controls,
+  responsive offsets, minimap hidden on very small screens, and reduced-motion
+  handling for flow animations. Browser-tested at 480px.
+- [x] **Index and template gallery polish** (v1.7.8, v1.13.0, v1.16.0): escaped
+  template cards, delegated listeners, sanitized category classes, fixed
+  creation redirect, four built-in topology templates, and real previews.
+- [x] **Theme and UI cleanup** (v1.7.4, v1.7.8, v1.13.0): narrowed
+  MutationObserver filters, static inline styles moved to CSS, and the embed
+  view split into `embed.css` and `embed-app.js`.
+- [x] **LibreNMS hook and legacy view polish**: Bootstrap button conventions,
+  safe external links, accessible labels, live-map entry points, and
+  confirmation UI for legacy delete.
+- [x] **Settings admin polish**: Bootstrap feedback and confirmation instead of
+  browser alerts; text-safe preview; explicit unavailable restore behavior.
+- [x] **Index and editor confirmation polish**: Bootstrap modals for destructive
+  actions; editor save errors route through toast feedback.
+- [x] **Validation coverage** (v1.13.0): `AccessibilitySmokeTest` (12 plain
+  PHPUnit cases), `tests/screenshot-check.sh` and `just visual` at
+  480/768/1920 px with a degenerate-capture guard, and the `justfile` facades.
+  Screenshot comparison in CI is unreleased.
+- [x] **Release readiness checklist**: documented the pre-release validation
+  flow, manual QA, and patch/minor/major definitions.
+- [x] **Upgrade safety** (v1.7.4): added upgrade notes to `INSTALL.md`, verified
+  existing config/output/validation tables, and made failure messages
+  actionable.
+
+### Earlier releases (v1.1.x - v1.6.5)
+
+#### v1.6.5
 
 - [x] Quick install normalizes LibreNMS plugin registration after enablement.
-- [x] Duplicate inactive `WeathermapNG` rows are cleaned from the LibreNMS `plugins` table.
-- [x] Install docs explain expected `wmng_*` and JSON-column `utf8mb4_bin` warnings.
-- [x] Legacy map list delete action uses Bootstrap confirmation instead of a browser prompt.
+- [x] Duplicate inactive `WeathermapNG` rows are cleaned from the `plugins` table.
+- [x] Install docs explain expected `wmng_*` and JSON-column `utf8mb4_bin`
+  warnings.
+- [x] Legacy map list delete action uses Bootstrap confirmation.
 
-### v1.6.4
+#### v1.6.4
 
 - [x] Composer path package registration during quick install.
 - [x] Weekly/manual LibreNMS install smoke test in CI.
@@ -413,77 +370,81 @@ These ideas are intentionally parked until the core product feels polished and m
 - [x] Route verification during quick install.
 - [x] Output directory configuration and readiness fixes.
 - [x] PHP 8.2+ requirement alignment across Composer, runtime checks, and tests.
-- [x] Health route exposure tightened: public liveness/readiness, authenticated details/metrics.
-- [x] Version metadata guardrails with `VERSION`, `composer.json`, changelog, and release tag checks.
-- [x] Release workflow validation for SemVer/version consistency.
+- [x] Health route exposure tightened: public liveness/readiness, authenticated
+  details/metrics.
+- [x] Version metadata guardrails across `VERSION`, `composer.json`, changelog,
+  and release tag.
+- [x] Release workflow validation for SemVer and version consistency.
 
-### v1.6.2
+#### v1.6.2
 
-- [x] Via points and via style for links: curved, angled, and straight path routing.
-- [x] Interactive via point editing in modern editor: add, drag, delete.
+- [x] Via points and via style for links: curved, angled, and straight paths.
+- [x] Interactive via point editing: add, drag, delete.
 - [x] Flow particles follow waypoint paths.
 - [x] Catmull-Rom spline interpolation for curved via style.
 - [x] Global `link_style` setting wired to embed and blade editors.
-- [x] `show_bandwidth` and `show_percentages` settings honored in embed viewer.
-- [x] Via style dropdown in blade editor link modal.
-- [x] Version dynamically read from Composer metadata at the time.
-- [x] Fixed modern editor `saveMap` endpoint.
+- [x] `show_bandwidth` and `show_percentages` honored in the embed viewer.
+- [x] Via style dropdown in the blade editor link modal.
+- [x] Version read from Composer metadata.
+- [x] Modern editor `saveMap` endpoint fixed.
 - [x] Settings terminology aligned: orthogonal to angled.
 
-### v1.6.1
+#### v1.6.1
 
 - [x] Professional 3-panel editor layout: toolbox, canvas, properties sidebar.
 - [x] Dark/light theme auto-detection matching LibreNMS.
 - [x] Zoom and pan: mouse wheel plus middle-click panning.
-- [x] Undo/redo system with 50-state history.
+- [x] Undo/redo with 50-state history.
 - [x] Keyboard shortcuts: Ctrl+S/Z/Y, Delete, arrow nudge, +/-/0 zoom, Esc.
 - [x] Editor minimap with click-to-navigate.
-- [x] Grid snapping toggle with visual overlay.
+- [x] Grid snapping toggle with overlay.
 - [x] Smart spiral node placement.
 - [x] Node boundary checking and canvas resize validation.
 - [x] Node duplication and inline property editing.
 - [x] Link mode with visual feedback.
-- [x] Unsaved changes indicator (auto-save wiring removed in v1.7.0 — referenced non-existent elements).
-- [x] Fixed link bandwidth utilization calculation accuracy.
-- [x] Templates gallery with built-in map templates.
-- [x] Main index page redesign with search, sort, improved cards, and empty state.
-- [x] Demo mode with simulated traffic data.
+- [x] Unsaved-changes indicator (auto-save wiring removed in v1.7.0 because it
+  referenced non-existent elements).
+- [x] Fixed link bandwidth utilization calculation.
+- [x] Templates gallery with built-in templates.
+- [x] Index redesign: search, sort, cards, empty state.
+- [x] Demo mode with simulated traffic.
 - [x] Docker development environment.
 
-### v1.6.0
+#### v1.6.0
 
-- [x] Simplified data fetching: RRD-only, removed buggy API/SNMP fallback paths.
-- [x] Fixed RRD path resolution to match LibreNMS naming.
-- [x] Fixed utilization calculation for full-duplex links.
+- [x] Simplified data fetching: RRD-only; buggy API/SNMP fallback removed.
+- [x] RRD path resolution matched to LibreNMS naming.
+- [x] Utilization calculation fixed for full-duplex links.
 - [x] Device-type node icons: router, switch, server, firewall.
-- [x] Enhanced link tooltips with bandwidth capacity.
+- [x] Link tooltips include bandwidth capacity.
 - [x] Embed navigation bar with map title and edit link.
-- [x] Proper service registration in ServiceProvider.
+- [x] Service registration in the ServiceProvider.
 - [x] Admin-only settings authorization.
-- [x] Fixed cache key collisions.
-- [x] Disabled unreliable ifIndex-based auto-discovery pending LLDP/CDP rewrite.
+- [x] Cache key collision fix.
+- [x] Unreliable ifIndex auto-discovery disabled, later replaced by the
+  LLDP/CDP rewrite in v1.12.0.
 
-### v1.5.x
+#### v1.5.x
 
-- [x] Map versioning foundation: storage and services written, but **dormant** — editor UI removed in v1.7.0, routes not registered. Activate in v1.8.0 by registering routes and building UI (see VERSIONING.md).
-- ~~Auto-save functionality~~ *(removed in v1.7.0 — dead code referencing non-existent elements)*
+- [x] Map versioning foundation: storage and services shipped dormant and were
+  activated in v1.8.0, which registered the routes and added the editor UI (see
+  [VERSIONING.md](docs/VERSIONING.md)).
 - [x] Demo mode for testing without devices.
-- [x] Docker development environment.
 - [x] Improved install scripts.
 - [x] Removed heatmap due to pan/zoom sync issues.
 
-### v1.4.x - v1.5.0
+#### v1.4.x - v1.5.0
 
 - [x] Security hardening: XSS prevention and input validation.
-- [x] Authorization policies.
+- [x] Authorization policies (replaced by admin-only `AdminCheck` in v1.7.0).
 - [x] FormRequest validation.
 
-### v1.3.x
+#### v1.3.x
 
 - [x] Performance caching system.
 - [x] E2E installation tests.
 
-### v1.2.x
+#### v1.2.x
 
 - [x] Map templates.
 - [x] Accessibility improvements.
@@ -491,7 +452,7 @@ These ideas are intentionally parked until the core product feels polished and m
 - [x] Loading states.
 - [x] Web installer.
 
-### v1.1.x
+#### v1.1.x
 
 - [x] Database-driven architecture.
 - [x] MVC structure with services.
@@ -508,18 +469,20 @@ These ideas are intentionally parked until the core product feels polished and m
 Want to help? Check out:
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
-- [GitHub Issues](https://github.com/lance0/weathermapNG/issues) - Feature requests and bugs
+- [GitHub Issues](https://github.com/lance0/weathermapNG/issues) - Feature
+  requests and bugs
 
-### Priority Areas
+### Priority areas
 
-1. **Operator workflows**: Click-through navigation to LibreNMS device pages, RRD graph hover popups, device status-based node icons — the #1 gaps vs legacy weathermap tools.
-2. **Editor productivity**: Bulk operations and per-map default styling.
-3. **Map scale**: Nested maps / drill-down hierarchy for multi-scale networks, NOC wall/kiosk mode.
-4. **Performance**: Large map rendering (viewport culling, particle throttling) and live update efficiency.
-5. **Discovery**: LLDP/CDP topology, custom metrics (CPU/memory/latency), alerts click-through.
-6. **Integration**: External embedding API, CLI tools, Grafana integration, config file import/export.
-
----
+1. **Saved views and dashboard organization**: per-user saved index filters
+   alongside favorites.
+2. **Historical playback and reports**: RRD time-range playback and scheduled
+   NOC-wall snapshots.
+3. **Export formats**: PDF, Visio/draw.io, and 2x/4x PNG.
+4. **Metrics beyond CPU/memory**: latency, packet loss, and custom OIDs.
+5. **Multi-user editing**: presence, conflict resolution, and edit locking.
+6. **Rendering above 300 nodes**: the WebGL engine work.
+7. **Integration**: API v2, plugin ecosystem, and external data sources.
 
 ## Feedback
 

@@ -1,145 +1,182 @@
 # WeathermapNG Versioning
 
-WeathermapNG has two different versioning concerns:
+How plugin releases are versioned, how saved map versions are stored and
+restored, and where the two meet.
 
-1. **Plugin release versioning**: the package version users install.
-2. **Map version history**: saved snapshots of individual maps.
+| Task | Section |
+|------|---------|
+| Bump or tag a release | [Version sources](#version-sources) · [Release coupling](#release-coupling) |
+| Inspect a saved snapshot | [Map version data model](#map-version-data-model) |
+| Call the history API | [API shape](#api-shape) |
+| Restore a map safely | [Safe restore](#safe-restore) |
+| Compare two versions | [Visual comparison](#visual-comparison) |
+| Check what is not built | [Not implemented](#not-implemented) |
 
-This document describes both and separates current behavior from planned work.
+## Version sources
 
-## Plugin Release Versioning
+Plugin releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
 
-WeathermapNG follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html) for releases:
+| Bump | Use |
+|------|-----|
+| Patch | Bug fixes, install fixes, documentation corrections, UI polish that does not change workflows. |
+| Minor | New user-facing functionality, endpoints, editor workflows, or supported install behavior. |
+| Major | Breaking changes, removed public behavior, incompatible install changes, or unsupported data migrations. |
 
-- `PATCH`: bug fixes, install fixes, documentation corrections, UI polish that does not change user workflows.
-- `MINOR`: new user-facing functionality, new endpoints, new editor workflows, or new supported install/runtime behavior.
-- `MAJOR`: breaking changes, removed public behavior, incompatible install changes, or unsupported data migrations.
+These sources must agree on every release:
 
-## Release Metadata
+| Source | Requirement |
+|--------|-------------|
+| `VERSION` | Canonical version string, one line, for example `1.16.0`. |
+| `composer.json` | The `"version"` field equals `VERSION` exactly. |
+| `CHANGELOG.md` | Contains `## [<version>] - <YYYY-MM-DD>` for the release. |
+| `README.md` | Version badge and tagged install example match the release. |
+| `ROADMAP.md` | Header states the current release; the status heading matches it. |
+| Git tag | `v<version>` matches `VERSION`. |
 
-The release version is stored in:
+`just release-bump v<version>` writes `VERSION`, `composer.json`, the README
+version badge, the ROADMAP last-reviewed line, and the `## Current Status`
+heading. It does not write the changelog entry or update the README install
+example. `just check-metadata` validates `VERSION`, `composer.json`, and the
+presence of the changelog section; the remaining entries are reviewed by hand.
 
-- `VERSION`
-- `composer.json`
-- `CHANGELOG.md`
-- Git tag, such as `v1.6.4`
+## Map version data model
 
-CI and release validation should keep these aligned. A release tag must match the project version.
+Map history is stored per map in `wmng_map_versions`. It exists for rollback and
+auditability while editing, not for whole-install backup.
 
-## Authorization Model In v1.7.0
+| Column | Content |
+|--------|---------|
+| `id` | Version id, used by restore and compare routes. |
+| `map_id` | Owning map; deletes with the map. |
+| `name` | Version name, required, up to 100 characters. |
+| `description` | Optional text, up to 1000 characters. |
+| `config_snapshot` | JSON snapshot of the map, nodes, and links. |
+| `created_by` | LibreNMS user id when available. |
+| `created_at` | Creation timestamp; versions are not updated after creation. |
 
-v1.7.0 standardized authorization on a simple admin-only model: maps have no per-user ownership and there is no `user_id` column on `wmng_maps`. Any authenticated LibreNMS user can read maps, templates, lookups, and health detail; all `POST`/`PUT`/`PATCH`/`DELETE` operations require an admin (`hasGlobalAdmin()`, `isAdmin()`, or `level >= 10`), enforced by the shared `AdminCheck` trait in each controller. Public health/readiness/liveness probes remain unauthenticated. Earlier per-map policy scaffolding (`MapPolicy`, `NodePolicy`) has been removed. See [API.md](API.md) for the per-route breakdown.
+The table is created by `database/setup.php` on fresh installs and upgrades, and
+by the matching migration.
 
-## Pre-release Checklist
+A snapshot contains:
 
-The full pre-release validation flow — syntax checks, `composer validate`, the test suite, CI verification, version-source alignment, tagging, and manual QA — lives in [RELEASE.md](../RELEASE.md). Follow that checklist before tagging any release. The quick checks below are a fast pre-flight, not a substitute for the full release readiness flow:
+- `map`: id, name, title, width, height, background, description,
+  `parent_map_id`, map `options`, and raw width/height.
+- `nodes`: keyed by id, with label, coordinates, `device_id`, and `meta`.
+- `links`: keyed by id, with endpoints, port ids, `bandwidth_bps`, and style.
+
+Rows remain until deleted. There is no automatic pruning, retention policy, or
+scheduled cleanup. The version list shows the newest 20 entries; the history
+response reports that as `display_limit` and keeps `max_versions` as a
+compatibility alias. Stored history is not limited to 20 versions.
+
+## API shape
+
+The version routes are registered in `routes/web.php` and are admin-only,
+including list, show, compare, and export. The editor's Version History modal
+uses the same routes.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions` | List versions for a map |
+| `POST` | `/plugin/WeathermapNG/api/maps/{map}/versions` | Create a named version |
+| `GET` | `/plugin/WeathermapNG/api/versions/{versionId}` | Show version details and snapshot |
+| `POST` | `/plugin/WeathermapNG/api/versions/{versionId}/restore` | Restore the map to a version |
+| `GET` | `/plugin/WeathermapNG/api/versions/{versionId}/compare/{compareId}` | Compare two versions |
+| `DELETE` | `/plugin/WeathermapNG/api/versions/{versionId}` | Delete one version |
+| `GET` | `/plugin/WeathermapNG/api/maps/{map}/versions/export` | Export all versions as JSON |
+
+Creating a version requires `name` and accepts an optional `description`. The
+compare response returns flat `nodes_added`, `nodes_removed`, `nodes_modified`,
+`links_added`, `links_removed`, and `links_modified` lists plus both snapshots.
+[API.md](API.md) is the authoritative route and response reference, including
+the version routes and authentication tiers for every other route.
+
+## Safe restore
+
+Restoring validates the snapshot and its references before changing the map.
+One transaction then:
+
+1. Saves a **Before restore #<id>** checkpoint.
+2. Replaces the map's nodes and links with the selected snapshot.
+3. Saves a **Restored version #<id>** entry.
+
+Existing saved versions are unchanged; restore the checkpoint to recover the
+state the operation replaced. Invalid snapshots return `422` with a redacted
+message, and database failures roll back the map and the new history.
+
+New snapshots include complete options, description, parent map, node metadata,
+and legacy canvas dimensions. Older snapshots restore only the fields they
+recorded; omitted settings are not guessed. Coordinate restores with active
+editors: concurrent editing is not a shared, conflict-aware session, and editor
+saves do not take the restore lock.
+
+The JSON export includes every saved version for the selected map regardless of
+the list's 20-entry display limit. It retains complete snapshots and available
+creator names. It is a map-history export, not a full backup; follow
+[INSTALL.md](INSTALL.md#backup-and-recovery) for database and configuration
+backups.
+
+## Visual comparison
+
+In Version History, choose **Compare** on one version, select another, and run
+the comparison. The left view is before; the right view is after. Added,
+removed, and modified nodes and links have text markers and colors. Both views
+share a scale so position changes remain visible. The table shows before/after
+map options, node fields, and link configuration.
+
+Older snapshots did not capture every field; those fields are marked
+unavailable. A recorded `null` remains distinct from an unset or unrecorded
+value. Matching uses saved node and link ids: editor saves can replace ids, so
+some edits appear as a removal plus an addition.
+
+The preview draws straight links; saved bends and styling appear in the details.
+Each view displays up to 100 nodes and 150 links, with up to 200 detail rows and
+explicit omitted/invalid counts. These are display limits; the response still
+contains the complete snapshots. Comparison does not change saved data.
+
+## Release coupling
+
+The full pre-release flow, manual QA, tagging, and workflow checks live in
+[RELEASE.md](../RELEASE.md).
+
+### Pre-release checklist
+
+Run the fast checks before the tagged release flow:
 
 ```bash
 composer validate --no-check-publish
 vendor/bin/phpunit --no-coverage
+just check-metadata
 ```
 
-Also verify:
+Then confirm:
 
-- `VERSION` matches `composer.json`.
-- `CHANGELOG.md` has an entry for the release.
-- Install CI and route smoke tests pass.
+- `VERSION` matches `composer.json` and the changelog has the release section.
+- Install CI, route smoke tests, and the visual comparison pass.
 - `quick-install.sh` still registers the package and discovers routes.
-- Public health/readiness endpoints remain minimal.
-- Authenticated detail/metrics endpoints remain protected.
-- Read endpoints stay open to authenticated users; mutation endpoints stay admin-only.
+- Public probes stay minimal and authenticated detail endpoints stay protected.
 
-## Current Map Version History Foundation
+This is a pre-flight, not a substitute for the full release flow. Run
+`just release-bump <version>`, add the changelog entry, run
+`just release-check <version>`, then `just release-tag <version>` after manual
+QA.
 
-Map versioning stores map snapshots in the `wmng_map_versions` table. It is intended for rollback and auditability while editing maps.
+`release-tag` requires a clean working tree and a matching changelog section.
+The Release workflow validates that the tag matches `VERSION`, `composer.json`,
+and `CHANGELOG.md`, extracts the matching changelog section as release notes,
+and attaches the archives. A mismatch blocks the release; there is no fallback.
 
-Implemented foundation:
+## Not implemented
 
-- Data model and table for named map versions with optional descriptions.
-- Service/controller code for saving, restoring, listing, comparing, deleting, and exporting versions.
-- Retain snapshots of nodes, links, and map settings.
+These are not scheduled:
 
-Version routes and the editor's Version History modal have been registered since
-v1.8.0. Mutation endpoints and version-history reads require an administrator.
+- Configurable retention or automatic snapshot cleanup.
+- Conflict detection or edit locking for concurrent map editing. Multi-user
+  editing is parked in [ROADMAP.md](../ROADMAP.md#long-term).
+- Storage backends other than the database table.
+- Version export formats other than JSON.
 
-## Map Version Data
-
-Each saved version includes:
-
-- Map ID
-- Version name
-- Optional description
-- Serialized map snapshot
-- Creator/user reference when available
-- Creation timestamp
-
-The table is created by `database/setup.php` on fresh installs and upgrades.
-
-## Current API Shape
-
-Routes are registered from `routes/web.php` through Laravel package discovery. That file is the authoritative route list.
-
-Version routes are registered and the editor UI is live (v1.8.0). The backend bugs in the dormant code (json_decode TypeError, wrong field names in captureSnapshot, upsert-only restore, wrong delete semantics) have been fixed. See [API.md](API.md) for the full route table.
-
-## Map Versioning Features
-
-The following features are implemented:
-
-- Save named versions from the editor (Version History modal).
-- Browse version list with creator, timestamp, and description.
-- Restore a map to a previous version (true rollback with ID preservation).
-- Delete individual versions.
-- Compare two versions: shows added/removed/modified node and link IDs.
-- Export all versions for a map as JSON.
-
-## Safe Restoration in v1.16.0
-
-Restoring validates the snapshot and its references before changing the map. One
-transaction saves a **Before restore** checkpoint, restores the selected snapshot,
-and saves a **Restored version** entry. Existing saved versions remain unchanged.
-Restore the checkpoint to recover the state that the operation replaced. Invalid
-snapshots return a safe error; database failures roll back the map and new history.
-
-New snapshots include complete options, description, parent map, node metadata
-and legacy canvas dimensions. Older snapshots restore only the fields they
-recorded; omitted historical settings are not guessed. History remains until
-manually deleted; the list displays the newest 20 entries. Coordinate restores
-with active editors: concurrent editing is not a shared, conflict-aware session.
-
-In v1.16.0, the JSON export includes every saved version for the
-selected map, independently of the list's display limit. It retains complete
-snapshots and available creator names. This export remains a map-history feature;
-follow the installation guide for full database and configuration backups.
-
-## Visual Comparison in v1.16.0
-
-In Version History, choose **Compare** on one version, select another, and run
-the comparison. The left view is before; the right view is after. Added, removed
-and modified nodes/links have text markers and colors. Both views share a scale
-so position changes remain visible. The table shows before/after map options,
-node fields and link configuration.
-
-Fields that older snapshots did not capture are marked unavailable. A recorded
-`null` remains distinct from an unset or unrecorded value. Matching uses saved
-node/link IDs: editor saves can replace IDs, so some edits appear as removals and
-additions. The preview draws straight links; saved bends and styling appear in
-the details. Each view displays up to 100 nodes and 150 links, with up to 200
-detail rows and explicit omitted/invalid counts. These are display limits; the
-response still contains the complete snapshots. Comparing changes no saved data.
-
-## Planned Versioning Work
-
-The following items are planned, not yet implemented:
-
-- More configurable retention policies.
-- Conflict detection for future collaborative editing.
-- Storage backends beyond the current database-backed snapshot model.
-- Export formats beyond JSON.
-
-## Map Version Best Practices
-
-Version history is live in the editor — save, restore, compare, and delete are available from the Version History modal. The following practices help get the most out of it:
-
+## Practices
 
 - Save a named version before large layout changes.
 - Use clear names such as `before-core-rack-rework` or `wan-cleanup-2026-05`.

@@ -1,14 +1,45 @@
 # Install, upgrade, and recover WeathermapNG
 
-This is the canonical guide for **v1.16.0**. Use the tagged release for a stable
-installation; following `main` is an explicit development choice. WeathermapNG is
-a LibreNMS v2 Composer-discovered plugin, served at `/plugin/WeathermapNG`.
+Canonical guide for installing, upgrading, configuring, diagnosing, and
+recovering WeathermapNG, a LibreNMS v2 Composer-discovered plugin served at
+`/plugin/WeathermapNG`. The current tagged release is v1.16.0; `main` contains
+unreleased changes after it.
 
-Requirements: an initialized LibreNMS MySQL/MariaDB installation, PHP 8.2+ with
-`gd`, `json`, `pdo`, and `mbstring`, Composer, readable RRD files, and a checkout
-writable by the LibreNMS runtime user. Also meet your LibreNMS release's PHP
-minimum: the tested LibreNMS 26.10.2 release supports PHP 8.4 and 8.5. Examples use `/opt/librenms` and user
-`librenms`; substitute your actual installation root and runtime user.
+## Choose a path
+
+| Path | Section and tradeoff |
+|------|----------------------|
+| Native install from the release tag | [Native stable installation](#native-stable-installation). Stable, reviewed source. Needs Git and a plugin directory the runtime user can write. |
+| Docker Compose | [Docker stable installation](#docker-stable-installation). LibreNMS and dependencies run in containers. Preserve the volumes and `/data` across app recreation. |
+| Release archive | [Native stable installation](#native-stable-installation). The same installer without Git. Upgrades replace source by hand. |
+| Follow `main` | [Updating](#updating). Newest changes, including unreleased ones. Not a stable target. |
+
+## Contents
+
+- [Requirements](#requirements)
+- [Native stable installation](#native-stable-installation)
+- [Docker stable installation](#docker-stable-installation)
+- [Configuration and precedence](#configuration-and-precedence)
+- [Updating](#updating)
+- [Diagnostics and targeted recovery](#diagnostics-and-targeted-recovery)
+- [Backup and recovery](#backup-and-recovery)
+- [Testing and qualification](#testing-and-qualification)
+
+## Requirements
+
+| Requirement | Detail |
+|---|---|
+| PHP | 8.2 or newer with `gd`, `json`, `pdo`, and `mbstring`. Meet your LibreNMS release's PHP minimum as well: LibreNMS 26.10.2 supports PHP 8.4 and 8.5. |
+| Database | An initialized LibreNMS MySQL/MariaDB installation. |
+| LibreNMS | The v2 Composer-discovered plugin model, with `lnms` and `artisan` available from the installation root. |
+| Composer | Runs as the LibreNMS runtime user and manages that user's global repository configuration. |
+| `flock` | Linux `flock`, normally supplied by `util-linux`. Installers refuse to run without it. |
+| RRD access | The runtime user can read LibreNMS's configured RRD directory for live traffic. |
+| Writable checkout | The parent plugin directory lets the runtime user create the checkout, and the checkout itself is writable during installation. |
+| Runtime user and home | Install and update as the LibreNMS user with that user's normal home. `sudo -u librenms -H bash` selects it. |
+
+Examples use `/opt/librenms` and user `librenms`; substitute your actual
+installation root and runtime user.
 
 ## Native stable installation
 
@@ -25,56 +56,67 @@ php verify-deployment.php --json
 exit
 ```
 
-The parent plugin directory must already permit the runtime user to create the
-checkout. For a downloaded release archive, extract its `WeathermapNG/` directory
-there and assign that directory to the runtime user before running the same
-installer. Native root execution is refused. In Docker, root execution drops the
-whole installer to `librenms` before dependency or database writes.
+- The parent plugin directory must already permit the runtime user to create the
+  checkout.
+- For a downloaded release archive, extract its `WeathermapNG/` directory there
+  and assign that directory to the runtime user before running the same
+  installer.
+- Native root execution is refused. In Docker, root execution drops the whole
+  installer to `librenms` before dependency or database writes.
+- `LIBRENMS_PATH` selects the installation. An invalid explicit root fails
+  instead of falling back to another database.
+- The installer runs required dependencies, registration, discovery, schema
+  setup, enablement, cache clearing, output setup, and the final report. Any
+  required failure exits nonzero with its step and retry command.
+- From the checkout, as the same runtime user, `just install /opt/librenms`
+  wraps this script. Recipe arguments are positional.
 
-`LIBRENMS_PATH` selects the installation; an invalid explicit root fails instead
-of falling back to another database. The installer runs required dependencies,
-registration, discovery, schema setup, enablement, cache clearing, output setup,
-and the final report. Any required failure exits nonzero with its step and retry
-command. From the checkout, as the same runtime user, `just install /opt/librenms`
-wraps this script; recipe arguments are positional.
+### Installer locks
 
-v1.16.0 also requires Linux `flock` (normally supplied by `util-linux`).
 The install and deploy scripts lock the selected LibreNMS root, physical plugin
 checkout, and runtime user's Composer home before changing shared state. A
 competing invocation exits with the busy resource and a retry instruction. Wait
 for the other installer to finish; do not delete the persistent lock files.
+
 Coordinate LibreNMS's daily updater, manual Composer commands, and source
 replacement separately: those operations do not take these locks. This has been
 tested on local Linux filesystems, including a checkout shared by Docker bind
-mounts; it does not establish distributed or network-filesystem coordination.
+mounts. It does not establish distributed or network-filesystem coordination.
 
-The supported registration contract is
+### Registration contract
+
+The supported registration is
 `composer config --global repositories.weathermapng` with the absolute checkout
 path, followed by `lnms plugin:add librenms/weathermapng` from the LibreNMS root.
 The installer manages this one per-user repository key and the obsolete local
 key, preserving unrelated repositories. LibreNMS records the requirement in
-`composer.plugins.json`. Keep installation and LibreNMS updates under the same
-runtime user/home so the repository remains discoverable. Do not replace this
-flow with a root-only `composer require` or manual database inserts.
+`composer.plugins.json`.
 
-In v1.16.0, installation refuses an existing managed repository entry
-that selects another checkout, has an unsupported type, or contains ambiguous
-glob paths. Use the existing checkout, or back up and deliberately correct only
-the `weathermapng` entry in the runtime user's Composer configuration before
-retrying. Object and named-list repository formats and equivalent home,
-environment and symlink paths are supported. Compatible global entries retain
-their stored options; the legacy local entry is removed only after successful
-registration. A failed fresh install can retain its newly created global entry.
-This does not roll back root Composer files, dependencies or database changes.
+Keep installation and LibreNMS updates under the same runtime user/home so the
+repository remains discoverable. Do not replace this flow with a root-only
+`composer require` or manual database inserts.
+
+Installation refuses an existing managed repository entry that selects another
+checkout, has an unsupported type, or contains ambiguous glob paths. Use the
+existing checkout, or back up and deliberately correct only the `weathermapng`
+entry in the runtime user's Composer configuration before retrying.
+
+Object and named-list repository formats and equivalent home, environment, and
+symlink paths are supported. Compatible global entries retain their stored
+options; the legacy local entry is removed only after successful registration. A
+failed fresh install can retain its newly created global entry. This does not
+roll back root Composer files, dependencies, or database changes.
+
+### First login
 
 After success, log in to LibreNMS and open `/plugin/WeathermapNG`, then open an
 existing map in the editor and embed viewer. CLI success cannot verify PHP-FPM
 opcode freshness or authenticated browser access.
 
-In v1.16.0, an empty index also offers **Create Sample Map**. Enter a
-unique name to create the device-free Star Topology example, then associate its
-nodes and links with your devices and ports in the editor. Canceling creates no
-data. **Browse Templates**, **Create Custom Map**, and import remain available.
+An empty index offers **Create Sample Map**. Enter a unique name to create the
+device-free Star Topology example, then associate its nodes and links with your
+devices and ports in the editor. Canceling creates no data. **Browse Templates**,
+**Create Custom Map**, and import remain available.
 
 ## Docker stable installation
 
@@ -89,44 +131,58 @@ docker compose -f docker-compose.simple.yml up -d db redis librenms
 docker compose -f docker-compose.simple.yml logs -f librenms
 ```
 
-Customize the supplied database credentials, exposed port, and image version for
-your environment before starting. The simple/dev files run from the checkout
-root. `docker-compose.example.yml` instead belongs in the **parent** directory and
-mounts `./WeathermapNG` plus its hook. It preserves its existing MariaDB 10.5 image,
-`librenms_password` example credentials, and `librenms_db`/`librenms_rrd`/
-`librenms_logs` volumes, with `/data` persisted separately. Preserve the original
-Compose project/volume mapping when upgrading an existing example deployment;
-switching to simple/dev is not an interchangeable invocation.
-`docker-compose.dev.yml` supplies test-only environment values.
+- Customize the supplied database credentials, exposed port, and image version
+  for your environment before starting.
+- `docker-compose.simple.yml` and `docker-compose.dev.yml` run from the checkout
+  root. `docker-compose.dev.yml` supplies test-only environment values.
+- `docker-compose.example.yml` belongs in the **parent** directory and mounts
+  `./WeathermapNG` plus its hook. It keeps its MariaDB 10.5 image,
+  `librenms_password` example credentials, and `librenms_db`/`librenms_rrd`/
+  `librenms_logs` volumes, with `/data` persisted separately.
+- Preserve the original Compose project/volume mapping when upgrading an existing
+  example deployment. Switching to simple/dev is not an interchangeable
+  invocation.
+
+### What the containers mount
 
 The app mounts the checkout at `/opt/librenms/html/plugins/WeathermapNG` and the
 executable `docker/99-weathermapng.sh` at
 `/etc/cont-init.d/99-weathermapng.sh:ro`. Keep the official image entrypoint and
-`S6_BEHAVIOUR_IF_STAGE2_FAILS=2`. The late hook runs the common installer after
-upstream configuration/schema initialization; a required failure stops startup
-before nginx/PHP-FPM serve the plugin. Mount source and hook only in the app;
-dispatchers must not concurrently install into the checkout.
+`S6_BEHAVIOUR_IF_STAGE2_FAILS=2`.
 
-Preserve the database volume, `/data` volume, and host checkout across app
-recreation. `/data` contains LibreNMS persistent configuration, logs, and RRD data.
-Do not persist the whole vendor tree or root Composer files. Registration is
-rebuilt by the hook each time. For the simple Compose file, inspect the result:
+The late hook runs the common installer after upstream configuration/schema
+initialization; a required failure stops startup before nginx/PHP-FPM serve the
+plugin. Mount source and hook only in the app. Dispatchers must not concurrently
+install into the checkout.
+
+### Keep across app recreation
+
+Preserve the database volume, `/data` volume, and host checkout. `/data` contains
+LibreNMS persistent configuration, logs, and RRD data. Do not persist the whole
+vendor tree or root Composer files. Registration is rebuilt by the hook each
+time.
+
+For the simple Compose file, inspect the result:
 
 ```bash
 docker exec -u librenms librenms-weathermap php /opt/librenms/html/plugins/WeathermapNG/verify-deployment.php --json
 ```
 
-Never use `docker compose down -v` when retaining data. The image's default file
-sessions live in its ephemeral filesystem; users may need to log in again after
-recreation. Accounts, maps, templates, saved versions, and settings remain in the
-database. Recheck both editor and embed access after logging in.
+- Never use `docker compose down -v` when retaining data.
+- The image's default file sessions live in its ephemeral filesystem; users may
+  need to log in again after recreation. Accounts, maps, templates, saved
+  versions, and settings remain in the database. Recheck both editor and embed
+  access after logging in.
 
 ## Configuration and precedence
 
-Package defaults live in `WeathermapNG/config/config.php`. Environment variables
-supply values referenced by that file. An optional published override lives at
-**`/opt/librenms/config/weathermapng.php`**, in the LibreNMS root, not in the plugin
-checkout. After installation, open a runtime-user shell to publish it if needed:
+- Package defaults live in `WeathermapNG/config/config.php`. Environment
+  variables supply values referenced by that file.
+- An optional published override lives at
+  **`/opt/librenms/config/weathermapng.php`**, in the LibreNMS root, not in the
+  plugin checkout.
+
+After installation, open a runtime-user shell to publish it if needed:
 
 ```bash
 sudo -u librenms -H bash
@@ -140,19 +196,27 @@ The provider merges package defaults with the application configuration, then
 overlays known keys from the active plugin's `plugins.settings` JSON. Scalars
 replace existing values; array values merge one level. Saved settings therefore
 win over the corresponding file/environment values. Unknown saved keys are
-ignored. Use the admin settings form for supported settings and keep secrets out
-of support reports. After environment/file changes, clear application config
-caches as the runtime user; refresh web workers through your normal PHP-FPM
-restart procedure, or recreate the Docker app.
+ignored.
 
-In the official Docker image, store custom variables in **`/data/.env`**, preserving
-its `APP_KEY` and `NODE_ID`. Startup generates `/opt/librenms/.env` and then appends
-`/data/.env`. For example, add `WEATHERMAPNG_EMBED_TOKEN=<your-token>` and, when
-wanted, `WEATHERMAPNG_DEMO_MODE=true` to the persistent file. Restrict access to
-it and recreate the app. A token supplied only as a Docker environment variable
-may appear in CLI configuration while PHP-FPM returns 403 because its environment
-is cleared. Verify the real HTTP endpoint after recreation. A token is optional
-for normal LibreNMS session access; see [embedding](EMBED.md) for external viewers.
+Use the admin settings form for supported settings and keep secrets out of
+support reports. After environment/file changes, clear application config caches
+as the runtime user; refresh web workers through your normal PHP-FPM restart
+procedure, or recreate the Docker app.
+
+### Docker persistent environment
+
+In the official Docker image, store custom variables in **`/data/.env`**,
+preserving its `APP_KEY` and `NODE_ID`. Startup generates `/opt/librenms/.env`
+and then appends `/data/.env`.
+
+For example, add `WEATHERMAPNG_EMBED_TOKEN=<your-token>` and, when wanted,
+`WEATHERMAPNG_DEMO_MODE=true` to the persistent file. Restrict access to it and
+recreate the app.
+
+A token supplied only as a Docker environment variable may appear in CLI
+configuration while PHP-FPM returns 403 because its environment is cleared.
+Verify the real HTTP endpoint after recreation. A token is optional for normal
+LibreNMS session access; see [embedding](EMBED.md) for external viewers.
 
 ## Updating
 
@@ -185,8 +249,9 @@ Detached tags and archive checkouts retain their selected source. A tracked
 branch with an upstream uses `git pull --ff-only`; dirty tracked files, a missing
 upstream, or a failed pull stop before installation. Keep operator configuration
 in the root published config or persistent environment, outside tracked source.
+
 For an archive upgrade, replace source with the selected release while retaining
-operator-owned data/output, then run `quick-install.sh`; do not extract unrelated
+operator-owned data/output, then run `quick-install.sh`. Do not extract unrelated
 or older source over a running deployment.
 
 For Docker, select the desired tag in the host checkout, then recreate only the
@@ -197,18 +262,23 @@ docker compose -f docker-compose.simple.yml up -d --no-deps --force-recreate lib
 ```
 
 The hook installs the selected source. Check the report, log in again if needed,
-and verify editor/embed access. To follow `main` deliberately, clone with
-`--branch main` instead of the release tag; use `deploy.sh` for native updates or
-fast-forward the host checkout and recreate the Docker app. `main` can contain
-unreleased changes.
+and verify editor/embed access.
 
-In v1.16.0, deploy checks the selected runtime's files, PHP extensions,
-required commands and known destination permissions before changing Git source.
+To follow `main` deliberately, clone with `--branch main` instead of the release
+tag. Use `deploy.sh` for native updates, or fast-forward the host checkout and
+recreate the Docker app. `main` can contain unreleased changes.
+
+### Deploy preflight
+
+Since v1.16.0, `deploy.sh` checks the selected runtime's files, PHP extensions,
+required commands, and known destination permissions before changing Git source.
 It checks Composer repository ownership under the installer locks before pulling,
 then the selected new installer checks its own requirements again. Correct a
-reported preflight problem and retry from the same checkout. These checks cannot
-predict requirements introduced by unseen source, dependency-solving failures or
-disk exhaustion, and do not provide rollback after later installation steps.
+reported preflight problem and retry from the same checkout.
+
+These checks cannot predict requirements introduced by unseen source,
+dependency-solving failures, or disk exhaustion, and do not provide rollback
+after later installation steps.
 
 ## Diagnostics and targeted recovery
 
@@ -219,13 +289,16 @@ LIBRENMS_PATH=/opt/librenms php verify-deployment.php --json
 ```
 
 The admin diagnostics page `/plugin/WeathermapNG/diagnostics` provides the same
-redacted report. It checks the selected root's requirement/registry, actual loaded
-provider and runtime routes, plugin enablement, database/table access, required
-extensions, and read/write permissions. v1.16.0 also checks the required
-columns on each runtime table: a readable zero count alone does not establish a
-usable schema. Unavailable counts are `null`; an empty
-table is zero. It does not repair files, expose configuration values, or establish
-web worker freshness/authenticated HTTP access. From the checkout under the runtime user,
+redacted report. It checks the selected root's requirement/registry, actual
+loaded provider and runtime routes, plugin enablement, database/table access,
+required extensions, and read/write permissions.
+
+The report also checks the required columns on each runtime table: a readable
+zero count alone does not establish a usable schema. Unavailable counts are
+`null`; an empty table is zero. It does not repair files, expose configuration
+values, or establish web worker freshness/authenticated HTTP access.
+
+From the checkout under the runtime user,
 `just verify-deployment /opt/librenms --json` wraps the checker.
 
 | Report layer / symptom | Targeted action |
@@ -234,7 +307,7 @@ web worker freshness/authenticated HTTP access. From the checkout under the runt
 | Root requirement, registry, provider, routes, or enabled row missing | Rerun `quick-install.sh` under the same runtime user/home. Resolve its first failing step; do not substitute a source-file route check. |
 | Database unavailable or required schema missing | Restore connectivity/permissions on the selected LibreNMS connection, then rerun the installer. Do not point setup at a guessed second database. |
 | Output not writable | Correct ownership/permissions on `output/maps`, `output/cache`, and `output/thumbnails` for the runtime user, then rerun the installer. |
-| CLI healthy, browser stale or denied | Check the actual HTTP response, login state, root/persistent environment and FPM configuration; refresh web workers. Docker file sessions can require login again. |
+| CLI healthy, browser stale or denied | Check the actual HTTP response, login state, root/persistent environment and FPM configuration; refresh web workers. |
 | Real traffic missing | Check port associations and runtime-user access to the configured LibreNMS RRD directory; compare with demo mode. |
 
 LibreNMS `validate.php` may report plugin-owned extra tables. Its `utf8mb4_bin`
@@ -283,11 +356,14 @@ name and protected client credentials file; never put a password on the command 
 The credentials account needs database dump privileges, including routines/events
 if used. Archive the selected plugin release/source, any local source changes,
 user Composer repository/auth configuration, and the published root config.
+
 For Docker also back up `/data/.env` and the relevant `/data` contents (including
 RRDs), your Compose files, hook, host checkout, and volume backups. Include output
 exports/thumbnails if you rely on those generated files. Do not archive the entire
-vendor tree as the dependency-restoration strategy. Test extraction into an empty
-protected directory and test database restoration before relying on a backup.
+vendor tree as the dependency-restoration strategy.
+
+Test extraction into an empty protected directory and test database restoration
+before relying on a backup.
 
 For recovery, keep the running database intact while validating a separate target:
 
@@ -341,33 +417,34 @@ Rolling source back alone does not reverse database changes. Recovery uses the
 saved matching database/config/source set; it is not an automatic downgrade or
 OS recovery mechanism.
 
-The v1.15.0 container installation path was qualified against LibreNMS 26.10.1/PHP 8.4.21 in the
-disposable official-image stack (image ID and repository digest
-`sha256:661ad568d441edd157ced5c7a58a559b3c2bc34c3824b6e492f8bc13b8c70e9f`).
-Tests exercise actual `daily.sh post-pull`
-dependency restoration, populated app recreation, fail-stop registration failure,
-and full single-database restore into a second owned database plus a private
-configuration-archive roundtrip. These are matching-version container and recovery controls.
+## Testing and qualification
 
-Native smoke on 2026-10-28 used full Debian 13.7/PHP 8.4 and Ubuntu 26.04.1/PHP 8.5
-KVM guests with native MariaDB, nginx and PHP-FPM. Populated v1.14.1 installs were
-upgraded to v1.15.0, then LibreNMS's unmodified release-channel `daily.sh` advanced
-26.9.1.1 to 26.10.2 and ran again. The patch was separately checked on those hosts.
-Ubuntu package maintenance upgraded 30 packages and installed eight, including a
-new kernel. Debian was already current; an explicitly constructed baseline using
-official PHP 8.4.24 packages was verified before a normal security upgrade of 14
-packages to 8.4.27. Both guests rebooted and retained accounts, map data, settings,
-registration and authenticated editor/embed access. Cached/uncached middleware,
-Chromium editing, streaming, legacy dimensions and new version capture were tested.
-
-This covers those source and package paths. Major distribution migrations,
-existing production hosts and general OS disaster recovery were not exercised.
-
-v1.16.0 adds a recurring native Ubuntu 26.04 CI lane with PHP-FPM,
-nginx and the runner's MySQL. It upgrades a populated v1.15.1 plugin checkout to
-the exact candidate revision, repeats deployment, and twice restores pristine
-LibreNMS 26.10.2 Composer files before running the unmodified upstream post-pull
-routine. It checks retained data/settings/history, registration, same-account
-editor access, token JSON/embed access and static assets. This lane tests plugin
-upgrades and dependency reconstruction; full LibreNMS release transitions and OS
-maintenance remain separate qualification.
+- The v1.15.0 container path was qualified against LibreNMS 26.10.1 / PHP 8.4.21
+  in the disposable official-image stack (image ID and repository digest
+  `sha256:661ad568d441edd157ced5c7a58a559b3c2bc34c3824b6e492f8bc13b8c70e9f`).
+  Tests exercise actual `daily.sh post-pull` dependency restoration, populated app
+  recreation, fail-stop registration failure, and full single-database restore
+  into a second owned database plus a private configuration-archive roundtrip.
+  These are matching-version container and recovery controls.
+- Native smoke on 2026-10-28 used full Debian 13.7 / PHP 8.4 and Ubuntu 26.04.1 /
+  PHP 8.5 KVM guests with native MariaDB, nginx, and PHP-FPM. Populated v1.14.1
+  installs were upgraded to v1.15.0, then LibreNMS's unmodified release-channel
+  `daily.sh` advanced 26.9.1.1 to 26.10.2 and ran again. The patch was separately
+  checked on those hosts.
+- Ubuntu package maintenance upgraded 30 packages and installed eight, including
+  a new kernel. Debian was already current; an explicitly constructed baseline
+  using official PHP 8.4.24 packages was verified before a normal security upgrade
+  of 14 packages to 8.4.27. Both guests rebooted and retained accounts, map data,
+  settings, registration, and authenticated editor/embed access. Cached and
+  uncached middleware, Chromium editing, streaming, legacy dimensions, and new
+  version capture were tested.
+- A recurring native Ubuntu 26.04 CI lane runs PHP-FPM, nginx, and the runner's
+  MySQL. It upgrades a populated v1.15.1 checkout to the exact candidate revision,
+  repeats deployment, and twice restores pristine LibreNMS 26.10.2 Composer files
+  before running the unmodified upstream post-pull routine. It checks retained
+  data/settings/history, registration, same-account editor access, token
+  JSON/embed access, and static assets.
+- The lane tests plugin upgrades and dependency reconstruction; full LibreNMS
+  release transitions and OS maintenance remain separate qualification.
+- These cover those source and package paths. Major distribution migrations,
+  existing production hosts, and general OS disaster recovery were not exercised.

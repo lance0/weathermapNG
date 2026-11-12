@@ -1,91 +1,121 @@
-# Release Readiness Checklist
+# Release process
 
-Pre-release validation flow and manual QA for tagging a WeathermapNG release.
-Applies to all versions. SemVer guidelines and version-source rules at the bottom.
+This page is the pre-release validation and manual QA flow for tagging a
+WeathermapNG release; versioning rules live in
+[docs/VERSIONING.md](docs/VERSIONING.md) and release history in
+[CHANGELOG.md](CHANGELOG.md).
 
-## 1. Pre-release Validation Flow
+## What blocks a release
 
-The `just` recipes automate most of this. Run them in order; stop and fix if
-anything fails.
+- `just check` or `just test-js` fails.
+- `VERSION`, `composer.json`, and `CHANGELOG.md` disagree, or the changelog has
+  no `## [<version>]` section.
+- `just release-tag` finds a dirty working tree or an existing tag.
+- Any required CI workflow is red, including Embed Authentication and
+  Installation Tests.
+- Any manual QA item fails.
+- `just check-docs` fails: a required document is missing or install guidance
+  lost its required literals.
 
-1. **Run the full pre-flight gate** (lint, metadata, docs, security, tests):
+## 1. Pre-release validation flow
+
+Run these in order. Stop and fix anything that fails.
+
+1. **Run the full gate** (lint, metadata, docs, security, PHPUnit) plus the pure
+   Node suites, including the documentation link/anchor check:
+
    ```bash
    just check
+   just test-js
    ```
 
-2. **Bump version sources** (VERSION, composer.json, README badge, ROADMAP
-   status):
+2. **Bump version sources** (`VERSION`, `composer.json`, README badge, ROADMAP
+   status). It warns if the changelog section is missing:
+
    ```bash
    just release-bump v<version>
    ```
 
-3. **Update the tagged install examples** in `docs/INSTALL.md` for the release version, then **add the CHANGELOG.md entry** — `just release-bump` warns if a
-   `## [<version>]` section is missing; write it (dated, above the previous
-   release section) before continuing.
+3. **Update the tagged install examples** in [docs/INSTALL.md](docs/INSTALL.md)
+   for this release, then **add the changelog entry** under
+   `## [<version>] - <YYYY-MM-DD>` above the previous release section.
 
-4. **Commit the version bump** and verify CI is green on the release branch
-   for all workflows in `.github/workflows/`:
+4. **Run the release preflight** — repeats `just check` and confirms `VERSION`
+   matches the release target:
+
+   ```bash
+   just release-check v<version>
+   ```
+
+5. **Commit and push the version bump**, then wait for every workflow in
+   `.github/workflows/` to pass:
    - `ci.yml`
    - `installation-tests.yml`
    - `embed-auth.yml` (called by CI and the release workflow)
    - `release.yml` (validates on tag)
 
-5. **Run the manual QA checklist** (section 2 below).
+6. **Run the manual QA checklist** in section 2 against a real LibreNMS
+   instance.
 
-6. **Tag and push the release** — runs the full check gate, then tags:
+7. **Tag and push** — checks for a clean tree, matching `VERSION`, a changelog
+   section, and an unused tag, then runs `just check` before tagging:
+
    ```bash
    just release-tag v<version>
    ```
 
-7. **The Release workflow publishes the GitHub release** — it runs the full
-   test suite, validates that the tag matches `VERSION`/`composer.json`/
-   `CHANGELOG.md`, extracts the matching `CHANGELOG.md` section as release
-   notes (title `v<version>`), and attaches the `.zip`/`.tar.gz` archives.
-   No fallback: a missing CHANGELOG section or a red suite blocks the release.
+8. **The Release workflow publishes the GitHub release.** It runs the full
+   suite and Embed Authentication, validates that the tag matches
+   `VERSION`/`composer.json`/`CHANGELOG.md`, extracts the matching changelog
+   section as release notes (title `v<version>`), and attaches the `.zip` and
+   `.tar.gz` archives. There is no fallback: a missing changelog section or a red
+   suite blocks publication.
 
-## 2. Manual QA Checklist
+## 2. Manual QA checklist
 
-Run each path against a real LibreNMS instance before tagging. Any failure blocks
-the release.
+Run each path against a real LibreNMS instance before tagging. Any failure
+blocks the release.
 
-- **Editor**: create a new map; add nodes and links; drag nodes; save; undo/redo;
-  zoom and pan.
-- **Embed**: open an embedded map; confirm it renders; verify live updates via SSE;
-  verify embed controls are present and functional.
-  CI's `embed-auth.yml` also checks real session cookies with token auth configured
-  and unconfigured, token-only access, route binding, and Chromium viewer navigation.
-  Run the HTTP checks locally with `just test-integration` against `librenms-dev`.
-- **Settings**: open the settings page; confirm it is admin-only (non-admin gets
-  denied); confirm existing settings load and save.
-- **Install**: on a clean LibreNMS install, run `quick-install.sh`; confirm
-  WeathermapNG routes appear under the LibreNMS plugin menu.
-- **Upgrade**: select the candidate release from the previous release and follow
-  [the canonical upgrade guide](docs/INSTALL.md#updating); confirm existing maps,
-  templates, saved versions, settings, editor and embed access survive. The lifecycle
-  and full scratch database/config recovery controls run in `embed-auth.yml`.
+| Area | Checks |
+|------|--------|
+| Editor | Create a map; add nodes and links; drag nodes; save; undo/redo; zoom and pan. |
+| Embed | Open an embedded map; confirm it renders; verify live updates over SSE; verify embed controls and kiosk mode. |
+| Settings | Open the settings page; confirm non-admins are denied; confirm existing settings load and save. |
+| Install | On a clean LibreNMS install, run `quick-install.sh`; confirm WeathermapNG routes appear under the plugin menu and `/plugin/WeathermapNG` loads. |
+| Upgrade | From the previous release, follow [the canonical upgrade guide](docs/INSTALL.md#updating); confirm existing maps, templates, saved versions, settings, editor and embed access survive. |
 
-## 3. SemVer Guidelines
+CI covers part of this checklist. `embed-auth.yml` checks real session cookies
+with token auth configured and unconfigured, token-only access, route binding,
+Chromium viewer navigation, favorites, version restore, and the install/upgrade
+lifecycle. Run the HTTP integration suites locally with `just test-integration`
+against the `librenms-dev` stack from `just dev-up`.
 
-WeathermapNG follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`).
+## 3. SemVer guidelines
 
-- **Patch** (`1.6.x`): bug fixes and performance improvements only. No new
-  user-facing features, no behavior changes.
-- **Minor** (`1.7.x`): new user-facing features or behavior changes that are
-  backward-compatible (e.g. an authorization model change, new editor actions, new
-  config options). Bump when users get something new without breaking their setup.
-- **Major** (`2.0.0`): breaking changes to the plugin API, database schema, or
-  plugin architecture. Requires a migration path documented in `CHANGELOG.md`.
+WeathermapNG follows [Semantic Versioning](https://semver.org/)
+(`MAJOR.MINOR.PATCH`). Full rules are in [docs/VERSIONING.md](docs/VERSIONING.md).
 
-Bump the `MAJOR.MINOR.PATCH` together; trailing components reset on a higher bump
-(`1.7.0` -> `1.7.1` patch, or `1.8.0` minor, or `2.0.0` major).
+| Bump | Use |
+|------|-----|
+| Patch (`1.6.x`) | Bug fixes and performance improvements only. No new user-facing features or behavior changes. |
+| Minor (`1.7.x`) | New user-facing features or backward-compatible behavior changes, such as an authorization change, new editor actions, or new config options. |
+| Major (`2.0.0`) | Breaking changes to the plugin API, database schema, or plugin architecture. Requires a migration path documented in [CHANGELOG.md](CHANGELOG.md). |
 
-## 4. Version Sources
+Bump `MAJOR.MINOR.PATCH` together; trailing components reset on a higher bump
+(`1.7.0` to `1.7.1` patch, `1.8.0` minor, `2.0.0` major).
 
-Three files must agree on every release. A mismatch fails the release:
+## 4. Version sources
 
-- `VERSION` — the canonical version string, one line (e.g. `1.7.0`).
-- `composer.json` — the `"version"` field must equal `VERSION` exactly.
-- `CHANGELOG.md` — must contain a `## [<version>] - <YYYY-MM-DD>` section whose
-  `<version>` matches `VERSION`.
+These must agree on every release. A mismatch fails `just check-metadata`, the
+release preflight, or the Release workflow:
 
-Update all three in the same commit that tags the release.
+| Source | Requirement |
+|--------|-------------|
+| `VERSION` | Canonical version string, one line (for example `1.16.0`). |
+| `composer.json` | The `"version"` field equals `VERSION` exactly. |
+| `CHANGELOG.md` | Contains `## [<version>] - <YYYY-MM-DD>` matching `VERSION`. |
+| Git tag | `v<version>` matches `VERSION`; the Release workflow checks this. |
+
+Update all sources in the same commit that tags the release. `just check-metadata`
+validates the three files; `just check-docs` validates that required documents
+exist and install guidance stays aligned.

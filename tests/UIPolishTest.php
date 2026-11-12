@@ -246,8 +246,8 @@ class UIPolishTest extends TestCase
         $version = trim(file_get_contents(__DIR__ . '/../VERSION'));
 
         $this->assertStringContainsString("## Current Status: v{$version} (Stable)", $content);
-        $this->assertStringContainsString('Idempotent LibreNMS plugin registration cleanup during reinstall', $content);
-        $this->assertStringContainsString('### v1.6.5', $content);
+        $this->assertStringContainsString('[Unreleased](CHANGELOG.md#unreleased)', $content);
+        $this->assertStringContainsString('#### v1.6.5', $content);
         $this->assertStringContainsString('Duplicate inactive `WeathermapNG` rows are cleaned', $content);
         $this->assertStringContainsString('Legacy map list delete action uses Bootstrap confirmation', $content);
     }

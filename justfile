@@ -112,6 +112,7 @@ check-docs:
     #!/usr/bin/env bash
     set -euo pipefail
     for doc in README.md CHANGELOG.md ROADMAP.md RELEASE.md CONTRIBUTING.md \
+               SECURITY.md KNOWN_ISSUES.md \
                docs/README.md docs/INSTALL.md docs/API.md docs/DEPLOYMENT.md \
                docs/PERFORMANCE.md docs/VERSIONING.md docs/EMBED.md; do
         test -f "$doc" || { echo "MISSING: $doc"; exit 1; }
@@ -121,6 +122,11 @@ check-docs:
         grep -qF 'plugin:add librenms/weathermapng' "$file"
         grep -qF 'verify-deployment.php' "$file"
     done
+    if command -v node >/dev/null 2>&1; then
+        node tests/docs-links-test.cjs
+    else
+        echo "node not on PATH — skipping documentation link check (CI runs it)"
+    fi
     echo "Docs checks pass."
 
 # Check no hardcoded secrets in PHP source
